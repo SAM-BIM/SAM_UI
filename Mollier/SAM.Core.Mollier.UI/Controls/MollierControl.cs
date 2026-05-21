@@ -12,7 +12,7 @@ namespace SAM.Core.Mollier.UI.Controls
 {
     public partial class MollierControl : UserControl
     {
-        Core.UI.HooverTimer hooverTimer;
+        HooverTimer hooverTimer;
         
         public event MollierPointSelectedEventHandler MollierPointSelected;
 
@@ -38,7 +38,7 @@ namespace SAM.Core.Mollier.UI.Controls
                 {
                     if(hooverTimer == null)
                     {
-                        hooverTimer = new Core.UI.HooverTimer(MollierChart, 500);
+                        hooverTimer = new HooverTimer(MollierChart, 500);
                         hooverTimer.Update += HooverTimer_Update;
                     }
 
