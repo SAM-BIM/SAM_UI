@@ -71,7 +71,7 @@ namespace SAM.Analytical.UI.WPF
             bool useWidths = simulateWindow.UseWidths;
 
             SolarCalculationMethod solarCalculationMethod = simulateWindow.SolarCalculationMethod;
-            bool updateConstructionLayersByPanelType = true;
+            bool updateConstructionLayersByPanelType = simulateWindow.UpdateConstructionLayersByPanelType;
 
             TextMap textMap = simulateWindow.SelectedTextMap;
             weatherData = simulateWindow.SelectedWeatherData;
@@ -416,6 +416,16 @@ namespace SAM.Analytical.UI.WPF
             {
                 fullYearSimulation_From = simulateWindow_Path.FullYearSimulation_From;
                 fullYearSimulation_To = simulateWindow_Path.FullYearSimulation_To;
+            }
+
+            if (string.IsNullOrWhiteSpace(projectName))
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(outputDirectory) || !System.IO.Directory.Exists(outputDirectory))
+            {
+                return null;
             }
 
             if (weatherData == null)
