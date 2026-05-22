@@ -40,7 +40,7 @@ namespace SAM.Analytical.UI.WPF
                 string extension = System.IO.Path.GetExtension(path);
                 if (extension.ToLower().EndsWith("tbd"))
                 {
-                    analyticalModel = Tas.Convert.ToSAM(path, false);
+                    analyticalModel = Tas.Convert.ToSAM(path, false, false);
                 }
                 else if (extension.ToLower().EndsWith("xml"))
                 {

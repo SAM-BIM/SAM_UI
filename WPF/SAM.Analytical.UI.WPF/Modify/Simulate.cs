@@ -272,7 +272,7 @@ namespace SAM.Analytical.UI.WPF
 
                     if (converted)
                     {
-                        AnalyticalModel analyticalModel_TBD = Tas.Convert.ToSAM(path_TBD, false);
+                        AnalyticalModel analyticalModel_TBD = Tas.Convert.ToSAM(path_TBD, false, false);
                         if(analyticalModel != null && analyticalModel_TBD != null)
                         {
                             AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
