@@ -1,0 +1,20 @@
+<UserControl x:Class="SAM.Core.Mollier.UI.Controls.ParameterControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             d:DesignHeight="28" d:DesignWidth="240"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid Margin="2">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="Label_Name" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <TextBox x:Name="TextBox_Value" Grid.Column="1" VerticalAlignment="Center"
+                 PreviewTextInput="TextBox_Value_PreviewTextInput"
+                 TextChanged="TextBox_Value_TextChanged" />
+        <TextBlock x:Name="Label_Unit" Grid.Column="2" VerticalAlignment="Center" Margin="6,0,0,0" />
+    </Grid>
+</UserControl>

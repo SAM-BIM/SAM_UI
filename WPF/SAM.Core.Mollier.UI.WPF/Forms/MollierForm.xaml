@@ -1,0 +1,9 @@
+<Window x:Class="SAM.Core.Mollier.UI.Forms.MollierForm"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mollier" Height="700" Width="1000">
+    <!-- SKELETON (Stage 2e): only the cross-referenced surface (MollierPointSelected event) is present
+         so the process controls / process forms compile. The full layout + behaviour is completed in the
+         final 2e batch. -->
+    <Grid />
+</Window>

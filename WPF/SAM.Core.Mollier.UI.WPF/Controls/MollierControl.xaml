@@ -1,0 +1,28 @@
+<UserControl x:Class="SAM.Core.Mollier.UI.Controls.MollierControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:oxy="http://oxyplot.org/wpf"
+             d:DesignHeight="588" d:DesignWidth="816"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid>
+        <oxy:PlotView x:Name="MollierChart"
+                      MouseDown="MollierChart_MouseDown"
+                      MouseMove="MollierChart_MouseMove"
+                      MouseUp="MollierChart_MouseUp">
+            <oxy:PlotView.ContextMenu>
+                <ContextMenu x:Name="ContextMenuStrip_Chart" Opened="ContextMenuStrip_Chart_Opening">
+                    <MenuItem x:Name="ToolStripMenuItem_Zoom" Header="Zoom">
+                        <MenuItem x:Name="ToolStripMenuItem_ProcessesAndPoints" Header="Processes and Points" Click="ToolStripMenuItem_ProcessesAndPoints_Click" />
+                        <MenuItem x:Name="ToolStripMenuItem_Selection" Header="Selection" Click="ToolStripMenuItem_Selection_Click" />
+                        <MenuItem x:Name="ToolStripMenuItem_Reset" Header="Zoom reset" Click="ToolStripMenuItem_Reset_Click" />
+                    </MenuItem>
+                    <Separator x:Name="ToolStripSeparator_Edit" />
+                    <MenuItem x:Name="ToolStripMenuItem_Edit" Header="Edit" Click="ToolStripMenuItem_Edit_Click" />
+                    <MenuItem x:Name="ToolStripMenuItem_Remove" Header="Remove" Click="ToolStripMenuItem_Remove_Click" />
+                </ContextMenu>
+            </oxy:PlotView.ContextMenu>
+        </oxy:PlotView>
+    </Grid>
+</UserControl>

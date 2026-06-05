@@ -1,0 +1,30 @@
+<Window x:Class="SAM.Core.Mollier.UI.Forms.MollierProcessForm"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mollier Process" Width="611" Height="492"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="79" />
+            <!-- Panel1 -->
+            <RowDefinition Height="*" />
+            <!-- Panel2 (hosts the dynamic process control) -->
+            <RowDefinition Height="48" />
+            <!-- button bar -->
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <TextBlock x:Name="processTypeLabel" Text="Process Type" FontSize="13.333" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="170,13,0,0" />
+            <ComboBox x:Name="MollierProcessType_ComboBox" IsEditable="False" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="110,38,0,0" Width="270" Height="24"
+                      SelectionChanged="MollierProcessType_ComboBox_SelectedIndexChanged" />
+        </Grid>
+
+        <Grid x:Name="Panel2_Host" Grid.Row="1" />
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,6">
+            <Button x:Name="Customize_Button" Content="Customize" Width="108" Height="30" Margin="6,0" Click="Customize_Button_Click" />
+            <Button x:Name="OK_Button" Content="OK" Width="108" Height="30" Margin="6,0" Click="OK_Button_Click" />
+            <Button x:Name="Cancel_Button" Content="Cancel" Width="108" Height="30" Margin="6,0" Click="Cancel_Button_Click" />
+        </StackPanel>
+    </Grid>
+</Window>
