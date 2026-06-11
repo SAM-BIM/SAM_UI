@@ -1682,26 +1682,31 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void Reload(ModifiedEventArgs modifiedEventArgs)
         {
-            progressBarWindowManager.Show("Reloading", "Reloading...");
+            string modifications = modifiedEventArgs?.Modifications == null ? null : string.Join(",", modifiedEventArgs.Modifications.ConvertAll(x => x?.GetType().Name));
 
-            SetEnabled();
-            //SetActiveGuid();
+            using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.Reload", modifications))
+            {
+                progressBarWindowManager.Show("Reloading", "Reloading...");
 
-            uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
-            tabControl.SelectionChanged -= TabControl_SelectionChanged;
+                SetEnabled();
+                //SetActiveGuid();
 
-            AnalyticalModel analyticalModel = uIAnalyticalModel.JSAMObject;
+                uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
+                tabControl.SelectionChanged -= TabControl_SelectionChanged;
 
-            UpdateTabItems(tabControl, analyticalModel, modifiedEventArgs);
+                AnalyticalModel analyticalModel = uIAnalyticalModel.JSAMObject;
 
-            UpdateUIGeometrySettings(tabControl, analyticalModel, modifiedEventArgs);
+                UpdateTabItems(tabControl, analyticalModel, modifiedEventArgs);
 
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications);
+                UpdateUIGeometrySettings(tabControl, analyticalModel, modifiedEventArgs);
 
-            uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
-            tabControl.SelectionChanged += TabControl_SelectionChanged;
+                uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications);
 
-            progressBarWindowManager.Close();
+                uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
+                tabControl.SelectionChanged += TabControl_SelectionChanged;
+
+                progressBarWindowManager.Close();
+            }
         }
 
         private void RemoveViewSettings()
@@ -3161,8 +3166,16 @@ namespace SAM.Analytical.UI.WPF.Windows
 
                 List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
 
-                GeometryObjectModel geometryObjectModel = analyticalModel.ToSAM_GeometryObjectModel(viewSettings);
-                viewportControl.UIGeometryObjectModel = new UIGeometryObjectModel(geometryObjectModel);
+                GeometryObjectModel geometryObjectModel;
+                using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.GeometryObjectModel", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+                {
+                    geometryObjectModel = analyticalModel.ToSAM_GeometryObjectModel(viewSettings);
+                }
+
+                using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.Viewport", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+                {
+                    viewportControl.UIGeometryObjectModel = new UIGeometryObjectModel(geometryObjectModel);
+                }
 
                 viewportControl.Select(sAMObjects);
             }

@@ -212,3 +212,36 @@ synchronously, behind a modal "Reloading" progress window (`AnalyticalWindow.xam
 | 4 | Issue 2 (clone-on-get) | S–M | Cross-cutting latency reduction |
 | 5 | Issue 3 (caching + background gen) | L | Makes unavoidable regenerations fast |
 | 6 | Issue 4 (incremental scene/batching) | L | Smooth pan/zoom/hover at scale |
+
+---
+
+## Phase 0 instrumentation: how to capture timings
+
+A lightweight, opt-in timing log (`SAM.Core.UI.PerformanceLog`) instruments the operations above.
+**Off by default** — zero behavior change unless the `SAM_UI_PERFORMANCE_LOG` environment variable is set:
+
+```
+SAM_UI_PERFORMANCE_LOG=1              -> log to %TEMP%\SAM_UI_Performance.log
+SAM_UI_PERFORMANCE_LOG=C:\dir\my.log  -> log to a specific file
+```
+
+Lines are tab-separated (`timestamp`, `elapsed ms`, `operation`, `detail`) and also written to the
+debugger output window. Measured operations:
+
+| Operation | What it measures | Issue |
+| --- | --- | --- |
+| `AnalyticalWindow.Reload` | Whole reload on any model modification (detail: modification types) | #11, #12 |
+| `AnalyticalWindow.ViewRegeneration.GeometryObjectModel` | `ToSAM_GeometryObjectModel` per view (detail: view name + settings type) | #11, #15 |
+| `AnalyticalWindow.ViewRegeneration.Viewport` | Scene swap into `ViewportControl` per view | #16 |
+| `ViewportControl.ToMedia3D` | `GeometryObjectModel` → WPF `ModelVisual3D` tree conversion | #16 |
+| `ViewportControl.HoverHitTest` | Ray hit-test on mouse move — only logged when ≥ 25 ms | #16 |
+| `FloorPlan.SectionPanels` | Sectioning all panels against the floor plan plane | #15 |
+| `FloorPlan.SectionSpaces` | Shell build + plane section for all spaces (detail: space count) | #15 |
+| `FloorPlan.LabelSolver` | `Solver2D` label placement (detail: label count) | #15 |
+| `View3D.SpaceShells` | Shell build/cut loop in 3D views (detail: space count) | #15 |
+| `AnalyticalModelControl.LoadAnalyticalModel` | Full model/views tree rebuild | #11 |
+| `UIJSAMObject.Clone` | Deep clone in the `JSAMObject` getter — one line **per access** | #14 |
+
+Suggested baseline session on a large model: open model, open 1/3/5 view tabs, assign an
+InternalCondition to one space and to 50 spaces, pan/zoom the floor plan for ~30 s — then keep the
+log file next to the timings table in this document.

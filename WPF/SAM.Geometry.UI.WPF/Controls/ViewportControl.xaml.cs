@@ -484,7 +484,14 @@ namespace SAM.Geometry.UI.WPF
 
             Point point = e.GetPosition(helixViewport3D);
 
-            RayMeshGeometry3DHitTestResult rayMeshGeometry3DHitTestResult = Core.UI.WPF.Query.RayMeshGeometry3DHitTestResult(helixViewport3D, point, out ModelVisual3D modelVisual3D);
+            RayMeshGeometry3DHitTestResult rayMeshGeometry3DHitTestResult;
+            ModelVisual3D modelVisual3D;
+
+            // Only slow hit-tests (>= 25 ms) are logged to avoid flooding the log on mouse move
+            using (PerformanceLog.Measure("ViewportControl.HoverHitTest", mode.ToString(), 25))
+            {
+                rayMeshGeometry3DHitTestResult = Core.UI.WPF.Query.RayMeshGeometry3DHitTestResult(helixViewport3D, point, out modelVisual3D);
+            }
             if (rayMeshGeometry3DHitTestResult != null && modelVisual3D != null)
             {
                 actionManager.Apply(new HighlightAction(modelVisual3D));
@@ -515,7 +522,12 @@ namespace SAM.Geometry.UI.WPF
                 return;
             }
 
-            ModelVisual3D modelVisual3D = Convert.ToMedia3D(geometryObjectModel);
+            ModelVisual3D modelVisual3D;
+            using (PerformanceLog.Measure("ViewportControl.ToMedia3D", mode.ToString()))
+            {
+                modelVisual3D = Convert.ToMedia3D(geometryObjectModel);
+            }
+
             if (modelVisual3D != null)
             {
                 helixViewport3D.Children.Add(modelVisual3D);

@@ -88,6 +88,8 @@ namespace SAM.Analytical.UI
                         }
                     }
 
+                    IDisposable performanceLogMeasurement = PerformanceLog.Measure("View3D.SpaceShells", string.Format("{0} [{1} spaces]", threeDimensionalViewSettings.Name, spaces.Count));
+
                     foreach (Space space in spaces)
                     {
                         Color? color = null;
@@ -143,6 +145,8 @@ namespace SAM.Analytical.UI
 
                         dictionary_Spaces[space.Guid] = geometry3DObjectCollection_Space;
                     }
+
+                    performanceLogMeasurement?.Dispose();
 
                     if (!legendUpdated)
                     {
@@ -504,7 +508,12 @@ namespace SAM.Analytical.UI
 
             if (showPanels || showApertures)
             {
-                Dictionary<Panel, List<ISegmentable3D>> dictionary = Analytical.Query.SectionDictionary<ISegmentable3D>(adjacencyCluster.GetPanels(), plane);
+                Dictionary<Panel, List<ISegmentable3D>> dictionary;
+                using (PerformanceLog.Measure("FloorPlan.SectionPanels", twoDimensionalViewSettings.Name))
+                {
+                    dictionary = Analytical.Query.SectionDictionary<ISegmentable3D>(adjacencyCluster.GetPanels(), plane);
+                }
+
                 if (dictionary == null)
                 {
                     return null;
@@ -547,16 +556,19 @@ namespace SAM.Analytical.UI
                 if (spaces != null)
                 {
                     Dictionary<Space, List<Face2D>> dictionary_Space = new Dictionary<Space, List<Face2D>>();
-                    foreach (Space space in spaces)
+                    using (PerformanceLog.Measure("FloorPlan.SectionSpaces", string.Format("{0} [{1} spaces]", twoDimensionalViewSettings.Name, spaces.Count)))
                     {
-                        Shell shell = adjacencyCluster?.Shell(space);
-                        List<Face3D> face3Ds = shell?.Section(plane);
-                        if (face3Ds == null || face3Ds.Count == 0)
+                        foreach (Space space in spaces)
                         {
-                            continue;
-                        }
+                            Shell shell = adjacencyCluster?.Shell(space);
+                            List<Face3D> face3Ds = shell?.Section(plane);
+                            if (face3Ds == null || face3Ds.Count == 0)
+                            {
+                                continue;
+                            }
 
-                        dictionary_Space[space] = face3Ds.ConvertAll(x => plane.Convert(x));
+                            dictionary_Space[space] = face3Ds.ConvertAll(x => plane.Convert(x));
+                        }
                     }
 
                     List<LegendItemData> legendItemDatas = new List<LegendItemData>();
@@ -692,7 +704,11 @@ namespace SAM.Analytical.UI
                     Solver2D solver2D = new Solver2D(area, new List<IClosed2D>());
                     solver2D.AddRange(solver2DDatas);
 
-                    List<Solver2DResult> solver2DResults = solver2D.Solve();
+                    List<Solver2DResult> solver2DResults;
+                    using (PerformanceLog.Measure("FloorPlan.LabelSolver", string.Format("{0} [{1} labels]", twoDimensionalViewSettings.Name, solver2DDatas.Count)))
+                    {
+                        solver2DResults = solver2D.Solve();
+                    }
 
                     // Check if solver2DResults is null
                     // Add shifted labels from solver2DResults to tuples
