@@ -773,20 +773,38 @@ namespace SAM.Core.Mollier.UI.Controls
                 Height = height,
             };
 
-            // OxyPlot forbids a model being attached to two PlotViews (throws InvalidOperationException),
-            // so detach it from the live chart first, hand it to the print view, then re-attach in finally.
+            // OxyPlot only draws its content during a real WPF render pass; Measure/Arrange alone leave the
+            // canvas empty (blank print). Host the print view in a tiny off-screen window so it actually
+            // renders, then PrintVisual it (vector). OxyPlot also forbids a model being attached to two
+            // PlotViews, so detach it from the live chart first and re-attach in finally.
+            System.Windows.Window window = new System.Windows.Window
+            {
+                Width = width,
+                Height = height,
+                Left = -32000,
+                Top = -32000,
+                WindowStyle = System.Windows.WindowStyle.None,
+                ShowInTaskbar = false,
+                ShowActivated = false,
+                Content = plotView,
+            };
+
             MollierChart.Model = null;
             try
             {
                 plotView.Model = plotModel;
-                plotView.Measure(new System.Windows.Size(width, height));
-                plotView.Arrange(new System.Windows.Rect(0, 0, width, height));
+                window.Show();
                 plotView.UpdateLayout();
+                plotView.InvalidatePlot(true);
+                // Pump the dispatcher so the layout + OxyPlot render pass completes before we capture it.
+                Dispatcher.Invoke(new Action(() => { }), System.Windows.Threading.DispatcherPriority.Render);
 
                 printDialog.PrintVisual(plotView, "Mollier Chart");
             }
             finally
             {
+                window.Content = null;
+                window.Close();
                 plotView.Model = null;
                 MollierChart.Model = plotModel;
                 MollierChart.InvalidatePlot(false);
