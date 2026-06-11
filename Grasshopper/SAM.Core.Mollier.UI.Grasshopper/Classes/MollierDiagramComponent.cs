@@ -1,4 +1,7 @@
-﻿using Grasshopper.Kernel;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using Grasshopper.Kernel;
 using SAM.Core.Grasshopper;
 using System;
 using System.Collections.Generic;
@@ -41,20 +44,20 @@ namespace SAM.Core.Mollier.UI.Grasshopper
             if (mollierForm == null)
             {
                 mollierForm = new MollierForm();
-                mollierForm.FormClosing += MollierForm_FormClosing;
+                mollierForm.Closed += MollierForm_FormClosing;
                 //mollierForm.MollierControlSettings = GetMollierControlSettings();
             }
 
             mollierForm.Clear();
 
-            mollierForm.Shown += MollierForm_Shown;
+            mollierForm.ContentRendered += MollierForm_Shown;
 
             mollierForm.Show();
         }
 
         private void MollierForm_Shown(object sender, EventArgs e)
         {
-            mollierForm.Shown -= MollierForm_Shown;
+            mollierForm.ContentRendered -= MollierForm_Shown;
 
             IEnumerable<IGH_Param> gH_Params = GetMollierDiagramParameters();
             if (gH_Params == null || gH_Params.Count() == 0)
@@ -87,7 +90,7 @@ namespace SAM.Core.Mollier.UI.Grasshopper
             }
         }
 
-        private void MollierForm_FormClosing(object sender, FormClosingEventArgs e)
+        private void MollierForm_FormClosing(object sender, EventArgs e)
         {
             mollierForm = null;
         }

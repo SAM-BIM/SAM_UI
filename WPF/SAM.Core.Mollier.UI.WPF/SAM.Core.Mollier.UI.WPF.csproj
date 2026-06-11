@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WPF replacement for the WinForms SAM.Core.Mollier.UI (Stage 2 of the WinForms retirement).
+    Chart layer is OxyPlot.Wpf (validated in the Stage 2a spike). No UseWindowsForms: the EMF
+    compatibility path renders through OxyPlot.WindowsForms.GraphicsRenderContext into a
+    System.Drawing.Imaging.Metafile (see EmfBridge.cs) without pulling in WinForms.
+
+    Targets net8.0-windows only, matching the consuming EXE 'SAM Analytical Mollier'
+    (which is net8.0-windows regardless of the legacy 'net48-windows' configuration name).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>SAM.Core.Mollier.UI.WPF</RootNamespace>
+    <AssemblyName>SAM.Core.Mollier.UI.WPF</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <OutputPath>..\..\build\</OutputPath>
+    <Configurations>Debug;Release;net48-windows</Configurations>
+  </PropertyGroup>
+
+  <!-- Domain layer (untouched) + shared SAM libraries, consumed by the ported chart-builders. -->
+  <ItemGroup>
+    <Reference Include="SAM.Core">
+      <HintPath>..\..\..\SAM\build\SAM.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.Mollier">
+      <HintPath>..\..\..\SAM_Mollier\build\SAM.Core.Mollier.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.Windows">
+      <HintPath>..\..\..\SAM_Windows\build\SAM.Core.Windows.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Geometry">
+      <HintPath>..\..\..\SAM\build\SAM.Geometry.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Geometry.Mollier">
+      <HintPath>..\..\..\SAM_Mollier\build\SAM.Geometry.Mollier.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Math">
+      <HintPath>..\..\..\SAM\build\SAM.Math.dll</HintPath>
+    </Reference>
+    <!-- Transitive dependency of SAM.Geometry (exposed through SAM.Geometry.Planar.Query). -->
+    <Reference Include="NetTopologySuite">
+      <HintPath>..\..\..\SAM\build\NetTopologySuite.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Units">
+      <HintPath>..\..\..\SAM\build\SAM.Units.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
+    <PackageReference Include="OxyPlot.WindowsForms" Version="2.2.0" />
+    <!-- Native PDF export (SkiaSharp, .NET-native — not the obsolete GDI OxyPlot.Pdf). Replaces the
+         deferred NetOffice/Excel PDF pipeline. -->
+    <PackageReference Include="OxyPlot.SkiaSharp" Version="2.2.0" />
+    <!-- Pinned to 7.0.0 to match the consuming EXE; both write to the shared ..\..\build\ dir. -->
+    <PackageReference Include="System.Drawing.Common" Version="7.0.0" />
+  </ItemGroup>
+
+</Project>

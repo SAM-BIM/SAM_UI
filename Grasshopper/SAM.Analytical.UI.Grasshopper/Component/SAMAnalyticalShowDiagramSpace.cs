@@ -1,4 +1,7 @@
-﻿using Grasshopper.Kernel;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using Grasshopper.Kernel;
 using SAM.Analytical.Grasshopper;
 using SAM.Analytical.Mollier;
 using SAM.Analytical.UI.Grasshopper.Properties;
@@ -169,9 +172,10 @@ namespace SAM.Analytical.UI.Grasshopper
                             double pressure = Standard.Pressure;
 
                             bool regenerate = true;
-                            if (mollierForm == null || mollierForm.IsDisposed)
+                            if (mollierForm == null)
                             {
-                                mollierForm = new Core.Mollier.UI.MollierForm() { ReadOnly = true, WindowState = System.Windows.Forms.FormWindowState.Normal };
+                                mollierForm = new Core.Mollier.UI.MollierForm() { ReadOnly = true, WindowState = System.Windows.WindowState.Normal };
+                                mollierForm.Closed += (s, e) => mollierForm = null; // WPF Window can't be re-Shown after close; recreate next run
                                 regenerate = false;
                             }
                             else
@@ -180,7 +184,7 @@ namespace SAM.Analytical.UI.Grasshopper
                             }
                             pressure = Core.Mollier.UI.Query.DefaultPressure(null, mollierProcesses);
 
-                            mollierForm.Name = string.IsNullOrWhiteSpace(space.Name) ? mollierForm.Name : space.Name;
+                            mollierForm.Title = string.IsNullOrWhiteSpace(space.Name) ? mollierForm.Title : space.Name;
                             mollierForm.MollierControlSettings = Core.Mollier.UI.Query.DefaultMollierControlSettings();
                             mollierForm.Pressure = pressure;
 
