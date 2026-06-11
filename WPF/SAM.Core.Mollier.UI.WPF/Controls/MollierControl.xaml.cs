@@ -746,8 +746,10 @@ namespace SAM.Core.Mollier.UI.Controls
             return true;
         }
 
-        // Native WPF printing: render the chart to the selected printer's printable area. The plot is
-        // rasterised at a supersampled resolution for crisp output, then drawn scaled into the page.
+        // Native WPF printing — VECTOR output (not a bitmap). The model is rendered through an off-screen
+        // OxyPlot PlotView, which draws WPF vector shapes/text; PrintVisual then captures those as vector,
+        // so the print stays crisp at any zoom. Assigning the shared model to the temp view detaches it
+        // from the live chart, so we re-attach afterwards.
         public bool Print()
         {
             System.Windows.Controls.PrintDialog printDialog = new System.Windows.Controls.PrintDialog();
@@ -760,26 +762,29 @@ namespace SAM.Core.Mollier.UI.Controls
             double height = printDialog.PrintableAreaHeight;
             if (width <= 0 || height <= 0)
             {
-                width = 1100;
-                height = 800;
+                width = MollierChart.ActualWidth > 0 ? MollierChart.ActualWidth : 1100;
+                height = MollierChart.ActualHeight > 0 ? MollierChart.ActualHeight : 800;
             }
 
-            const double scale = 2.0; // supersample for print quality, then draw scaled to the page
-            OxyPlot.Wpf.PngExporter pngExporter = new OxyPlot.Wpf.PngExporter
+            OxyPlot.Wpf.PlotView plotView = new OxyPlot.Wpf.PlotView
             {
-                Width = (int)(width * scale),
-                Height = (int)(height * scale),
-                Resolution = 96 * scale,
+                Background = System.Windows.Media.Brushes.White,
+                Width = width,
+                Height = height,
+                Model = plotModel,
             };
-            System.Windows.Media.Imaging.BitmapSource bitmap = pngExporter.ExportToBitmap(plotModel);
+            plotView.Measure(new System.Windows.Size(width, height));
+            plotView.Arrange(new System.Windows.Rect(0, 0, width, height));
+            plotView.UpdateLayout();
 
-            System.Windows.Media.DrawingVisual drawingVisual = new System.Windows.Media.DrawingVisual();
-            using (System.Windows.Media.DrawingContext drawingContext = drawingVisual.RenderOpen())
-            {
-                drawingContext.DrawImage(bitmap, new System.Windows.Rect(0, 0, width, height));
-            }
+            printDialog.PrintVisual(plotView, "Mollier Chart");
 
-            printDialog.PrintVisual(drawingVisual, "Mollier Chart");
+            // Re-attach the model to the live chart (assigning it to the temp view detached it). Null first
+            // so the DependencyProperty actually changes and OxyPlot re-attaches.
+            plotView.Model = null;
+            MollierChart.Model = null;
+            MollierChart.Model = plotModel;
+            MollierChart.InvalidatePlot(false);
             return true;
         }
 
