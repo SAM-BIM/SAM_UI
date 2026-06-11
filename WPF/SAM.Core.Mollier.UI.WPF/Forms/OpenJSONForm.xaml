@@ -1,0 +1,15 @@
+<Window x:Class="SAM.Core.Mollier.UI.Forms.OpenJSONForm"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="209" Height="164" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{x:Static SystemColors.ActiveCaptionBrush}">
+    <Grid>
+        <Button x:Name="MergeButton" Content="MERGE" FontFamily="Leelawadee UI" FontWeight="Bold" FontSize="13.6"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,12,0,0" Width="169" Height="41"
+                Click="MergeButton_Click" />
+        <Button x:Name="ReplaceButton" Content="REPLACE" FontFamily="Leelawadee UI" FontWeight="Bold" FontSize="13.6"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,67,0,0" Width="169" Height="41"
+                Click="ReplaceButton_Click" />
+    </Grid>
+</Window>

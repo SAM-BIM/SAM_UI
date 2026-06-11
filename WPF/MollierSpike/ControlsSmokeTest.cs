@@ -46,6 +46,15 @@ namespace MollierSpike
             pass &= TryWindow(report, "UIMollierPointForm", () => new SAM.Core.Mollier.UI.Forms.UIMollierPointForm());
             pass &= TryWindow(report, "UIMollierProcessForm", () => new SAM.Core.Mollier.UI.UIMollierProcessForm());
 
+            // Batch 5 leaf controls + forms.
+            pass &= Try(report, "ListPointsOptionControl", () => new ListPointsOptionControl());
+            pass &= Try(report, "PointManageControl", () => new PointManageControl());
+            pass &= TryWindow(report, "OpenJSONForm", () => new SAM.Core.Mollier.UI.Forms.OpenJSONForm());
+            pass &= TryWindow(report, "PointListOptionForm", () => new SAM.Core.Mollier.UI.Forms.PointListOptionForm());
+            pass &= TryWindow(report, "UIMollierObjectsForm", () => new SAM.Core.Mollier.UI.Forms.UIMollierObjectsForm());
+            pass &= TryWindow(report, "MollierControlSettingsForm", () => new SAM.Core.Mollier.UI.MollierControlSettingsForm());
+            pass &= TryWindow(report, "MollierForm", () => new SAM.Core.Mollier.UI.MollierForm());
+
             report.Insert(0, pass ? "RESULT: PASS\n" : "RESULT: FAIL\n");
             string text = report.ToString();
             Console.WriteLine(text);
@@ -65,6 +74,7 @@ namespace MollierSpike
             catch (Exception ex)
             {
                 report.AppendLine($"[FAIL] {name}: {ex.GetType().Name}: {ex.Message}");
+                report.AppendLine(ex.StackTrace);
                 return false;
             }
         }
