@@ -869,6 +869,31 @@ namespace SAM.Core.Mollier.UI.Controls
             ((IPlotView)MollierChart).ShowTracker(trackerHitResult);
         }
 
+        // Pops the value-box at an arbitrary clicked location, showing the same formatted text as the
+        // hover tracker for the Mollier point there (or the snapped existing point).
+        private void ShowPointTracker(MollierPoint mollierPoint, ScreenPoint screenPoint)
+        {
+            if (mollierPoint == null)
+            {
+                return;
+            }
+
+            string text = Query.ToolTipText(mollierPoint, mollierControlSettings.ChartType);
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            TrackerHitResult trackerHitResult = new TrackerHitResult
+            {
+                Position = screenPoint,
+                Text = text,
+                PlotModel = plotModel,
+            };
+
+            ((IPlotView)MollierChart).ShowTracker(trackerHitResult);
+        }
+
         private void MollierChart_MouseUp(object sender, MouseButtonEventArgs e)
         {
             if (!selection || !dragging)
@@ -878,7 +903,8 @@ namespace SAM.Core.Mollier.UI.Controls
                 if (e.ChangedButton == MouseButton.Left)
                 {
                     System.Windows.Point pc = e.GetPosition(MollierChart);
-                    MollierPoint mollierPoint = GetNearestMollierPoint(new ScreenPoint(pc.X, pc.Y), 12);
+                    ScreenPoint screenPoint = new ScreenPoint(pc.X, pc.Y);
+                    MollierPoint mollierPoint = GetNearestMollierPoint(screenPoint, 12);
                     Point2D point2D;
                     if (mollierPoint != null)
                     {
@@ -889,6 +915,13 @@ namespace SAM.Core.Mollier.UI.Controls
                         mollierPoint = GetMollierPoint(pc.X, pc.Y, out point2D);
                     }
                     MollierPointSelected?.Invoke(this, new MollierPointSelectedEventArgs(mollierPoint, point2D));
+
+                    // With Hover on, a click also pops the value-box for the clicked location (or the
+                    // snapped point), using the same formatted text as the hover tracker.
+                    if (EnableHoover)
+                    {
+                        ShowPointTracker(mollierPoint, screenPoint);
+                    }
                 }
                 return;
             }
