@@ -63,15 +63,16 @@ namespace SAM.Core.Mollier.UI.Controls
             plotModel = new PlotModel { Background = OxyColors.White, PlotMargins = new OxyThickness(double.NaN) };
             MollierChart.Model = plotModel;
 
-            // OxyPlot's default PlotController binds the left mouse button (track/pan) and the right button,
-            // and marks the WPF routed MouseDown/Up as handled. That swallowed our own handlers, breaking
+            // OxyPlot's default PlotController binds the mouse buttons (track/pan) and a hover tracker, and
+            // marks the WPF routed mouse events handled. That swallowed our own handlers — breaking
             // (1) the rectangle-select zoom, (4) click-to-select that drives the ε / SHR tools, and (5) the
-            // "..." point picker in the process dialogs (all of which depend on MollierChart_MouseUp raising
-            // MollierPointSelected). Unbind the left/right buttons so those events reach our handlers; the
-            // right button is then free for the WPF ContextMenu, and the wheel-zoom binding is left intact.
+            // "..." point picker (all of which depend on MollierChart_MouseUp raising MollierPointSelected) —
+            // and its built-in tracker popped a second, raw value-box (series title + full-precision X/Y) that
+            // competed with our formatted hover box. Clear all default bindings so those events reach our
+            // handlers and only our tracker shows; keep just the wheel-zoom.
             PlotController controller = new PlotController();
-            controller.UnbindMouseDown(OxyMouseButton.Left);
-            controller.UnbindMouseDown(OxyMouseButton.Right);
+            controller.UnbindAll();
+            controller.BindMouseWheel(PlotCommands.ZoomWheel);
             MollierChart.Controller = controller;
         }
 
