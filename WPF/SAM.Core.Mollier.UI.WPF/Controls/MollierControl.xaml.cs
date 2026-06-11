@@ -809,18 +809,11 @@ namespace SAM.Core.Mollier.UI.Controls
                 Series series = pointSeries ?? plotModel.GetSeriesFromPoint(screenPoint, 10);
                 if (series != null)
                 {
-                    // Highlight any hovered series (grid lines included — this is the "select lines" feedback)...
+                    // Highlight any hovered series (grid lines included — this is the "select lines" feedback).
                     BumpThickness(series, series.Tag is MollierProcess ? SelectedObjectWidth_Process : SelectedObjectWidth_Default);
 
-                    // ...but only show the value-box for the meaningful objects (clean, GUID-free text).
-                    if (IsHoverable(series))
-                    {
-                        ShowHoverTracker(series, screenPoint);
-                    }
-                    else
-                    {
-                        ((IPlotView)MollierChart).HideTracker();
-                    }
+                    // The value-box only appears for meaningful objects; grid lines produce no text -> hidden.
+                    ShowHoverTracker(series, screenPoint);
                 }
                 else
                 {
@@ -830,55 +823,59 @@ namespace SAM.Core.Mollier.UI.Controls
             }
         }
 
-        // Only the meaningful series (processes, points) get the hover value-box; the background grid
-        // lines carry GUID/auto titles and would otherwise show a useless "<guid> X Y" tracker.
-        private static bool IsHoverable(Series series)
-        {
-            return series.Tag is UIMollierProcess
-                || series.Tag is UIMollierPoint
-                || series.Title == Modify.MollierPointsTitle;
-        }
-
-        // Restores the WinForms "yellow box" hover tooltip with the GUID-free value text. We always show a
-        // FRESH, series-less TrackerHitResult: if the result still references its Series, the WPF tracker
-        // re-derives the default "<title> x y" text at render time and ignores our override (which is exactly
-        // why the multi-point scatter kept showing the raw box). Process / single-point series carry a clean
-        // TrackerFormatString already; the multi-point scatter has none, so its text is built from the tag.
+        // Restores the WinForms "yellow box" hover tooltip. The text is built directly from the hovered
+        // series' domain tag (never from OxyPlot's per-series default), and shown via a FRESH, series-less
+        // TrackerHitResult — if the result still references its Series the WPF tracker re-derives the raw
+        // "<title> x y" text at render time and ignores our override, which is what kept the default box
+        // appearing on points and on the cooling-process auxiliary lines.
         private void ShowHoverTracker(Series series, ScreenPoint screenPoint)
         {
-            TrackerHitResult trackerHitResult = series.GetNearestPoint(screenPoint, series is LineSeries);
-            if (trackerHitResult == null)
-            {
-                ((IPlotView)MollierChart).HideTracker();
-                return;
-            }
-
-            string text;
-            if (!string.IsNullOrEmpty(series.TrackerFormatString))
-            {
-                // Process / single point: the format string is the literal ToolTipText, so the result text is clean.
-                text = trackerHitResult.Text;
-            }
-            else
-            {
-                // Multi-point scatter ("MollierPoints"): recover the UIMollierPoint under the cursor and format it.
-                ScatterSeries scatterSeries = series as ScatterSeries;
-                object tag = scatterSeries == null ? null : NearestScatterTag(scatterSeries, screenPoint);
-                text = tag is UIMollierPoint uIMollierPoint ? Query.ToolTipText(uIMollierPoint, mollierControlSettings.ChartType) : null;
-            }
-
+            string text = HoverText(series, screenPoint);
             if (string.IsNullOrEmpty(text))
             {
                 ((IPlotView)MollierChart).HideTracker();
                 return;
             }
 
+            TrackerHitResult trackerHitResult = series.GetNearestPoint(screenPoint, series is LineSeries);
+            ScreenPoint position = trackerHitResult != null ? trackerHitResult.Position : screenPoint;
+
             ((IPlotView)MollierChart).ShowTracker(new TrackerHitResult
             {
-                Position = trackerHitResult.Position,
+                Position = position,
                 Text = text,
                 PlotModel = plotModel,
             });
+        }
+
+        // Formatted hover/click text for a hovered series, derived from its Mollier tag. Returns null for
+        // anything without a meaningful tag (e.g. the background grid lines), which hides the tracker.
+        private string HoverText(Series series, ScreenPoint screenPoint)
+        {
+            ChartType chartType = mollierControlSettings.ChartType;
+
+            if (series.Tag is UIMollierProcess uIMollierProcess && uIMollierProcess.MollierProcess != null)
+            {
+                return Query.ToolTipText(uIMollierProcess.MollierProcess.Start, uIMollierProcess.MollierProcess.End, chartType, Query.FullProcessName(uIMollierProcess));
+            }
+
+            if (series.Tag is MollierProcess mollierProcess)
+            {
+                return Query.ToolTipText(mollierProcess.Start, mollierProcess.End, chartType, Query.FullProcessName(mollierProcess));
+            }
+
+            if (series.Tag is UIMollierPoint uIMollierPoint)
+            {
+                return Query.ToolTipText(uIMollierPoint, chartType);
+            }
+
+            // Multi-point scatter ("MollierPoints"): recover the UIMollierPoint under the cursor.
+            if (series is ScatterSeries scatterSeries && NearestScatterTag(scatterSeries, screenPoint) is UIMollierPoint nearest)
+            {
+                return Query.ToolTipText(nearest, chartType);
+            }
+
+            return null;
         }
 
         // Pops the value-box at an arbitrary clicked location, showing the same formatted text as the
