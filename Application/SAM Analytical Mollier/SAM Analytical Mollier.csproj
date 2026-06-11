@@ -26,8 +26,8 @@
     <Reference Include="SAM.Core.Mollier">
       <HintPath>..\..\..\SAM_Mollier\build\SAM.Core.Mollier.dll</HintPath>
     </Reference>
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
+    <!-- Removed legacy net-framework references (System.Data.DataSetExtensions, Microsoft.CSharp):
+         unused by this app (no DataSet/dynamic) and unresolvable on net8.0-windows. -->
   </ItemGroup>
   <ItemGroup>
     <Content Include="SAM.ico" />

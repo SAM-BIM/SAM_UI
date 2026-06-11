@@ -20,15 +20,13 @@ using SystemColor = System.Drawing.Color;
 namespace SAM.Core.Mollier.UI.Controls
 {
     /// <summary>
-    /// WPF/OxyPlot port of the WinForms MollierControl (Stage 2d, core).
-    /// Hosts an OxyPlot PlotView, sets up axes for both chart types, drives the ported 2c
-    /// chart-builders via Regenerate(), and provides hit-test / pixel↔value transforms,
-    /// drag-select zoom, hover highlight and PNG/SVG/EMF export.
+    /// WPF/OxyPlot port of the WinForms MollierControl.
+    /// Hosts an OxyPlot PlotView, sets up axes for both chart types (incl. the partial-vapour-pressure
+    /// secondary axis), drives the chart-builders via Regenerate(), and provides hit-test / pixel↔value
+    /// transforms, drag-select zoom, hover highlight + value-box, and PNG/SVG/EMF/PDF export.
+    /// PDF export is native (OxyPlot SkiaSharp) — no Excel/NetOffice dependency.
     ///
-    /// DEFERRED (tracked): the label-collision solver (AddLabels + ScaleVector2D/AxesRatio/
-    /// Obstacles/Solver2DDatas/ChartLabels), the partial-vapour-pressure secondary axis,
-    /// the NetOffice Excel PDF export and WinForms printing, and the Edit dialogs
-    /// (UIMollierPointForm / UIMollierProcessForm — Stage 2e).
+    /// DEFERRED (tracked): WinForms printing (Print is a stub).
     /// </summary>
     public partial class MollierControl : UserControl
     {

@@ -28,9 +28,6 @@
     <Reference Include="SAM.Core">
       <HintPath>..\..\..\SAM\build\SAM.Core.dll</HintPath>
     </Reference>
-    <Reference Include="SAM.Core.Excel">
-      <HintPath>..\..\..\SAM_Excel\build\SAM.Core.Excel.dll</HintPath>
-    </Reference>
     <Reference Include="SAM.Core.Mollier">
       <HintPath>..\..\..\SAM_Mollier\build\SAM.Core.Mollier.dll</HintPath>
     </Reference>
