@@ -1,4 +1,7 @@
-﻿using SAM.Analytical.Mollier;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Analytical.Mollier;
 using SAM.Core.Mollier;
 using SAM.Core.Mollier.UI;
 using SAM.Core.Windows.Forms;
@@ -94,19 +97,14 @@ namespace SAM.Analytical.UI
 
             double pressure = Core.Mollier.UI.Query.DefaultPressure(null, mollierProcesses);
 
-            using (MollierForm mollierForm = new MollierForm() { ReadOnly = true, WindowState = FormWindowState.Normal })
-            {
-                mollierForm.Name = string.IsNullOrWhiteSpace(space.Name) ? mollierForm.Name : space.Name;
-                mollierForm.MollierControlSettings = Core.Mollier.UI.Query.DefaultMollierControlSettings();
-                mollierForm.Pressure = pressure;
-                //mollierForm.AddProcesses(mollierProcesses, false);
-                mollierForm.AddMollierObjects(mollierProcesses, false);
-
-                if(mollierForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-            }
+            // MollierForm is now a WPF Window: not IDisposable (no using), and Name with arbitrary text
+            // would throw, so the space name goes to Title. ShowDialog() takes no owner on a WPF Window.
+            MollierForm mollierForm = new MollierForm() { ReadOnly = true, WindowState = System.Windows.WindowState.Normal };
+            mollierForm.Title = string.IsNullOrWhiteSpace(space.Name) ? mollierForm.Title : space.Name;
+            mollierForm.MollierControlSettings = Core.Mollier.UI.Query.DefaultMollierControlSettings();
+            mollierForm.Pressure = pressure;
+            mollierForm.AddMollierObjects(mollierProcesses, false);
+            mollierForm.ShowDialog();
 
             return;
         }

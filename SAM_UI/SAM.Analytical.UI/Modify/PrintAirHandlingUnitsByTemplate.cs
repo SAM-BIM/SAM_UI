@@ -1,4 +1,7 @@
-﻿using System;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -189,35 +192,34 @@ namespace SAM.Analytical.UI
                     float height = (float)(double)range.Height;
                     float height_2 = (float)(double)range_2.Height;
 
-                    string path = System.IO.Path.GetTempFileName();
-                    string path_2 = System.IO.Path.GetTempFileName();
-                    
+                    // .emf so the WPF MollierControl.SaveImage picks the EMF (vector) exporter by extension.
+                    string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString() + ".emf");
+                    string path_2 = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString() + ".emf");
+
                     paths.Add(path);
                     paths.Add(path_2);
 
                      MollierGroup mollierGroup = Mollier.Modify.UpdateProcesses(new AirHandlingUnitResult(airHandlingUnitResult));
 
-                    using (MollierControl mollierControl = new MollierControl() { Visible = false })
+                    // MollierControl is now a WPF UserControl (not IDisposable, no Visible/Size/Refresh). It is
+                    // never shown - we build the chart headlessly via Regenerate() and export the PlotModel at an
+                    // explicit pixel size with SaveImage (EMF vector, sized as the WinForms control was: range * 2).
                     {
+                        MollierControl mollierControl = new MollierControl();
                         MollierControlSettings mollierControlSettings = new MollierControlSettings();
                         mollierControlSettings.HumidityRatio_Max = 0.025;
                         mollierControlSettings.ChartType = ChartType.Mollier;
                         mollierControl.MollierControlSettings = mollierControlSettings;
 
-                        //mollierProcesses?.ForEach(x => mollierControl.AddProcess(x, false));
                         mollierControl.AddMollierObjects(mollierGroup.GetObjects<UIMollierProcess>(), false);
-
-                        mollierControl.Size = new Size(System.Convert.ToInt32(width * 2), System.Convert.ToInt32(height * 2));
-                        mollierControl.Refresh();
-                        mollierControl.Save(ChartExportType.EMF, path: path);
-
+                        mollierControl.Regenerate();
+                        mollierControl.SaveImage(path, System.Convert.ToInt32(width * 2), System.Convert.ToInt32(height * 2));
 
                         mollierControlSettings.HumidityRatio_Max = 0.03;
-                        mollierControl.Size = new Size(System.Convert.ToInt32(width_2 * 2), System.Convert.ToInt32(height_2 * 2));
-                        mollierControlSettings.ChartType = ChartType.Psychrometric; 
+                        mollierControlSettings.ChartType = ChartType.Psychrometric;
                         mollierControl.MollierControlSettings = mollierControlSettings;
-                        
-                        mollierControl.Save(ChartExportType.EMF, path: path_2);
+                        mollierControl.Regenerate();
+                        mollierControl.SaveImage(path_2, System.Convert.ToInt32(width_2 * 2), System.Convert.ToInt32(height_2 * 2));
                     }
 
                     worksheet.Shapes.AddPicture(path, NetOffice.OfficeApi.Enums.MsoTriState.msoFalse, NetOffice.OfficeApi.Enums.MsoTriState.msoCTrue, left, top, width, height);

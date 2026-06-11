@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework Condition=" '$(Configuration)' == 'net48-windows' ">net48-windows</TargetFramework>
     <TargetFramework Condition=" '$(Configuration)' != 'net48-windows' ">net8.0-windows</TargetFramework>
@@ -134,7 +134,7 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Mollier\SAM.Core.Mollier.UI\SAM.Core.Mollier.UI.csproj" />
+    <ProjectReference Include="..\..\WPF\SAM.Core.Mollier.UI.WPF\SAM.Core.Mollier.UI.WPF.csproj" />
     <ProjectReference Include="..\..\SAM_UI\SAM.Analytical.UI\SAM.Analytical.UI.csproj" />
     <ProjectReference Include="..\..\SAM_UI\SAM.Core.UI\SAM.Core.UI.csproj" />
     <ProjectReference Include="..\..\SAM_UI\SAM.Geometry.UI\SAM.Geometry.UI.csproj" />

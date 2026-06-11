@@ -2110,13 +2110,9 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_OpenMollierChart_Click(object sender, RoutedEventArgs e)
         {
-            using (Core.Mollier.UI.MollierForm mollierForm = new Core.Mollier.UI.MollierForm())
-            {
-                if (mollierForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-            }
+            // MollierForm is now a WPF Window (not IDisposable; ShowDialog returns bool?).
+            Core.Mollier.UI.MollierForm mollierForm = new Core.Mollier.UI.MollierForm();
+            mollierForm.ShowDialog();
         }
 
         private void RibbonButton_OpenPartL_Click(object sender, RoutedEventArgs e)
