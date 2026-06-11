@@ -1,8 +1,8 @@
 <Window x:Class="SAM.Core.Mollier.UI.Forms.MollierProcessForm"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Mollier Process" Width="611" Height="492"
-        ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+        Title="Mollier Process" Width="700" Height="520" MinWidth="500" MinHeight="360"
+        ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="79" />

@@ -62,6 +62,17 @@ namespace SAM.Core.Mollier.UI.Controls
             mollierControlSettings = new MollierControlSettings();
             plotModel = new PlotModel { Background = OxyColors.White, PlotMargins = new OxyThickness(double.NaN) };
             MollierChart.Model = plotModel;
+
+            // OxyPlot's default PlotController binds the left mouse button (track/pan) and the right button,
+            // and marks the WPF routed MouseDown/Up as handled. That swallowed our own handlers, breaking
+            // (1) the rectangle-select zoom, (4) click-to-select that drives the ε / SHR tools, and (5) the
+            // "..." point picker in the process dialogs (all of which depend on MollierChart_MouseUp raising
+            // MollierPointSelected). Unbind the left/right buttons so those events reach our handlers; the
+            // right button is then free for the WPF ContextMenu, and the wheel-zoom binding is left intact.
+            PlotController controller = new PlotController();
+            controller.UnbindMouseDown(OxyMouseButton.Left);
+            controller.UnbindMouseDown(OxyMouseButton.Right);
+            MollierChart.Controller = controller;
         }
 
         /// <summary>Hover highlight toggle. (WinForms used a HooverTimer; here it is inline mouse-move highlighting.)</summary>
@@ -112,7 +123,9 @@ namespace SAM.Core.Mollier.UI.Controls
 
             plotModel.Axes.Add(axisX);
             plotModel.Axes.Add(axisY);
-            // TODO (2d): partial-vapour-pressure secondary axis (CreateXAxis) when PartialVapourPressure_Axis is set.
+
+            // Partial-vapour-pressure secondary axis (WinForms CreateXAxis): a top axis in [kPa].
+            AddPartialVapourPressureAxis(AxisPosition.Top);
         }
 
         private void setAxisGraph_Psychrometric()
@@ -154,7 +167,52 @@ namespace SAM.Core.Mollier.UI.Controls
 
             plotModel.Axes.Add(axisX);
             plotModel.Axes.Add(axisY);
-            // TODO (2d): partial-vapour-pressure secondary axis (CreateYAxis) when PartialVapourPressure_Axis is set.
+
+            // Partial-vapour-pressure secondary axis (WinForms CreateYAxis): a left axis in [kPa]
+            // (the humidity-ratio axis sits on the right in the psychrometric chart).
+            AddPartialVapourPressureAxis(AxisPosition.Left);
+        }
+
+        // Adds the partial-vapour-pressure scale as a secondary axis (top for Mollier, left for
+        // Psychrometric), mirroring the WinForms CreateXAxis/CreateYAxis. pW is derived from the
+        // humidity-ratio range via the saturation relation; the axis is linear in pW [kPa], which is a
+        // close approximation of the (mildly non-linear) x↔pW mapping over the chart range. When the
+        // View ▸ Partial Vapour Pressure toggle is off the axis is omitted entirely.
+        private void AddPartialVapourPressureAxis(AxisPosition axisPosition)
+        {
+            if (mollierControlSettings == null || !mollierControlSettings.PartialVapourPressure_Axis)
+            {
+                return;
+            }
+
+            double pressure = mollierControlSettings.Pressure;
+            double partialVapourPressure_Min = Mollier.Query.PartialVapourPressure_ByHumidityRatio(mollierControlSettings.HumidityRatio_Min, 45, pressure) / 1000;
+            double partialVapourPressure_Max = Mollier.Query.PartialVapourPressure_ByHumidityRatio(mollierControlSettings.HumidityRatio_Max, 45, pressure) / 1000;
+
+            if (double.IsNaN(partialVapourPressure_Min) || double.IsNaN(partialVapourPressure_Max) || partialVapourPressure_Max <= partialVapourPressure_Min)
+            {
+                return;
+            }
+
+            double interval = mollierControlSettings.PartialVapourPressure_Interval;
+
+            LinearAxis partialVapourPressureAxis = new LinearAxis
+            {
+                Key = "PartialVapourPressure",
+                Position = axisPosition,
+                Title = "Partial Vapour Pressure pW [kPa]",
+                Minimum = partialVapourPressure_Min,
+                Maximum = partialVapourPressure_Max,
+                MajorStep = interval > 0 ? interval : double.NaN,
+                MajorGridlineStyle = LineStyle.None,
+                MinorGridlineStyle = LineStyle.None,
+                MinorTickSize = 0,
+                StringFormat = "0.##",
+                IsZoomEnabled = false,
+                IsPanEnabled = false,
+            };
+
+            plotModel.Axes.Add(partialVapourPressureAxis);
         }
 
         // ----------------------------------------------------------------- Regenerate

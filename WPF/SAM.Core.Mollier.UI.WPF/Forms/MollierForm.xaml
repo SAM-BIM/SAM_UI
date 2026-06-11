@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:SAM.Core.Mollier.UI.Controls"
         Title="Mollier" Width="1100" Height="800" WindowState="Maximized"
-        Loaded="MollierForm_Load" Closing="MollierForm_FormClosing" KeyDown="MollierForm_KeyDown">
+        Loaded="MollierForm_Load" Closing="MollierForm_FormClosing" PreviewKeyDown="MollierForm_KeyDown">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -15,10 +15,10 @@
         <controls:MollierControl x:Name="MollierControl_Main" Grid.Row="2" EnableHoover="False" Margin="10,2,10,2" />
 
         <Menu Grid.Row="0">
-            <MenuItem Header="File">
+            <MenuItem Header="_File">
                 <MenuItem Header="New" Click="newToolStripMenuItem_Click" />
                 <MenuItem Header="Open" Click="OpenToolStripMenuItem_Click" />
-                <MenuItem Header="Save" Click="SaveToolStripMenuItem_Click" />
+                <MenuItem Header="Save" InputGestureText="Ctrl+S" Click="SaveToolStripMenuItem_Click" />
                 <MenuItem Header="Save as PDF">
                     <MenuItem Header="A3_Portrait" Click="PdfA3_PortraitToolStripMenuItem_Click" />
                     <MenuItem Header="A3_Landscape" Click="PdfA3_LandscapeToolStripMenuItem_Click" />
@@ -26,26 +26,26 @@
                     <MenuItem Header="A4_Landscape" Click="a4LandscapeToolStripMenuItem_Click" />
                 </MenuItem>
                 <MenuItem Header="Save as JPG" Click="saveAsJPGToolStripMenuItem_Click" />
-                <MenuItem Header="Save as EMF" Click="saveAsEMFToolStripMenuItem_Click" />
+                <MenuItem Header="Save as EMF" InputGestureText="Ctrl+E" Click="saveAsEMFToolStripMenuItem_Click" />
                 <MenuItem Header="Print" Click="printToolStripMenuItem_Click" />
             </MenuItem>
-            <MenuItem Header="Edit">
-                <MenuItem Header="Add Point" Click="ToolStripMenuItem_AddPoint_Click" />
-                <MenuItem Header="Add Process" Click="ToolStripMenuItem_AddProcess_Click" />
-                <MenuItem Header="Edit/Delete" Click="ToolStripMenuItem_Edit_Click" />
+            <MenuItem Header="_Edit">
+                <MenuItem Header="Add Point" InputGestureText="Ctrl+O" Click="ToolStripMenuItem_AddPoint_Click" />
+                <MenuItem Header="Add Process" InputGestureText="Ctrl+R" Click="ToolStripMenuItem_AddProcess_Click" />
+                <MenuItem Header="Edit/Delete" InputGestureText="Ctrl+D" Click="ToolStripMenuItem_Edit_Click" />
                 <Separator />
                 <MenuItem Header="ε" Click="ToolStripMenuItem_Epsilon_Click" />
                 <MenuItem Header="SHR" Click="ToolStripMenuItem_SHR_Click" />
             </MenuItem>
-            <MenuItem Header="View">
+            <MenuItem Header="_View">
                 <MenuItem x:Name="ToolStripMenuItem_Density" Header="Density" IsChecked="True" ToolTip="Turn Density Line on or off" Click="ToolStripMenuItem_Density_Click" />
                 <MenuItem x:Name="ToolStripMenuItem_Enthalpy" Header="Enthalpy" IsChecked="True" ToolTip="Turn Enthalpy Line on or off" Click="ToolStripMenuItem_Enthalpy_Click" />
                 <MenuItem x:Name="ToolStripMenuItem_SpecificVolume" Header="Specific Volume" IsChecked="True" ToolTip="Turn Specific Volume Line on or off" Click="ToolStripMenuItem_SpecificVolume_Click" />
                 <MenuItem x:Name="ToolStripMenuItem_WetBulbTemperature" Header="Wet Bulb Temperature" IsChecked="True" ToolTip="Turn Wet-Bulb Temperature Line on or off" Click="ToolStripMenuItem_WetBulbTemperature_Click" />
                 <MenuItem x:Name="ToolStripMenuItem_PartialVapourPressure" Header="Partial Vapour Pressure" IsChecked="True" ToolTip="Turn Partial Vapour Pressure axis on or off" Click="ToolStripMenuItem_PartialVapourPressure_Click" />
                 <MenuItem Header="Chart Type">
-                    <MenuItem x:Name="ChartToolStripMenuItem_Mollier" Header="Mollier" IsChecked="True" Click="ChartToolStripMenuItem_Mollier_Click" />
-                    <MenuItem x:Name="ChartToolStripMenuItem_Psychrometric" Header="Psychrometric" Click="ChartToolStripMenuItem_Psychrometric_Click" />
+                    <MenuItem x:Name="ChartToolStripMenuItem_Mollier" Header="Mollier" IsChecked="True" InputGestureText="Ctrl+M" Click="ChartToolStripMenuItem_Mollier_Click" />
+                    <MenuItem x:Name="ChartToolStripMenuItem_Psychrometric" Header="Psychrometric" InputGestureText="Ctrl+P" Click="ChartToolStripMenuItem_Psychrometric_Click" />
                 </MenuItem>
                 <MenuItem Header="Color Theme">
                     <MenuItem x:Name="defaultToolStripMenuItem" Header="Default" IsChecked="True" Click="defaultToolStripMenuItem_Click" />
@@ -56,11 +56,11 @@
                 <MenuItem x:Name="ToolStripMenuItem_ComfortZones" Header="Comfort Zones" Click="ToolStripMenuItem_ComfortZoners_Click" />
                 <MenuItem x:Name="ToolStripMenuItem_DivisionArea" Header="Division Area" Click="ToolStripMenuItem_DivisionArea_Click" />
             </MenuItem>
-            <MenuItem Header="Settings">
+            <MenuItem Header="_Settings">
                 <MenuItem Header="Settings" Click="ToolStripMenuItem_OpenSettings_Click" />
             </MenuItem>
             <MenuItem Header="Reset Chart" ToolTip="Reset all chart data to the default values" Click="resetChartToolStripMenuItem_Click" />
-            <MenuItem Header="Help">
+            <MenuItem Header="_Help">
                 <MenuItem Header="Wiki" Click="ToolStripMenuItem_Wiki_Click" />
             </MenuItem>
         </Menu>

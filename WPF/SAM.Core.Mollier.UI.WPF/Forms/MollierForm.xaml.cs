@@ -1141,63 +1141,62 @@ namespace SAM.Core.Mollier.UI
             }
         }
 
+        // PreviewKeyDown (tunnelling) so the window intercepts the Ctrl shortcuts BEFORE the focused child
+        // (chart / text box) — the WPF equivalent of the WinForms KeyPreview = true. Each handled shortcut
+        // is marked e.Handled so the focused control does not also act on the key (e.g. Ctrl+C copy).
         private void MollierForm_KeyDown(object sender, KeyEventArgs e)
         {
-            if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
             {
-                if (e.Key == Key.E)
-                {
-                    SaveAs(null);
-                    return;
-                }
-
-                if (e.Key == Key.S)
-                {
-                    Save();
-                    return;
-                }
-
-                if (e.Key == Key.M)
-                {
-                    ShowMollier();
-                    return;
-                }
-
-                if (e.Key == Key.P)
-                {
-                    ShowPsychrometric();
-                    return;
-                }
-
-                if (e.Key == Key.D)
-                {
-                    Edit();
-                    return;
-                }
-
-                if (e.Key == Key.R)
-                {
-                    AddProcess();
-                    return;
-                }
-
-                if (e.Key == Key.O)
-                {
-                    AddPoint();
-                    return;
-                }
-
-                if (e.Key == Key.C)
-                {
-                    CoolingAuxiliaryProcessesVisibility();
-                    return;
-                }
+                return;
             }
+
+            switch (e.Key)
+            {
+                case Key.E:
+                    SaveAs(null);
+                    break;
+                case Key.S:
+                    Save();
+                    break;
+                case Key.M:
+                    ShowMollier();
+                    break;
+                case Key.P:
+                    ShowPsychrometric();
+                    break;
+                case Key.D:
+                    Edit();
+                    break;
+                case Key.R:
+                    AddProcess();
+                    break;
+                case Key.O:
+                    AddPoint();
+                    break;
+                case Key.C:
+                    CoolingAuxiliaryProcessesVisibility();
+                    break;
+                default:
+                    return;
+            }
+
+            e.Handled = true;
         }
 
         private void ToolStripMenuItem_Wiki_Click(object sender, RoutedEventArgs e)
         {
-            System.Diagnostics.Process.Start("https://github.com/HoareLea/SAM_Mollier/wiki/HomeUI");
+            // .NET (Core) defaults ProcessStartInfo.UseShellExecute to false, so Process.Start(url) throws
+            // Win32Exception ("The system cannot find the file specified"). Opening a URL needs the shell.
+            const string url = "https://github.com/HoareLea/SAM_Mollier/wiki/HomeUI";
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show("Could not open the wiki page:" + Environment.NewLine + exception.Message, "Wiki");
+            }
         }
 
         private void ToolStripMenuItem_AddPoint_Click(object sender, RoutedEventArgs e)
