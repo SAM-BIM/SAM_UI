@@ -23,10 +23,9 @@ namespace SAM.Core.Mollier.UI.Controls
     /// WPF/OxyPlot port of the WinForms MollierControl.
     /// Hosts an OxyPlot PlotView, sets up axes for both chart types (incl. the partial-vapour-pressure
     /// secondary axis), drives the chart-builders via Regenerate(), and provides hit-test / pixel↔value
-    /// transforms, drag-select zoom, hover highlight + value-box, and PNG/SVG/EMF/PDF export.
-    /// PDF export is native (OxyPlot SkiaSharp) — no Excel/NetOffice dependency.
-    ///
-    /// DEFERRED (tracked): WinForms printing (Print is a stub).
+    /// transforms, drag-select zoom, hover highlight + value-box, native printing, and
+    /// PNG/SVG/EMF/PDF export. PDF/print are native (OxyPlot SkiaSharp / WPF PrintDialog) —
+    /// no Excel/NetOffice dependency.
     /// </summary>
     public partial class MollierControl : UserControl
     {
@@ -744,6 +743,43 @@ namespace SAM.Core.Mollier.UI.Controls
                 OxyPlot.SkiaSharp.PdfExporter.Export(plotModel, fileStream, width, height);
             }
 
+            return true;
+        }
+
+        // Native WPF printing: render the chart to the selected printer's printable area. The plot is
+        // rasterised at a supersampled resolution for crisp output, then drawn scaled into the page.
+        public bool Print()
+        {
+            System.Windows.Controls.PrintDialog printDialog = new System.Windows.Controls.PrintDialog();
+            if (printDialog.ShowDialog() != true)
+            {
+                return false;
+            }
+
+            double width = printDialog.PrintableAreaWidth;
+            double height = printDialog.PrintableAreaHeight;
+            if (width <= 0 || height <= 0)
+            {
+                width = 1100;
+                height = 800;
+            }
+
+            const double scale = 2.0; // supersample for print quality, then draw scaled to the page
+            OxyPlot.Wpf.PngExporter pngExporter = new OxyPlot.Wpf.PngExporter
+            {
+                Width = (int)(width * scale),
+                Height = (int)(height * scale),
+                Resolution = 96 * scale,
+            };
+            System.Windows.Media.Imaging.BitmapSource bitmap = pngExporter.ExportToBitmap(plotModel);
+
+            System.Windows.Media.DrawingVisual drawingVisual = new System.Windows.Media.DrawingVisual();
+            using (System.Windows.Media.DrawingContext drawingContext = drawingVisual.RenderOpen())
+            {
+                drawingContext.DrawImage(bitmap, new System.Windows.Rect(0, 0, width, height));
+            }
+
+            printDialog.PrintVisual(drawingVisual, "Mollier Chart");
             return true;
         }
 

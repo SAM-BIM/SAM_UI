@@ -926,8 +926,7 @@ namespace SAM.Core.Mollier.UI
 
         private void printToolStripMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // WinForms Print pipeline is deferred in the WPF port.
-            MessageBox.Show("Printing is not yet available in the WPF Mollier chart.", "Print");
+            MollierControl_Main.Print();
         }
 
         private void newToolStripMenuItem_Click(object sender, RoutedEventArgs e)
