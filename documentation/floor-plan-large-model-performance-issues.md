@@ -1,7 +1,7 @@
 # Floor plan / large model performance — issue drafts
 
 Status: **ideas / inspiration, to be verified** (prototype on a `sow/*` branch before committing to an approach).
-Each section below is a ready-to-paste GitHub issue. All code references were verified against `master` (June 2026).
+Each section below is a ready-to-paste GitHub issue (logged as #11–#16). All code references were verified against **both `master` and `sow/2026-Q2`** (e23112f, June 2026); line numbers below are for `sow/2026-Q2`, the current working branch. Of the cited files, only `UIJSAMObject.cs` and `AnalyticalWindow.xaml.cs` differ between the two branches, and only in unrelated ways (WinForms→WPF dialog migration, Mollier port) — every finding holds on both.
 
 Reported pain points these address:
 1. With large models, zooming the floor plan is difficult and spaces disappear.
@@ -26,11 +26,11 @@ Every view tab holds a `ViewportControl` whose scene is produced by
 - `Modify.AssignSpaceInternalCondition(UIAnalyticalModel, Space, InternalCondition)`
   (`WPF/SAM.Analytical.UI.WPF/Modify/AssignSpaceInternalCondition.cs:29`) assigns via the
   `uIAnalyticalModel.JSAMObject` **setter**, which always raises a `FullModification`
-  (`SAM_UI/SAM.Core.UI/Classes/UIJSAMObject.cs:58-74`). A `FullModification` forces
+  (`SAM_UI/SAM.Core.UI/Classes/UIJSAMObject.cs:62-78`). A `FullModification` forces
   `updateGeometry = true` for **every** open view tab in `AnalyticalWindow.UpdateTabItem`
-  (`WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs:3129`).
+  (`WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs:3125`).
 - The multi-space overload (`AssignSpaceInternalCondition.cs:99`) already passes a GUID-scoped
-  `AnalyticalModelModification(sAMObjects)` — but `UpdateTabItem` (lines 3149–3172) still
+  `AnalyticalModelModification(sAMObjects)` — but `UpdateTabItem` (lines 3145–3168) still
   regenerates the **entire** `GeometryObjectModel` for any view that merely *contains* one of
   those GUIDs: full `ToSAM_GeometryObjectModel()` (re-sectioning, label solving, legend rebuild)
   plus a full WPF visual-tree rebuild via the `ViewportControl.UIGeometryObjectModel` setter →
@@ -66,7 +66,7 @@ Extend the existing `IModification` infrastructure (already in place and partial
 ### What the code does today
 - `UIJSAMObject<T>.JSAMObject` **getter** returns `Core.Query.Clone(jSAMObject)` — a deep clone
   (serialize/deserialize round trip) of the entire `AnalyticalModel`
-  (`SAM_UI/SAM.Core.UI/Classes/UIJSAMObject.cs:58-68`).
+  (`SAM_UI/SAM.Core.UI/Classes/UIJSAMObject.cs:62-72`).
 - `AnalyticalWindow.xaml.cs` alone reads `uIAnalyticalModel?.JSAMObject` ~48 times; many are
   casual reads inside event handlers, context-menu handlers and `Reload`
   (`AnalyticalWindow.xaml.cs:1693`). For a large model each such read costs a full-model clone
@@ -187,7 +187,7 @@ levels.
 
 ### What the code does today
 `AnalyticalWindow.Reload` → `UpdateTabItems` iterates **all enabled** view settings and calls
-`UpdateTabItem` for each (`WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs:3205-3239`),
+`UpdateTabItem` for each (`WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs:3201-3235`),
 so one edit pays the regeneration cost (Issue 3) multiplied by the number of open tabs —
 synchronously, behind a modal "Reloading" progress window (`AnalyticalWindow.xaml.cs:1683-1705`).
 
