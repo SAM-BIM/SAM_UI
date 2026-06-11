@@ -839,9 +839,11 @@ namespace SAM.Core.Mollier.UI.Controls
                 || series.Title == Modify.MollierPointsTitle;
         }
 
-        // Restores the WinForms "yellow box" hover tooltip: shows OxyPlot's tracker with the GUID-free
-        // value text. Process / single-point series already carry a clean TrackerFormatString; the
-        // multi-point scatter has none, so its text is built on the fly from the nearest point's tag.
+        // Restores the WinForms "yellow box" hover tooltip with the GUID-free value text. We always show a
+        // FRESH, series-less TrackerHitResult: if the result still references its Series, the WPF tracker
+        // re-derives the default "<title> x y" text at render time and ignores our override (which is exactly
+        // why the multi-point scatter kept showing the raw box). Process / single-point series carry a clean
+        // TrackerFormatString already; the multi-point scatter has none, so its text is built from the tag.
         private void ShowHoverTracker(Series series, ScreenPoint screenPoint)
         {
             TrackerHitResult trackerHitResult = series.GetNearestPoint(screenPoint, series is LineSeries);
@@ -851,23 +853,32 @@ namespace SAM.Core.Mollier.UI.Controls
                 return;
             }
 
-            if (string.IsNullOrEmpty(series.TrackerFormatString))
+            string text;
+            if (!string.IsNullOrEmpty(series.TrackerFormatString))
             {
-                // Multi-point scatter ("MollierPoints"): recover the UIMollierPoint under the cursor.
+                // Process / single point: the format string is the literal ToolTipText, so the result text is clean.
+                text = trackerHitResult.Text;
+            }
+            else
+            {
+                // Multi-point scatter ("MollierPoints"): recover the UIMollierPoint under the cursor and format it.
                 ScatterSeries scatterSeries = series as ScatterSeries;
                 object tag = scatterSeries == null ? null : NearestScatterTag(scatterSeries, screenPoint);
-                if (tag is UIMollierPoint uIMollierPoint)
-                {
-                    trackerHitResult.Text = Query.ToolTipText(uIMollierPoint, mollierControlSettings.ChartType);
-                }
-                else
-                {
-                    ((IPlotView)MollierChart).HideTracker();
-                    return;
-                }
+                text = tag is UIMollierPoint uIMollierPoint ? Query.ToolTipText(uIMollierPoint, mollierControlSettings.ChartType) : null;
             }
 
-            ((IPlotView)MollierChart).ShowTracker(trackerHitResult);
+            if (string.IsNullOrEmpty(text))
+            {
+                ((IPlotView)MollierChart).HideTracker();
+                return;
+            }
+
+            ((IPlotView)MollierChart).ShowTracker(new TrackerHitResult
+            {
+                Position = trackerHitResult.Position,
+                Text = text,
+                PlotModel = plotModel,
+            });
         }
 
         // Pops the value-box at an arbitrary clicked location, showing the same formatted text as the
