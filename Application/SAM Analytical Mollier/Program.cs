@@ -1,5 +1,7 @@
-﻿using System;
-using System.Windows.Forms;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using System;
 
 namespace SAM.Analytical.Mollier.UI
 {
@@ -11,9 +13,10 @@ namespace SAM.Analytical.Mollier.UI
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Core.Mollier.UI.MollierForm());
+            // MollierForm is now a WPF Window (Stage 2 WinForms->WPF migration), so the standalone
+            // Mollier app hosts it via a WPF Application instead of WinForms Application.Run(Form).
+            System.Windows.Application application = new System.Windows.Application();
+            application.Run(new Core.Mollier.UI.MollierForm());
         }
     }
 }
