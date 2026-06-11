@@ -771,20 +771,26 @@ namespace SAM.Core.Mollier.UI.Controls
                 Background = System.Windows.Media.Brushes.White,
                 Width = width,
                 Height = height,
-                Model = plotModel,
             };
-            plotView.Measure(new System.Windows.Size(width, height));
-            plotView.Arrange(new System.Windows.Rect(0, 0, width, height));
-            plotView.UpdateLayout();
 
-            printDialog.PrintVisual(plotView, "Mollier Chart");
-
-            // Re-attach the model to the live chart (assigning it to the temp view detached it). Null first
-            // so the DependencyProperty actually changes and OxyPlot re-attaches.
-            plotView.Model = null;
+            // OxyPlot forbids a model being attached to two PlotViews (throws InvalidOperationException),
+            // so detach it from the live chart first, hand it to the print view, then re-attach in finally.
             MollierChart.Model = null;
-            MollierChart.Model = plotModel;
-            MollierChart.InvalidatePlot(false);
+            try
+            {
+                plotView.Model = plotModel;
+                plotView.Measure(new System.Windows.Size(width, height));
+                plotView.Arrange(new System.Windows.Rect(0, 0, width, height));
+                plotView.UpdateLayout();
+
+                printDialog.PrintVisual(plotView, "Mollier Chart");
+            }
+            finally
+            {
+                plotView.Model = null;
+                MollierChart.Model = plotModel;
+                MollierChart.InvalidatePlot(false);
+            }
             return true;
         }
 
