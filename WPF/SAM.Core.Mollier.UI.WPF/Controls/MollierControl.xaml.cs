@@ -684,6 +684,11 @@ namespace SAM.Core.Mollier.UI.Controls
 
         public bool Save(ChartExportType chartExportType, string path = null)
         {
+            return Save(chartExportType, Core.PageSize.A4, Core.PageOrientation.Landscape, path);
+        }
+
+        public bool Save(ChartExportType chartExportType, Core.PageSize pageSize, Core.PageOrientation pageOrientation, string path = null)
+        {
             if (string.IsNullOrEmpty(path))
             {
                 string name = mollierControlSettings.ChartType == ChartType.Mollier ? "Mollier" : "Psychrometric";
@@ -692,7 +697,7 @@ namespace SAM.Core.Mollier.UI.Controls
                 {
                     case ChartExportType.JPG: saveFileDialog.Filter = "PNG image (*.png)|*.png|JPG image (*.jpg)|*.jpg|SVG image (*.svg)|*.svg"; break;
                     case ChartExportType.EMF: saveFileDialog.Filter = "EMF document (*.emf)|*.emf|All files (*.*)|*.*"; break;
-                    case ChartExportType.PDF: return false; // TODO (2d): NetOffice Excel PDF pipeline not yet ported.
+                    case ChartExportType.PDF: saveFileDialog.Filter = "PDF document (*.pdf)|*.pdf|All files (*.*)|*.*"; break;
                 }
                 if (saveFileDialog.ShowDialog() != true)
                 {
@@ -703,10 +708,45 @@ namespace SAM.Core.Mollier.UI.Controls
 
             if (chartExportType == ChartExportType.PDF)
             {
-                return false; // TODO (2d): NetOffice Excel PDF pipeline not yet ported.
+                return SavePdf(path, pageSize, pageOrientation);
             }
 
             return SaveImage(path);
+        }
+
+        // Native PDF export via OxyPlot's SkiaSharp exporter (no Excel/NetOffice, no GDI). The plot is
+        // rendered to fill the chosen page; dimensions are in points (1 pt = 1/72"), portrait values
+        // swapped for landscape.
+        public bool SavePdf(string path, Core.PageSize pageSize, Core.PageOrientation pageOrientation)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            // ISO 216 page sizes in points (portrait).
+            float width;
+            float height;
+            switch (pageSize)
+            {
+                case Core.PageSize.A3: width = 841.89f; height = 1190.55f; break;
+                case Core.PageSize.A4:
+                default: width = 595.28f; height = 841.89f; break;
+            }
+
+            if (pageOrientation == Core.PageOrientation.Landscape)
+            {
+                float temp = width;
+                width = height;
+                height = temp;
+            }
+
+            using (FileStream fileStream = File.Create(path))
+            {
+                OxyPlot.SkiaSharp.PdfExporter.Export(plotModel, fileStream, width, height);
+            }
+
+            return true;
         }
 
         // ----------------------------------------------------------------- Selection / highlight API

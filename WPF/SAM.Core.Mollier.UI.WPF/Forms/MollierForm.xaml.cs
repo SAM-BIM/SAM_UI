@@ -735,25 +735,25 @@ namespace SAM.Core.Mollier.UI
             MollierControl_Main.Save(ChartExportType.JPG);
         }
 
-        // PDF export pipeline (NetOffice Excel) is deferred in the WPF port; Save(PDF) is currently a no-op.
+        // Native PDF export (OxyPlot PdfSharp exporter) — one handler per page size / orientation.
         private void PdfA3_PortraitToolStripMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            MollierControl_Main.Save(ChartExportType.PDF);
+            MollierControl_Main.Save(ChartExportType.PDF, Core.PageSize.A3, Core.PageOrientation.Portrait);
         }
 
         private void PdfA3_LandscapeToolStripMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            MollierControl_Main.Save(ChartExportType.PDF);
+            MollierControl_Main.Save(ChartExportType.PDF, Core.PageSize.A3, Core.PageOrientation.Landscape);
         }
 
         private void a4PortraitToolStripMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            MollierControl_Main.Save(ChartExportType.PDF);
+            MollierControl_Main.Save(ChartExportType.PDF, Core.PageSize.A4, Core.PageOrientation.Portrait);
         }
 
         private void a4LandscapeToolStripMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            MollierControl_Main.Save(ChartExportType.PDF);
+            MollierControl_Main.Save(ChartExportType.PDF, Core.PageSize.A4, Core.PageOrientation.Landscape);
         }
 
         private void PointsCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
