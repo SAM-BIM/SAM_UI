@@ -25,7 +25,7 @@
                     <MenuItem Header="A4_Portrait" Click="a4PortraitToolStripMenuItem_Click" />
                     <MenuItem Header="A4_Landscape" Click="a4LandscapeToolStripMenuItem_Click" />
                 </MenuItem>
-                <MenuItem Header="Save as JPG" Click="saveAsJPGToolStripMenuItem_Click" />
+                <MenuItem Header="Save as Image…" ToolTip="Save the chart as PNG, JPG or SVG" Click="saveAsJPGToolStripMenuItem_Click" />
                 <MenuItem Header="Save as EMF" InputGestureText="Ctrl+E" Click="saveAsEMFToolStripMenuItem_Click" />
                 <MenuItem Header="Print" Click="printToolStripMenuItem_Click" />
             </MenuItem>

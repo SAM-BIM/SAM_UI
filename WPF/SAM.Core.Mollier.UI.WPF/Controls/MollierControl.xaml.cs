@@ -799,24 +799,80 @@ namespace SAM.Core.Mollier.UI.Controls
             if (EnableHoover)
             {
                 RestoreHover();
-                Series series = plotModel.GetSeriesFromPoint(new ScreenPoint(p.X, p.Y), 5);
-                if (series != null)
+                ScreenPoint screenPoint = new ScreenPoint(p.X, p.Y);
+                Series series = plotModel.GetSeriesFromPoint(screenPoint, 10);
+                if (series != null && IsHoverable(series))
                 {
                     BumpThickness(series, series.Tag is MollierProcess ? SelectedObjectWidth_Process : SelectedObjectWidth_Default);
+                    ShowHoverTracker(series, screenPoint);
+                }
+                else
+                {
+                    ((IPlotView)MollierChart).HideTracker();
                 }
                 plotModel.InvalidatePlot(false);
             }
+        }
+
+        // Only the meaningful series (processes, points) get the hover value-box; the background grid
+        // lines carry GUID/auto titles and would otherwise show a useless "<guid> X Y" tracker.
+        private static bool IsHoverable(Series series)
+        {
+            return series.Tag is UIMollierProcess
+                || series.Tag is UIMollierPoint
+                || series.Title == Modify.MollierPointsTitle;
+        }
+
+        // Restores the WinForms "yellow box" hover tooltip: shows OxyPlot's tracker with the GUID-free
+        // value text. Process / single-point series already carry a clean TrackerFormatString; the
+        // multi-point scatter has none, so its text is built on the fly from the nearest point's tag.
+        private void ShowHoverTracker(Series series, ScreenPoint screenPoint)
+        {
+            TrackerHitResult trackerHitResult = series.GetNearestPoint(screenPoint, series is LineSeries);
+            if (trackerHitResult == null)
+            {
+                ((IPlotView)MollierChart).HideTracker();
+                return;
+            }
+
+            if (string.IsNullOrEmpty(series.TrackerFormatString))
+            {
+                // Multi-point scatter ("MollierPoints"): recover the UIMollierPoint under the cursor.
+                ScatterSeries scatterSeries = series as ScatterSeries;
+                object tag = scatterSeries == null ? null : NearestScatterTag(scatterSeries, screenPoint);
+                if (tag is UIMollierPoint uIMollierPoint)
+                {
+                    trackerHitResult.Text = Query.ToolTipText(uIMollierPoint, mollierControlSettings.ChartType);
+                }
+                else
+                {
+                    ((IPlotView)MollierChart).HideTracker();
+                    return;
+                }
+            }
+
+            ((IPlotView)MollierChart).ShowTracker(trackerHitResult);
         }
 
         private void MollierChart_MouseUp(object sender, MouseButtonEventArgs e)
         {
             if (!selection || !dragging)
             {
-                // Plain left-click -> point selection.
+                // Plain left-click -> point selection. If an existing chart point is within proximity,
+                // snap to it so the picker returns that point's exact values; otherwise use the click location.
                 if (e.ChangedButton == MouseButton.Left)
                 {
                     System.Windows.Point pc = e.GetPosition(MollierChart);
-                    MollierPoint mollierPoint = GetMollierPoint(pc.X, pc.Y, out Point2D point2D);
+                    MollierPoint mollierPoint = GetNearestMollierPoint(new ScreenPoint(pc.X, pc.Y), 12);
+                    Point2D point2D;
+                    if (mollierPoint != null)
+                    {
+                        point2D = Convert.ToSAM(mollierPoint, mollierControlSettings.ChartType);
+                    }
+                    else
+                    {
+                        mollierPoint = GetMollierPoint(pc.X, pc.Y, out point2D);
+                    }
                     MollierPointSelected?.Invoke(this, new MollierPointSelectedEventArgs(mollierPoint, point2D));
                 }
                 return;
@@ -1063,6 +1119,45 @@ namespace SAM.Core.Mollier.UI.Controls
             }
 
             return best <= 144 ? result : null; // within ~12 px
+        }
+
+        // Returns the existing chart point (standalone or process marker) nearest the cursor within
+        // 'proximity' pixels, or null. Used to snap the click-to-pick so it returns an exact existing point.
+        private MollierPoint GetNearestMollierPoint(ScreenPoint screen, double proximity)
+        {
+            if (axisX == null || axisY == null)
+            {
+                return null;
+            }
+
+            MollierPoint result = null;
+            double best = proximity * proximity;
+            foreach (Series series in plotModel.Series)
+            {
+                if (!(series is ScatterSeries scatterSeries))
+                {
+                    continue;
+                }
+
+                foreach (ScatterPoint scatterPoint in scatterSeries.Points)
+                {
+                    if (!(scatterPoint.Tag is MollierPoint mollierPoint))
+                    {
+                        continue;
+                    }
+
+                    double dx = axisX.Transform(scatterPoint.X) - screen.X;
+                    double dy = axisY.Transform(scatterPoint.Y) - screen.Y;
+                    double distance = dx * dx + dy * dy;
+                    if (distance < best)
+                    {
+                        best = distance;
+                        result = mollierPoint;
+                    }
+                }
+            }
+
+            return result;
         }
     }
 }
