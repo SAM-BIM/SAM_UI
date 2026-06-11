@@ -800,11 +800,26 @@ namespace SAM.Core.Mollier.UI.Controls
             {
                 RestoreHover();
                 ScreenPoint screenPoint = new ScreenPoint(p.X, p.Y);
-                Series series = plotModel.GetSeriesFromPoint(screenPoint, 10);
-                if (series != null && IsHoverable(series))
+
+                // Existing points sit on top of (and often exactly on) the grid lines, so OxyPlot's nearest
+                // series would otherwise resolve to a line and the point would never highlight. Give points
+                // priority; if none is within proximity fall back to the nearest line / process series.
+                ScatterSeries pointSeries = NearestPointSeries(screenPoint, 12);
+                Series series = pointSeries ?? plotModel.GetSeriesFromPoint(screenPoint, 10);
+                if (series != null)
                 {
+                    // Highlight any hovered series (grid lines included — this is the "select lines" feedback)...
                     BumpThickness(series, series.Tag is MollierProcess ? SelectedObjectWidth_Process : SelectedObjectWidth_Default);
-                    ShowHoverTracker(series, screenPoint);
+
+                    // ...but only show the value-box for the meaningful objects (clean, GUID-free text).
+                    if (IsHoverable(series))
+                    {
+                        ShowHoverTracker(series, screenPoint);
+                    }
+                    else
+                    {
+                        ((IPlotView)MollierChart).HideTracker();
+                    }
                 }
                 else
                 {
@@ -1153,6 +1168,45 @@ namespace SAM.Core.Mollier.UI.Controls
                     {
                         best = distance;
                         result = mollierPoint;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // Returns the scatter series owning the existing chart point nearest the cursor within 'proximity'
+        // pixels (or null). Used so the Hover highlight/value-box prefers points over the grid lines.
+        private ScatterSeries NearestPointSeries(ScreenPoint screen, double proximity)
+        {
+            if (axisX == null || axisY == null)
+            {
+                return null;
+            }
+
+            ScatterSeries result = null;
+            double best = proximity * proximity;
+            foreach (Series series in plotModel.Series)
+            {
+                if (!(series is ScatterSeries scatterSeries))
+                {
+                    continue;
+                }
+
+                foreach (ScatterPoint scatterPoint in scatterSeries.Points)
+                {
+                    if (!(scatterPoint.Tag is MollierPoint))
+                    {
+                        continue;
+                    }
+
+                    double dx = axisX.Transform(scatterPoint.X) - screen.X;
+                    double dy = axisY.Transform(scatterPoint.Y) - screen.Y;
+                    double distance = dx * dx + dy * dy;
+                    if (distance < best)
+                    {
+                        best = distance;
+                        result = scatterSeries;
                     }
                 }
             }
