@@ -32,6 +32,202 @@ namespace SAM.Analytical.UI
         {
             return Math.Round(value, 3).ToString(CultureInfo.InvariantCulture);
         }
+
+        // Per-space cache of the (expensive, topological) AdjacencyCluster.Shell(space) build, shared by the
+        // 2D floor-plan and 3D paths. Keyed by space guid; the stored signature captures the geometry of the
+        // space's bounding panels, so a geometry edit re-builds while an attribute-only edit is a cache hit.
+        private static readonly Dictionary<Guid, Tuple<string, Shell>> shellCache = new Dictionary<Guid, Tuple<string, Shell>>();
+        private static readonly object shellCacheLock = new object();
+
+        // Per-space cache of the sectioned-and-converted floor-plan Face2Ds. Keyed by space guid; the signature
+        // adds the cut plane to the shell signature, so a hit skips both the shell build AND the shell.Section
+        // call. Holds geometry only - the per-space visibility gate and edge offset are applied at the use site
+        // because they are attribute/setting driven, not geometric.
+        private static readonly Dictionary<Guid, Tuple<string, List<Face2D>>> sectionCache = new Dictionary<Guid, Tuple<string, List<Face2D>>>();
+        private static readonly object sectionCacheLock = new object();
+
+        // Both caches are static and keyed per space guid, so a long-running session that opens many large
+        // models (each with fresh guids) would otherwise grow without bound. Cap the entry count and clear
+        // when a new key would exceed it - the cap is well above any single model's space count, so the active
+        // model stays fully cached and only cross-model accumulation is bounded. (See PR #28 / Codex review.)
+        private const int maxCachedSpaces = 50000;
+
+        // Signature of a space's shell-input geometry: the guids and vertices of its bounding panels (the same
+        // panels AdjacencyCluster.Shell builds from). O(vertices) - cheap relative to the shell topology build.
+        private static string SpaceGeometrySignature(AdjacencyCluster adjacencyCluster, Space space)
+        {
+            if (adjacencyCluster == null || space == null)
+            {
+                return null;
+            }
+
+            List<Panel> panels = adjacencyCluster.GetPanels(space);
+            if (panels == null || panels.Count == 0)
+            {
+                return null;
+            }
+
+            List<string> parts = new List<string>(panels.Count);
+            foreach (Panel panel in panels)
+            {
+                if (panel == null)
+                {
+                    continue;
+                }
+
+                StringBuilder stringBuilder = new StringBuilder();
+                stringBuilder.Append(panel.Guid).Append('|');
+
+                List<IClosedPlanar3D> edge3Ds = panel.GetFace3D()?.GetEdge3Ds();
+                if (edge3Ds != null)
+                {
+                    foreach (IClosedPlanar3D edge3D in edge3Ds)
+                    {
+                        List<Point3D> point3Ds = (edge3D as ISegmentable3D)?.GetPoints();
+                        if (point3Ds == null)
+                        {
+                            continue;
+                        }
+
+                        foreach (Point3D point3D in point3Ds)
+                        {
+                            stringBuilder.Append(Sig(point3D.X)).Append(',').Append(Sig(point3D.Y)).Append(',').Append(Sig(point3D.Z)).Append(';');
+                        }
+
+                        stringBuilder.Append('#');
+                    }
+                }
+
+                parts.Add(stringBuilder.ToString());
+            }
+
+            // Sort so the signature is independent of the panel enumeration order.
+            parts.Sort(StringComparer.Ordinal);
+            return string.Join("\n", parts);
+        }
+
+        // Signature of a cut plane (origin + axes + normal), rounded so float noise does not cause misses.
+        private static string PlaneSignature(Plane plane)
+        {
+            if (plane == null)
+            {
+                return string.Empty;
+            }
+
+            StringBuilder stringBuilder = new StringBuilder();
+            AppendVectorSignature(stringBuilder, plane.Origin?.X, plane.Origin?.Y, plane.Origin?.Z);
+            stringBuilder.Append('|');
+            AppendVectorSignature(stringBuilder, plane.AxisX?.X, plane.AxisX?.Y, plane.AxisX?.Z);
+            stringBuilder.Append('|');
+            AppendVectorSignature(stringBuilder, plane.AxisY?.X, plane.AxisY?.Y, plane.AxisY?.Z);
+            stringBuilder.Append('|');
+            AppendVectorSignature(stringBuilder, plane.Normal?.X, plane.Normal?.Y, plane.Normal?.Z);
+            return stringBuilder.ToString();
+        }
+
+        private static void AppendVectorSignature(StringBuilder stringBuilder, double? x, double? y, double? z)
+        {
+            if (x == null || y == null || z == null)
+            {
+                return;
+            }
+
+            stringBuilder.Append(Sig(x.Value)).Append(',').Append(Sig(y.Value)).Append(',').Append(Sig(z.Value));
+        }
+
+        // Returns the space's Shell, reusing a cached instance when the bounding-panel geometry is unchanged.
+        // The Shell is consumed read-only downstream (Section / Cut), so sharing an instance built from an
+        // earlier model clone is safe.
+        private static Shell GetShell(AdjacencyCluster adjacencyCluster, Space space, out bool cacheHit)
+        {
+            cacheHit = false;
+            if (adjacencyCluster == null || space == null)
+            {
+                return null;
+            }
+
+            string signature = SpaceGeometrySignature(adjacencyCluster, space);
+
+            if (signature != null)
+            {
+                lock (shellCacheLock)
+                {
+                    if (shellCache.TryGetValue(space.Guid, out Tuple<string, Shell> cached) && cached != null && string.Equals(cached.Item1, signature, StringComparison.Ordinal))
+                    {
+                        cacheHit = true;
+                        return cached.Item2;
+                    }
+                }
+            }
+
+            Shell shell = adjacencyCluster.Shell(space);
+
+            if (signature != null)
+            {
+                lock (shellCacheLock)
+                {
+                    if (shellCache.Count >= maxCachedSpaces && !shellCache.ContainsKey(space.Guid))
+                    {
+                        shellCache.Clear();
+                    }
+
+                    shellCache[space.Guid] = new Tuple<string, Shell>(signature, shell);
+                }
+            }
+
+            return shell;
+        }
+
+        // Returns the 2D floor-plan section faces for a space in the given plane, reusing cached geometry when
+        // the space geometry AND the cut plane are unchanged. A hit avoids both the shell build and the section.
+        private static List<Face2D> GetSectionFace2Ds(AdjacencyCluster adjacencyCluster, Space space, Plane plane, out bool cacheHit)
+        {
+            cacheHit = false;
+            if (adjacencyCluster == null || space == null || plane == null)
+            {
+                return null;
+            }
+
+            string geometrySignature = SpaceGeometrySignature(adjacencyCluster, space);
+            string signature = geometrySignature == null ? null : string.Concat(geometrySignature, "\n@plane:", PlaneSignature(plane));
+
+            if (signature != null)
+            {
+                lock (sectionCacheLock)
+                {
+                    if (sectionCache.TryGetValue(space.Guid, out Tuple<string, List<Face2D>> cached) && cached != null && string.Equals(cached.Item1, signature, StringComparison.Ordinal))
+                    {
+                        cacheHit = true;
+                        return cached.Item2;
+                    }
+                }
+            }
+
+            // Section-cache miss: build via the shell cache (so a plane-only change still reuses the shell).
+            Shell shell = GetShell(adjacencyCluster, space, out _);
+            List<Face3D> face3Ds = shell?.Section(plane);
+            if (face3Ds == null || face3Ds.Count == 0)
+            {
+                return null;
+            }
+
+            List<Face2D> result = face3Ds.ConvertAll(x => plane.Convert(x));
+
+            if (signature != null)
+            {
+                lock (sectionCacheLock)
+                {
+                    if (sectionCache.Count >= maxCachedSpaces && !sectionCache.ContainsKey(space.Guid))
+                    {
+                        sectionCache.Clear();
+                    }
+
+                    sectionCache[space.Guid] = new Tuple<string, List<Face2D>>(signature, result);
+                }
+            }
+
+            return result;
+        }
         public static GeometryObjectModel ToSAM_GeometryObjectModel(this AnalyticalModel analyticalModel, IViewSettings viewSettings)
         {
             if (analyticalModel == null || viewSettings == null)
@@ -103,7 +299,8 @@ namespace SAM.Analytical.UI
                         }
                     }
 
-                    IDisposable performanceLogMeasurement = PerformanceLog.Measure("View3D.SpaceShells", string.Format("{0} [{1} spaces]", threeDimensionalViewSettings.Name, spaces.Count));
+                    System.Diagnostics.Stopwatch spaceShellsStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
+                    int spaceShellCacheHits = 0;
 
                     foreach (Space space in spaces)
                     {
@@ -130,7 +327,12 @@ namespace SAM.Analytical.UI
                             continue;
                         }
 
-                        Shell shell = adjacencyCluster.Shell(space);
+                        Shell shell = GetShell(adjacencyCluster, space, out bool shellCacheHit);
+                        if (shellCacheHit)
+                        {
+                            spaceShellCacheHits++;
+                        }
+
                         if (shell == null)
                         {
                             continue;
@@ -161,7 +363,11 @@ namespace SAM.Analytical.UI
                         dictionary_Spaces[space.Guid] = geometry3DObjectCollection_Space;
                     }
 
-                    performanceLogMeasurement?.Dispose();
+                    if (spaceShellsStopwatch != null)
+                    {
+                        spaceShellsStopwatch.Stop();
+                        PerformanceLog.Write("View3D.SpaceShells", string.Format("{0} [{1} spaces] [{2} cached]", threeDimensionalViewSettings.Name, spaces.Count, spaceShellCacheHits), spaceShellsStopwatch.Elapsed.TotalMilliseconds);
+                    }
 
                     if (!legendUpdated)
                     {
@@ -571,19 +777,29 @@ namespace SAM.Analytical.UI
                 if (spaces != null)
                 {
                     Dictionary<Space, List<Face2D>> dictionary_Space = new Dictionary<Space, List<Face2D>>();
-                    using (PerformanceLog.Measure("FloorPlan.SectionSpaces", string.Format("{0} [{1} spaces]", twoDimensionalViewSettings.Name, spaces.Count)))
-                    {
-                        foreach (Space space in spaces)
-                        {
-                            Shell shell = adjacencyCluster?.Shell(space);
-                            List<Face3D> face3Ds = shell?.Section(plane);
-                            if (face3Ds == null || face3Ds.Count == 0)
-                            {
-                                continue;
-                            }
+                    System.Diagnostics.Stopwatch sectionStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
+                    int sectionCacheHits = 0;
 
-                            dictionary_Space[space] = face3Ds.ConvertAll(x => plane.Convert(x));
+                    foreach (Space space in spaces)
+                    {
+                        List<Face2D> face2Ds = GetSectionFace2Ds(adjacencyCluster, space, plane, out bool sectionCacheHit);
+                        if (sectionCacheHit)
+                        {
+                            sectionCacheHits++;
                         }
+
+                        if (face2Ds == null || face2Ds.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        dictionary_Space[space] = face2Ds;
+                    }
+
+                    if (sectionStopwatch != null)
+                    {
+                        sectionStopwatch.Stop();
+                        PerformanceLog.Write("FloorPlan.SectionSpaces", string.Format("{0} [{1} spaces] [{2} cached]", twoDimensionalViewSettings.Name, spaces.Count, sectionCacheHits), sectionStopwatch.Elapsed.TotalMilliseconds);
                     }
 
                     List<LegendItemData> legendItemDatas = new List<LegendItemData>();
