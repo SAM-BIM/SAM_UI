@@ -15,6 +15,14 @@ namespace SAM.Core.UI
 
         protected T jSAMObject;
 
+        // Cached deep clone returned by the JSAMObject getter. The getter used to clone the whole
+        // object on EVERY read (dozens of times per view reload); the cache collapses that to one
+        // clone per modification. Invalidated (see InvalidateClone) whenever jSAMObject is replaced.
+        // Contract note: callers within the same modification epoch now share one clone instance, so a
+        // caller must not mutate the returned object in place without persisting via SetJSAMObject.
+        private T cachedClone;
+        private bool cachedCloneValid;
+
         protected bool modified;
 
         public event EventHandler Opening;
@@ -68,10 +76,18 @@ namespace SAM.Core.UI
                     return default;
                 }
 
+                if (cachedCloneValid)
+                {
+                    return cachedClone;
+                }
+
                 using (PerformanceLog.Measure("UIJSAMObject.Clone", typeof(T).Name))
                 {
-                    return Core.Query.Clone(jSAMObject);
+                    cachedClone = Core.Query.Clone(jSAMObject);
                 }
+
+                cachedCloneValid = true;
+                return cachedClone;
             }
 
             set
@@ -93,8 +109,17 @@ namespace SAM.Core.UI
         public void SetJSAMObject(T jSAMObject, IEnumerable<IModification> modifications)
         {
             this.jSAMObject = jSAMObject;
+            InvalidateClone();
             modified = true;
             OnModified(modifications);
+        }
+
+        // Subclasses that assign the jSAMObject field directly (e.g. via Load) must call this so the
+        // cached clone returned by the JSAMObject getter does not go stale.
+        protected void InvalidateClone()
+        {
+            cachedClone = default;
+            cachedCloneValid = false;
         }
 
 
@@ -118,6 +143,7 @@ namespace SAM.Core.UI
                 if(jSAMObjects != null && jSAMObjects.Count != 0)
                 {
                     jSAMObject = jSAMObjects.FirstOrDefault();
+                    InvalidateClone();
                     result = jSAMObject != null;
                 }
             }
@@ -175,6 +201,7 @@ namespace SAM.Core.UI
             }
 
             jSAMObject = default;
+            InvalidateClone();
 
             modified = false;
             OnClosed();
