@@ -83,6 +83,18 @@ trivial scene; confirm the DX11 device initializes and disposes cleanly on both 
 machines (integrated GPUs, RDP/VM — SharpDX needs a real or WARP device). **Gate:** no device/airspace
 issues, clean tab open/close/dispose.
 
+> **Phase A status: implemented, awaiting hardware verification.**
+> `SAM_UI_VIEWPORT_SHARPDX` (any value other than empty/`0`) overlays a 280×180 `Viewport3DX` in the
+> bottom-right corner of the 3D view — a lit unit box with coordinate system and frame-rate overlay
+> (`Controls/SharpDXViewportSpike.cs`, hosted by `ViewportControl`). The DX11 device lives in a
+> single process-wide `DefaultEffectsManager`, created lazily on first use (timed as
+> `ViewportControl.SharpDX.CreateDevice` in the performance log) and disposed on dispatcher
+> shutdown — deliberately **not** per control, because WPF unloads tab content on every tab switch.
+> To pass the gate, verify on the target machines (both TFMs, including integrated GPU and RDP/VM):
+> the box renders in the corner over the live Helix view (airspace), tabs open/close/switch
+> repeatedly without device errors or leaks, the spike hides in floor-plan mode, and the app exits
+> cleanly. With the flag unset nothing is created.
+
 **Phase B — conversion + scene build.** Implement `Convert.ToElement3D(GeometryObjectModel)` /
 `Create.Element3D(...)`, merging per object by material into one `MeshGeometryModel3D` (+ one
 `LineGeometryModel3D` for edges). Rebuild the `Guid → Element3D` index (mirror `BuildVisual3DIndex`).

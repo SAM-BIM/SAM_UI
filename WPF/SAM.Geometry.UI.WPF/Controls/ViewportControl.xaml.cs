@@ -45,6 +45,12 @@ namespace SAM.Geometry.UI.WPF
 
         private FloorPlan2DControl floorPlan2DControl;
 
+        // Phase A spike viewport for the SharpDX port (issue #18 gate 3): a small overlay in the
+        // bottom-right corner of the 3D view rendering a trivial scene on the DirectX 11 device,
+        // to de-risk device init/airspace/tab lifecycle on real machines before Phase B. Null
+        // unless SAM_UI_VIEWPORT_SHARPDX is set - see SharpDXViewportSpike.
+        private readonly FrameworkElement sharpDXViewport;
+
         // 2D (orthographic) floor-plan clip-plane tracking (issue #13). Helix zoom/pan moves the
         // camera while the near/far planes are otherwise set once (UpdateMode), so section geometry
         // can leave the fixed depth slab and "disappear". We cache the scene's world-Z extent on Load
@@ -74,6 +80,9 @@ namespace SAM.Geometry.UI.WPF
             {
                 string value = Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D");
                 PerformanceLog.Write("ViewportControl.FloorPlan2DEnabled", string.Format("{0} [SAM_UI_FLOORPLAN_2D={1}]", floorPlan2DEnabled, value ?? "(null)"), 0);
+
+                string value_SharpDX = Environment.GetEnvironmentVariable("SAM_UI_VIEWPORT_SHARPDX");
+                PerformanceLog.Write("ViewportControl.SharpDXViewportEnabled", string.Format("{0} [SAM_UI_VIEWPORT_SHARPDX={1}]", SharpDXViewportSpike.Enabled, value_SharpDX ?? "(null)"), 0);
             }
 
             helixViewport3D.PanGesture = new MouseGesture(MouseAction.LeftClick, ModifierKeys.Shift);
@@ -94,6 +103,23 @@ namespace SAM.Geometry.UI.WPF
             floorPlan2DControl.ObjectDoubleClicked += FloorPlan2DControl_ObjectDoubleClicked;
             floorPlan2DControl.ObjectSelectionChanged += FloorPlan2DControl_ObjectSelectionChanged;
             floorPlan2DControl.ContextMenuOpening += FloorPlan2DControl_ContextMenuOpening;
+
+            if (SharpDXViewportSpike.Enabled)
+            {
+                sharpDXViewport = SharpDXViewportSpike.CreateViewport();
+                sharpDXViewport.Width = 280;
+                sharpDXViewport.Height = 180;
+                sharpDXViewport.HorizontalAlignment = HorizontalAlignment.Right;
+                sharpDXViewport.VerticalAlignment = VerticalAlignment.Bottom;
+                sharpDXViewport.Margin = new Thickness(0, 0, 8, 8);
+
+                // Added last so it overlays the corner of the Helix viewport - composing the D3D
+                // surface on top of live WPF content is exactly the airspace case to validate
+                grid.Children.Add(sharpDXViewport);
+
+                // The spike only covers the 3D view; floor plans are FloorPlan2DControl (issue #18)
+                sharpDXViewport.Visibility = mode == Mode.ThreeDimensional ? Visibility.Visible : Visibility.Collapsed;
+            }
         }
 
         public event ObjectContextMenuOpeningEventHandler ObjectContextMenuOpening;
@@ -1214,6 +1240,12 @@ namespace SAM.Geometry.UI.WPF
             }
 
             helixViewport3D.ZoomExtents();
+
+            if (sharpDXViewport != null)
+            {
+                // The spike only covers the 3D view; floor plans are FloorPlan2DControl (issue #18)
+                sharpDXViewport.Visibility = mode == Mode.ThreeDimensional ? Visibility.Visible : Visibility.Collapsed;
+            }
 
             if (floorPlan2DEnabled)
             {
