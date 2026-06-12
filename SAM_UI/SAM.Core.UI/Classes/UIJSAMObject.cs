@@ -15,13 +15,17 @@ namespace SAM.Core.UI
 
         protected T jSAMObject;
 
-        // Cached deep clone returned by the JSAMObject getter. The getter used to clone the whole
-        // object on EVERY read (dozens of times per view reload); the cache collapses that to one
-        // clone per modification. Invalidated (see InvalidateClone) whenever jSAMObject is replaced.
-        // Contract note: callers within the same modification epoch now share one clone instance, so a
-        // caller must not mutate the returned object in place without persisting via SetJSAMObject.
+        // Optional cached deep clone for the JSAMObject getter. The getter clones the whole object on
+        // every read (dozens of times per view reload). Subclasses whose reads are strictly read-only
+        // can opt in via CacheJSAMObjectClone to collapse that to one clone per modification.
+        // It is OFF by default: the default getter keeps its defensive-copy contract (a fresh, isolated
+        // clone per read), which callers that hand sub-objects to modal editors and cancel rely on.
+        // Cache is invalidated (InvalidateClone) whenever jSAMObject is replaced.
         private T cachedClone;
         private bool cachedCloneValid;
+
+        // Opt in (override => true) only when every consumer treats the returned object as read-only.
+        protected virtual bool CacheJSAMObjectClone => false;
 
         protected bool modified;
 
@@ -76,18 +80,24 @@ namespace SAM.Core.UI
                     return default;
                 }
 
-                if (cachedCloneValid)
+                if (CacheJSAMObjectClone && cachedCloneValid)
                 {
                     return cachedClone;
                 }
 
+                T clone;
                 using (PerformanceLog.Measure("UIJSAMObject.Clone", typeof(T).Name))
                 {
-                    cachedClone = Core.Query.Clone(jSAMObject);
+                    clone = Core.Query.Clone(jSAMObject);
                 }
 
-                cachedCloneValid = true;
-                return cachedClone;
+                if (CacheJSAMObjectClone)
+                {
+                    cachedClone = clone;
+                    cachedCloneValid = true;
+                }
+
+                return clone;
             }
 
             set
