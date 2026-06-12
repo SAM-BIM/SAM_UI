@@ -1680,6 +1680,10 @@ namespace SAM.Analytical.UI.WPF.Windows
             doubleRangeWindow.Range = range;
         }
 
+        // View guids whose geometry regeneration was deferred because the tab was not active
+        // when a modification arrived. Regenerated lazily on activation (see RegenerateIfDirty).
+        private readonly HashSet<Guid> dirtyViewGuids = new HashSet<Guid>();
+
         private void Reload(ModifiedEventArgs modifiedEventArgs)
         {
             progressBarWindowManager.Show("Reloading", "Reloading...");
@@ -2910,6 +2914,44 @@ namespace SAM.Analytical.UI.WPF.Windows
             uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
             Modify.SetActiveGuid(uIAnalyticalModel, guid);
             uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
+
+            RegenerateIfDirty(guid);
+        }
+
+        // Regenerate a view tab whose geometry update was deferred while it was inactive.
+        // No-op if the tab is not dirty, so activating an up-to-date tab stays free.
+        private void RegenerateIfDirty(Guid guid)
+        {
+            if (guid == Guid.Empty || !dirtyViewGuids.Contains(guid))
+            {
+                return;
+            }
+
+            AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
+            if (analyticalModel == null)
+            {
+                return;
+            }
+
+            IViewSettings viewSettings = Query.ViewSettings<ViewSettings>(uIAnalyticalModel, guid);
+            if (viewSettings == null)
+            {
+                dirtyViewGuids.Remove(guid);
+                return;
+            }
+
+            uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
+            tabControl.SelectionChanged -= TabControl_SelectionChanged;
+
+            progressBarWindowManager?.Show("Reloading", "Reloading...");
+
+            // FullModification forces the geometry regeneration; UpdateTabItem clears the dirty flag.
+            UpdateTabItem(tabControl, analyticalModel, new ModifiedEventArgs(new FullModification()), viewSettings, true);
+
+            progressBarWindowManager?.Close();
+
+            tabControl.SelectionChanged += TabControl_SelectionChanged;
+            uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
         }
 
         private void TabItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
@@ -3058,7 +3100,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
         }
 
-        private TabItem UpdateTabItem(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs, IViewSettings viewSettings = null)
+        private TabItem UpdateTabItem(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs, IViewSettings viewSettings = null, bool active = true)
         {
             if (tabControl == null || analyticalModel == null)
             {
@@ -3152,8 +3194,19 @@ namespace SAM.Analytical.UI.WPF.Windows
                 }
             }
 
+            if (updateGeometry && !active && uIGeometryObjectModel?.JSAMObject != null)
+            {
+                // Defer regeneration of this already-populated background tab until it is activated.
+                // Keeps edit latency independent of the number of open view tabs (the tab keeps showing
+                // its previous content meanwhile). A never-loaded tab is still generated eagerly below.
+                dirtyViewGuids.Add(viewSettings.Guid);
+                updateGeometry = false;
+            }
+
             if (updateGeometry)
             {
+                dirtyViewGuids.Remove(viewSettings.Guid);
+
                 if (progressBarWindowManager != null)
                 {
                     progressBarWindowManager.Text = string.Format("View Regeneration [{0}]", string.IsNullOrWhiteSpace(name) ? "???" : name);
@@ -3212,6 +3265,17 @@ namespace SAM.Analytical.UI.WPF.Windows
                 List<IViewSettings> viewSettingsList = uIGeometrySettings.GetViewSettings<IViewSettings>();
                 if (viewSettingsList != null)
                 {
+                    // Only the active tab regenerates its geometry now; others are deferred (see UpdateTabItem).
+                    // Fall back to the selected tab when ActiveGuid is empty or points to a view that is not
+                    // rendered here (disabled/removed - those paths do not clear ActiveGuid); otherwise every
+                    // tab would be deferred. A final reconciliation below guarantees the visible tab is fresh.
+                    Guid activeGuid = uIGeometrySettings.ActiveGuid;
+                    bool activeGuidRendered = activeGuid != Guid.Empty && viewSettingsList.Any(x => x != null && x.Guid == activeGuid && !(x is ViewSettings viewSettings_Active && !viewSettings_Active.Enabled));
+                    if (!activeGuidRendered)
+                    {
+                        activeGuid = (tabControl.SelectedItem as TabItem)?.Content is ViewportControl viewportControl_Active ? viewportControl_Active.Guid : Guid.Empty;
+                    }
+
                     foreach (IViewSettings viewSettings in viewSettingsList)
                     {
                         if (viewSettings is ViewSettings)
@@ -3222,7 +3286,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                             }
                         }
 
-                        TabItem tabItem = UpdateTabItem(tabControl, analyticalModel, modifiedEventArgs, viewSettings);
+                        TabItem tabItem = UpdateTabItem(tabControl, analyticalModel, modifiedEventArgs, viewSettings, viewSettings.Guid == activeGuid);
                         if (tabItem != null)
                         {
                             result.Add(tabItem);
@@ -3244,6 +3308,19 @@ namespace SAM.Analytical.UI.WPF.Windows
                 }
 
                 tabControl.Items.RemoveAt(i);
+            }
+
+            // Reconcile: the tab that is actually visible must never be left stale. This covers the case
+            // where the saved active view was removed/disabled and WPF selected a deferred tab during the
+            // removal above. Runs inside Reload (event handlers already detached), so no extra plumbing.
+            if (tabControl.SelectedItem is TabItem selectedTabItem && selectedTabItem.Content is ViewportControl selectedViewportControl && dirtyViewGuids.Contains(selectedViewportControl.Guid)
+                && analyticalModel != null && analyticalModel.TryGetValue(AnalyticalModelParameter.UIGeometrySettings, out UIGeometrySettings uIGeometrySettings_Selected) && uIGeometrySettings_Selected != null)
+            {
+                IViewSettings viewSettings_Selected = uIGeometrySettings_Selected.GetViewSettings<IViewSettings>()?.Find(x => x != null && x.Guid == selectedViewportControl.Guid);
+                if (viewSettings_Selected != null)
+                {
+                    UpdateTabItem(tabControl, analyticalModel, modifiedEventArgs, viewSettings_Selected, true);
+                }
             }
 
             return result;
@@ -3280,6 +3357,13 @@ namespace SAM.Analytical.UI.WPF.Windows
                 }
 
                 if (!geometryObjectModel.TryGetValue(GeometryObjectModelParameter.ViewSettings, out IViewSettings viewSettings) || viewSettings == null)
+                {
+                    continue;
+                }
+
+                // Skip tabs with deferred (stale) geometry: their current view settings were already
+                // applied by UpdateTabItem, so reading the stale stored copy back here would revert the edit.
+                if (dirtyViewGuids.Contains(viewSettings.Guid))
                 {
                     continue;
                 }
