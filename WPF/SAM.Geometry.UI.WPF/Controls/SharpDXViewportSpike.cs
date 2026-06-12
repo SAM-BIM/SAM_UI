@@ -87,8 +87,12 @@ namespace SAM.Geometry.UI.WPF
                     ShowCoordinateSystem = true,
                     ShowViewCube = false,
                     ShowFrameRate = true,
-                    Title = "SharpDX spike",
-                    ZoomExtentsWhenLoaded = true
+                    Title = "SharpDX spike"
+                    // No ZoomExtentsWhenLoaded: a duplicated view tab realizes its content while the
+                    // tab is unselected, so the first Loaded can fire before the viewport has a size
+                    // or an attached scene - the auto-ZoomExtents then derives a degenerate camera
+                    // and the spike stays empty (PR #30 test feedback). The explicit camera above
+                    // already frames the unit box.
                 };
 
                 viewport3DX.Items.Add(new AmbientLight3D { Color = Color.FromRgb(64, 64, 64) });
