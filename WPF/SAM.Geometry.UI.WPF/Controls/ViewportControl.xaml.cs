@@ -1,4 +1,7 @@
-﻿using SAM.Core;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core;
 using SAM.Core.UI;
 using SAM.Core.UI.WPF;
 using SAM.Geometry.Object;
@@ -33,6 +36,15 @@ namespace SAM.Geometry.UI.WPF
         private UIGeometryObjectModel uIGeometryObjectModel;
 
         private FloorPlan2DControl floorPlan2DControl;
+
+        // 2D (orthographic) floor-plan clip-plane tracking (issue #13). Helix zoom/pan moves the
+        // camera while the near/far planes are otherwise set once (UpdateMode), so section geometry
+        // can leave the fixed depth slab and "disappear". We cache the scene's world-Z extent on Load
+        // and re-fit the near/far planes around it on every camera change so it always stays visible.
+        private const double clipPlaneMargin = 100;
+        private double sceneZMin = double.NaN;
+        private double sceneZMax = double.NaN;
+        private bool updatingClipPlanes;
 
         public ViewportControl()
         {
@@ -115,6 +127,8 @@ namespace SAM.Geometry.UI.WPF
             menuItem.Header = "Zoom Extents";
             menuItem.Click += MenuItem_ZoomExtents_Click;
             floorPlan2DControl.ContextMenu.Items.Add(menuItem);
+
+            AddZoomSelectedMenuItem(floorPlan2DControl.ContextMenu);
 
             List<ModelVisual3D> modelVisual3Ds = new List<ModelVisual3D>();
             foreach (SAMObject sAMObject in floorPlan2DControl.SelectedSAMObjects())
@@ -569,6 +583,66 @@ namespace SAM.Geometry.UI.WPF
 
         private void helixViewport3D_CameraChanged(object sender, RoutedEventArgs e)
         {
+            UpdateClipPlanes2D();
+        }
+
+        /// <summary>
+        /// In orthographic floor-plan mode the camera moves on zoom/pan while the near/far planes are
+        /// otherwise set once (UpdateMode), so the section geometry can leave the fixed depth slab and
+        /// vanish (issue #13). Re-fit the planes around the cached scene depth-range on every camera
+        /// change so the geometry stays inside the slab across the whole zoom range.
+        /// </summary>
+        private void UpdateClipPlanes2D()
+        {
+            // Only the Helix orthographic 2D path needs this; the 2D renderer has no clip planes
+            if (updatingClipPlanes || mode != Mode.TwoDimensional || Active2D)
+            {
+                return;
+            }
+
+            if (double.IsNaN(sceneZMin) || double.IsNaN(sceneZMax))
+            {
+                return;
+            }
+
+            ProjectionCamera projectionCamera = helixViewport3D.Camera;
+            if (projectionCamera == null)
+            {
+                return;
+            }
+
+            Vector3D lookDirection = projectionCamera.LookDirection;
+            if (lookDirection.Length <= 0)
+            {
+                return;
+            }
+            lookDirection.Normalize();
+
+            Point3D position = projectionCamera.Position;
+
+            // Signed depth (distance along the look direction) of the two scene Z extremes
+            double depth_1 = Vector3D.DotProduct(new Point3D(position.X, position.Y, sceneZMin) - position, lookDirection);
+            double depth_2 = Vector3D.DotProduct(new Point3D(position.X, position.Y, sceneZMax) - position, lookDirection);
+
+            double near = System.Math.Min(depth_1, depth_2) - clipPlaneMargin;
+            double far = System.Math.Max(depth_1, depth_2) + clipPlaneMargin;
+
+            // Avoid re-entrancy (assigning the planes raises CameraChanged again) and pointless churn
+            if (System.Math.Abs(projectionCamera.NearPlaneDistance - near) < 1e-6 && System.Math.Abs(projectionCamera.FarPlaneDistance - far) < 1e-6)
+            {
+                return;
+            }
+
+            updatingClipPlanes = true;
+            try
+            {
+                projectionCamera.NearPlaneDistance = near;
+                projectionCamera.FarPlaneDistance = far;
+            }
+            finally
+            {
+                updatingClipPlanes = false;
+            }
         }
 
         private void helixViewport3D_ContextMenuOpening(object sender, ContextMenuEventArgs e)
@@ -591,6 +665,8 @@ namespace SAM.Geometry.UI.WPF
             menuItem.Header = "Zoom Extents";
             menuItem.Click += MenuItem_ZoomExtents_Click;
             helixViewport3D.ContextMenu.Items.Add(menuItem);
+
+            AddZoomSelectedMenuItem(helixViewport3D.ContextMenu);
 
             ObjectContextMenuOpening?.Invoke(this, new ObjectContextMenuOpeningEventArgs(helixViewport3D.ContextMenu, e, actionManager.SelectedVisual3Ds()?.FindAll(x => x is ModelVisual3D)?.ConvertAll(x => x as ModelVisual3D)));
         }
@@ -751,6 +827,19 @@ namespace SAM.Geometry.UI.WPF
                     helixViewport3D.Children.Add(modelVisual3D);
                 }
 
+                // Cache the scene depth extent for 2D clip-plane tracking (issue #13)
+                Rect3D bounds = helixViewport3D.Children.Bounds();
+                if (bounds != Rect3D.Empty)
+                {
+                    sceneZMin = bounds.Z;
+                    sceneZMax = bounds.Z + bounds.SizeZ;
+                }
+                else
+                {
+                    sceneZMin = double.NaN;
+                    sceneZMax = double.NaN;
+                }
+
                 if (count == 0)
                 {
                     helixViewport3D.ZoomExtents();
@@ -785,6 +874,39 @@ namespace SAM.Geometry.UI.WPF
             }
 
             helixViewport3D.ZoomExtents();
+        }
+
+        // Offer "Zoom Selected" only when something is selected (issue #13). Works in both the Helix
+        // and 2D paths - SelectedSAMObjects/Zoom already branch on Active2D internally.
+        private void AddZoomSelectedMenuItem(ContextMenu contextMenu)
+        {
+            if (contextMenu == null)
+            {
+                return;
+            }
+
+            List<SAMObject> sAMObjects = SelectedSAMObjects<SAMObject>();
+            if (sAMObjects == null || sAMObjects.Count == 0)
+            {
+                return;
+            }
+
+            MenuItem menuItem = new MenuItem();
+            menuItem.Name = "MenuItem_ZoomSelected";
+            menuItem.Header = "Zoom Selected";
+            menuItem.Click += MenuItem_ZoomSelected_Click;
+            contextMenu.Items.Add(menuItem);
+        }
+
+        private void MenuItem_ZoomSelected_Click(object sender, RoutedEventArgs e)
+        {
+            List<SAMObject> sAMObjects = SelectedSAMObjects<SAMObject>();
+            if (sAMObjects == null || sAMObjects.Count == 0)
+            {
+                return;
+            }
+
+            Zoom(sAMObjects);
         }
 
         private void RectangularSelector_Selected(object sender, EventArgs e)
@@ -987,7 +1109,10 @@ namespace SAM.Geometry.UI.WPF
                 helixViewport3D.Camera.LookDirection = new Vector3D(0, 0.0001, -0.9999);
                 helixViewport3D.Camera.NearPlaneDistance = -1000;
                 helixViewport3D.Camera.FarPlaneDistance = 1000;
-                helixViewport3D.ZoomAroundMouseDownPoint = false;
+                // Zoom toward the cursor in floor-plan mode (issue #13). Previously disabled because the
+                // camera shift it causes pushed geometry out of the fixed near/far slab; that slab now
+                // tracks the camera (UpdateClipPlanes2D), so zoom-to-cursor is safe.
+                helixViewport3D.ZoomAroundMouseDownPoint = true;
                 helixViewport3D.IsPanEnabled = true;
                 helixViewport3D.IsRotationEnabled = false;
                 //helixViewport3D.ShowCameraInfo = true;
