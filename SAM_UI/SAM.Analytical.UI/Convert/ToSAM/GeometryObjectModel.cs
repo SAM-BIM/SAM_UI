@@ -46,6 +46,12 @@ namespace SAM.Analytical.UI
         private static readonly Dictionary<Guid, Tuple<string, List<Face2D>>> sectionCache = new Dictionary<Guid, Tuple<string, List<Face2D>>>();
         private static readonly object sectionCacheLock = new object();
 
+        // Both caches are static and keyed per space guid, so a long-running session that opens many large
+        // models (each with fresh guids) would otherwise grow without bound. Cap the entry count and clear
+        // when a new key would exceed it - the cap is well above any single model's space count, so the active
+        // model stays fully cached and only cross-model accumulation is bounded. (See PR #28 / Codex review.)
+        private const int maxCachedSpaces = 50000;
+
         // Signature of a space's shell-input geometry: the guids and vertices of its bounding panels (the same
         // panels AdjacencyCluster.Shell builds from). O(vertices) - cheap relative to the shell topology build.
         private static string SpaceGeometrySignature(AdjacencyCluster adjacencyCluster, Space space)
@@ -160,6 +166,11 @@ namespace SAM.Analytical.UI
             {
                 lock (shellCacheLock)
                 {
+                    if (shellCache.Count >= maxCachedSpaces && !shellCache.ContainsKey(space.Guid))
+                    {
+                        shellCache.Clear();
+                    }
+
                     shellCache[space.Guid] = new Tuple<string, Shell>(signature, shell);
                 }
             }
@@ -206,6 +217,11 @@ namespace SAM.Analytical.UI
             {
                 lock (sectionCacheLock)
                 {
+                    if (sectionCache.Count >= maxCachedSpaces && !sectionCache.ContainsKey(space.Guid))
+                    {
+                        sectionCache.Clear();
+                    }
+
                     sectionCache[space.Guid] = new Tuple<string, List<Face2D>>(signature, result);
                 }
             }
