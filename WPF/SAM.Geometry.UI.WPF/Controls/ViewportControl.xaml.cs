@@ -22,6 +22,10 @@ namespace SAM.Geometry.UI.WPF
         // Experimental 2D floor plan renderer (see FloorPlan2DControl) - opt-in, off by default
         private static readonly bool floorPlan2DEnabled = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D")) && Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D").Trim() != "0";
 
+        // Record the resolved flag state once, so the performance log shows whether the
+        // 2D floor plan path is live in this process (the env var is read only at startup)
+        private static int floorPlan2DStateLogged = 0;
+
         private ActionManager actionManager;
         private Mode mode = Mode.ThreeDimensional;
 
@@ -33,6 +37,13 @@ namespace SAM.Geometry.UI.WPF
         public ViewportControl()
         {
             InitializeComponent();
+
+            // Log the 2D floor plan flag state once per process (raw env var value + resolved bool)
+            if (System.Threading.Interlocked.Exchange(ref floorPlan2DStateLogged, 1) == 0)
+            {
+                string value = Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D");
+                PerformanceLog.Write("ViewportControl.FloorPlan2DEnabled", string.Format("{0} [SAM_UI_FLOORPLAN_2D={1}]", floorPlan2DEnabled, value ?? "(null)"), 0);
+            }
 
             helixViewport3D.PanGesture = new MouseGesture(MouseAction.LeftClick, ModifierKeys.Shift);
             helixViewport3D.RotateGesture = new MouseGesture(MouseAction.RightClick, ModifierKeys.Shift);
