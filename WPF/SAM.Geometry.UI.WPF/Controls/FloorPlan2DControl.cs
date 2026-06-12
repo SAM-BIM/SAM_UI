@@ -240,6 +240,8 @@ namespace SAM.Geometry.UI.WPF
                 }
             }
 
+            HashSet<Item> selectedItems_Previous = new HashSet<Item>(selectedItems);
+
             List<Item> items_Redraw = new List<Item>(selectedItems);
 
             selectedItems.Clear();
@@ -257,7 +259,8 @@ namespace SAM.Geometry.UI.WPF
                 Render(item, item == hooveredItem, selectedItems.Contains(item));
             }
 
-            return items_Selected.Count != 0;
+            // Selection changed also when an empty/nonmatching set cleared previous items - callers raise ObjectSelectionChanged from this
+            return !selectedItems.SetEquals(selectedItems_Previous);
         }
 
         public bool ClearSelection()
