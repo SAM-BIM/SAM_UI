@@ -3266,8 +3266,12 @@ namespace SAM.Analytical.UI.WPF.Windows
                 if (viewSettingsList != null)
                 {
                     // Only the active tab regenerates its geometry now; others are deferred (see UpdateTabItem).
+                    // Fall back to the selected tab when ActiveGuid is empty or points to a view that is not
+                    // rendered here (disabled/removed - those paths do not clear ActiveGuid); otherwise every
+                    // tab would be deferred. A final reconciliation below guarantees the visible tab is fresh.
                     Guid activeGuid = uIGeometrySettings.ActiveGuid;
-                    if (activeGuid == Guid.Empty)
+                    bool activeGuidRendered = activeGuid != Guid.Empty && viewSettingsList.Any(x => x != null && x.Guid == activeGuid && !(x is ViewSettings viewSettings_Active && !viewSettings_Active.Enabled));
+                    if (!activeGuidRendered)
                     {
                         activeGuid = (tabControl.SelectedItem as TabItem)?.Content is ViewportControl viewportControl_Active ? viewportControl_Active.Guid : Guid.Empty;
                     }
@@ -3304,6 +3308,19 @@ namespace SAM.Analytical.UI.WPF.Windows
                 }
 
                 tabControl.Items.RemoveAt(i);
+            }
+
+            // Reconcile: the tab that is actually visible must never be left stale. This covers the case
+            // where the saved active view was removed/disabled and WPF selected a deferred tab during the
+            // removal above. Runs inside Reload (event handlers already detached), so no extra plumbing.
+            if (tabControl.SelectedItem is TabItem selectedTabItem && selectedTabItem.Content is ViewportControl selectedViewportControl && dirtyViewGuids.Contains(selectedViewportControl.Guid)
+                && analyticalModel != null && analyticalModel.TryGetValue(AnalyticalModelParameter.UIGeometrySettings, out UIGeometrySettings uIGeometrySettings_Selected) && uIGeometrySettings_Selected != null)
+            {
+                IViewSettings viewSettings_Selected = uIGeometrySettings_Selected.GetViewSettings<IViewSettings>()?.Find(x => x != null && x.Guid == selectedViewportControl.Guid);
+                if (viewSettings_Selected != null)
+                {
+                    UpdateTabItem(tabControl, analyticalModel, modifiedEventArgs, viewSettings_Selected, true);
+                }
             }
 
             return result;
