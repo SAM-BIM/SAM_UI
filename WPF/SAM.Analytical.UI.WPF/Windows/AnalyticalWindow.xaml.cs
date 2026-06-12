@@ -3208,7 +3208,33 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
+            // Only a double-click on the tab header itself should open View Settings. A double-click on an
+            // object inside the viewport opens that object's properties; that same double-click bubbles up
+            // to the TabItem, so without this guard View Settings would also open the moment the properties
+            // dialog is dismissed.
+            if (tabItem.Content is DependencyObject content && e.OriginalSource is DependencyObject source && IsDescendantOf(source, content))
+            {
+                return;
+            }
+
             EditViewSettings(tabItem);
+        }
+
+        private static bool IsDescendantOf(DependencyObject node, DependencyObject ancestor)
+        {
+            while (node != null)
+            {
+                if (node == ancestor)
+                {
+                    return true;
+                }
+
+                node = node is System.Windows.Media.Visual || node is System.Windows.Media.Media3D.Visual3D
+                    ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                    : System.Windows.LogicalTreeHelper.GetParent(node);
+            }
+
+            return false;
         }
 
         private List<TabItem> UpdateTabItems(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs)
