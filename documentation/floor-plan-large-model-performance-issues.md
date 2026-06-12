@@ -273,6 +273,10 @@ value, or leaving it unset, uses the 2D canvas.
   performance log for direct comparison against `ViewportControl.ToMedia3D` /
   `ViewportControl.HoverHitTest` on the same model.
 
-Known v1 limitations (fine for an experiment behind a flag): camera save/restore between
-sessions is not wired for the 2D path (opens at zoom-extents), and `UpdateCamera` view-settings
-modifications are a visual no-op in 2D.
+Camera persistence (added with the default flip, PR #30 review): `ViewportControl.Camera`
+bridges to the 2D canvas - `FloorPlan2DControl.GetCamera` expresses the pan/zoom as a camera
+over the section plane (height above the plane encodes the zoom level) and `SetCamera` applies
+it back (held pending until the view has a plane and a real size), so floor-plan view positions
+save/restore through the existing `ViewSettings.Camera` plumbing and `UpdateCamera` view-settings
+modifications work in 2D. Legacy cameras saved by the Helix orthographic path restore the pan
+position with a clamped zoom.

@@ -660,6 +660,18 @@ namespace SAM.Geometry.UI.WPF
 
         private Camera GetCamera()
         {
+            if (Active2D)
+            {
+                // Floor-plan pan/zoom expressed as a camera, so view settings persist for the 2D
+                // canvas (PR #30 review). Null (empty/never-shown view) falls back to the Helix
+                // camera below - the same value the old orthographic path would have reported.
+                Camera camera_FloorPlan = floorPlan2DControl.GetCamera();
+                if (camera_FloorPlan != null)
+                {
+                    return camera_FloorPlan;
+                }
+            }
+
             if (ActiveSharpDX3D)
             {
                 return sharpDXViewportControl.GetCamera();
@@ -1194,6 +1206,12 @@ namespace SAM.Geometry.UI.WPF
         {
             if (camera == null)
             {
+                return;
+            }
+
+            if (Active2D)
+            {
+                floorPlan2DControl.SetCamera(camera);
                 return;
             }
 
