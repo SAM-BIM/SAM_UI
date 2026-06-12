@@ -599,6 +599,15 @@ namespace SAM.Analytical.UI
                             continue;
                         }
 
+                        // Skip hidden spaces here - before the label solver - so a hidden space's tag
+                        // does not participate in collision resolution and shift/blank visible labels.
+                        // Mirrors the 3D path's visibility early-out; covers both the face and the label.
+                        SurfaceAppearance surfaceAppearance = Query.SurfaceAppearance(space, twoDimensionalViewSettings);
+                        if (surfaceAppearance == null || surfaceAppearance.Opacity == 0 || !surfaceAppearance.Visible)
+                        {
+                            continue;
+                        }
+
                         List<Face2D> face2Ds_Offset = new List<Face2D>();
                         foreach (Face2D face2D in face2Ds)
                         {
@@ -748,16 +757,9 @@ namespace SAM.Analytical.UI
                             color = System.Drawing.Color.FromKnownColor(System.Drawing.KnownColor.LightGray).ToMedia();
                         }
 
-                        SurfaceAppearance surfaceAppearance = Query.SurfaceAppearance(space, twoDimensionalViewSettings, color);
-
-                        // Skip hidden spaces entirely (face AND label). Mirrors the 3D path's early-out;
-                        // without this a hidden space's face is suppressed at render time but its tag still draws.
-                        if (surfaceAppearance == null || surfaceAppearance.Opacity == 0 || !surfaceAppearance.Visible)
-                        {
-                            continue;
-                        }
-
                         Geometry3DObjectCollection geometry3DObjectCollection_Space = new Geometry3DObjectCollection() { Tag = space };
+
+                        SurfaceAppearance surfaceAppearance = Query.SurfaceAppearance(space, twoDimensionalViewSettings, color);
 
                         face2Ds.ForEach(x => geometry3DObjectCollection_Space.Add(new Face3DObject(plane.Convert(x), surfaceAppearance)));
 
