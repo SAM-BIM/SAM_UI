@@ -281,6 +281,11 @@ namespace SAM.Geometry.UI.WPF
                 return false;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                return sharpDXViewportControl.ContainsAny<T>(guids);
+            }
+
             // 3D path: O(1) per guid via the index instead of an O(N) visual-tree walk (issue #16).
             foreach (Guid guid in guids)
             {

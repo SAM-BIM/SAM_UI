@@ -43,9 +43,9 @@ namespace SAM.Geometry.UI.WPF
             public List<Tuple<string, Vector3, float>> Texts = new List<Tuple<string, Vector3, float>>();
         }
 
-        // Key: ARGB fill/stroke color with the appearance opacity already folded into the alpha
+        // Color key: ARGB fill/stroke color with the appearance opacity already folded into the alpha
         private readonly Dictionary<int, MeshBucket> meshBuckets = new Dictionary<int, MeshBucket>();
-        private readonly Dictionary<int, LineBucket> lineBuckets = new Dictionary<int, LineBucket>();
+        private readonly Dictionary<Tuple<int, double>, LineBucket> lineBuckets = new Dictionary<Tuple<int, double>, LineBucket>();
         private readonly Dictionary<int, TextBucket> textBuckets = new Dictionary<int, TextBucket>();
 
         private static int ToKey(System.Drawing.Color color, double opacity)
@@ -57,6 +57,18 @@ namespace SAM.Geometry.UI.WPF
         private static Color4 ToColor4(int key)
         {
             return new Color4(((key >> 16) & 0xFF) / 255f, ((key >> 8) & 0xFF) / 255f, (key & 0xFF) / 255f, ((key >> 24) & 0xFF) / 255f);
+        }
+
+        private static double ToLineThickness(double thickness)
+        {
+            if (thickness <= 0)
+            {
+                return 0;
+            }
+
+            // SAM curve thickness is a world-space tube radius in the Media3D path. SharpDX line
+            // thickness is screen-space pixels, so keep the common 0.04 panel edge visible as 1 px.
+            return System.Math.Max(1, thickness * 25);
         }
 
         public void AddMesh(System.Drawing.Color color, double opacity, IList<Vector3> positions, IList<int> triangleIndices)
@@ -85,9 +97,15 @@ namespace SAM.Geometry.UI.WPF
             }
         }
 
-        public void AddSegment(System.Drawing.Color color, double opacity, Vector3 start, Vector3 end)
+        public void AddSegment(System.Drawing.Color color, double opacity, double thickness, Vector3 start, Vector3 end)
         {
-            int key = ToKey(color, opacity);
+            double lineThickness = ToLineThickness(thickness);
+            if (lineThickness <= 0)
+            {
+                return;
+            }
+
+            Tuple<int, double> key = Tuple.Create(ToKey(color, opacity), lineThickness);
             if (!lineBuckets.TryGetValue(key, out LineBucket lineBucket))
             {
                 lineBucket = new LineBucket();
@@ -151,9 +169,9 @@ namespace SAM.Geometry.UI.WPF
                 });
             }
 
-            foreach (KeyValuePair<int, LineBucket> keyValuePair in lineBuckets)
+            foreach (KeyValuePair<Tuple<int, double>, LineBucket> keyValuePair in lineBuckets)
             {
-                Color4 color4 = ToColor4(keyValuePair.Key);
+                Color4 color4 = ToColor4(keyValuePair.Key.Item1);
 
                 LineGeometry3D lineGeometry3D = new LineGeometry3D
                 {
@@ -165,7 +183,7 @@ namespace SAM.Geometry.UI.WPF
                 {
                     Geometry = lineGeometry3D,
                     Color = System.Windows.Media.Color.FromArgb((byte)(color4.Alpha * 255), (byte)(color4.Red * 255), (byte)(color4.Green * 255), (byte)(color4.Blue * 255)),
-                    Thickness = 1
+                    Thickness = keyValuePair.Key.Item2
                 });
             }
 

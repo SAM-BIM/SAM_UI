@@ -156,6 +156,24 @@ namespace SAM.Geometry.UI.WPF
             return dictionary_Element3D.TryGetValue(guid, out Element3D element3D) ? element3D : null;
         }
 
+        public bool ContainsAny<T>(IEnumerable<Guid> guids) where T : SAMObject
+        {
+            if (guids == null)
+            {
+                return false;
+            }
+
+            foreach (Guid guid in guids)
+            {
+                if (dictionary_Element3D.TryGetValue(guid, out Element3D element3D) && Core.UI.WPF.Query.JSAMObject<T>(element3D) != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public Camera GetCamera()
         {
             HelixToolkit.Wpf.SharpDX.Camera camera = viewport3DX.Camera;

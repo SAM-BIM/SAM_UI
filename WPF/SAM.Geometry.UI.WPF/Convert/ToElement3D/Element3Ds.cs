@@ -373,7 +373,7 @@ namespace SAM.Geometry.UI.WPF
                 return;
             }
 
-            sharpDXSceneBuilder.AddSegment(curveAppearance.Color, curveAppearance.Opacity, ToVector3(segment3D[0]), ToVector3(segment3D[1]));
+            sharpDXSceneBuilder.AddSegment(curveAppearance.Color, curveAppearance.Opacity, curveAppearance.Thickness, ToVector3(segment3D[0]), ToVector3(segment3D[1]));
         }
 
         private static Vector3 ToVector3(Point3D point3D)
