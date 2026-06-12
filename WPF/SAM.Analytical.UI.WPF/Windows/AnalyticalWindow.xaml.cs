@@ -3196,6 +3196,17 @@ namespace SAM.Analytical.UI.WPF.Windows
                 if (guids == null || guids.Count == 0 || viewportControl.ContainsAny<SAMObject>(guids))
                 {
                     updateGeometry = true;
+
+                    // Attribute-only fast path (#11): when every model modification is an AttributeModification
+                    // (attribute edits that cannot change geometry, visibility or label text - e.g. assigning an
+                    // InternalCondition), the view only needs new space fill colors and a refreshed legend.
+                    // Update those in place instead of regenerating sections, labels and the scene.
+                    if (guids != null && guids.Count != 0
+                        && analyticalModelModifications.TrueForAll(x => x is AttributeModification)
+                        && TryRefreshSpaceAppearances(viewportControl, analyticalModel, viewSettings, name))
+                    {
+                        updateGeometry = false;
+                    }
                 }
             }
 
@@ -3251,6 +3262,48 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
 
             return tabItem;
+        }
+
+        // In-place refresh of space colors + legend for attribute-only edits (see AttributeModification).
+        // Returns false when the in-place result could differ from a full regeneration; the caller then
+        // falls back to the regular ToSAM_GeometryObjectModel path.
+        private bool TryRefreshSpaceAppearances(ViewportControl viewportControl, AnalyticalModel analyticalModel, IViewSettings viewSettings, string name)
+        {
+            TwoDimensionalViewSettings twoDimensionalViewSettings = viewSettings as TwoDimensionalViewSettings;
+            if (twoDimensionalViewSettings == null)
+            {
+                return false;
+            }
+
+            GeometryObjectModel geometryObjectModel = viewportControl.UIGeometryObjectModel?.JSAMObject;
+            if (geometryObjectModel == null)
+            {
+                return false;
+            }
+
+            using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.AttributeRefresh", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+            {
+                List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
+
+                if (!UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, twoDimensionalViewSettings, out HashSet<Guid> spaceGuids))
+                {
+                    return false;
+                }
+
+                if (!viewportControl.RefreshAppearances(spaceGuids))
+                {
+                    return false;
+                }
+
+                // Re-skinning replaces the Model3Ds selection visuals were painted on - re-apply the
+                // selection, mirroring what the full regeneration path does after a scene rebuild.
+                if (sAMObjects != null && sAMObjects.Count != 0)
+                {
+                    viewportControl.Select(sAMObjects);
+                }
+            }
+
+            return true;
         }
 
         private void TabItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)

@@ -26,7 +26,10 @@ namespace SAM.Analytical.UI.WPF
             space_Temp.InternalCondition = internalCondition;
             adjacencyCluster.AddObject(space_Temp);
 
-            uIAnalyticalModel.JSAMObject = new AnalyticalModel(analyticalModel, adjacencyCluster, analyticalModel.MaterialLibrary, profileLibrary);
+            // Attribute-only edit: scope the modification to the space (the JSAMObject setter would raise a
+            // FullModification and regenerate every view) and mark it as attribute-only so views can refresh
+            // colors/legend in place (#11).
+            uIAnalyticalModel.SetJSAMObject(new AnalyticalModel(analyticalModel, adjacencyCluster, analyticalModel.MaterialLibrary, profileLibrary), new AttributeModification(new SAMObject[] { space_Temp }));
         }
 
         public static void AssignSpaceInternalCondition(this UIAnalyticalModel uIAnalyticalModel, IEnumerable<Space> spaces)
@@ -96,7 +99,7 @@ namespace SAM.Analytical.UI.WPF
                 sAMObjects.Add(space_Temp);
             }
 
-            uIAnalyticalModel.SetJSAMObject(new AnalyticalModel(analyticalModel, adjacencyCluster, analyticalModel.MaterialLibrary, profileLibrary), new AnalyticalModelModification(sAMObjects));
+            uIAnalyticalModel.SetJSAMObject(new AnalyticalModel(analyticalModel, adjacencyCluster, analyticalModel.MaterialLibrary, profileLibrary), new AttributeModification(sAMObjects));
         }
     }
 }

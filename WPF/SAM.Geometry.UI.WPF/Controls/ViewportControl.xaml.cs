@@ -249,6 +249,40 @@ namespace SAM.Geometry.UI.WPF
             return Core.UI.WPF.Query.Visual3D<T>(helixViewport3D.Children, guid);
         }
 
+        /// <summary>
+        /// In-place appearance refresh for attribute-only edits: re-skins the visuals of the given
+        /// objects from the current UIGeometryObjectModel (whose appearances were already updated -
+        /// see Modify.RefreshAppearance) and refreshes the legend, without rebuilding the scene.
+        /// The 2D path redraws from the model directly (cheap; pan/zoom preserved).
+        /// </summary>
+        public bool RefreshAppearances(IEnumerable<Guid> guids)
+        {
+            GeometryObjectModel geometryObjectModel = uIGeometryObjectModel?.JSAMObject;
+            if (geometryObjectModel == null)
+            {
+                return false;
+            }
+
+            if (Active2D)
+            {
+                floorPlan2DControl.Load(geometryObjectModel);
+            }
+            else if (guids != null)
+            {
+                foreach (Guid guid in guids)
+                {
+                    Visual3D visual3D = GetVisual3D<SAMObject>(guid);
+                    if (visual3D != null)
+                    {
+                        Modify.RefreshAppearance(visual3D);
+                    }
+                }
+            }
+
+            RefreshLegend(geometryObjectModel);
+            return true;
+        }
+
         public List<T> SAMObjects<T>() where T : SAMObject
         {
             if (Active2D)
@@ -723,8 +757,13 @@ namespace SAM.Geometry.UI.WPF
                 }
             }
 
+            RefreshLegend(geometryObjectModel);
+        }
+
+        private void RefreshLegend(GeometryObjectModel geometryObjectModel)
+        {
             legendControl.Visibility = Visibility.Hidden;
-            if (geometryObjectModel.TryGetValue(GeometryObjectModelParameter.ViewSettings, out ViewSettings viewSettings))
+            if (geometryObjectModel != null && geometryObjectModel.TryGetValue(GeometryObjectModelParameter.ViewSettings, out ViewSettings viewSettings))
             {
                 Legend legend = viewSettings.Legend;
                 List<LegendItem> legendItems = legend?.LegendItems;
