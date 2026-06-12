@@ -1,4 +1,7 @@
-﻿using SAM.Core;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core;
 using SAM.Geometry.Object;
 using System;
 using System.Collections.Generic;
@@ -8,6 +11,11 @@ namespace SAM.Geometry.UI.WPF
 {
     public class UIGeometryObjectModel : Core.UI.UIJSAMObject<GeometryObjectModel>
     {
+        // The rendered scene model is read-only to its consumers (viewport rendering, view-settings
+        // and object queries) - they never mutate-and-discard it - so caching the clone is safe here
+        // and removes the dominant per-reload clone cost (GeometryObjectModel clones ran 70-90 ms each).
+        protected override bool CacheJSAMObjectClone => true;
+
         public UIGeometryObjectModel(string path)
        : base(path)
         {
@@ -124,6 +132,7 @@ namespace SAM.Geometry.UI.WPF
             }
 
             jSAMObject = geometryObjectModel_Result;
+            InvalidateClone();
             return jSAMObject != null;
         }
     }
