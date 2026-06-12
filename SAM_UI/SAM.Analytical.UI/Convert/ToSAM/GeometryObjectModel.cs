@@ -10,6 +10,8 @@ using SAM.Geometry.Spatial;
 using SAM.Geometry.UI;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using System.Windows.Forms;
 using System.Windows.Media;
 
@@ -17,6 +19,19 @@ namespace SAM.Analytical.UI
 {
     public static partial class Convert
     {
+        // Per-view memoization of the floor-plan label solver (Solver2D.Solve, the dominant cost in a
+        // floor-plan regeneration). Keyed by view guid; the stored signature captures every solver input
+        // (per space: name, anchor, label size, limit-area boundary), so any change re-solves. Holds only
+        // solved label positions (keyed by space guid) - never object references - to avoid stale state.
+        private static readonly Dictionary<Guid, Tuple<string, Dictionary<Guid, Tuple<Point2D, bool>>>> labelSolveCache
+            = new Dictionary<Guid, Tuple<string, Dictionary<Guid, Tuple<Point2D, bool>>>>();
+        private static readonly object labelSolveCacheLock = new object();
+
+        // Round to mm for the cache signature so float noise does not cause spurious misses.
+        private static string Sig(double value)
+        {
+            return Math.Round(value, 3).ToString(CultureInfo.InvariantCulture);
+        }
         public static GeometryObjectModel ToSAM_GeometryObjectModel(this AnalyticalModel analyticalModel, IViewSettings viewSettings)
         {
             if (analyticalModel == null || viewSettings == null)
@@ -659,7 +674,7 @@ namespace SAM.Analytical.UI
                     List<Tuple<Space, List<Face2D>, string, Point2D>> tuples = new List<Tuple<Space, List<Face2D>, string, Point2D>>();
 
                     List<Solver2DData> solver2DDatas = new List<Solver2DData>();
-                    List<Point2D> points = new List<Point2D>();
+                    List<string> labelSignatureParts = new List<string>();
 
                     foreach (KeyValuePair<Space, List<Face2D>> keyValuePair in dictionary_Space)
                     {
@@ -686,10 +701,29 @@ namespace SAM.Analytical.UI
                         double farthestPointDistance = 0;
                         foreach (Point2D pointsTemp in face2Ds[0].Edge2Ds[0].Polygon2D().Points)
                         {
-                            points.Add(pointsTemp);
                             double distance = pointsTemp.Distance(point2D);
 
                             farthestPointDistance = Math.Max(distance, farthestPointDistance);
+                        }
+
+                        // Signature must capture the FULL limit area (face2Ds[0], passed as LimitArea below),
+                        // including any inner loops/holes - not just the outer edge - so a change to a hole
+                        // forces a re-solve rather than a false cache hit.
+                        StringBuilder boundaryBuilder = new StringBuilder();
+                        foreach (var edge2D in face2Ds[0].Edge2Ds)
+                        {
+                            List<Point2D> edgePoints = edge2D?.Polygon2D()?.Points;
+                            if (edgePoints == null)
+                            {
+                                continue;
+                            }
+
+                            foreach (Point2D edgePoint in edgePoints)
+                            {
+                                boundaryBuilder.Append(Sig(edgePoint.X)).Append(',').Append(Sig(edgePoint.Y)).Append(';');
+                            }
+
+                            boundaryBuilder.Append('#');
                         }
                         Rectangle2D rectangle2D = new Rectangle2D(new Point2D(point2D.X + width / 2, point2D.Y + height / 2), width, height);
 
@@ -703,46 +737,99 @@ namespace SAM.Analytical.UI
                         solver2DData.Solver2DSettings = solver2DSettings;
 
                         solver2DDatas.Add(solver2DData);
+
+                        // Per-space contribution to the label-solver cache signature (see labelSolveCache).
+                        labelSignatureParts.Add(string.Concat(space.Guid.ToString(), "|", name, "|", Sig(point2D.X), "|", Sig(point2D.Y), "|", Sig(width), "|", Sig(height), "|", Sig(farthestPointDistance), "|", boundaryBuilder.ToString()));
                     }
 
-                    // Maybe we should create bigger area
-                    Rectangle2D area = Geometry.Planar.Create.Rectangle2D(points);
+                    labelSignatureParts.Sort(StringComparer.Ordinal);
+                    string labelSignature = string.Join("\n", labelSignatureParts);
 
-                    // Set the area as infinite so that the labels can extend beyond the faces
-                    area = new Rectangle2D(new Point2D(double.MinValue / 2, double.MinValue / 2), double.MaxValue, double.MaxValue);
-                    Solver2D solver2D = new Solver2D(area, new List<IClosed2D>());
-                    solver2D.AddRange(solver2DDatas);
+                    Guid labelViewGuid = twoDimensionalViewSettings.Guid;
+                    Dictionary<Guid, Tuple<Point2D, bool>> labelPositions = null;
 
-                    List<Solver2DResult> solver2DResults;
-                    using (PerformanceLog.Measure("FloorPlan.LabelSolver", string.Format("{0} [{1} labels]", twoDimensionalViewSettings.Name, solver2DDatas.Count)))
+                    lock (labelSolveCacheLock)
                     {
-                        solver2DResults = solver2D.Solve();
-                    }
-
-                    // Check if solver2DResults is null
-                    // Add shifted labels from solver2DResults to tuples
-                    if (solver2DResults != null)
-                    {
-                        foreach (Solver2DResult solver2DResult in solver2DResults)
+                        if (labelSolveCache.TryGetValue(labelViewGuid, out Tuple<string, Dictionary<Guid, Tuple<Point2D, bool>>> cached) && cached != null && string.Equals(cached.Item1, labelSignature, StringComparison.Ordinal))
                         {
-                            Solver2DData solver2DData = solver2DResult.Solver2DData;
-                            Tuple<Space, List<Face2D>, string, Point2D> tuple = solver2DData.Tag as Tuple<Space, List<Face2D>, string, Point2D>;
+                            labelPositions = cached.Item2;
+                        }
+                    }
 
+                    if (labelPositions != null)
+                    {
+                        // Cache hit: identical solver inputs - reuse solved label positions, skip Solver2D.Solve().
+                        PerformanceLog.Write("FloorPlan.LabelSolver", string.Format("{0} [{1} labels] [cached]", twoDimensionalViewSettings.Name, solver2DDatas.Count), 0);
+
+                        foreach (Solver2DData solver2DData in solver2DDatas)
+                        {
+                            Tuple<Space, List<Face2D>, string, Point2D> tuple = solver2DData.Tag as Tuple<Space, List<Face2D>, string, Point2D>;
                             if (tuple == null)
                             {
                                 continue;
                             }
 
-                            Rectangle2D rectangle2D = solver2DResult.Closed2D<Rectangle2D>();
-                            if (rectangle2D != null)
+                            if (labelPositions.TryGetValue(tuple.Item1.Guid, out Tuple<Point2D, bool> position) && position != null)
                             {
-                                tuple = new Tuple<Space, List<Face2D>, string, Point2D>(tuple.Item1, tuple.Item2, tuple.Item3, rectangle2D.GetCentroid());
+                                tuples.Add(new Tuple<Space, List<Face2D>, string, Point2D>(tuple.Item1, tuple.Item2, position.Item2 ? tuple.Item3 : "", position.Item1));
                             }
                             else
                             {
-                                tuple = new Tuple<Space, List<Face2D>, string, Point2D>(tuple.Item1, tuple.Item2, "", tuple.Item4);
+                                tuples.Add(tuple);
                             }
-                            tuples.Add(tuple);
+                        }
+                    }
+                    else
+                    {
+                        // Set the area as infinite so that the labels can extend beyond the faces
+                        Rectangle2D area = new Rectangle2D(new Point2D(double.MinValue / 2, double.MinValue / 2), double.MaxValue, double.MaxValue);
+                        Solver2D solver2D = new Solver2D(area, new List<IClosed2D>());
+                        solver2D.AddRange(solver2DDatas);
+
+                        List<Solver2DResult> solver2DResults;
+                        using (PerformanceLog.Measure("FloorPlan.LabelSolver", string.Format("{0} [{1} labels]", twoDimensionalViewSettings.Name, solver2DDatas.Count)))
+                        {
+                            solver2DResults = solver2D.Solve();
+                        }
+
+                        labelPositions = new Dictionary<Guid, Tuple<Point2D, bool>>();
+
+                        // Check if solver2DResults is null
+                        // Add shifted labels from solver2DResults to tuples
+                        if (solver2DResults != null)
+                        {
+                            foreach (Solver2DResult solver2DResult in solver2DResults)
+                            {
+                                Solver2DData solver2DData = solver2DResult.Solver2DData;
+                                Tuple<Space, List<Face2D>, string, Point2D> tuple = solver2DData.Tag as Tuple<Space, List<Face2D>, string, Point2D>;
+
+                                if (tuple == null)
+                                {
+                                    continue;
+                                }
+
+                                Rectangle2D rectangle2D = solver2DResult.Closed2D<Rectangle2D>();
+                                if (rectangle2D != null)
+                                {
+                                    Point2D centroid = rectangle2D.GetCentroid();
+                                    labelPositions[tuple.Item1.Guid] = new Tuple<Point2D, bool>(centroid, true);
+                                    tuple = new Tuple<Space, List<Face2D>, string, Point2D>(tuple.Item1, tuple.Item2, tuple.Item3, centroid);
+                                }
+                                else
+                                {
+                                    labelPositions[tuple.Item1.Guid] = new Tuple<Point2D, bool>(tuple.Item4, false);
+                                    tuple = new Tuple<Space, List<Face2D>, string, Point2D>(tuple.Item1, tuple.Item2, "", tuple.Item4);
+                                }
+                                tuples.Add(tuple);
+                            }
+
+                            // Only cache a real solve. If Solve() returned null the uncached path produced no
+                            // labels; caching that empty state would make the next identical regen take the
+                            // hit path and render every label at its anchor instead - so leave it uncached.
+                            lock (labelSolveCacheLock)
+                            {
+                                labelSolveCache[labelViewGuid] = new Tuple<string, Dictionary<Guid, Tuple<Point2D, bool>>>(labelSignature, labelPositions);
+                            }
                         }
                     }
 
