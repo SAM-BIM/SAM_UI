@@ -125,7 +125,31 @@ namespace SAM.Geometry.UI.WPF
             viewport3DX.MouseLeave += Viewport3DX_MouseLeave;
             viewport3DX.KeyDown += Viewport3DX_KeyDown;
 
+            // The viewport binds some letter keys to camera view commands by default (e.g. U -> top
+            // view). Those swallow the app's global shortcuts (U = Unhide All, handled in
+            // AnalyticalWindow.Window_KeyDown) before they bubble out of the viewport. Drop the
+            // conflicting bindings so the keystrokes reach the window. Re-applied on Loaded in case
+            // the defaults are (re)added when the template is applied.
+            RemoveConflictingKeyBindings();
+
             Children.Add(viewport3DX);
+        }
+
+        // Keys the app uses as global shortcuts (AnalyticalWindow.Window_KeyDown) that the Viewport3DX
+        // also binds to camera commands; the app shortcut wins.
+        private static readonly Key[] reservedKeys = new Key[] { Key.U };
+
+        private void RemoveConflictingKeyBindings()
+        {
+            for (int i = viewport3DX.InputBindings.Count - 1; i >= 0; i--)
+            {
+                if (viewport3DX.InputBindings[i] is KeyBinding keyBinding
+                    && keyBinding.Modifiers == ModifierKeys.None
+                    && System.Array.IndexOf(reservedKeys, keyBinding.Key) >= 0)
+                {
+                    viewport3DX.InputBindings.RemoveAt(i);
+                }
+            }
         }
 
         private static bool ResolveEnabled()
@@ -911,6 +935,8 @@ namespace SAM.Geometry.UI.WPF
 
         private void Viewport3DX_Loaded(object sender, RoutedEventArgs e)
         {
+            RemoveConflictingKeyBindings();
+
             if (zoomExtentsPending)
             {
                 zoomExtentsPending = false;
