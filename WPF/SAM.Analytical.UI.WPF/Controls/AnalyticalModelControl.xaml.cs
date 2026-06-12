@@ -250,7 +250,22 @@ namespace SAM.Analytical.UI.WPF
         {
             using (PerformanceLog.Measure("AnalyticalModelControl.LoadAnalyticalModel"))
             {
-                LoadModel(analyticalModel);
+                // The model tree (spaces/panels/apertures/ICs/materials/profiles/systems/zones) is rebuilt
+                // from scratch here and is the dominant reload cost. A pure ViewSettingsModification
+                // (hide, colour, legend, camera) cannot change any of that content, so skip the model-tree
+                // rebuild for it. Open/Close, full and model modifications still rebuild. The views tree is
+                // cheap and may change on a ViewSettingsModification (e.g. view rename), so it always loads.
+                List<IModification> modifications = modifiedEventArgs?.Modifications;
+                bool rebuildModel = treeView_Model == null || treeView_Model.Items.Count == 0
+                    || modifiedEventArgs is OpenedEventArgs || modifiedEventArgs is ClosedEventArgs
+                    || modifications == null || modifications.Count == 0
+                    || !modifications.All(x => x is ViewSettingsModification);
+
+                if (rebuildModel)
+                {
+                    LoadModel(analyticalModel);
+                }
+
                 LoadViews(analyticalModel);
             }
         }
