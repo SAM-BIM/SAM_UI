@@ -599,6 +599,15 @@ namespace SAM.Analytical.UI
                             continue;
                         }
 
+                        // Skip hidden spaces here - before the label solver - so a hidden space's tag
+                        // does not participate in collision resolution and shift/blank visible labels.
+                        // Mirrors the 3D path's visibility early-out; covers both the face and the label.
+                        SurfaceAppearance surfaceAppearance = Query.SurfaceAppearance(space, twoDimensionalViewSettings);
+                        if (surfaceAppearance == null || surfaceAppearance.Opacity == 0 || !surfaceAppearance.Visible)
+                        {
+                            continue;
+                        }
+
                         List<Face2D> face2Ds_Offset = new List<Face2D>();
                         foreach (Face2D face2D in face2Ds)
                         {
