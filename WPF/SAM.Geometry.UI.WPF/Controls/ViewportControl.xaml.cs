@@ -22,8 +22,16 @@ namespace SAM.Geometry.UI.WPF
     /// </summary>
     public partial class ViewportControl : UserControl
     {
-        // Experimental 2D floor plan renderer (see FloorPlan2DControl) - opt-in, off by default
-        private static readonly bool floorPlan2DEnabled = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D")) && Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D").Trim() != "0";
+        // 2D floor plan renderer (see FloorPlan2DControl) - now ON by default (issue #18). Set
+        // SAM_UI_FLOORPLAN_2D=0 to fall back to the legacy Helix orthographic 2D path.
+        private static readonly bool floorPlan2DEnabled = ResolveFloorPlan2DEnabled();
+
+        // Default on; only an explicit "0" opts back out to the Helix orthographic 2D path.
+        private static bool ResolveFloorPlan2DEnabled()
+        {
+            string value = Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D");
+            return string.IsNullOrWhiteSpace(value) || value.Trim() != "0";
+        }
 
         // Record the resolved flag state once, so the performance log shows whether the
         // 2D floor plan path is live in this process (the env var is read only at startup)

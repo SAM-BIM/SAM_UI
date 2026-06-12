@@ -28,6 +28,11 @@
     <PackageReference Include="HelixToolkit.Wpf">
       <Version>2.27.0</Version>
     </PackageReference>
+    <!-- DirectX 11 viewport (issue #18 gate 3 / SharpDX port). Phase A spike, gated behind
+         SAM_UI_VIEWPORT_SHARPDX; current 3D path stays on HelixToolkit.Wpf 2.x until proven. -->
+    <PackageReference Include="HelixToolkit.Wpf.SharpDX">
+      <Version>3.1.2</Version>
+    </PackageReference>
     <PackageReference Include="NetOfficeFw.Excel">
       <Version>1.9.7</Version>
     </PackageReference>

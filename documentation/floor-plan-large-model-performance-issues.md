@@ -248,12 +248,12 @@ log file next to the timings table in this document.
 
 ---
 
-## Experimental: 2D floor plan renderer (flag-gated)
+## 2D floor plan renderer (default on)
 
 Implements the "2D canvas for floor plans" direction from issue #18 (also addresses #13 and the
-floor-plan part of #16). **Off by default** — enable with the `SAM_UI_FLOORPLAN_2D` environment
-variable (any value other than empty/`0`). With the flag off, behavior is byte-for-byte identical
-to before.
+floor-plan part of #16). **On by default** (issue #18 decision) — set `SAM_UI_FLOORPLAN_2D=0` to
+fall back to the legacy Helix orthographic 2D path (byte-for-byte the old behavior). Any other
+value, or leaving it unset, uses the 2D canvas.
 
 - `WPF/SAM.Geometry.UI.WPF/Controls/FloorPlan2DControl.cs` — renders the same
   `GeometryObjectModel` as flat WPF `DrawingVisual`s: spaces as filled `StreamGeometry`
