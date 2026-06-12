@@ -113,6 +113,8 @@ namespace SAM.Geometry.UI.WPF
                 sharpDXViewportControl.ObjectHoovered += SharpDXViewportControl_ObjectHoovered;
                 sharpDXViewportControl.ObjectDoubleClicked += SharpDXViewportControl_ObjectDoubleClicked;
                 sharpDXViewportControl.ObjectSelectionChanged += SharpDXViewportControl_ObjectSelectionChanged;
+                sharpDXViewportControl.ContextMenu = new ContextMenu();
+                sharpDXViewportControl.ContextMenuOpening += SharpDXViewportControl_ContextMenuOpening;
 
                 // Mode defaults to ThreeDimensional, so the SharpDX viewport starts active and
                 // the Helix one hidden; UpdateMode keeps the visibilities in sync afterwards
@@ -223,6 +225,46 @@ namespace SAM.Geometry.UI.WPF
             }
 
             ObjectContextMenuOpening?.Invoke(this, new ObjectContextMenuOpeningEventArgs(floorPlan2DControl.ContextMenu, e, modelVisual3Ds));
+        }
+
+        // Right-click menu for the SharpDX 3D view (issue #32 item 4) - mirrors the 2D handler above
+        // and helixViewport3D_ContextMenuOpening: builds the Zoom Extents / Zoom Selected items and
+        // fires ObjectContextMenuOpening with stub ModelVisual3Ds for the selected objects, so the
+        // AnalyticalWindow consumer (Hide/Unhide/Isolate/properties) works unchanged.
+        private void SharpDXViewportControl_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            if (Keyboard.IsKeyDown(Key.LeftCtrl) ||
+                Keyboard.IsKeyDown(Key.RightCtrl) ||
+                Keyboard.IsKeyDown(Key.LeftAlt) ||
+                Keyboard.IsKeyDown(Key.RightAlt) ||
+                Keyboard.IsKeyDown(Key.LeftShift) ||
+                Keyboard.IsKeyDown(Key.RightShift))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            sharpDXViewportControl.ContextMenu = new ContextMenu();
+
+            MenuItem menuItem = new MenuItem();
+            menuItem.Name = "MenuItem_ZoomExtents";
+            menuItem.Header = "Zoom Extents";
+            menuItem.Click += MenuItem_ZoomExtents_Click;
+            sharpDXViewportControl.ContextMenu.Items.Add(menuItem);
+
+            AddZoomSelectedMenuItem(sharpDXViewportControl.ContextMenu);
+
+            List<ModelVisual3D> modelVisual3Ds = new List<ModelVisual3D>();
+            foreach (SAMObject sAMObject in sharpDXViewportControl.SelectedSAMObjects())
+            {
+                ModelVisual3D modelVisual3D = sharpDXViewportControl.GetStubVisual3D(sAMObject.Guid);
+                if (modelVisual3D != null)
+                {
+                    modelVisual3Ds.Add(modelVisual3D);
+                }
+            }
+
+            ObjectContextMenuOpening?.Invoke(this, new ObjectContextMenuOpeningEventArgs(sharpDXViewportControl.ContextMenu, e, modelVisual3Ds));
         }
 
         public Camera Camera
