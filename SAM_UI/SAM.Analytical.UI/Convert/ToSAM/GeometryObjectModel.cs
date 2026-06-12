@@ -699,14 +699,31 @@ namespace SAM.Analytical.UI
                         }
 
                         double farthestPointDistance = 0;
-                        StringBuilder boundaryBuilder = new StringBuilder();
                         foreach (Point2D pointsTemp in face2Ds[0].Edge2Ds[0].Polygon2D().Points)
                         {
                             double distance = pointsTemp.Distance(point2D);
 
                             farthestPointDistance = Math.Max(distance, farthestPointDistance);
+                        }
 
-                            boundaryBuilder.Append(Sig(pointsTemp.X)).Append(',').Append(Sig(pointsTemp.Y)).Append(';');
+                        // Signature must capture the FULL limit area (face2Ds[0], passed as LimitArea below),
+                        // including any inner loops/holes - not just the outer edge - so a change to a hole
+                        // forces a re-solve rather than a false cache hit.
+                        StringBuilder boundaryBuilder = new StringBuilder();
+                        foreach (var edge2D in face2Ds[0].Edge2Ds)
+                        {
+                            List<Point2D> edgePoints = edge2D?.Polygon2D()?.Points;
+                            if (edgePoints == null)
+                            {
+                                continue;
+                            }
+
+                            foreach (Point2D edgePoint in edgePoints)
+                            {
+                                boundaryBuilder.Append(Sig(edgePoint.X)).Append(',').Append(Sig(edgePoint.Y)).Append(';');
+                            }
+
+                            boundaryBuilder.Append('#');
                         }
                         Rectangle2D rectangle2D = new Rectangle2D(new Point2D(point2D.X + width / 2, point2D.Y + height / 2), width, height);
 
@@ -805,11 +822,14 @@ namespace SAM.Analytical.UI
                                 }
                                 tuples.Add(tuple);
                             }
-                        }
 
-                        lock (labelSolveCacheLock)
-                        {
-                            labelSolveCache[labelViewGuid] = new Tuple<string, Dictionary<Guid, Tuple<Point2D, bool>>>(labelSignature, labelPositions);
+                            // Only cache a real solve. If Solve() returned null the uncached path produced no
+                            // labels; caching that empty state would make the next identical regen take the
+                            // hit path and render every label at its anchor instead - so leave it uncached.
+                            lock (labelSolveCacheLock)
+                            {
+                                labelSolveCache[labelViewGuid] = new Tuple<string, Dictionary<Guid, Tuple<Point2D, bool>>>(labelSignature, labelPositions);
+                            }
                         }
                     }
 
