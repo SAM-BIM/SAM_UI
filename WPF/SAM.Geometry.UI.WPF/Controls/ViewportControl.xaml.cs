@@ -46,6 +46,17 @@ namespace SAM.Geometry.UI.WPF
         private double sceneZMax = double.NaN;
         private bool updatingClipPlanes;
 
+        // Guid -> visual index for the 3D (Helix) scene, rebuilt on each Load. Replaces the O(N) visual-tree
+        // walks (Core.UI.WPF.Query.Visual3D / ContainsAny) that back GetVisual3D, ContainsAny and the #11
+        // attribute fast-path RefreshAppearances with O(1) lookups (issue #16). The 2D path keeps using
+        // FloorPlan2DControl's own guid index. UI-thread only, so no locking.
+        private readonly Dictionary<Guid, ModelVisual3D> dictionary_Visual3D = new Dictionary<Guid, ModelVisual3D>();
+
+        // Hover hit-test throttle: a full ray hit-test on every mouse-move is costly on large 3D scenes
+        // (issue #16). Process at most once per interval; intermediate moves keep the current highlight.
+        private const int hoverHitTestThrottleMilliseconds = 30;
+        private int lastHoverHitTestTick;
+
         public ViewportControl()
         {
             InitializeComponent();
@@ -229,17 +240,26 @@ namespace SAM.Geometry.UI.WPF
                 return sAMObjects != null && sAMObjects.Find(x => guids.Contains(x.Guid)) != null;
             }
 
-            return Query.ContainsAny<T>(helixViewport3D.Children, guids);
+            if (guids == null)
+            {
+                return false;
+            }
+
+            // 3D path: O(1) per guid via the index instead of an O(N) visual-tree walk (issue #16).
+            foreach (Guid guid in guids)
+            {
+                if (dictionary_Visual3D.TryGetValue(guid, out ModelVisual3D modelVisual3D) && Carries<T>(modelVisual3D))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public bool Contains<T>(Guid guid) where T : SAMObject
         {
-            if (Active2D)
-            {
-                return ContainsAny<T>([guid]);
-            }
-
-            return Query.ContainsAny<T>(helixViewport3D.Children, [guid]);
+            return ContainsAny<T>([guid]);
         }
 
         public T GetSAMObject<T>(Guid guid) where T : SAMObject
@@ -260,7 +280,33 @@ namespace SAM.Geometry.UI.WPF
                 return modelVisual3D;
             }
 
-            return Core.UI.WPF.Query.Visual3D<T>(helixViewport3D.Children, guid);
+            // 3D path: O(1) index lookup instead of an O(N) visual-tree walk (issue #16). The indexed
+            // visual is the outermost per-object container (Tag = space/panel), which is exactly what
+            // RefreshAppearance (recurses children) and selection operate on.
+            if (dictionary_Visual3D.TryGetValue(guid, out ModelVisual3D modelVisual3D_Indexed) && Carries<T>(modelVisual3D_Indexed))
+            {
+                return modelVisual3D_Indexed;
+            }
+
+            return null;
+        }
+
+        // True when the visual carries a T (directly or via ITaggable.Tag.Value) on itself or its Content -
+        // mirrors the type match in Core.UI.WPF.Query.Visual3D so the index preserves ContainsAny/GetVisual3D
+        // type semantics.
+        private static bool Carries<T>(ModelVisual3D modelVisual3D) where T : SAMObject
+        {
+            if (modelVisual3D == null)
+            {
+                return false;
+            }
+
+            if (Core.UI.WPF.Query.JSAMObject<T>(modelVisual3D) != null)
+            {
+                return true;
+            }
+
+            return modelVisual3D.Content != null && Core.UI.WPF.Query.JSAMObject<T>(modelVisual3D.Content) != null;
         }
 
         /// <summary>
@@ -769,6 +815,15 @@ namespace SAM.Geometry.UI.WPF
 
         private void helixViewport3D_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            // Leading-edge throttle: process at most one hit-test per interval. unchecked handles
+            // Environment.TickCount wraparound. Intermediate moves keep the current highlight (issue #16).
+            int tick = Environment.TickCount;
+            if (unchecked(tick - lastHoverHitTestTick) < hoverHitTestThrottleMilliseconds)
+            {
+                return;
+            }
+            lastHoverHitTestTick = tick;
+
             actionManager.Cancel<HighlightAction>();
 
             Point point = e.GetPosition(helixViewport3D);
@@ -806,6 +861,9 @@ namespace SAM.Geometry.UI.WPF
                 Core.UI.WPF.Modify.Clear<ModelVisual3D>(helixViewport3D.Children, new Type[] { typeof(GeometryObjectModel) });
             }
 
+            // The scene is being rebuilt - drop the stale guid index (issue #16); the 3D branch repopulates it.
+            dictionary_Visual3D.Clear();
+
             // Flag-gated 2D floor plan path: render via FloorPlan2DControl, keep the Helix scene empty
             floorPlan2DControl.Load(Active2D ? geometryObjectModel : null);
 
@@ -825,6 +883,7 @@ namespace SAM.Geometry.UI.WPF
                 if (modelVisual3D != null)
                 {
                     helixViewport3D.Children.Add(modelVisual3D);
+                    BuildVisual3DIndex(modelVisual3D);
                 }
 
                 // Cache the scene depth extent for 2D clip-plane tracking (issue #13)
@@ -847,6 +906,34 @@ namespace SAM.Geometry.UI.WPF
             }
 
             RefreshLegend(geometryObjectModel);
+        }
+
+        // Walks the freshly built 3D scene and maps each object's guid to its visual. Pre-order +
+        // first-wins, so the outermost per-object container (Tag = space/panel) is the indexed visual.
+        // Resolves the object from the visual's own attached IJSAMObject first, then its Content - mirroring
+        // Core.UI.WPF.Query.Visual3D - so the index finds everything the old O(N) walk would (issue #16).
+        private void BuildVisual3DIndex(Visual3D visual3D)
+        {
+            if (!(visual3D is ModelVisual3D modelVisual3D))
+            {
+                return;
+            }
+
+            SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(modelVisual3D);
+            if (sAMObject == null && modelVisual3D.Content != null)
+            {
+                sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(modelVisual3D.Content);
+            }
+
+            if (sAMObject != null && !dictionary_Visual3D.ContainsKey(sAMObject.Guid))
+            {
+                dictionary_Visual3D[sAMObject.Guid] = modelVisual3D;
+            }
+
+            foreach (Visual3D visual3D_Child in modelVisual3D.Children)
+            {
+                BuildVisual3DIndex(visual3D_Child);
+            }
         }
 
         private void RefreshLegend(GeometryObjectModel geometryObjectModel)
