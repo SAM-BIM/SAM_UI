@@ -1,4 +1,7 @@
-﻿using SAM.Geometry.Spatial;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Geometry.Spatial;
 using System;
 using System.Collections.Generic;
 using System.Windows.Media.Media3D;
@@ -67,6 +70,14 @@ namespace SAM.Geometry.UI.WPF
                         result.Normals.Add(vector3D.ToMedia3D());
                     }
                 }
+            }
+
+            // Freeze the immutable mesh so WPF stops change-tracking it (large positions/indices/normals
+            // collections) and can share it across visuals - a key cost on large 3D scenes (issue #16).
+            // Selection/highlight/refresh build new meshes rather than mutate this one, so this is safe.
+            if (result.CanFreeze)
+            {
+                result.Freeze();
             }
 
             return result;
@@ -152,7 +163,15 @@ namespace SAM.Geometry.UI.WPF
             }
 
 
-            return meshBuilder.ToMesh();
+            MeshGeometry3D result = meshBuilder.ToMesh();
+
+            // Freeze the immutable curve/segment mesh (see note above, issue #16).
+            if (result != null && result.CanFreeze)
+            {
+                result.Freeze();
+            }
+
+            return result;
         }
     }
 }
