@@ -729,6 +729,11 @@ namespace SAM.Geometry.UI.WPF
                 return true;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                return sharpDXViewportControl.Zoom([sAMObject.Guid]);
+            }
+
             Visual3D visual3D = GetVisual3D<SAMObject>(sAMObject.Guid);
             if (visual3D == null)
             {
@@ -762,6 +767,11 @@ namespace SAM.Geometry.UI.WPF
 
                 floorPlan2DControl.Zoom(guids);
                 return true;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                return sharpDXViewportControl.Zoom(new List<T>(sAMObjects).FindAll(x => x != null).ConvertAll(x => x.Guid));
             }
 
             List<Rect3D> rect3Ds = new List<Rect3D>();
@@ -1174,6 +1184,12 @@ namespace SAM.Geometry.UI.WPF
             if (Active2D)
             {
                 floorPlan2DControl.ZoomExtents();
+                return;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                sharpDXViewportControl.ZoomExtents();
                 return;
             }
 

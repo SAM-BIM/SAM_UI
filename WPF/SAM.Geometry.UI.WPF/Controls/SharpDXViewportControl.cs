@@ -486,6 +486,59 @@ namespace SAM.Geometry.UI.WPF
         }
 
         /// <summary>
+        /// Zooms to the combined extents of the given objects ("Zoom Selected", issue #32 / #13).
+        /// Bounds are taken from the merged mesh/line positions (world space - the scene has no
+        /// per-object transforms). Returns false when none of the guids are present or have geometry.
+        /// </summary>
+        public bool Zoom(IEnumerable<Guid> guids)
+        {
+            if (guids == null)
+            {
+                return false;
+            }
+
+            bool any = false;
+            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
+
+            foreach (Guid guid in guids)
+            {
+                if (!dictionary_Element3D.TryGetValue(guid, out Element3D element3D) || !(element3D is GroupModel3D groupModel3D))
+                {
+                    continue;
+                }
+
+                foreach (Element3D element3D_Child in groupModel3D.Children)
+                {
+                    Geometry3D geometry3D = (element3D_Child as MeshGeometryModel3D)?.Geometry ?? (element3D_Child as LineGeometryModel3D)?.Geometry;
+                    if (geometry3D?.Positions == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (Vector3 position in geometry3D.Positions)
+                    {
+                        any = true;
+                        if (position.X < minX) { minX = position.X; }
+                        if (position.Y < minY) { minY = position.Y; }
+                        if (position.Z < minZ) { minZ = position.Z; }
+                        if (position.X > maxX) { maxX = position.X; }
+                        if (position.Y > maxY) { maxY = position.Y; }
+                        if (position.Z > maxZ) { maxZ = position.Z; }
+                    }
+                }
+            }
+
+            if (!any)
+            {
+                return false;
+            }
+
+            viewport3DX.ZoomExtents(new Media3D.Rect3D(minX, minY, minZ, maxX - minX, maxY - minY, maxZ - minZ), 0);
+            return true;
+        }
+
+        /// <summary>
         /// Zooms to the scene extents; deferred until the viewport is loaded with a non-zero size
         /// (zooming a size-less viewport derives a degenerate camera - Phase A, PR #30).
         /// </summary>
