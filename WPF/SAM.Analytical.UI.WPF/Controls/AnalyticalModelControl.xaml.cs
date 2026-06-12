@@ -248,8 +248,11 @@ namespace SAM.Analytical.UI.WPF
 
         private void LoadAnalyticalModel(AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs)
         {
-            LoadModel(analyticalModel);
-            LoadViews(analyticalModel);
+            using (PerformanceLog.Measure("AnalyticalModelControl.LoadAnalyticalModel"))
+            {
+                LoadModel(analyticalModel);
+                LoadViews(analyticalModel);
+            }
         }
 
         private void LoadModel(AnalyticalModel analyticalModel)

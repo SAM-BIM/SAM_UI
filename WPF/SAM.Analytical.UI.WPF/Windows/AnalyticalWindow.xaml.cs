@@ -1686,26 +1686,31 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void Reload(ModifiedEventArgs modifiedEventArgs)
         {
-            progressBarWindowManager.Show("Reloading", "Reloading...");
+            string modifications = modifiedEventArgs?.Modifications == null ? null : string.Join(",", modifiedEventArgs.Modifications.ConvertAll(x => x?.GetType().Name));
 
-            SetEnabled();
-            //SetActiveGuid();
+            using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.Reload", modifications))
+            {
+                progressBarWindowManager.Show("Reloading", "Reloading...");
 
-            uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
-            tabControl.SelectionChanged -= TabControl_SelectionChanged;
+                SetEnabled();
+                //SetActiveGuid();
 
-            AnalyticalModel analyticalModel = uIAnalyticalModel.JSAMObject;
+                uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
+                tabControl.SelectionChanged -= TabControl_SelectionChanged;
 
-            UpdateTabItems(tabControl, analyticalModel, modifiedEventArgs);
+                AnalyticalModel analyticalModel = uIAnalyticalModel.JSAMObject;
 
-            UpdateUIGeometrySettings(tabControl, analyticalModel, modifiedEventArgs);
+                UpdateTabItems(tabControl, analyticalModel, modifiedEventArgs);
 
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications);
+                UpdateUIGeometrySettings(tabControl, analyticalModel, modifiedEventArgs);
 
-            uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
-            tabControl.SelectionChanged += TabControl_SelectionChanged;
+                uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications);
 
-            progressBarWindowManager.Close();
+                uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
+                tabControl.SelectionChanged += TabControl_SelectionChanged;
+
+                progressBarWindowManager.Close();
+            }
         }
 
         private void RemoveViewSettings()
@@ -3214,8 +3219,16 @@ namespace SAM.Analytical.UI.WPF.Windows
 
                 List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
 
-                GeometryObjectModel geometryObjectModel = analyticalModel.ToSAM_GeometryObjectModel(viewSettings);
-                viewportControl.UIGeometryObjectModel = new UIGeometryObjectModel(geometryObjectModel);
+                GeometryObjectModel geometryObjectModel;
+                using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.GeometryObjectModel", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+                {
+                    geometryObjectModel = analyticalModel.ToSAM_GeometryObjectModel(viewSettings);
+                }
+
+                using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.Viewport", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+                {
+                    viewportControl.UIGeometryObjectModel = new UIGeometryObjectModel(geometryObjectModel);
+                }
 
                 viewportControl.Select(sAMObjects);
             }
@@ -3248,7 +3261,33 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
+            // Only a double-click on the tab header itself should open View Settings. A double-click on an
+            // object inside the viewport opens that object's properties; that same double-click bubbles up
+            // to the TabItem, so without this guard View Settings would also open the moment the properties
+            // dialog is dismissed.
+            if (tabItem.Content is DependencyObject content && e.OriginalSource is DependencyObject source && IsDescendantOf(source, content))
+            {
+                return;
+            }
+
             EditViewSettings(tabItem);
+        }
+
+        private static bool IsDescendantOf(DependencyObject node, DependencyObject ancestor)
+        {
+            while (node != null)
+            {
+                if (node == ancestor)
+                {
+                    return true;
+                }
+
+                node = node is System.Windows.Media.Visual || node is System.Windows.Media.Media3D.Visual3D
+                    ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                    : System.Windows.LogicalTreeHelper.GetParent(node);
+            }
+
+            return false;
         }
 
         private List<TabItem> UpdateTabItems(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs)

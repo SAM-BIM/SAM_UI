@@ -19,15 +19,31 @@ namespace SAM.Geometry.UI.WPF
     /// </summary>
     public partial class ViewportControl : UserControl
     {
+        // Experimental 2D floor plan renderer (see FloorPlan2DControl) - opt-in, off by default
+        private static readonly bool floorPlan2DEnabled = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D")) && Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D").Trim() != "0";
+
+        // Record the resolved flag state once, so the performance log shows whether the
+        // 2D floor plan path is live in this process (the env var is read only at startup)
+        private static int floorPlan2DStateLogged = 0;
+
         private ActionManager actionManager;
         private Mode mode = Mode.ThreeDimensional;
 
         private RectangularSelector rectangularSelector;
         private UIGeometryObjectModel uIGeometryObjectModel;
 
+        private FloorPlan2DControl floorPlan2DControl;
+
         public ViewportControl()
         {
             InitializeComponent();
+
+            // Log the 2D floor plan flag state once per process (raw env var value + resolved bool)
+            if (System.Threading.Interlocked.Exchange(ref floorPlan2DStateLogged, 1) == 0)
+            {
+                string value = Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D");
+                PerformanceLog.Write("ViewportControl.FloorPlan2DEnabled", string.Format("{0} [SAM_UI_FLOORPLAN_2D={1}]", floorPlan2DEnabled, value ?? "(null)"), 0);
+            }
 
             helixViewport3D.PanGesture = new MouseGesture(MouseAction.LeftClick, ModifierKeys.Shift);
             helixViewport3D.RotateGesture = new MouseGesture(MouseAction.RightClick, ModifierKeys.Shift);
@@ -41,6 +57,12 @@ namespace SAM.Geometry.UI.WPF
 
             rectangularSelector.Selecting += RectangularSelector_Selecting;
 
+            floorPlan2DControl = new FloorPlan2DControl() { Visibility = Visibility.Collapsed, ContextMenu = new ContextMenu() };
+            grid.Children.Insert(grid.Children.IndexOf(helixViewport3D) + 1, floorPlan2DControl);
+            floorPlan2DControl.ObjectHoovered += FloorPlan2DControl_ObjectHoovered;
+            floorPlan2DControl.ObjectDoubleClicked += FloorPlan2DControl_ObjectDoubleClicked;
+            floorPlan2DControl.ObjectSelectionChanged += FloorPlan2DControl_ObjectSelectionChanged;
+            floorPlan2DControl.ContextMenuOpening += FloorPlan2DControl_ContextMenuOpening;
         }
 
         public event ObjectContextMenuOpeningEventHandler ObjectContextMenuOpening;
@@ -49,6 +71,63 @@ namespace SAM.Geometry.UI.WPF
 
         public event ObjectHooveredEventHandler ObjectHoovered;
         public event ObjectSelectionChangedEventHandler ObjectSelectionChanged;
+
+        private bool Active2D
+        {
+            get
+            {
+                return floorPlan2DEnabled && mode == Mode.TwoDimensional;
+            }
+        }
+
+        private void FloorPlan2DControl_ObjectHoovered(object sender, ObjectHooveredEventArgs e)
+        {
+            ObjectHoovered?.Invoke(this, e);
+        }
+
+        private void FloorPlan2DControl_ObjectDoubleClicked(object sender, ObjectDoubleClickedEventArgs e)
+        {
+            ObjectDoubleClicked?.Invoke(this, e);
+        }
+
+        private void FloorPlan2DControl_ObjectSelectionChanged(object sender, ObjectSelectionChangedEventArgs e)
+        {
+            ObjectSelectionChanged?.Invoke(this, e);
+        }
+
+        private void FloorPlan2DControl_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            if (Keyboard.IsKeyDown(Key.LeftCtrl) ||
+                Keyboard.IsKeyDown(Key.RightCtrl) ||
+                Keyboard.IsKeyDown(Key.LeftAlt) ||
+                Keyboard.IsKeyDown(Key.RightAlt) ||
+                Keyboard.IsKeyDown(Key.LeftShift) ||
+                Keyboard.IsKeyDown(Key.RightShift))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            floorPlan2DControl.ContextMenu = new ContextMenu();
+
+            MenuItem menuItem = new MenuItem();
+            menuItem.Name = "MenuItem_ZoomExtents";
+            menuItem.Header = "Zoom Extents";
+            menuItem.Click += MenuItem_ZoomExtents_Click;
+            floorPlan2DControl.ContextMenu.Items.Add(menuItem);
+
+            List<ModelVisual3D> modelVisual3Ds = new List<ModelVisual3D>();
+            foreach (SAMObject sAMObject in floorPlan2DControl.SelectedSAMObjects())
+            {
+                ModelVisual3D modelVisual3D = floorPlan2DControl.GetStubVisual3D(sAMObject.Guid);
+                if (modelVisual3D != null)
+                {
+                    modelVisual3Ds.Add(modelVisual3D);
+                }
+            }
+
+            ObjectContextMenuOpening?.Invoke(this, new ObjectContextMenuOpeningEventArgs(floorPlan2DControl.ContextMenu, e, modelVisual3Ds));
+        }
 
         public Camera Camera
         {
@@ -125,11 +204,27 @@ namespace SAM.Geometry.UI.WPF
 
         public bool ContainsAny<T>(IEnumerable<Guid> guids) where T : SAMObject
         {
+            if (Active2D)
+            {
+                if (guids == null)
+                {
+                    return false;
+                }
+
+                List<T> sAMObjects = floorPlan2DControl.SAMObjects<T>();
+                return sAMObjects != null && sAMObjects.Find(x => guids.Contains(x.Guid)) != null;
+            }
+
             return Query.ContainsAny<T>(helixViewport3D.Children, guids);
         }
 
         public bool Contains<T>(Guid guid) where T : SAMObject
         {
+            if (Active2D)
+            {
+                return ContainsAny<T>([guid]);
+            }
+
             return Query.ContainsAny<T>(helixViewport3D.Children, [guid]);
         }
 
@@ -140,11 +235,27 @@ namespace SAM.Geometry.UI.WPF
 
         public Visual3D GetVisual3D<T>(Guid guid) where T : SAMObject
         {
+            if (Active2D)
+            {
+                ModelVisual3D modelVisual3D = floorPlan2DControl.GetStubVisual3D(guid);
+                if (modelVisual3D == null || Core.UI.WPF.Query.JSAMObject<T>(modelVisual3D) == null)
+                {
+                    return null;
+                }
+
+                return modelVisual3D;
+            }
+
             return Core.UI.WPF.Query.Visual3D<T>(helixViewport3D.Children, guid);
         }
 
         public List<T> SAMObjects<T>() where T : SAMObject
         {
+            if (Active2D)
+            {
+                return floorPlan2DControl.SAMObjects<T>();
+            }
+
             List<ModelVisual3D> visual3Ds = Core.UI.WPF.Query.Visual3Ds<ModelVisual3D>(helixViewport3D.Children, new Type[] { typeof(GeometryObjectModel) });
             if (visual3Ds is null)
             {
@@ -169,6 +280,17 @@ namespace SAM.Geometry.UI.WPF
 
         public bool Select(SAMObject sAMObject)
         {
+            if (Active2D)
+            {
+                bool result2D = sAMObject == null ? floorPlan2DControl.ClearSelection() : floorPlan2DControl.Select([sAMObject.Guid]);
+                if (result2D)
+                {
+                    ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                }
+
+                return result2D;
+            }
+
             bool result = false;
 
             if (sAMObject == null)
@@ -198,6 +320,26 @@ namespace SAM.Geometry.UI.WPF
 
         public bool Select<T>(IEnumerable<T> sAMObjects) where T : SAMObject
         {
+            if (Active2D)
+            {
+                bool result2D;
+                if (sAMObjects == null)
+                {
+                    result2D = floorPlan2DControl.ClearSelection();
+                }
+                else
+                {
+                    result2D = floorPlan2DControl.Select(new List<T>(sAMObjects).FindAll(x => x != null).ConvertAll(x => x.Guid));
+                }
+
+                if (result2D)
+                {
+                    ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                }
+
+                return result2D;
+            }
+
             bool result = false;
 
             if (sAMObjects == null)
@@ -244,6 +386,20 @@ namespace SAM.Geometry.UI.WPF
         
         public List<T> SelectedSAMObjects<T>() where T : SAMObject
         {
+            if (Active2D)
+            {
+                List<T> result2D = new List<T>();
+                foreach (SAMObject sAMObject in floorPlan2DControl.SelectedSAMObjects())
+                {
+                    if (sAMObject is T)
+                    {
+                        result2D.Add((T)sAMObject);
+                    }
+                }
+
+                return result2D;
+            }
+
             if (actionManager == null)
             {
                 return null;
@@ -286,6 +442,17 @@ namespace SAM.Geometry.UI.WPF
                 return false;
             }
 
+            if (Active2D)
+            {
+                if (!floorPlan2DControl.Contains(sAMObject.Guid))
+                {
+                    return false;
+                }
+
+                floorPlan2DControl.Zoom([sAMObject.Guid]);
+                return true;
+            }
+
             Visual3D visual3D = GetVisual3D<SAMObject>(sAMObject.Guid);
             if (visual3D == null)
             {
@@ -307,6 +474,18 @@ namespace SAM.Geometry.UI.WPF
             if (sAMObjects == null)
             {
                 return false;
+            }
+
+            if (Active2D)
+            {
+                List<Guid> guids = new List<T>(sAMObjects).FindAll(x => x != null && floorPlan2DControl.Contains(x.Guid)).ConvertAll(x => x.Guid);
+                if (guids.Count == 0)
+                {
+                    return false;
+                }
+
+                floorPlan2DControl.Zoom(guids);
+                return true;
             }
 
             List<Rect3D> rect3Ds = new List<Rect3D>();
@@ -484,7 +663,14 @@ namespace SAM.Geometry.UI.WPF
 
             Point point = e.GetPosition(helixViewport3D);
 
-            RayMeshGeometry3DHitTestResult rayMeshGeometry3DHitTestResult = Core.UI.WPF.Query.RayMeshGeometry3DHitTestResult(helixViewport3D, point, out ModelVisual3D modelVisual3D);
+            RayMeshGeometry3DHitTestResult rayMeshGeometry3DHitTestResult;
+            ModelVisual3D modelVisual3D;
+
+            // Only slow hit-tests (>= 25 ms) are logged to avoid flooding the log on mouse move
+            using (PerformanceLog.Measure("ViewportControl.HoverHitTest", mode.ToString(), 25))
+            {
+                rayMeshGeometry3DHitTestResult = Core.UI.WPF.Query.RayMeshGeometry3DHitTestResult(helixViewport3D, point, out modelVisual3D);
+            }
             if (rayMeshGeometry3DHitTestResult != null && modelVisual3D != null)
             {
                 actionManager.Apply(new HighlightAction(modelVisual3D));
@@ -510,20 +696,31 @@ namespace SAM.Geometry.UI.WPF
                 Core.UI.WPF.Modify.Clear<ModelVisual3D>(helixViewport3D.Children, new Type[] { typeof(GeometryObjectModel) });
             }
 
+            // Flag-gated 2D floor plan path: render via FloorPlan2DControl, keep the Helix scene empty
+            floorPlan2DControl.Load(Active2D ? geometryObjectModel : null);
+
             if (geometryObjectModel == null)
             {
                 return;
             }
 
-            ModelVisual3D modelVisual3D = Convert.ToMedia3D(geometryObjectModel);
-            if (modelVisual3D != null)
+            if (!Active2D)
             {
-                helixViewport3D.Children.Add(modelVisual3D);
-            }
+                ModelVisual3D modelVisual3D;
+                using (PerformanceLog.Measure("ViewportControl.ToMedia3D", mode.ToString()))
+                {
+                    modelVisual3D = Convert.ToMedia3D(geometryObjectModel);
+                }
 
-            if (count == 0)
-            {
-                helixViewport3D.ZoomExtents();
+                if (modelVisual3D != null)
+                {
+                    helixViewport3D.Children.Add(modelVisual3D);
+                }
+
+                if (count == 0)
+                {
+                    helixViewport3D.ZoomExtents();
+                }
             }
 
             legendControl.Visibility = Visibility.Hidden;
@@ -542,6 +739,12 @@ namespace SAM.Geometry.UI.WPF
 
         private void MenuItem_ZoomExtents_Click(object sender, RoutedEventArgs e)
         {
+            if (Active2D)
+            {
+                floorPlan2DControl.ZoomExtents();
+                return;
+            }
+
             helixViewport3D.ZoomExtents();
         }
 
@@ -627,6 +830,13 @@ namespace SAM.Geometry.UI.WPF
 
             if (selectionType == SelectionType.Undefined)
             {
+                return;
+            }
+
+            if (Active2D)
+            {
+                floorPlan2DControl.SelectByScreenRect(rect, selectionType);
+                ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
                 return;
             }
 
@@ -745,6 +955,17 @@ namespace SAM.Geometry.UI.WPF
             }
 
             helixViewport3D.ZoomExtents();
+
+            if (floorPlan2DEnabled)
+            {
+                bool active2D = Active2D;
+
+                floorPlan2DControl.Visibility = active2D ? Visibility.Visible : Visibility.Collapsed;
+                helixViewport3D.Visibility = active2D ? Visibility.Collapsed : Visibility.Visible;
+
+                // Mode is assigned after UIGeometryObjectModel (see AnalyticalWindow.UpdateTabItem) - reroute the loaded model to the renderer that just became active
+                Load(uIGeometryObjectModel?.JSAMObject);
+            }
         }
     }
 }

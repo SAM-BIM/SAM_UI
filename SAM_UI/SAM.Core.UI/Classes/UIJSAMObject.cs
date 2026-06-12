@@ -68,7 +68,10 @@ namespace SAM.Core.UI
                     return default;
                 }
 
-                return Core.Query.Clone(jSAMObject);
+                using (PerformanceLog.Measure("UIJSAMObject.Clone", typeof(T).Name))
+                {
+                    return Core.Query.Clone(jSAMObject);
+                }
             }
 
             set
