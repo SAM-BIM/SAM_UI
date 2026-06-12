@@ -151,6 +151,11 @@ namespace SAM.Geometry.UI.WPF
                     Normals = UnitNormals(keyValuePair.Value.Positions.Count)
                 };
 
+                // Static per-geometry octree for hover/selection picking (issue #32 Phase C):
+                // FindHits walks it instead of every triangle, which is what makes the unthrottled
+                // mouse-move hit-test affordable on large models.
+                meshGeometry3D.UpdateOctree();
+
                 // Ambient = Diffuse reproduces the flat, unshaded look of the Helix 3D path
                 // (ambient-only lighting); specular off.
                 PhongMaterial phongMaterial = new PhongMaterial
@@ -179,11 +184,16 @@ namespace SAM.Geometry.UI.WPF
                     Indices = keyValuePair.Value.Indices
                 };
 
+                // Lines and billboards are not pickable (IsHitTestVisible = false): the meshes define
+                // an object's pickable footprint, so a click near an edge selects the face under it
+                // instead of snapping to screen-space line proximity (issue #32 Phase C). Mirrors the
+                // Helix path, where hit-testing is ray-mesh only.
                 result.Add(new LineGeometryModel3D
                 {
                     Geometry = lineGeometry3D,
                     Color = System.Windows.Media.Color.FromArgb((byte)(color4.Alpha * 255), (byte)(color4.Red * 255), (byte)(color4.Green * 255), (byte)(color4.Blue * 255)),
-                    Thickness = keyValuePair.Key.Item2
+                    Thickness = keyValuePair.Key.Item2,
+                    IsHitTestVisible = false
                 });
             }
 
@@ -207,7 +217,8 @@ namespace SAM.Geometry.UI.WPF
                 result.Add(new BillboardTextModel3D
                 {
                     Geometry = billboardText3D,
-                    FixedSize = false
+                    FixedSize = false,
+                    IsHitTestVisible = false
                 });
             }
 

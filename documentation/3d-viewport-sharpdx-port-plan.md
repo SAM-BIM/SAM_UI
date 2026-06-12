@@ -118,12 +118,26 @@ build well under 1 s on the 625-space model; visual parity with the Helix scene.
 > Helix `ViewportControl.ToMedia3D` for the A/B. Guid → `Element3D` index in place; view-settings
 > camera applied on first load, user camera preserved on reloads.
 > **Phase B limitations (by design):** hover/selection/context menu and "zoom selected" are
-> no-ops in the SharpDX 3D view until Phase C; orthographic-3D camera and view chrome are Phase D.
+> no-ops in the SharpDX 3D view until Phase C (hover/selection since landed — see the Phase C
+> status below); orthographic-3D camera and view chrome are Phase D.
 
 **Phase C — interaction.** Port hover (octree `FindHits`), single/rectangle selection, highlight
 (`HighlightAction` → swap material/overlay), the #11 `RefreshAppearances` fast-path (recolor the
 affected object's `MeshGeometryModel3D.Material`), and context-menu plumbing. **Gate:** hover/select
 < 50 ms; rectangle select parity.
+
+> **Phase C status:** the recolor fast-path (#32 item 1), hover (item 2) and selection (item 3) are
+> in. Hover picks via `FindHits` over per-geometry static octrees (built in `SharpDXSceneBuilder`),
+> unthrottled — `ViewportControl.HoverHitTest` logs ≥ 25 ms occurrences with mode `SharpDX` for the
+> gate check. Hover doubles the object's edge thickness (`HighlightAction` parity), selection swaps
+> fill to RGB(125,125,255)/blue edges (`SelectionSurfaceAppearance` parity); single/Ctrl/double
+> click, Escape and rectangle selection (projected-geometry tests with the classic Helix
+> `FindHits(rect, mode)` Inside/Touch semantics, fed by the existing `RectangularSelector` overlay)
+> all raise the existing `ViewportControl` events, with detached stub `ModelVisual3D`s as payloads
+> (the `FloorPlan2DControl` interop pattern). Programmatic `Select`/`SelectedSAMObjects`/
+> `GetVisual3D` route to the SharpDX scene. Lines and text billboards are not pickable (meshes
+> define the pickable footprint; curve-only objects are still rectangle-selectable). Context-menu
+> plumbing (item 4) is outstanding.
 
 **Phase D — camera & chrome.** Perspective + orthographic-3D cameras, `ZoomExtents`, "Zoom Selected",
 view-cube/coordinate system, `SetCamera`/`GetCamera` round-trip, view-settings application. Confirm

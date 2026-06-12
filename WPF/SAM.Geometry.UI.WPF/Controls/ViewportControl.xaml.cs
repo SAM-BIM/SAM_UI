@@ -45,10 +45,12 @@ namespace SAM.Geometry.UI.WPF
 
         private FloorPlan2DControl floorPlan2DControl;
 
-        // DirectX 11 renderer for the 3D view (issue #18 gate 3, Phase B) - null unless
+        // DirectX 11 renderer for the 3D view (issue #18 gate 3) - null unless
         // SAM_UI_VIEWPORT_SHARPDX is set; see SharpDXViewportControl. While active the Helix
-        // viewport stays hidden and empty; hover/selection/context menu (Phase C) and the
-        // orthographic-3D camera and chrome (Phase D) still run only on the Helix path.
+        // viewport stays hidden and empty. Hover and selection (issue #32 Phase C) are handled
+        // inside the control and surface through the same Object* events as the other renderers;
+        // context-menu plumbing (Phase C item 4) and the orthographic-3D camera and chrome
+        // (Phase D) still run only on the Helix path.
         private readonly SharpDXViewportControl sharpDXViewportControl;
 
         // 2D (orthographic) floor-plan clip-plane tracking (issue #13). Helix zoom/pan moves the
@@ -108,6 +110,9 @@ namespace SAM.Geometry.UI.WPF
             {
                 sharpDXViewportControl = new SharpDXViewportControl();
                 grid.Children.Insert(grid.Children.IndexOf(floorPlan2DControl) + 1, sharpDXViewportControl);
+                sharpDXViewportControl.ObjectHoovered += SharpDXViewportControl_ObjectHoovered;
+                sharpDXViewportControl.ObjectDoubleClicked += SharpDXViewportControl_ObjectDoubleClicked;
+                sharpDXViewportControl.ObjectSelectionChanged += SharpDXViewportControl_ObjectSelectionChanged;
 
                 // Mode defaults to ThreeDimensional, so the SharpDX viewport starts active and
                 // the Helix one hidden; UpdateMode keeps the visibilities in sync afterwards
@@ -165,6 +170,21 @@ namespace SAM.Geometry.UI.WPF
         }
 
         private void FloorPlan2DControl_ObjectSelectionChanged(object sender, ObjectSelectionChangedEventArgs e)
+        {
+            ObjectSelectionChanged?.Invoke(this, e);
+        }
+
+        private void SharpDXViewportControl_ObjectHoovered(object sender, ObjectHooveredEventArgs e)
+        {
+            ObjectHoovered?.Invoke(this, e);
+        }
+
+        private void SharpDXViewportControl_ObjectDoubleClicked(object sender, ObjectDoubleClickedEventArgs e)
+        {
+            ObjectDoubleClicked?.Invoke(this, e);
+        }
+
+        private void SharpDXViewportControl_ObjectSelectionChanged(object sender, ObjectSelectionChangedEventArgs e)
         {
             ObjectSelectionChanged?.Invoke(this, e);
         }
@@ -336,6 +356,19 @@ namespace SAM.Geometry.UI.WPF
                 return modelVisual3D;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                // Same stub interop as the 2D branch: a detached ModelVisual3D carrying the object,
+                // resolvable by every existing consumer (issue #32 Phase C)
+                ModelVisual3D modelVisual3D_Stub = sharpDXViewportControl.GetStubVisual3D(guid);
+                if (modelVisual3D_Stub == null || Core.UI.WPF.Query.JSAMObject<T>(modelVisual3D_Stub) == null)
+                {
+                    return null;
+                }
+
+                return modelVisual3D_Stub;
+            }
+
             // 3D path: O(1) index lookup instead of an O(N) visual-tree walk (issue #16). The indexed
             // visual is the outermost per-object container (Tag = space/panel), which is exactly what
             // RefreshAppearance (recurses children) and selection operate on.
@@ -447,6 +480,17 @@ namespace SAM.Geometry.UI.WPF
                 return result2D;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                bool result_SharpDX = sAMObject == null ? sharpDXViewportControl.ClearSelection() : sharpDXViewportControl.Select([sAMObject.Guid]);
+                if (result_SharpDX)
+                {
+                    ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                }
+
+                return result_SharpDX;
+            }
+
             bool result = false;
 
             if (sAMObject == null)
@@ -494,6 +538,26 @@ namespace SAM.Geometry.UI.WPF
                 }
 
                 return result2D;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                bool result_SharpDX;
+                if (sAMObjects == null)
+                {
+                    result_SharpDX = sharpDXViewportControl.ClearSelection();
+                }
+                else
+                {
+                    result_SharpDX = sharpDXViewportControl.Select(new List<T>(sAMObjects).FindAll(x => x != null).ConvertAll(x => x.Guid));
+                }
+
+                if (result_SharpDX)
+                {
+                    ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                }
+
+                return result_SharpDX;
             }
 
             bool result = false;
@@ -554,6 +618,20 @@ namespace SAM.Geometry.UI.WPF
                 }
 
                 return result2D;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                List<T> result_SharpDX = new List<T>();
+                foreach (SAMObject sAMObject in sharpDXViewportControl.SelectedSAMObjects())
+                {
+                    if (sAMObject is T)
+                    {
+                        result_SharpDX.Add((T)sAMObject);
+                    }
+                }
+
+                return result_SharpDX;
             }
 
             if (actionManager == null)
@@ -1181,6 +1259,15 @@ namespace SAM.Geometry.UI.WPF
             if (Active2D)
             {
                 floorPlan2DControl.SelectByScreenRect(rect, selectionType);
+                ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                return;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                // The RectangularSelector rect is in grid coordinates, which the SharpDX viewport
+                // fills - same coordinate space (issue #32 Phase C)
+                sharpDXViewportControl.SelectByScreenRect(rect, selectionType);
                 ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
                 return;
             }
