@@ -83,23 +83,34 @@ trivial scene; confirm the DX11 device initializes and disposes cleanly on both 
 machines (integrated GPUs, RDP/VM — SharpDX needs a real or WARP device). **Gate:** no device/airspace
 issues, clean tab open/close/dispose.
 
-> **Phase A status: implemented, awaiting hardware verification.**
-> `SAM_UI_VIEWPORT_SHARPDX` (any value other than empty/`0`) overlays a 280×180 `Viewport3DX` in the
-> bottom-right corner of the 3D view — a lit unit box with coordinate system and frame-rate overlay
-> (`Controls/SharpDXViewportSpike.cs`, hosted by `ViewportControl`). The DX11 device lives in a
-> single process-wide `DefaultEffectsManager`, created lazily on first use (timed as
-> `ViewportControl.SharpDX.CreateDevice` in the performance log) and disposed on dispatcher
-> shutdown — deliberately **not** per control, because WPF unloads tab content on every tab switch.
-> To pass the gate, verify on the target machines (both TFMs, including integrated GPU and RDP/VM):
-> the box renders in the corner over the live Helix view (airspace), tabs open/close/switch
-> repeatedly without device errors or leaks, the spike hides in floor-plan mode, and the app exits
-> cleanly. With the flag unset nothing is created.
+> **Phase A status: done** (PR #30). The trivial-scene spike validated on a dev machine: device
+> created once (~220 ms) and shared by 10 viewports, airspace composition over live WPF content OK,
+> tab open/close/switch/duplicate clean (a `ZoomExtentsWhenLoaded` zero-size race in duplicated
+> tabs was found and fixed - never auto-zoom an unloaded viewport). The DX11 device lives in a
+> single process-wide `DefaultEffectsManager`, created lazily (timed as
+> `ViewportControl.SharpDX.CreateDevice`) and disposed on dispatcher shutdown — deliberately
+> **not** per control, because WPF unloads tab content on every tab switch. Still outstanding
+> (now testable with the real scene, below): net48 build, integrated GPU, RDP/VM.
+> The spike file was replaced by the Phase B `Controls/SharpDXViewportControl.cs`.
 
 **Phase B — conversion + scene build.** Implement `Convert.ToElement3D(GeometryObjectModel)` /
 `Create.Element3D(...)`, merging per object by material into one `MeshGeometryModel3D` (+ one
 `LineGeometryModel3D` for edges). Rebuild the `Guid → Element3D` index (mirror `BuildVisual3DIndex`).
 Instrument `ViewportControl.ToElement3D` for direct comparison against `ToMedia3D`. **Gate:** full
 build well under 1 s on the 625-space model; visual parity with the Helix scene.
+
+> **Phase B status: implemented, awaiting measurement + visual parity check.**
+> With `SAM_UI_VIEWPORT_SHARPDX` set, the 3D view renders full-size through
+> `Controls/SharpDXViewportControl.cs`; the Helix viewport stays hidden and empty (same pattern as
+> the 2D floor plan flag). `Convert.ToElement3Ds` walks the model exactly like `Create.Model3D`
+> but merges per object by material via `Classes/SharpDXSceneBuilder.cs`: one `MeshGeometryModel3D`
+> per fill color (CullMode.None replaces the doubled triangles), one `LineGeometryModel3D` per
+> curve color, one `BillboardTextModel3D` per text color (world-sized billboards — scale to be
+> tuned on first visual check). Scene build is timed as `ViewportControl.ToElement3D` next to the
+> Helix `ViewportControl.ToMedia3D` for the A/B. Guid → `Element3D` index in place; view-settings
+> camera applied on first load, user camera preserved on reloads.
+> **Phase B limitations (by design):** hover/selection/context menu and "zoom selected" are
+> no-ops in the SharpDX 3D view until Phase C; orthographic-3D camera and view chrome are Phase D.
 
 **Phase C — interaction.** Port hover (octree `FindHits`), single/rectangle selection, highlight
 (`HighlightAction` → swap material/overlay), the #11 `RefreshAppearances` fast-path (recolor the
