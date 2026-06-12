@@ -748,9 +748,16 @@ namespace SAM.Analytical.UI
                             color = System.Drawing.Color.FromKnownColor(System.Drawing.KnownColor.LightGray).ToMedia();
                         }
 
-                        Geometry3DObjectCollection geometry3DObjectCollection_Space = new Geometry3DObjectCollection() { Tag = space };
-
                         SurfaceAppearance surfaceAppearance = Query.SurfaceAppearance(space, twoDimensionalViewSettings, color);
+
+                        // Skip hidden spaces entirely (face AND label). Mirrors the 3D path's early-out;
+                        // without this a hidden space's face is suppressed at render time but its tag still draws.
+                        if (surfaceAppearance == null || surfaceAppearance.Opacity == 0 || !surfaceAppearance.Visible)
+                        {
+                            continue;
+                        }
+
+                        Geometry3DObjectCollection geometry3DObjectCollection_Space = new Geometry3DObjectCollection() { Tag = space };
 
                         face2Ds.ForEach(x => geometry3DObjectCollection_Space.Add(new Face3DObject(plane.Convert(x), surfaceAppearance)));
 
