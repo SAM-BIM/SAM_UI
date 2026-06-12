@@ -245,3 +245,34 @@ debugger output window. Measured operations:
 Suggested baseline session on a large model: open model, open 1/3/5 view tabs, assign an
 InternalCondition to one space and to 50 spaces, pan/zoom the floor plan for ~30 s — then keep the
 log file next to the timings table in this document.
+
+---
+
+## Experimental: 2D floor plan renderer (flag-gated)
+
+Implements the "2D canvas for floor plans" direction from issue #18 (also addresses #13 and the
+floor-plan part of #16). **Off by default** — enable with the `SAM_UI_FLOORPLAN_2D` environment
+variable (any value other than empty/`0`). With the flag off, behavior is byte-for-byte identical
+to before.
+
+- `WPF/SAM.Geometry.UI.WPF/Controls/FloorPlan2DControl.cs` — renders the same
+  `GeometryObjectModel` as flat WPF `DrawingVisual`s: spaces as filled `StreamGeometry`
+  (even-odd fill handles holes), panels as lines, labels as `FormattedText`. Pan/zoom are a
+  matrix transform — cursor-centered wheel zoom, Shift+Left or Middle drag to pan, no clip
+  planes (fixes the disappearing-spaces failure mode by construction). Hover/selection redraw
+  only the affected visual; selection colors match the Helix path (fill 125,125,255 / edge blue).
+- `ViewportControl` hosts it: when the flag is set and the view is `TwoDimensional`, the Helix
+  viewport is collapsed and left empty, and all public APIs (`Select`, `Zoom`, `ContainsAny`,
+  `SAMObjects`, `SelectedSAMObjects`, rectangle select, Zoom Extents menu) route to the 2D
+  control. 3D views are untouched.
+- Interop: each top-level geometry collection gets a detached stub `ModelVisual3D` carrying the
+  same `IJSAMObject` attached property as Helix visuals, so `ObjectHoovered` /
+  `ObjectDoubleClicked` / `ObjectContextMenuOpening` consumers in `AnalyticalWindow` work
+  unchanged.
+- Instrumented: `FloorPlan2DControl.Load` and `FloorPlan2DControl.HoverHitTest` appear in the
+  performance log for direct comparison against `ViewportControl.ToMedia3D` /
+  `ViewportControl.HoverHitTest` on the same model.
+
+Known v1 limitations (fine for an experiment behind a flag): camera save/restore between
+sessions is not wired for the 2D path (opens at zoom-extents), and `UpdateCamera` view-settings
+modifications are a visual no-op in 2D.
