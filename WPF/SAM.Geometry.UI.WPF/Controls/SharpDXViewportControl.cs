@@ -15,6 +15,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Media3D = System.Windows.Media.Media3D;
+// 'Material' is ambiguous between SAM.Core.Material and HelixToolkit.Wpf.SharpDX.Material once both
+// namespaces are imported; the SharpDX scene material (MeshGeometryModel3D.Material) is meant here.
+using Material = HelixToolkit.Wpf.SharpDX.Material;
 
 namespace SAM.Geometry.UI.WPF
 {
