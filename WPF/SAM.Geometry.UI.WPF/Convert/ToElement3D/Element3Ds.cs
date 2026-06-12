@@ -39,10 +39,7 @@ namespace SAM.Geometry.UI.WPF
                         continue;
                     }
 
-                    SharpDXSceneBuilder sharpDXSceneBuilder = new SharpDXSceneBuilder();
-                    Append(sharpDXSceneBuilder, sAMGeometryObject);
-
-                    List<Element3D> element3Ds = sharpDXSceneBuilder.Build();
+                    List<Element3D> element3Ds = ToElement3Ds(sAMGeometryObject);
                     if (element3Ds == null || element3Ds.Count == 0)
                     {
                         continue;
@@ -60,6 +57,24 @@ namespace SAM.Geometry.UI.WPF
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Builds the merged SharpDX models for a single object (the children of its GroupModel3D),
+        /// without wrapping them in a group or tagging - used both by ToElement3Ds(GeometryObjectModel)
+        /// above and by the in-place appearance re-skin (SharpDXViewportControl.RefreshAppearance,
+        /// issue #32), which rebuilds only the edited objects from their updated SurfaceAppearances.
+        /// </summary>
+        internal static List<Element3D> ToElement3Ds(ISAMGeometryObject sAMGeometryObject)
+        {
+            if (sAMGeometryObject == null)
+            {
+                return null;
+            }
+
+            SharpDXSceneBuilder sharpDXSceneBuilder = new SharpDXSceneBuilder();
+            Append(sharpDXSceneBuilder, sAMGeometryObject);
+            return sharpDXSceneBuilder.Build();
         }
 
         // Mirrors the type dispatch of Create.Model3D, but accumulates primitives into the

@@ -156,6 +156,55 @@ namespace SAM.Geometry.UI.WPF
             return dictionary_Element3D.TryGetValue(guid, out Element3D element3D) ? element3D : null;
         }
 
+        /// <summary>
+        /// In-place appearance refresh for attribute-only edits (issue #32 / #11): rebuilds only the
+        /// given objects' merged models from their attached IJSAMObject - whose SurfaceAppearances were
+        /// already updated in place (Analytical.UI.Modify.TryRefreshSpaceAppearances) - and swaps each
+        /// GroupModel3D's children. Geometry is unchanged by construction, so this re-triangulates only
+        /// the edited objects (cheap), leaving the camera and every other object untouched - no full
+        /// ToElement3Ds. Mirrors Modify.RefreshAppearance on the Helix path.
+        /// </summary>
+        public void RefreshAppearance(IEnumerable<Guid> guids)
+        {
+            if (guids == null)
+            {
+                return;
+            }
+
+            foreach (Guid guid in guids)
+            {
+                if (!dictionary_Element3D.TryGetValue(guid, out Element3D element3D))
+                {
+                    continue;
+                }
+
+                GroupModel3D groupModel3D = element3D as GroupModel3D;
+                if (groupModel3D == null)
+                {
+                    continue;
+                }
+
+                // The attached object is the same instance the analytical refresh mutated (the scene and
+                // the UIGeometryObjectModel share the cached model graph - issue #14).
+                ISAMGeometryObject sAMGeometryObject = Core.UI.WPF.Query.JSAMObject<ISAMGeometryObject>(groupModel3D);
+                if (sAMGeometryObject == null)
+                {
+                    continue;
+                }
+
+                List<Element3D> element3Ds = Convert.ToElement3Ds(sAMGeometryObject);
+
+                groupModel3D.Children.Clear();
+                if (element3Ds != null)
+                {
+                    foreach (Element3D element3D_Child in element3Ds)
+                    {
+                        groupModel3D.Children.Add(element3D_Child);
+                    }
+                }
+            }
+        }
+
         public bool ContainsAny<T>(IEnumerable<Guid> guids) where T : SAMObject
         {
             if (guids == null)

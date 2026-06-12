@@ -99,7 +99,15 @@ issues, clean tab open/close/dispose.
 Instrument `ViewportControl.ToElement3D` for direct comparison against `ToMedia3D`. **Gate:** full
 build well under 1 s on the 625-space model; visual parity with the Helix scene.
 
-> **Phase B status: implemented, awaiting measurement + visual parity check.**
+> **Phase B status: implemented; build-time measured (gate met, warm case). Visual parity + hardware matrix still open (#31).**
+>
+> **Measured (625-space model, `SAM_UI_PERFORMANCE_LOG`):** warm rebuild (space shells cached)
+> `ToElement3D` ~110–280 ms vs Helix `ToMedia3D` ~2300 ms — **~15–20×**; full warm 3D pipeline
+> ~340 ms, well under the 1 s gate. Cold/heavy first-build ~2–2.5 s, where `ToElement3D` tracks an
+> expensive `GeometryObjectModel` build — that cost is **upstream of the renderer** (per-face
+> `Spatial.Create.Mesh3D` triangulation, paid by both `ToMedia3D` and `ToElement3D`, uncached) and is
+> tracked as a separate shared follow-up (#33: cache triangulated `Mesh3D` / background generation),
+> **not** a port blocker. Build-time gate: **GO** (warm/steady-state).
 > With `SAM_UI_VIEWPORT_SHARPDX` set, the 3D view renders full-size through
 > `Controls/SharpDXViewportControl.cs`; the Helix viewport stays hidden and empty (same pattern as
 > the 2D floor plan flag). `Convert.ToElement3Ds` walks the model exactly like `Create.Model3D`

@@ -139,6 +139,21 @@ namespace SAM.Geometry.UI.WPF
             }
         }
 
+        /// <summary>
+        /// True when an attribute-only edit on this view can be refreshed in place (recolor + legend)
+        /// instead of regenerating the whole scene. 2D always supports it (canvas reload / Helix
+        /// per-visual re-skin); the 3D view supports it only on the SharpDX path (per-object re-skin) -
+        /// the legacy Helix 3D renderer has no in-place re-skin, so 3D edits there fall back to full
+        /// regeneration (issue #32).
+        /// </summary>
+        public bool SupportsInPlaceAppearanceRefresh
+        {
+            get
+            {
+                return mode == Mode.TwoDimensional || ActiveSharpDX3D;
+            }
+        }
+
         private void FloorPlan2DControl_ObjectHoovered(object sender, ObjectHooveredEventArgs e)
         {
             ObjectHoovered?.Invoke(this, e);
@@ -370,9 +385,9 @@ namespace SAM.Geometry.UI.WPF
             }
             else if (ActiveSharpDX3D)
             {
-                // Phase B: no per-object re-skin yet - rebuild the (fast) SharpDX scene from the
-                // updated model; the camera is preserved (Load only zooms a previously empty scene)
-                sharpDXViewportControl.Load(geometryObjectModel);
+                // In-place per-object re-skin from the (already appearance-updated) model objects -
+                // no ToElement3Ds rebuild, camera and other objects untouched (issue #32 / #11).
+                sharpDXViewportControl.RefreshAppearance(guids);
             }
             else if (guids != null)
             {
