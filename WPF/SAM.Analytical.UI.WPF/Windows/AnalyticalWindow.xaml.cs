@@ -3170,9 +3170,10 @@ namespace SAM.Analytical.UI.WPF.Windows
             UIGeometryObjectModel uIGeometryObjectModel = viewportControl.UIGeometryObjectModel;
 
             bool updateGeometry = uIGeometryObjectModel?.JSAMObject == null || modifiedEventArgs.Modifications.Find(x => x is FullModification) != null;
+
+            List<ViewSettingsModification> viewSettingsModifications = modifiedEventArgs.GetModifications<ViewSettingsModification>((x) => x.ViewSettings?.Find(y => y.Guid == viewSettings.Guid) != null);
             if (!updateGeometry)
             {
-                List<ViewSettingsModification> viewSettingsModifications = modifiedEventArgs.GetModifications<ViewSettingsModification>((x) => x.ViewSettings?.Find(y => y.Guid == viewSettings.Guid) != null);
                 if(viewSettingsModifications != null && viewSettingsModifications.Count != 0)
                 {
                     if(viewSettingsModifications.Any(x => x.UpdateCamera))
@@ -3186,6 +3187,13 @@ namespace SAM.Analytical.UI.WPF.Windows
                             viewportControl.Camera = threeDimensionalViewSettings.Camera;
                         }
                     }
+
+                    // A view-settings change flagged to update geometry (e.g. "Load view", which copies
+                    // the whole source view settings) regenerates the scene as well as applying the camera.
+                    if (viewSettingsModifications.Any(x => x.UpdateGeometry))
+                    {
+                        updateGeometry = true;
+                    }
                 }
             }
 
@@ -3193,7 +3201,17 @@ namespace SAM.Analytical.UI.WPF.Windows
             {
                 List<AnalyticalModelModification> analyticalModelModifications = modifiedEventArgs.GetModifications<AnalyticalModelModification>();
                 HashSet<Guid> guids = analyticalModelModifications?.Guids();
-                if (guids == null || guids.Count == 0 || viewportControl.ContainsAny<SAMObject>(guids))
+
+                // A camera-only view-settings change ("Load camera") carries no geometry change, so don't
+                // let the catch-all below force a full regeneration. This guard is precise: it only applies
+                // when every matching view-settings modification is camera-only (UpdateCamera, not
+                // UpdateGeometry) and there are no model edits to react to - the general view-settings edit
+                // path (single-arg ViewSettingsModification, UpdateCamera false) still regenerates as before.
+                bool cameraOnlyViewSettingsUpdate = viewSettingsModifications != null && viewSettingsModifications.Count != 0
+                    && viewSettingsModifications.TrueForAll(x => x.UpdateCamera && !x.UpdateGeometry)
+                    && (analyticalModelModifications == null || analyticalModelModifications.Count == 0);
+
+                if (!cameraOnlyViewSettingsUpdate && (guids == null || guids.Count == 0 || viewportControl.ContainsAny<SAMObject>(guids)))
                 {
                     updateGeometry = true;
 

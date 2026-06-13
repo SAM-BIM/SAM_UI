@@ -52,6 +52,7 @@ Gestures differ per surface. The table is the current (as-shipped) mapping.
 | **Window select** | L→R = inside, R→L = crossing | same | same |
 | **Context menu** | Right-click | Right-click | Right-click |
 | **Double-click** | open / `ObjectDoubleClicked` | open / `ObjectDoubleClicked` | open / `ObjectDoubleClicked` |
+| **Toggle projection** (perspective ⇄ orthographic) | n/a | `Ctrl+Shift+O`, or right-click → *Orthographic* | n/a (always orthographic) |
 
 References:
 - Helix pan / rotate: [ViewportControl.xaml.cs:90-91](../WPF/SAM.Geometry.UI.WPF/Controls/ViewportControl.xaml.cs#L90)
@@ -66,6 +67,15 @@ Currently available via the **right-click context menu** only (no key binding):
 
 On the SharpDX path both are framed by `FrameCamera` (fits the bounding sphere,
 keeps world Z up) rather than the built-in `Viewport3DX.ZoomExtents`.
+
+### Perspective ⇄ orthographic (SharpDX 3D)
+`Ctrl+Shift+O` toggles the 3D camera between perspective and orthographic
+projection (parity with the Helix `OrthographicToggleGesture` default). The same
+toggle is on the right-click menu as a checkable *Orthographic* item, so it is
+both discoverable and shows the current projection. The toggle preserves the view
+framing; on very large models the projection switch re-renders the scene, so it is
+not instant. The view always opens in perspective (projection is not persisted -
+parity with the Helix path). See `SharpDXViewportControl.ToggleProjection`.
 
 > ⚠️ **Known inconsistencies between surfaces:**
 > 1. Helix orbits with **Shift+Right**, but SharpDX orbits with plain **Right** — they do not match each other.

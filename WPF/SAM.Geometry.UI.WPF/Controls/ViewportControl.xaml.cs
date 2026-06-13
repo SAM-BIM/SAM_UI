@@ -254,6 +254,16 @@ namespace SAM.Geometry.UI.WPF
 
             AddZoomSelectedMenuItem(sharpDXViewportControl.ContextMenu);
 
+            // Perspective <-> orthographic toggle (issue #37 Phase D) - a discoverable mouse path for
+            // the same switch as the Ctrl+Shift+O gesture; the check mark shows the current projection.
+            MenuItem menuItem_Orthographic = new MenuItem();
+            menuItem_Orthographic.Name = "MenuItem_Orthographic";
+            menuItem_Orthographic.Header = "Orthographic";
+            menuItem_Orthographic.IsCheckable = true;
+            menuItem_Orthographic.IsChecked = sharpDXViewportControl.Orthographic;
+            menuItem_Orthographic.Click += MenuItem_Orthographic_Click;
+            sharpDXViewportControl.ContextMenu.Items.Add(menuItem_Orthographic);
+
             List<ModelVisual3D> modelVisual3Ds = new List<ModelVisual3D>();
             foreach (SAMObject sAMObject in sharpDXViewportControl.SelectedSAMObjects())
             {
@@ -1176,6 +1186,14 @@ namespace SAM.Geometry.UI.WPF
                     legendControl.Visibility = Visibility.Visible;
                     legendControl.Legend = legend;
                 }
+            }
+        }
+
+        private void MenuItem_Orthographic_Click(object sender, RoutedEventArgs e)
+        {
+            if (ActiveSharpDX3D)
+            {
+                sharpDXViewportControl.ToggleProjection();
             }
         }
 

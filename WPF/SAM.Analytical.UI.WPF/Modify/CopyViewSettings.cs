@@ -81,7 +81,10 @@ namespace SAM.Analytical.UI.WPF
 
             analyticalModel.SetValue(AnalyticalModelParameter.UIGeometrySettings, uIGeometrySettings);
 
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(viewSettings_Destination, false, true));
+            // "Load view" copies the whole source view settings (appearances, types, legend, camera),
+            // so the geometry must be regenerated as well as the camera applied - hence updateGeometry:
+            // true. ("Load camera" / CopyViewSettingsCamera copies only the camera, updateGeometry: false.)
+            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(viewSettings_Destination, true, true));
         }
     }
 }
