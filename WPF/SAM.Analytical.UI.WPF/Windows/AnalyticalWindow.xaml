@@ -521,6 +521,7 @@
             <RibbonTab x:Name="RibbonTab_Help" Header="Help">
                 <RibbonGroup x:Name="RibbonGroup_Help_General" Header="General">
                     <RibbonButton x:Name="RibbonButton_Wiki" Label="Wiki" />
+                    <RibbonButton x:Name="RibbonButton_KeyboardShortcuts" Label="Shortcuts" />
                     <RibbonButton x:Name="RibbonButton_About" Label="About" />
                 </RibbonGroup>
             </RibbonTab>

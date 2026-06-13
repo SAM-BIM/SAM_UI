@@ -1197,7 +1197,11 @@ namespace SAM.Geometry.UI.WPF
             }
         }
 
-        private void MenuItem_ZoomExtents_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Zooms to the extents of the active view (2D canvas, SharpDX 3D or Helix 3D). Public so the
+        /// window can bind it to a shortcut (Rhino-style "ZE"); also used by the context-menu handler.
+        /// </summary>
+        public void ZoomExtents()
         {
             if (Active2D)
             {
@@ -1212,6 +1216,11 @@ namespace SAM.Geometry.UI.WPF
             }
 
             helixViewport3D.ZoomExtents();
+        }
+
+        private void MenuItem_ZoomExtents_Click(object sender, RoutedEventArgs e)
+        {
+            ZoomExtents();
         }
 
         // Offer "Zoom Selected" only when something is selected (issue #13). Works in both the Helix

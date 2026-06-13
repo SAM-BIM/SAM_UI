@@ -22,7 +22,7 @@ and act on the current selection.
 | --- | --- | --- |
 | `I` | Isolate selected | `Isolate()` |
 | `H` | Hide selected | `Hide()` |
-| `U` | Unhide All (reveal hidden) | `RevealHidden()` |
+| `U` (or `UU`) | Unhide All (reveal hidden) | `RevealHidden()` |
 | `Delete` | Delete selected | `Delete()` |
 | `R` | Reverse geometry direction | `Reverse()` |
 | `P` | Show properties of selected | `ShowProperties()` |
@@ -30,12 +30,20 @@ and act on the current selection.
 | `G` | Select by GUID | `SelectByGuid()` |
 | `F` | Select by filter | `SelectByFilter()` |
 | `F12` | Show JSON of selection | — |
+| `Z` then `E` | Zoom extents | `ZoomExtents()` |
+| `Z` then `S` | Zoom selected | `ZoomSelected()` |
 | `Ctrl+S` | Save As | `SaveAs()` |
 | `Esc` | Clear selection | per-viewport handler |
 
-> ⚠️ These are **single-key, global** handlers fired from `Window_KeyDown`. They
-> are not gated on input focus, so they can fire while a text field has focus.
-> See [§4](#4-observations) for the Revit two-letter alternative.
+> `Z E` / `Z S` are two-letter chords (Rhino-style): press `Z`, then the second
+> key within ~1 s. `Z` on its own does nothing. The single-letter actions
+> (`H`/`I`/`U`/`R`…) still fire immediately; `U` and `UU` both Unhide All.
+>
+> This list is also available in the app via **Help → Shortcuts**
+> (`KeyboardShortcutsWindow`). Keep the two in sync when bindings change.
+>
+> ⚠️ The single-key handlers fired from `Window_KeyDown` are **global** - not
+> gated on input focus, so they can fire while a text field has focus.
 
 ---
 
@@ -45,7 +53,7 @@ Gestures differ per surface. The table is the current (as-shipped) mapping.
 
 | Action | Helix 3D | SharpDX 3D | FloorPlan 2D |
 | --- | --- | --- | --- |
-| **Rotate / orbit** | Shift + Right-drag | Right-drag *(stock default)* | n/a (2D) |
+| **Rotate / orbit** | Shift + Right-drag | Right-drag (a plain right-*click* opens the menu) | n/a (2D) |
 | **Pan** | Shift + Left-drag | Middle-drag, Shift + Left-drag | Middle-drag, Shift + Left-drag |
 | **Zoom** | Wheel | Wheel (around cursor) | Wheel (around cursor) |
 | **Select** | Left-click, Ctrl+click toggles | Left-click, Ctrl+click toggles | Left-click, Ctrl+click toggles |
@@ -61,9 +69,9 @@ References:
 - Rectangle selector (5 px threshold, inside vs crossing): [RectangularSelector.cs](../WPF/SAM.Geometry.UI.WPF/Classes/RectangularSelector.cs)
 
 ### Zoom Extents / Zoom Selected
-Currently available via the **right-click context menu** only (no key binding):
-- *Zoom Extents* — [ViewportControl.xaml.cs:210](../WPF/SAM.Geometry.UI.WPF/Controls/ViewportControl.xaml.cs#L210)
-- *Zoom Selected* — shown only when something is selected, [ViewportControl.xaml.cs:1201](../WPF/SAM.Geometry.UI.WPF/Controls/ViewportControl.xaml.cs#L1201)
+Available via the `Z E` / `Z S` chords (above) and the **right-click context menu**:
+- *Zoom Extents* — `ViewportControl.ZoomExtents()`, also the context-menu item
+- *Zoom Selected* — `ZoomSelected()` (window) / context-menu item shown only when something is selected
 
 On the SharpDX path both are framed by `FrameCamera` (fits the bounding sphere,
 keeps world Z up) rather than the built-in `Viewport3DX.ZoomExtents`.
@@ -77,10 +85,17 @@ framing; on very large models the projection switch re-renders the scene, so it 
 not instant. The view always opens in perspective (projection is not persisted -
 parity with the Helix path). See `SharpDXViewportControl.ToggleProjection`.
 
-> ⚠️ **Known inconsistencies between surfaces:**
-> 1. Helix orbits with **Shift+Right**, but SharpDX orbits with plain **Right** — they do not match each other.
-> 2. Pan is **Middle** on SharpDX / 2D but **Shift+Left** on Helix.
-> 3. `U` is removed from the SharpDX `Viewport3DX` default key bindings so the app's Unhide-All keeps the key (see `RemoveConflictingKeyBindings`).
+> On the SharpDX path, a right-*drag* orbits and a right-*click* (no drag) opens
+> the context menu, so the menu no longer pops open at the end of every orbit
+> (`SharpDXViewportControl_ContextMenuOpening` cancels the menu after a drag).
+>
+> ⚠️ **Remaining inconsistency between surfaces:**
+> - Helix orbits with **Shift+Right**, SharpDX orbits with plain **Right-drag** — they still differ.
+> - Pan is **Middle** on SharpDX / 2D but **Shift+Left** on Helix.
+>
+> All no-modifier `Viewport3DX` key bindings (the cube's F/B/L/R/U/D face-view keys)
+> are stripped on the SharpDX path so the app's single-letter shortcuts always win
+> (see `RemoveConflictingKeyBindings`); the clickable view cube still snaps to faces.
 
 ---
 
@@ -124,30 +139,19 @@ exact authoritative tables.*
 
 ## 4. Observations
 
-The intent to follow Revit is sound; the current gaps are:
+**Implemented (this round):**
+- `Z E` Zoom Extents and `Z S` Zoom Selected chords (Rhino-style), `UU` accepted
+  as an alias of `U` for Unhide All.
+- SharpDX view-cube face-view key bindings stripped so the app's single letters
+  always win; the clickable cube still snaps.
+- SharpDX right-drag orbits, right-click opens the menu (menu no longer pops
+  after an orbit).
+- View cube reverted to the library default (Front/Back/Left/Right/Top/Bottom).
 
-1. **Single-key vs two-key.** SAM uses `H` / `I` / `U`; Revit uses `HH` / `HI` /
-   `HR`. Single keys are faster but (a) don't match Revit muscle memory and
-   (b) can fire while typing because `Window_KeyDown` is global and not gated on
-   focus. Revit's two-letter scheme avoids both.
-2. **Unhide mapping.** SAM `U` ↔ Revit `HR`. Keep `U` or add `HR` for parity.
-3. **Orbit gesture.** Pan now matches Revit (Middle). The remaining mismatch is
-   orbit: Revit uses **Shift+Middle**, SAM uses Right / Shift+Right. Aligning
-   the SharpDX orbit to **Shift+Middle** would both match Revit and unify the
-   Helix vs SharpDX behaviour.
-4. **No key binding for Zoom Extents / Zoom Selected** — Revit's `ZE` / `ZF`
-   equivalents would be a natural addition.
-
-### A possible Revit-aligned scheme (proposal, not yet implemented)
-
-| Action | Proposed | Notes |
-| --- | --- | --- |
-| Hide | `HH` | keep `H` as an alias during transition |
-| Isolate | `HI` | keep `I` as an alias |
-| Unhide All | `HR` | keep `U` as an alias |
-| Zoom Extents | `ZE` / `ZF` | currently context-menu only |
-| Zoom Selected | `ZS` | currently context-menu only |
-| Orbit (3D) | Shift + Middle-drag | unify Helix + SharpDX, match Revit |
-
-Discuss and agree the target scheme before changing bindings — see the related
-tracking issue.
+**Still open (discuss before changing):**
+- **Single-key vs two-key.** SAM uses `H` / `I`; Revit uses `HH` / `HI`. Single
+  keys are faster but can fire while typing because `Window_KeyDown` is global and
+  not gated on focus. A full Revit two-letter scheme would avoid both.
+- **Orbit gesture.** Revit orbits with **Shift+Middle**; SAM SharpDX uses
+  **Right-drag** and Helix uses **Shift+Right**. Aligning SharpDX to Shift+Middle
+  would match Revit and unify the two viewports.
