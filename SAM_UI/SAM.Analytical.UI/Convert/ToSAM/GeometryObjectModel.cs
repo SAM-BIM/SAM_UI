@@ -418,6 +418,12 @@ namespace SAM.Analytical.UI
             {
                 System.Diagnostics.Stopwatch panelsStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
 
+                // Sub-split the panel loop: FixEdges (per-face edge cleanup) vs Cut (per-face cut by the
+                // view's section planes). Panels are rebuilt every regeneration with no per-panel cache,
+                // unlike spaces - so this also shows whether a panel cache (mirroring shellCache) would pay off.
+                double panelFixEdgesMilliseconds = 0;
+                double panelCutMilliseconds = 0;
+
                 Legend legend_Panels = legend_Temp is null ? null : new Legend(legend_Temp);
 
                 List<Panel> panels = adjacencyCluster.GetPanels();
@@ -475,6 +481,7 @@ namespace SAM.Analytical.UI
                             continue;
                         }
 
+                        System.Diagnostics.Stopwatch panelFixEdgesStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
                         for (int i = 0; i < face3Ds.Count; i++)
                         {
                             List<Face3D> face3Ds_FixEdges = face3Ds[i].FixEdges();
@@ -488,9 +495,14 @@ namespace SAM.Analytical.UI
                                 face3Ds[i] = face3Ds_FixEdges.Find(x => x.IsValid());
                             }
                         }
+                        if (panelFixEdgesStopwatch != null)
+                        {
+                            panelFixEdgesMilliseconds += panelFixEdgesStopwatch.Elapsed.TotalMilliseconds;
+                        }
 
                         if (planes != null && planes.Count != 0)
                         {
+                            System.Diagnostics.Stopwatch panelCutStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
                             List<Face3D> face3Ds_Temp = new List<Face3D>();
                             foreach (Face3D face3D in face3Ds)
                             {
@@ -503,6 +515,10 @@ namespace SAM.Analytical.UI
                             }
 
                             face3Ds = face3Ds_Temp;
+                            if (panelCutStopwatch != null)
+                            {
+                                panelCutMilliseconds += panelCutStopwatch.Elapsed.TotalMilliseconds;
+                            }
                         }
 
                         if (face3Ds == null || face3Ds.Count == 0)
@@ -545,6 +561,8 @@ namespace SAM.Analytical.UI
                 {
                     panelsStopwatch.Stop();
                     PerformanceLog.Write("View3D.Panels", threeDimensionalViewSettings.Name, panelsStopwatch.Elapsed.TotalMilliseconds);
+                    PerformanceLog.Write("View3D.Panels.FixEdges", threeDimensionalViewSettings.Name, panelFixEdgesMilliseconds);
+                    PerformanceLog.Write("View3D.Panels.Cut", threeDimensionalViewSettings.Name, panelCutMilliseconds);
                 }
             }
 
