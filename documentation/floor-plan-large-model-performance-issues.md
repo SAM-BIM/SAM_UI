@@ -280,3 +280,41 @@ it back (held pending until the view has a plane and a real size), so floor-plan
 save/restore through the existing `ViewSettings.Camera` plumbing and `UpdateCamera` view-settings
 modifications work in 2D. Legacy cameras saved by the Helix orthographic path restore the pan
 position with a clamped zoom.
+
+---
+
+## Implemented per-regeneration caches (SAM-BIM/SAM#16)
+
+All of these memoize purely-geometric per-regeneration work in `GeometryObjectModel.cs` (and the
+renderer triangulation layer), keyed by a content signature so attribute / view-settings edits are
+cache hits while geometry edits re-compute. They share the same pattern (static dictionary + lock +
+rounded-to-mm signature + entry-count cap). Measured on the 10k-space model (`SAM_UI_PERFORMANCE_LOG=1`):
+
+| Cache | Op memoized | Warm win | PR |
+| --- | --- | --- | --- |
+| `labelSolveCache` | `Solver2D` label placement (per view) | ~150 s → ~0.2 s | #22 / SAM#15 |
+| `shellCache` / `sectionCache` | `AdjacencyCluster.Shell` + `shell.Section(plane)` (per space) | recompute → ~0 on attribute edits | #28 |
+| `panelFaceCache` | `Face3D.FixEdges()` (per panel) | ~4.2 s → ~0.25 s (~16×) | #34 |
+| `CachedMesh3D` | `Spatial.Create.Mesh3D(face3D)` triangulation (per face) | ~1.8 s → ~0 (33635/33635 hits) | #35 |
+| `panelCutCache` | `face3D.Cut(planes)` section cut (per panel) | ~1.8 s → ~0 on warm sectioned views | SAM#16 |
+
+`panelCutCache` only populates when **View → View Range** section planes are active (`View3D.Panels.Cut`
+is 0 ms otherwise); its signature combines the cut-input face geometry **and** the planes, so changing
+the section plane correctly re-cuts. It mirrors the 2D `sectionCache` exactly.
+
+### Tried and reverted (kept here so they are not re-attempted)
+
+Measurement, not the static O(N²) scan, decided each of these — see SAM-BIM/SAM#16 and SAM_UI PR #36:
+
+- **OCCT `ShellSectionByPlanes` swap for the 3D path** — ruled out: `View3D.SpaceShells`
+  (shell build + cut) measured ~0.1 s on 10k, so it was never the bottleneck. No code change.
+- **The SAM.Geometry O(N²) candidates** (`ConnectedFace3Ds`, `MergeOverlaps`, coplanar grouping,
+  `Split`/`SelfIntersectionSegment2Ds`, `Snap`, `Connected`) — confirmed benign: they run per-space
+  over a small local N, and time-per-space did not grow with model size. Left unchanged.
+- **SharpDX batch-attach** (PR #36) — adding the ~33k scene models under one parent group did **not**
+  reduce `ToElement3D.Attach` (~3.5 s); that cost is the inherent GPU attachment of 33k separate
+  models, not the number of `Items.Add` calls. Reverted (kept per-object add; avoids selection-topology
+  risk for zero gain). The real lever is model-count reduction (merge-by-material + CPU pick index),
+  parked under #32/#16.
+- **SharpDX mesh-array cache** (PR #36) — memoizing the per-`Mesh3D` array conversion did **not** move
+  `ToElement3D.Append`, whose cost is per-face edge/segment build, not the array copy. Reverted.
