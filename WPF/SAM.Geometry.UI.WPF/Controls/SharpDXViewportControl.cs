@@ -622,10 +622,45 @@ namespace SAM.Geometry.UI.WPF
             if (viewport3DX.IsLoaded && viewport3DX.ActualWidth > 0)
             {
                 viewport3DX.ZoomExtents();
+                LevelCameraUp();
                 return;
             }
 
             zoomExtentsPending = true;
+        }
+
+        // Re-levels the camera so world Z stays "up" in the view (the horizon stays level).
+        // After rotating around an off-axis pivot the camera's up direction can roll; the built-in
+        // Viewport3DX.ZoomExtents preserves that roll, so framing a tiny isolated building leaves the
+        // view tilted (the "rotates it in a strange tilted way" report). Re-projects the up direction
+        // onto the plane perpendicular to the look direction, aligned with world Z. No-op when looking
+        // straight up/down (Z is degenerate there - keep whatever up the camera had).
+        private void LevelCameraUp()
+        {
+            HelixToolkit.Wpf.SharpDX.Camera camera = viewport3DX.Camera;
+            if (camera == null)
+            {
+                return;
+            }
+
+            Media3D.Vector3D lookDirection = camera.LookDirection;
+            if (lookDirection.Length < 1e-6)
+            {
+                return;
+            }
+
+            lookDirection.Normalize();
+
+            Media3D.Vector3D worldUp = new Media3D.Vector3D(0, 0, 1);
+            Media3D.Vector3D up = worldUp - Media3D.Vector3D.DotProduct(worldUp, lookDirection) * lookDirection;
+            if (up.Length < 1e-6)
+            {
+                // Looking straight along Z; nothing to level against - leave the up direction as is.
+                return;
+            }
+
+            up.Normalize();
+            camera.UpDirection = up;
         }
 
         // Indexes a group's merged child models (child -> guid for hit resolution) and snapshots
