@@ -49,8 +49,8 @@ namespace SAM.Geometry.UI.WPF
         // SAM_UI_VIEWPORT_SHARPDX is set; see SharpDXViewportControl. While active the Helix
         // viewport stays hidden and empty. Hover and selection (issue #32 Phase C) are handled
         // inside the control and surface through the same Object* events as the other renderers;
-        // context-menu plumbing (Phase C item 4) and the orthographic-3D camera and chrome
-        // (Phase D) still run only on the Helix path.
+        // the camera, view chrome and orthographic-3D toggle (Ctrl+Shift+O) are Phase D (issue #37),
+        // all handled inside the control.
         private readonly SharpDXViewportControl sharpDXViewportControl;
 
         // 2D (orthographic) floor-plan clip-plane tracking (issue #13). Helix zoom/pan moves the
@@ -253,6 +253,16 @@ namespace SAM.Geometry.UI.WPF
             sharpDXViewportControl.ContextMenu.Items.Add(menuItem);
 
             AddZoomSelectedMenuItem(sharpDXViewportControl.ContextMenu);
+
+            // Perspective <-> orthographic toggle (issue #37 Phase D) - a discoverable mouse path for
+            // the same switch as the Ctrl+Shift+O gesture; the check mark shows the current projection.
+            MenuItem menuItem_Orthographic = new MenuItem();
+            menuItem_Orthographic.Name = "MenuItem_Orthographic";
+            menuItem_Orthographic.Header = "Orthographic";
+            menuItem_Orthographic.IsCheckable = true;
+            menuItem_Orthographic.IsChecked = sharpDXViewportControl.Orthographic;
+            menuItem_Orthographic.Click += MenuItem_Orthographic_Click;
+            sharpDXViewportControl.ContextMenu.Items.Add(menuItem_Orthographic);
 
             List<ModelVisual3D> modelVisual3Ds = new List<ModelVisual3D>();
             foreach (SAMObject sAMObject in sharpDXViewportControl.SelectedSAMObjects())
@@ -1179,7 +1189,19 @@ namespace SAM.Geometry.UI.WPF
             }
         }
 
-        private void MenuItem_ZoomExtents_Click(object sender, RoutedEventArgs e)
+        private void MenuItem_Orthographic_Click(object sender, RoutedEventArgs e)
+        {
+            if (ActiveSharpDX3D)
+            {
+                sharpDXViewportControl.ToggleProjection();
+            }
+        }
+
+        /// <summary>
+        /// Zooms to the extents of the active view (2D canvas, SharpDX 3D or Helix 3D). Public so the
+        /// window can bind it to a shortcut (Rhino-style "ZE"); also used by the context-menu handler.
+        /// </summary>
+        public void ZoomExtents()
         {
             if (Active2D)
             {
@@ -1194,6 +1216,11 @@ namespace SAM.Geometry.UI.WPF
             }
 
             helixViewport3D.ZoomExtents();
+        }
+
+        private void MenuItem_ZoomExtents_Click(object sender, RoutedEventArgs e)
+        {
+            ZoomExtents();
         }
 
         // Offer "Zoom Selected" only when something is selected (issue #13). Works in both the Helix

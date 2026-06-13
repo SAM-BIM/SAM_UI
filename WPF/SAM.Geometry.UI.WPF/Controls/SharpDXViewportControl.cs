@@ -35,8 +35,9 @@ namespace SAM.Geometry.UI.WPF
     /// selection (SelectByScreenRect, driven by the ViewportControl RectangularSelector overlay).
     /// Event payloads are detached stub ModelVisual3Ds carrying the same attached IJSAMObject as
     /// the Helix visuals - the FloorPlan2DControl interop pattern - so existing consumers
-    /// (AnalyticalWindow) keep working unchanged. Context-menu plumbing (Phase C item 4) and the
-    /// orthographic-3D camera and view chrome (Phase D) still run only on the Helix path.
+    /// (AnalyticalWindow) keep working unchanged. Context-menu plumbing (Phase C item 4) is in;
+    /// Phase D adds the orthographic-3D camera (Ctrl+Shift+O toggle, parity with the Helix
+    /// OrthographicToggleGesture) on top of the camera framing / view chrome already here.
     ///
     /// The DX11 device lives in a single process-wide EffectsManager shared by every instance
     /// (one per tab), created lazily and disposed on dispatcher shutdown - WPF unloads tab
@@ -92,6 +93,11 @@ namespace SAM.Geometry.UI.WPF
 
         private bool zoomExtentsPending;
 
+        // Field of view of the perspective camera, remembered across an orthographic toggle so the
+        // perspective look is restored exactly when switching back (the OrthographicCamera carries a
+        // Width instead of a field of view). Defaults to the constructor PerspectiveCamera's 45.
+        private double fieldOfView_Perspective = 45.0;
+
         public event ObjectHooveredEventHandler ObjectHoovered;
         public event ObjectDoubleClickedEventHandler ObjectDoubleClicked;
         public event ObjectSelectionChangedEventHandler ObjectSelectionChanged;
@@ -115,7 +121,8 @@ namespace SAM.Geometry.UI.WPF
 
                 // View-cube interaction: drag the cube to orbit (IsViewCubeMoverEnabled) and click
                 // edges/corners to snap to diagonal/isometric views (IsViewCubeEdgeClicksEnabled), not
-                // only the flat faces. Face labels are set from a custom texture below (compass).
+                // only the flat faces. The default library cube (Front/Back/Left/Right/Top/Bottom) is
+                // kept - no custom face texture.
                 IsViewCubeMoverEnabled = true,
                 IsViewCubeEdgeClicksEnabled = true,
                 ModelUpDirection = new Media3D.Vector3D(0, 0, 1),
@@ -137,15 +144,6 @@ namespace SAM.Geometry.UI.WPF
             viewport3DX.InputBindings.Add(new MouseBinding(ViewportCommands.Pan, new MouseGesture(MouseAction.MiddleClick)));
             viewport3DX.InputBindings.Add(new MouseBinding(ViewportCommands.Pan, new MouseGesture(MouseAction.LeftClick, ModifierKeys.Shift)));
 
-            // Compass face labels on the view cube (N/E/S/W + TOP/BOTTOM) instead of the default
-            // Front/Back/...; this SharpDX view cube takes labels via a texture, not per-face strings.
-            // Keeps the library default cube if texture generation is unavailable.
-            TextureModel viewCubeTexture = GetViewCubeTexture(viewport3DX.EffectsManager);
-            if (viewCubeTexture != null)
-            {
-                viewport3DX.ViewCubeTexture = viewCubeTexture;
-            }
-
             // Single white ambient light - parity with the Helix 3D path (Load adds AmbientLight
             // only), which renders flat unshaded colors.
             viewport3DX.Items.Add(new AmbientLight3D { Color = Colors.White });
@@ -162,27 +160,52 @@ namespace SAM.Geometry.UI.WPF
             viewport3DX.MouseLeave += Viewport3DX_MouseLeave;
             viewport3DX.KeyDown += Viewport3DX_KeyDown;
 
-            // The viewport binds some letter keys to camera view commands by default (e.g. U -> top
-            // view). Those swallow the app's global shortcuts (U = Unhide All, handled in
-            // AnalyticalWindow.Window_KeyDown) before they bubble out of the viewport. Drop the
-            // conflicting bindings so the keystrokes reach the window. Re-applied on Loaded in case
-            // the defaults are (re)added when the template is applied.
+            // Right-drag orbits and right-click opens the context menu - the same button. Track whether
+            // the right button was dragged (orbit) and, if so, suppress the context menu so it no longer
+            // pops open at the end of every orbit (Rhino behaviour: drag = orbit, click = menu). The
+            // handler is registered here, before ViewportControl subscribes, so cancelling it (Handled)
+            // stops the menu the host would otherwise build.
+            viewport3DX.PreviewMouseRightButtonDown += Viewport3DX_PreviewMouseRightButtonDown;
+            ContextMenuOpening += SharpDXViewportControl_ContextMenuOpening;
+
+            // The viewport binds single letter keys to camera view commands by default (F/B/L/R/U/D ->
+            // front/back/... views). Those swallow the app's global shortcuts (U = Unhide All, R =
+            // Reverse, F = Select by Filter, handled in AnalyticalWindow.Window_KeyDown) before they
+            // bubble out of the viewport. Drop every no-modifier key binding so the keystrokes reach the
+            // window; the clickable view cube still snaps to faces. Re-applied on Loaded in case the
+            // defaults are (re)added when the template is applied.
             RemoveConflictingKeyBindings();
 
             Children.Add(viewport3DX);
         }
 
-        // Keys the app uses as global shortcuts (AnalyticalWindow.Window_KeyDown) that the Viewport3DX
-        // also binds to camera commands; the app shortcut wins.
-        private static readonly Key[] reservedKeys = new Key[] { Key.U };
+        // Right-drag (orbit) vs right-click (context menu) discrimination - see the ctor. Set on
+        // right-button-down, flipped once the mouse moves past the drag threshold while the right
+        // button is held, read in SharpDXViewportControl_ContextMenuOpening.
+        private Point rightButtonDownPoint;
+        private bool rightButtonDragged;
+        private const double rightDragThreshold = 4;
+
+        private void Viewport3DX_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            rightButtonDownPoint = e.GetPosition(this);
+            rightButtonDragged = false;
+        }
+
+        private void SharpDXViewportControl_ContextMenuOpening(object sender, System.Windows.Controls.ContextMenuEventArgs e)
+        {
+            // Orbit just happened (right-drag) - don't open the menu the host is about to build.
+            if (rightButtonDragged)
+            {
+                e.Handled = true;
+            }
+        }
 
         private void RemoveConflictingKeyBindings()
         {
             for (int i = viewport3DX.InputBindings.Count - 1; i >= 0; i--)
             {
-                if (viewport3DX.InputBindings[i] is KeyBinding keyBinding
-                    && keyBinding.Modifiers == ModifierKeys.None
-                    && System.Array.IndexOf(reservedKeys, keyBinding.Key) >= 0)
+                if (viewport3DX.InputBindings[i] is KeyBinding keyBinding && keyBinding.Modifiers == ModifierKeys.None)
                 {
                     viewport3DX.InputBindings.RemoveAt(i);
                 }
@@ -212,49 +235,6 @@ namespace SAM.Geometry.UI.WPF
             }
 
             return effectsManager;
-        }
-
-        // Cached compass-labelled view-cube texture (shared: it is plain image data, device-independent
-        // once generated). Built once via the Direct2D text helper from the shared EffectsManager.
-        private static TextureModel viewCubeTexture;
-
-        // Generates the N/E/S/W + TOP/BOTTOM view-cube face texture. CreateViewBoxTexture takes the
-        // faces in the order front, back, left, right, top, down. With ModelUpDirection = +Z and +Y
-        // taken as project North, the natural site-plan reading (viewer south of the model, looking
-        // north) is front = South, back = North, left = West, right = East. If a face reads wrong in
-        // the app this is a pure label swap here - no other logic depends on it. Returns null (keep the
-        // library default cube) if the texture cannot be built.
-        private static TextureModel GetViewCubeTexture(IEffectsManager effectsManager)
-        {
-            if (viewCubeTexture != null)
-            {
-                return viewCubeTexture;
-            }
-
-            if (effectsManager == null)
-            {
-                return null;
-            }
-
-            try
-            {
-                HelixToolkit.Maths.Color4 face = new HelixToolkit.Maths.Color4(0.85f, 0.88f, 0.95f, 1f); // light steel
-                HelixToolkit.Maths.Color4 text = new HelixToolkit.Maths.Color4(0f, 0f, 0f, 1f);          // black
-
-                System.IO.Stream stream = BitmapExtensions.CreateViewBoxTexture(
-                    effectsManager,
-                    "S", "N", "W", "E", "TOP", "BOTTOM",
-                    face, face, face, face, face, face,
-                    text, text, text, text, text, text);
-
-                viewCubeTexture = new TextureModel(stream, true);
-            }
-            catch
-            {
-                viewCubeTexture = null;
-            }
-
-            return viewCubeTexture;
         }
 
         /// <summary>
@@ -598,6 +578,96 @@ namespace SAM.Geometry.UI.WPF
         }
 
         /// <summary>
+        /// True when the 3D camera is orthographic. Setting it switches projection, preserving the
+        /// view framing (issue #37 Phase D). Mirrors HelixViewport3D.Orthographic.
+        /// </summary>
+        public bool Orthographic
+        {
+            get
+            {
+                return viewport3DX.Camera is OrthographicCamera;
+            }
+
+            set
+            {
+                SetOrthographic(value);
+            }
+        }
+
+        /// <summary>
+        /// Toggles the 3D camera between perspective and orthographic projection (Ctrl+Shift+O,
+        /// parity with the Helix OrthographicToggleGesture / HelixViewport3D.Orthographic).
+        /// </summary>
+        public void ToggleProjection()
+        {
+            SetOrthographic(!(viewport3DX.Camera is OrthographicCamera));
+        }
+
+        // Swaps the viewport camera to the requested projection, carrying Position/LookDirection/
+        // UpDirection and the clip planes across so the view does not jump. Perspective -> orthographic
+        // derives the orthographic Width from the field of view and the look-at distance
+        // (width = 2 * d * tan(fov/2)), so the on-screen scale is continuous; the reverse restores the
+        // remembered field of view. Projection is intentionally not persisted in the camera/view
+        // settings - the Helix path doesn't persist it either - so a reloaded view opens in perspective.
+        private void SetOrthographic(bool orthographic)
+        {
+            // The clip planes live on ProjectionCamera (the shared base of both camera types), not the
+            // Camera base; carry them across so the switch doesn't reset the depth range.
+            HelixToolkit.Wpf.SharpDX.ProjectionCamera projectionCamera = viewport3DX.Camera as HelixToolkit.Wpf.SharpDX.ProjectionCamera;
+            if (projectionCamera == null)
+            {
+                return;
+            }
+
+            if (orthographic)
+            {
+                if (projectionCamera is OrthographicCamera)
+                {
+                    return;
+                }
+
+                if (projectionCamera is HelixToolkit.Wpf.SharpDX.PerspectiveCamera perspectiveCamera)
+                {
+                    fieldOfView_Perspective = perspectiveCamera.FieldOfView;
+                }
+
+                double distance = projectionCamera.LookDirection.Length;
+                double width = 2.0 * distance * System.Math.Tan(0.5 * fieldOfView_Perspective * System.Math.PI / 180.0);
+                if (width <= 0 || double.IsNaN(width) || double.IsInfinity(width))
+                {
+                    width = distance > 0 ? distance : 1.0;
+                }
+
+                viewport3DX.Camera = new OrthographicCamera
+                {
+                    Position = projectionCamera.Position,
+                    LookDirection = projectionCamera.LookDirection,
+                    UpDirection = projectionCamera.UpDirection,
+                    NearPlaneDistance = projectionCamera.NearPlaneDistance,
+                    FarPlaneDistance = projectionCamera.FarPlaneDistance,
+                    Width = width
+                };
+            }
+            else
+            {
+                if (projectionCamera is HelixToolkit.Wpf.SharpDX.PerspectiveCamera)
+                {
+                    return;
+                }
+
+                viewport3DX.Camera = new HelixToolkit.Wpf.SharpDX.PerspectiveCamera
+                {
+                    Position = projectionCamera.Position,
+                    LookDirection = projectionCamera.LookDirection,
+                    UpDirection = projectionCamera.UpDirection,
+                    NearPlaneDistance = projectionCamera.NearPlaneDistance,
+                    FarPlaneDistance = projectionCamera.FarPlaneDistance,
+                    FieldOfView = fieldOfView_Perspective
+                };
+            }
+        }
+
+        /// <summary>
         /// Zooms to the combined extents of the given objects ("Zoom Selected", issue #32 / #13).
         /// Bounds are taken from the merged mesh/line positions (world space - the scene has no
         /// per-object transforms). Returns false when none of the guids are present or have geometry.
@@ -704,12 +774,19 @@ namespace SAM.Geometry.UI.WPF
 
             lookDirection.Normalize();
 
-            double fieldOfView = (camera as HelixToolkit.Wpf.SharpDX.PerspectiveCamera)?.FieldOfView ?? 45.0;
+            double fieldOfView = (camera as HelixToolkit.Wpf.SharpDX.PerspectiveCamera)?.FieldOfView ?? fieldOfView_Perspective;
             double distance = 1.1 * radius / System.Math.Sin(0.5 * fieldOfView * System.Math.PI / 180.0);
 
             Media3D.Point3D centerPoint = new Media3D.Point3D(center.X, center.Y, center.Z);
             camera.Position = centerPoint - lookDirection * distance;
             camera.LookDirection = lookDirection * distance;
+
+            // An orthographic camera ignores distance for scale, so fit the sphere by its Width
+            // (the perspective branch above already framed it through position/distance).
+            if (camera is OrthographicCamera orthographicCamera)
+            {
+                orthographicCamera.Width = 2.2 * radius;
+            }
 
             // Keep world Z up here too (Zoom Selected), so framing a selection after rotating around
             // an off-axis pivot does not leave the view rolled - same intent as ZoomExtents.
@@ -987,6 +1064,17 @@ namespace SAM.Geometry.UI.WPF
 
         private void Viewport3DX_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            // Track a right-button drag (orbit) so the context menu can be suppressed at the end of it
+            // (see SharpDXViewportControl_ContextMenuOpening).
+            if (e.RightButton == MouseButtonState.Pressed && !rightButtonDragged)
+            {
+                Point point = e.GetPosition(this);
+                if (System.Math.Abs(point.X - rightButtonDownPoint.X) >= rightDragThreshold || System.Math.Abs(point.Y - rightButtonDownPoint.Y) >= rightDragThreshold)
+                {
+                    rightButtonDragged = true;
+                }
+            }
+
             // No hover while a gesture is in progress (left drag = rectangle selection overlay,
             // right drag = camera rotation, middle = pan)
             if (e.LeftButton == MouseButtonState.Pressed || e.RightButton == MouseButtonState.Pressed || e.MiddleButton == MouseButtonState.Pressed)
@@ -1108,6 +1196,15 @@ namespace SAM.Geometry.UI.WPF
             if (e.Key == Key.Escape && ClearSelection())
             {
                 ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                return;
+            }
+
+            // Ctrl+Shift+O toggles perspective <-> orthographic projection - parity with the Helix
+            // path, whose HelixViewport3D.OrthographicToggleGesture defaults to Ctrl+Shift+O.
+            if (e.Key == Key.O && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                ToggleProjection();
+                e.Handled = true;
             }
         }
 

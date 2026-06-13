@@ -146,14 +146,36 @@ view-cube/coordinate system, `SetCamera`/`GetCamera` round-trip, view-settings a
 the legacy Helix orthographic **2D** path can be deleted (floor plans already on `FloorPlan2DControl`).
 **Gate:** camera save/restore parity; no 2D regressions.
 
-> **Phase D status: partial (camera framing landed).** Done: `ZoomExtents` and "Zoom Selected"
-> route to the SharpDX view (Zoom Selected re-aims the camera at the selection bounds centre rather
-> than only dollying along the old look direction); `ZoomExtents` re-levels the camera up to world Z
-> so isolating + rotating a small object no longer leaves the view tilted; selection-aware rotation
+> **Phase D status: done (issue #37).** Done: `ZoomExtents` and "Zoom Selected" route to the
+> SharpDX view (Zoom Selected re-aims the camera at the selection bounds centre rather than only
+> dollying along the old look direction); `ZoomExtents` re-levels the camera up to world Z so
+> isolating + rotating a small object no longer leaves the view tilted; selection-aware rotation
 > pivot (FixedRotationPoint on the selection centroid, cursor-point fallback); view cube +
-> coordinate system enabled; `Get`/`SetCamera` exist. Outstanding: orthographic-3D camera mode,
-> view-settings application, `Get`/`SetCamera` save/restore parity check, and confirming the legacy
-> Helix orthographic 2D path can be deleted.
+> coordinate system enabled.
+>
+> **Orthographic-3D camera (issue #37):** `SharpDXViewportControl.ToggleProjection()` /
+> `Orthographic` swaps the viewport camera between `PerspectiveCamera` and `OrthographicCamera`,
+> bound to **Ctrl+Shift+O** (parity with the Helix `OrthographicToggleGesture` default). The swap
+> carries Position/LookDirection/UpDirection and the clip planes across, derives the orthographic
+> `Width` from the perspective field of view and the look-at distance so the on-screen scale is
+> continuous, and restores the remembered field of view on the way back. `FrameCamera`
+> (ZoomExtents / Zoom Selected) fits the bounding sphere by `Width` when orthographic.
+>
+> **View-settings application + `Get`/`SetCamera` round-trip:** the view-settings camera is applied
+> to the SharpDX camera on view activation (`ViewportControl.Load` -> `SharpDXViewportControl.Load`,
+> first non-empty load) and saved back via `ViewportControl.Camera` (-> `GetCamera`); `SetCamera`/
+> `GetCamera` round-trip Position/look/up identically to the Helix path, including the same
+> ±world-Z look-direction pole nudge. Projection is **not** persisted in the `Camera`/`ViewSettings`
+> model - the Helix 3D path doesn't persist it either, so a reloaded view opens in perspective
+> (parity, not a regression).
+>
+> **Legacy Helix orthographic 2D path - confirmed deletable (removal deferred to Phase E):** floor
+> plans render on `FloorPlan2DControl` by default (`SAM_UI_FLOORPLAN_2D` on). The Helix ortho-2D
+> path (`ViewportControl.UpdateMode` else-branch, `UpdateClipPlanes2D`/`sceneZMin`/`sceneZMax`/
+> `helixViewport3D_CameraChanged`) is reached only with `SAM_UI_FLOORPLAN_2D=0`; nothing else
+> depends on it. It is **not** removed here because the surrounding Helix mouse/rect-select handlers
+> still serve the Helix **3D** path (active when `SAM_UI_VIEWPORT_SHARPDX` is off), whose removal is
+> Phase E - the two Helix removals land together there.
 
 **Phase E — flip & remove.** Make SharpDX the default for 3D, keep `SAM_UI_VIEWPORT_SHARPDX=0` as the
 escape hatch for one release, then remove the `HelixToolkit.Wpf` 3D code path and the old

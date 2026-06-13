@@ -834,6 +834,9 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_Wiki.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_Wiki.Click += RibbonButton_Wiki_Click;
 
+            RibbonButton_KeyboardShortcuts.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_KeyboardShortcuts.Click += RibbonButton_KeyboardShortcuts_Click;
+
             RibbonButton_About.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_About.Click += RibbonButton_About_Click;
 
@@ -1792,6 +1795,12 @@ namespace SAM.Analytical.UI.WPF.Windows
                     MessageBox.Show(Core.Query.AboutInfoTypeText(comboBoxForm.SelectedItem), "Info");
                 }
             }
+        }
+
+        private void RibbonButton_KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
+        {
+            KeyboardShortcutsWindow keyboardShortcutsWindow = new KeyboardShortcutsWindow() { Owner = this };
+            keyboardShortcutsWindow.ShowDialog();
         }
 
         private void RibbonButton_AddMissingObjects_Click(object sender, RoutedEventArgs e)
@@ -3170,9 +3179,10 @@ namespace SAM.Analytical.UI.WPF.Windows
             UIGeometryObjectModel uIGeometryObjectModel = viewportControl.UIGeometryObjectModel;
 
             bool updateGeometry = uIGeometryObjectModel?.JSAMObject == null || modifiedEventArgs.Modifications.Find(x => x is FullModification) != null;
+
+            List<ViewSettingsModification> viewSettingsModifications = modifiedEventArgs.GetModifications<ViewSettingsModification>((x) => x.ViewSettings?.Find(y => y.Guid == viewSettings.Guid) != null);
             if (!updateGeometry)
             {
-                List<ViewSettingsModification> viewSettingsModifications = modifiedEventArgs.GetModifications<ViewSettingsModification>((x) => x.ViewSettings?.Find(y => y.Guid == viewSettings.Guid) != null);
                 if(viewSettingsModifications != null && viewSettingsModifications.Count != 0)
                 {
                     if(viewSettingsModifications.Any(x => x.UpdateCamera))
@@ -3186,6 +3196,13 @@ namespace SAM.Analytical.UI.WPF.Windows
                             viewportControl.Camera = threeDimensionalViewSettings.Camera;
                         }
                     }
+
+                    // A view-settings change flagged to update geometry (e.g. "Load view", which copies
+                    // the whole source view settings) regenerates the scene as well as applying the camera.
+                    if (viewSettingsModifications.Any(x => x.UpdateGeometry))
+                    {
+                        updateGeometry = true;
+                    }
                 }
             }
 
@@ -3193,7 +3210,17 @@ namespace SAM.Analytical.UI.WPF.Windows
             {
                 List<AnalyticalModelModification> analyticalModelModifications = modifiedEventArgs.GetModifications<AnalyticalModelModification>();
                 HashSet<Guid> guids = analyticalModelModifications?.Guids();
-                if (guids == null || guids.Count == 0 || viewportControl.ContainsAny<SAMObject>(guids))
+
+                // A camera-only view-settings change ("Load camera") carries no geometry change, so don't
+                // let the catch-all below force a full regeneration. This guard is precise: it only applies
+                // when every matching view-settings modification is camera-only (UpdateCamera, not
+                // UpdateGeometry) and there are no model edits to react to - the general view-settings edit
+                // path (single-arg ViewSettingsModification, UpdateCamera false) still regenerates as before.
+                bool cameraOnlyViewSettingsUpdate = viewSettingsModifications != null && viewSettingsModifications.Count != 0
+                    && viewSettingsModifications.TrueForAll(x => x.UpdateCamera && !x.UpdateGeometry)
+                    && (analyticalModelModifications == null || analyticalModelModifications.Count == 0);
+
+                if (!cameraOnlyViewSettingsUpdate && (guids == null || guids.Count == 0 || viewportControl.ContainsAny<SAMObject>(guids)))
                 {
                     updateGeometry = true;
 
@@ -3885,8 +3912,47 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
         }
 
+        // Two-letter chord state (Rhino-style "ZE"/"ZS"). A prefix key (Z) is remembered for a short
+        // window; the next key completes the chord. Z has no single-key action of its own, so there is
+        // nothing to defer - a lone Z, or Z followed by a non-chord key, simply does nothing for the Z.
+        private Key? pendingChordKey;
+        private int pendingChordTick;
+        private const int chordTimeoutMilliseconds = 1000;
+
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
+            // Complete a pending chord (e.g. Z then E). unchecked handles TickCount wraparound.
+            if (pendingChordKey.HasValue)
+            {
+                Key prefix = pendingChordKey.Value;
+                pendingChordKey = null;
+
+                if (unchecked(Environment.TickCount - pendingChordTick) <= chordTimeoutMilliseconds && prefix == Key.Z)
+                {
+                    if (e.Key == Key.E)
+                    {
+                        ZoomExtents();
+                        return;
+                    }
+
+                    if (e.Key == Key.S)
+                    {
+                        ZoomSelected();
+                        return;
+                    }
+
+                    // Not a Z-chord - fall through and handle e.Key as a normal shortcut below.
+                }
+            }
+
+            // Start the Z chord prefix; Z on its own does nothing.
+            if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.None)
+            {
+                pendingChordKey = Key.Z;
+                pendingChordTick = Environment.TickCount;
+                return;
+            }
+
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.S)
             {
                 SaveAs();
@@ -3943,6 +4009,26 @@ namespace SAM.Analytical.UI.WPF.Windows
             else if (e.Key == Key.P)
             {
                 ShowProperties();
+            }
+        }
+
+        private void ZoomExtents()
+        {
+            GetActiveViewportControl()?.ZoomExtents();
+        }
+
+        private void ZoomSelected()
+        {
+            ViewportControl viewportControl = GetActiveViewportControl();
+            if (viewportControl == null)
+            {
+                return;
+            }
+
+            List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
+            if (sAMObjects != null && sAMObjects.Count != 0)
+            {
+                viewportControl.Zoom(sAMObjects);
             }
         }
     }
