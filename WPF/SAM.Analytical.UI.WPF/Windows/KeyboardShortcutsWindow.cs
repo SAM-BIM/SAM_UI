@@ -27,6 +27,8 @@ namespace SAM.Analytical.UI.WPF
 
             stackPanel.Children.Add(Section("General", new[,]
             {
+                { "Ctrl + Z", "Undo" },
+                { "Ctrl + Y  /  Ctrl + Shift + Z", "Redo" },
                 { "Ctrl + S", "Save as" },
                 { "G", "Select by Guid" },
                 { "F", "Select by filter" },

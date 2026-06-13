@@ -1,4 +1,7 @@
-﻿using SAM.Geometry.UI;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Geometry.UI;
 
 namespace SAM.Analytical.UI.WPF
 {
@@ -26,7 +29,10 @@ namespace SAM.Analytical.UI.WPF
 
             analyticalModel.SetValue(AnalyticalModelParameter.UIGeometrySettings, uIGeometrySettings);
 
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(uIGeometrySettings.GetViewSettings(guid)));
+            // Active-tab bookkeeping: persisting which view is active is transient UI state, not a user
+            // edit, so it must not be captured on the undo history (otherwise Ctrl+Z steps through tab
+            // changes and consumes the bounded history).
+            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(uIGeometrySettings.GetViewSettings(guid)), false);
         }
     }
 }

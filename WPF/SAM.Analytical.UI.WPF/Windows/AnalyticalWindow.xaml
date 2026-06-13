@@ -426,6 +426,10 @@
                 </RibbonGroup>
             </RibbonTab>
             <RibbonTab x:Name="RibbonTab_Edit" Header="Edit">
+                <RibbonGroup x:Name="RibbonGroup_Edit_History" Header="History">
+                    <RibbonButton x:Name="RibbonButton_Undo" Label="Undo" />
+                    <RibbonButton x:Name="RibbonButton_Redo" Label="Redo" />
+                </RibbonGroup>
                 <RibbonGroup x:Name="RibbonGroup_Edit_WeatherData" Header="Weather Data">
                     <RibbonButton x:Name="RibbonButton_EditWeatherData" Label="Weather Data" />
                     <RibbonButton x:Name="RibbonButton_ImportWeatherData" Label="Import" />

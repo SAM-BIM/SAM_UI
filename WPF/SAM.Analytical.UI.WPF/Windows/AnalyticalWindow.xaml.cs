@@ -837,6 +837,14 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_KeyboardShortcuts.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_KeyboardShortcuts.Click += RibbonButton_KeyboardShortcuts_Click;
 
+            RibbonButton_Undo.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Undo.Click += RibbonButton_Undo_Click;
+            RibbonButton_Undo.IsEnabled = false;
+
+            RibbonButton_Redo.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Redo.Click += RibbonButton_Redo_Click;
+            RibbonButton_Redo.IsEnabled = false;
+
             RibbonButton_About.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_About.Click += RibbonButton_About_Click;
 
@@ -1707,7 +1715,10 @@ namespace SAM.Analytical.UI.WPF.Windows
 
                 UpdateUIGeometrySettings(tabControl, analyticalModel, modifiedEventArgs);
 
-                uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications);
+                // Re-commit the (tab/geometry-settings-updated) model without adding an undo entry: the
+                // triggering edit was already captured by its own SetJSAMObject, so capturing here too
+                // would make undo require two clicks.
+                uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications, false);
 
                 uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
                 tabControl.SelectionChanged += TabControl_SelectionChanged;
@@ -1795,6 +1806,16 @@ namespace SAM.Analytical.UI.WPF.Windows
                     MessageBox.Show(Core.Query.AboutInfoTypeText(comboBoxForm.SelectedItem), "Info");
                 }
             }
+        }
+
+        private void RibbonButton_Undo_Click(object sender, RoutedEventArgs e)
+        {
+            Undo();
+        }
+
+        private void RibbonButton_Redo_Click(object sender, RoutedEventArgs e)
+        {
+            Redo();
         }
 
         private void RibbonButton_KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
@@ -2852,7 +2873,10 @@ namespace SAM.Analytical.UI.WPF.Windows
             UIGeometrySettings uIGeometrySettings = UpdateUIGeometrySettings(tabControl, analyticalModel, new ModifiedEventArgs());
 
             uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(uIGeometrySettings.GetViewSettings<IViewSettings>()));
+            // Syncing the current viewport/camera state back into the model (e.g. before a save) is a
+            // transient writeback, not a user edit, so skip the undo snapshot - otherwise saving pushes
+            // a spurious history entry and clears redo.
+            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(uIGeometrySettings.GetViewSettings<IViewSettings>()), false);
             uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
         }
 
@@ -3091,6 +3115,7 @@ namespace SAM.Analytical.UI.WPF.Windows
         private void UIAnalyticalModel_Closed(object sender, ClosedEventArgs e)
         {
             Reload(e);
+            RefreshHistoryButtons();
 
             Title = titlePrefix;
         }
@@ -3098,12 +3123,18 @@ namespace SAM.Analytical.UI.WPF.Windows
         private void UIAnalyticalModel_Modified(object sender, ModifiedEventArgs e)
         {
             Reload(e);
+            RefreshHistoryButtons();
         }
 
         private void UIAnalyticalModel_Opened(object sender, OpenedEventArgs e)
         {
             SetDefaultViewSettings();
             Reload(e);
+
+            // A freshly opened model starts with empty history - drop any entry created by the
+            // open-time view-settings setup above.
+            uIAnalyticalModel?.ClearHistory();
+            RefreshHistoryButtons();
 
             Title = titlePrefix;
 
@@ -3921,6 +3952,21 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
+            // Undo / redo. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Checked before the Z chord
+            // prefix below (that only starts on a modifier-free Z).
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Z)
+            {
+                Undo();
+                return;
+            }
+
+            if ((Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Y)
+                || (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.Z))
+            {
+                Redo();
+                return;
+            }
+
             // Complete a pending chord (e.g. Z then E). unchecked handles TickCount wraparound.
             if (pendingChordKey.HasValue)
             {
@@ -4010,6 +4056,24 @@ namespace SAM.Analytical.UI.WPF.Windows
             {
                 ShowProperties();
             }
+        }
+
+        private void Undo()
+        {
+            uIAnalyticalModel?.Undo();
+        }
+
+        private void Redo()
+        {
+            uIAnalyticalModel?.Redo();
+        }
+
+        // Keep the ribbon Undo/Redo buttons enabled only when there is something to undo/redo. Called
+        // after every model change (UIAnalyticalModel_Modified) and after open/new/close.
+        private void RefreshHistoryButtons()
+        {
+            RibbonButton_Undo.IsEnabled = uIAnalyticalModel != null && uIAnalyticalModel.CanUndo;
+            RibbonButton_Redo.IsEnabled = uIAnalyticalModel != null && uIAnalyticalModel.CanRedo;
         }
 
         private void ZoomExtents()

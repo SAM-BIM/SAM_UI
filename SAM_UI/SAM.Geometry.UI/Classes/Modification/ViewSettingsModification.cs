@@ -14,6 +14,11 @@ namespace SAM.Geometry.UI
 
         public bool UpdateCamera { get; } = false;
 
+        // A camera-only view update (e.g. "Load camera", or persisting the camera on a tab switch) is a
+        // transient view change, not a model edit - keep it off the undo history. Every other
+        // view-settings change (appearances, types, legend, "Load view") is undoable.
+        public override bool Undoable => !(UpdateCamera && !UpdateGeometry);
+
         public ViewSettingsModification(IViewSettings viewSettings)
         {
             if(viewSettings != null)

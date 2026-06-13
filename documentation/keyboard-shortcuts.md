@@ -32,6 +32,8 @@ and act on the current selection.
 | `F12` | Show JSON of selection | — |
 | `Z` then `E` | Zoom extents | `ZoomExtents()` |
 | `Z` then `S` | Zoom selected | `ZoomSelected()` |
+| `Ctrl+Z` | Undo | `Undo()` |
+| `Ctrl+Y` / `Ctrl+Shift+Z` | Redo | `Redo()` |
 | `Ctrl+S` | Save As | `SaveAs()` |
 | `Esc` | Clear selection | per-viewport handler |
 
