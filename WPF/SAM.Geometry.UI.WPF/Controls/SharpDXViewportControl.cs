@@ -611,6 +611,10 @@ namespace SAM.Geometry.UI.WPF
             Media3D.Point3D centerPoint = new Media3D.Point3D(center.X, center.Y, center.Z);
             camera.Position = centerPoint - lookDirection * distance;
             camera.LookDirection = lookDirection * distance;
+
+            // Keep world Z up here too (Zoom Selected), so framing a selection after rotating around
+            // an off-axis pivot does not leave the view rolled - same intent as ZoomExtents.
+            LevelCameraUp();
         }
 
         /// <summary>
@@ -621,8 +625,13 @@ namespace SAM.Geometry.UI.WPF
         {
             if (viewport3DX.IsLoaded && viewport3DX.ActualWidth > 0)
             {
-                viewport3DX.ZoomExtents();
+                // Level BEFORE zooming, not after: the built-in ZoomExtents animates (Helix default
+                // ~200 ms) and carries the camera's current up direction through to the animation
+                // target, so leveling afterwards is overwritten frame-by-frame by the in-flight
+                // animation. Leveling first makes the animation target a world-Z-up camera, so the
+                // view settles level (the "rotates off the Z axis" report on an isolated element).
                 LevelCameraUp();
+                viewport3DX.ZoomExtents();
                 return;
             }
 
