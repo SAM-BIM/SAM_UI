@@ -46,11 +46,19 @@ namespace SAM.Analytical.UI
         private static readonly Dictionary<Guid, Tuple<string, List<Face2D>>> sectionCache = new Dictionary<Guid, Tuple<string, List<Face2D>>>();
         private static readonly object sectionCacheLock = new object();
 
-        // Both caches are static and keyed per space guid, so a long-running session that opens many large
-        // models (each with fresh guids) would otherwise grow without bound. Cap the entry count and clear
-        // when a new key would exceed it - the cap is well above any single model's space count, so the active
-        // model stays fully cached and only cross-model accumulation is bounded. (See PR #28 / Codex review.)
+        // Per-panel cache of the edge-fixed Face3Ds (panel.GetFace3Ds(true) + per-face FixEdges). FixEdges is
+        // the dominant 3D-panel cost (View3D.Panels.FixEdges ~4.7 s on a 10k model) and is purely geometric, so
+        // it is memoized like the space shell / section caches: keyed by panel guid with a face-geometry
+        // signature, a geometry edit re-builds while attribute / view-settings edits are cache hits.
+        private static readonly Dictionary<Guid, Tuple<string, List<Face3D>>> panelFaceCache = new Dictionary<Guid, Tuple<string, List<Face3D>>>();
+        private static readonly object panelFaceCacheLock = new object();
+
+        // All of these caches are static and keyed per object guid, so a long-running session that opens many
+        // large models (each with fresh guids) would otherwise grow without bound. Cap the entry count and clear
+        // when a new key would exceed it - the caps are well above any single model's space / panel count, so the
+        // active model stays fully cached and only cross-model accumulation is bounded. (See PR #28 / Codex review.)
         private const int maxCachedSpaces = 50000;
+        private const int maxCachedPanels = 250000;
 
         // Signature of a space's shell-input geometry: the guids and vertices of its bounding panels (the same
         // panels AdjacencyCluster.Shell builds from). O(vertices) - cheap relative to the shell topology build.
@@ -176,6 +184,116 @@ namespace SAM.Analytical.UI
             }
 
             return shell;
+        }
+
+        // Signature of a Face3D list: every edge vertex, rounded to mm so float noise does not cause misses.
+        // Order-sensitive - panel.GetFace3Ds(true) returns a stable order for a given panel.
+        private static string Face3DsSignature(List<Face3D> face3Ds)
+        {
+            if (face3Ds == null || face3Ds.Count == 0)
+            {
+                return null;
+            }
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (Face3D face3D in face3Ds)
+            {
+                if (face3D == null)
+                {
+                    stringBuilder.Append("null");
+                    stringBuilder.Append('@');
+                    continue;
+                }
+
+                List<IClosedPlanar3D> edge3Ds = face3D.GetEdge3Ds();
+                if (edge3Ds != null)
+                {
+                    foreach (IClosedPlanar3D edge3D in edge3Ds)
+                    {
+                        List<Point3D> point3Ds = (edge3D as ISegmentable3D)?.GetPoints();
+                        if (point3Ds == null)
+                        {
+                            continue;
+                        }
+
+                        foreach (Point3D point3D in point3Ds)
+                        {
+                            stringBuilder.Append(Sig(point3D.X)).Append(',').Append(Sig(point3D.Y)).Append(',').Append(Sig(point3D.Z)).Append(';');
+                        }
+
+                        stringBuilder.Append('#');
+                    }
+                }
+
+                stringBuilder.Append('@');
+            }
+
+            return stringBuilder.ToString();
+        }
+
+        // Returns the panel's edge-fixed Face3Ds, reusing a cached result when the panel's face geometry is
+        // unchanged. FixEdges per face is the dominant 3D-panel cost and is purely geometric, so it is memoized
+        // like the space shell / section caches. The cached faces are consumed read-only downstream (Cut /
+        // Face3DObject), so sharing an instance built from an earlier model clone is safe. Returns null when the
+        // panel carries no faces.
+        private static List<Face3D> GetPanelFace3Ds(Panel panel, out bool cacheHit)
+        {
+            cacheHit = false;
+            if (panel == null)
+            {
+                return null;
+            }
+
+            List<Face3D> face3Ds = panel.GetFace3Ds(true);
+            if (face3Ds == null || face3Ds.Count == 0)
+            {
+                return null;
+            }
+
+            string signature = Face3DsSignature(face3Ds);
+
+            if (signature != null)
+            {
+                lock (panelFaceCacheLock)
+                {
+                    if (panelFaceCache.TryGetValue(panel.Guid, out Tuple<string, List<Face3D>> cached) && cached != null && string.Equals(cached.Item1, signature, StringComparison.Ordinal))
+                    {
+                        cacheHit = true;
+                        return cached.Item2;
+                    }
+                }
+            }
+
+            // Cache miss: run FixEdges per face (the expensive step), keeping the existing semantics - replace
+            // each face with the largest valid edge-fixed face (or null if none is valid, as before).
+            for (int i = 0; i < face3Ds.Count; i++)
+            {
+                List<Face3D> face3Ds_FixEdges = face3Ds[i].FixEdges();
+                if (face3Ds_FixEdges != null && face3Ds_FixEdges.Count != 0)
+                {
+                    if (face3Ds_FixEdges.Count != 1)
+                    {
+                        face3Ds_FixEdges.Sort((x, y) => y.GetArea().CompareTo(x.GetArea()));
+                    }
+
+                    face3Ds[i] = face3Ds_FixEdges.Find(x => x.IsValid());
+                }
+            }
+
+            if (signature != null)
+            {
+                lock (panelFaceCacheLock)
+                {
+                    if (panelFaceCache.Count >= maxCachedPanels && !panelFaceCache.ContainsKey(panel.Guid))
+                    {
+                        panelFaceCache.Clear();
+                    }
+
+                    panelFaceCache[panel.Guid] = new Tuple<string, List<Face3D>>(signature, face3Ds);
+                }
+            }
+
+            return face3Ds;
         }
 
         // Returns the 2D floor-plan section faces for a space in the given plane, reusing cached geometry when
@@ -418,11 +536,11 @@ namespace SAM.Analytical.UI
             {
                 System.Diagnostics.Stopwatch panelsStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
 
-                // Sub-split the panel loop: FixEdges (per-face edge cleanup) vs Cut (per-face cut by the
-                // view's section planes). Panels are rebuilt every regeneration with no per-panel cache,
-                // unlike spaces - so this also shows whether a panel cache (mirroring shellCache) would pay off.
+                // Sub-split the panel loop: FixEdges (per-face edge cleanup, now cached in GetPanelFace3Ds) vs
+                // Cut (per-face cut by the view's section planes). FixEdges time is incurred only on a cache miss.
                 double panelFixEdgesMilliseconds = 0;
                 double panelCutMilliseconds = 0;
+                int panelFaceCacheHits = 0;
 
                 Legend legend_Panels = legend_Temp is null ? null : new Legend(legend_Temp);
 
@@ -475,29 +593,21 @@ namespace SAM.Analytical.UI
                             continue;
                         }
 
-                        List<Face3D> face3Ds = panel.GetFace3Ds(true);
-                        if (face3Ds == null || face3Ds.Count == 0)
-                        {
-                            continue;
-                        }
-
                         System.Diagnostics.Stopwatch panelFixEdgesStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
-                        for (int i = 0; i < face3Ds.Count; i++)
-                        {
-                            List<Face3D> face3Ds_FixEdges = face3Ds[i].FixEdges();
-                            if (face3Ds_FixEdges != null && face3Ds_FixEdges.Count != 0)
-                            {
-                                if (face3Ds_FixEdges.Count != 1)
-                                {
-                                    face3Ds_FixEdges.Sort((x, y) => y.GetArea().CompareTo(x.GetArea()));
-                                }
-
-                                face3Ds[i] = face3Ds_FixEdges.Find(x => x.IsValid());
-                            }
-                        }
+                        List<Face3D> face3Ds = GetPanelFace3Ds(panel, out bool panelFaceCacheHit);
                         if (panelFixEdgesStopwatch != null)
                         {
                             panelFixEdgesMilliseconds += panelFixEdgesStopwatch.Elapsed.TotalMilliseconds;
+                        }
+
+                        if (panelFaceCacheHit)
+                        {
+                            panelFaceCacheHits++;
+                        }
+
+                        if (face3Ds == null || face3Ds.Count == 0)
+                        {
+                            continue;
                         }
 
                         if (planes != null && planes.Count != 0)
@@ -560,8 +670,8 @@ namespace SAM.Analytical.UI
                 if (panelsStopwatch != null)
                 {
                     panelsStopwatch.Stop();
-                    PerformanceLog.Write("View3D.Panels", threeDimensionalViewSettings.Name, panelsStopwatch.Elapsed.TotalMilliseconds);
-                    PerformanceLog.Write("View3D.Panels.FixEdges", threeDimensionalViewSettings.Name, panelFixEdgesMilliseconds);
+                    PerformanceLog.Write("View3D.Panels", string.Format("{0} [{1} cached]", threeDimensionalViewSettings.Name, panelFaceCacheHits), panelsStopwatch.Elapsed.TotalMilliseconds);
+                    PerformanceLog.Write("View3D.Panels.FixEdges", string.Format("{0} [{1} cached]", threeDimensionalViewSettings.Name, panelFaceCacheHits), panelFixEdgesMilliseconds);
                     PerformanceLog.Write("View3D.Panels.Cut", threeDimensionalViewSettings.Name, panelCutMilliseconds);
                 }
             }
