@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Core.UI;
 using SAM.Geometry.Spatial;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 
 namespace SAM.Geometry.UI.WPF
 {
@@ -32,6 +34,17 @@ namespace SAM.Geometry.UI.WPF
         // count, so the active model stays fully cached and only cross-model accumulation is bounded.
         // (Mirrors the maxCachedSpaces / maxCachedPanels caps in GeometryObjectModel.)
         private const int maxCachedMeshes = 500000;
+
+        // Diagnostic counters for a single top-level build (reset by ResetMesh3DCacheStats, read by
+        // LogMesh3DCacheStats). Triangulation is the suspected #1 cost of ViewportControl.ToElement3D
+        // (#33), but that timer wraps the whole scene build; splitting out cache hits / misses / the
+        // remaining (miss-path) triangulation time shows whether the cache is actually hit and how much
+        // triangulation cost is left - same diagnostic split as View3D.Panels.FixEdges upstream. Counts
+        // are cheap and always kept; the miss-path stopwatch runs only when the performance log is on.
+        private static long mesh3DCacheHits;
+        private static long mesh3DCacheMisses;
+        private static double mesh3DTriangulateMilliseconds;
+        private static readonly object mesh3DStatsLock = new object();
 
         // Round to mm for the cache signature so float noise does not cause spurious misses.
         private static string Mesh3DSig(double value)
@@ -87,18 +100,19 @@ namespace SAM.Geometry.UI.WPF
             string signature = Face3DSignature(face3D);
             if (signature == null)
             {
-                return Spatial.Create.Mesh3D(face3D);
+                return Triangulate(face3D);
             }
 
             lock (mesh3DCacheLock)
             {
                 if (mesh3DCache.TryGetValue(signature, out Mesh3D cached))
                 {
+                    Interlocked.Increment(ref mesh3DCacheHits);
                     return cached;
                 }
             }
 
-            Mesh3D mesh3D = Spatial.Create.Mesh3D(face3D);
+            Mesh3D mesh3D = Triangulate(face3D);
 
             lock (mesh3DCacheLock)
             {
@@ -111,6 +125,55 @@ namespace SAM.Geometry.UI.WPF
             }
 
             return mesh3D;
+        }
+
+        // Cache miss: run the (expensive) triangulation, counting it and - when the performance log is
+        // enabled - timing it so the remaining miss-path cost is visible in LogMesh3DCacheStats.
+        private static Mesh3D Triangulate(Face3D face3D)
+        {
+            Interlocked.Increment(ref mesh3DCacheMisses);
+
+            if (!PerformanceLog.Enabled)
+            {
+                return Spatial.Create.Mesh3D(face3D);
+            }
+
+            System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Mesh3D mesh3D = Spatial.Create.Mesh3D(face3D);
+            stopwatch.Stop();
+
+            lock (mesh3DStatsLock)
+            {
+                mesh3DTriangulateMilliseconds += stopwatch.Elapsed.TotalMilliseconds;
+            }
+
+            return mesh3D;
+        }
+
+        // Zero the per-build diagnostic counters. Call once at the start of a top-level scene build.
+        internal static void ResetMesh3DCacheStats()
+        {
+            Interlocked.Exchange(ref mesh3DCacheHits, 0);
+            Interlocked.Exchange(ref mesh3DCacheMisses, 0);
+            lock (mesh3DStatsLock)
+            {
+                mesh3DTriangulateMilliseconds = 0;
+            }
+        }
+
+        // Emit the diagnostic line: miss-path triangulation time + hit / miss counts for this build.
+        // On a warm regen of an unchanged model, hits should dominate and the time should be near zero.
+        internal static void LogMesh3DCacheStats(string detail)
+        {
+            long hits = Interlocked.Read(ref mesh3DCacheHits);
+            long misses = Interlocked.Read(ref mesh3DCacheMisses);
+            double milliseconds;
+            lock (mesh3DStatsLock)
+            {
+                milliseconds = mesh3DTriangulateMilliseconds;
+            }
+
+            PerformanceLog.Write("ViewportControl.ToElement3D.Triangulate", string.Format("{0} [{1} hits / {2} misses]", detail ?? string.Empty, hits, misses), milliseconds);
         }
     }
 }

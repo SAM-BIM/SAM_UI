@@ -2,6 +2,7 @@
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using HelixToolkit.Wpf.SharpDX;
+using SAM.Core.UI;
 using SAM.Geometry.Object;
 using SAM.Geometry.Object.Spatial;
 using SAM.Geometry.Spatial;
@@ -29,6 +30,15 @@ namespace SAM.Geometry.UI.WPF
 
             List<Element3D> result = new List<Element3D>();
 
+            // Reset the per-build triangulation cache counters so the diagnostic line below reflects
+            // only this build (see Mesh3DCache / issue #33). The whole-build cost is timed one level up
+            // as ViewportControl.ToElement3D; this splits out the triangulation slice and its hit rate.
+            bool logEnabled = PerformanceLog.Enabled;
+            if (logEnabled)
+            {
+                ResetMesh3DCacheStats();
+            }
+
             List<ISAMGeometryObject> sAMGeometryObjects = geometryObjectModel.GetSAMGeometryObjects<ISAMGeometryObject>();
             if (sAMGeometryObjects != null)
             {
@@ -54,6 +64,11 @@ namespace SAM.Geometry.UI.WPF
                     Core.UI.WPF.Modify.SetIJSAMObject(groupModel3D, sAMGeometryObject);
                     result.Add(groupModel3D);
                 }
+            }
+
+            if (logEnabled)
+            {
+                LogMesh3DCacheStats(string.Format("[{0} objects]", result.Count));
             }
 
             return result;
