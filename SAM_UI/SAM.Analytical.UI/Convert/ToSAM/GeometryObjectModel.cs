@@ -416,6 +416,8 @@ namespace SAM.Analytical.UI
             Dictionary<Guid, Geometry3DObjectCollection> dictionary_Panels = new Dictionary<Guid, Geometry3DObjectCollection>();
             if (showPanels)
             {
+                System.Diagnostics.Stopwatch panelsStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
+
                 Legend legend_Panels = legend_Temp is null ? null : new Legend(legend_Temp);
 
                 List<Panel> panels = adjacencyCluster.GetPanels();
@@ -538,12 +540,20 @@ namespace SAM.Analytical.UI
 
                     }
                 }
+
+                if (panelsStopwatch != null)
+                {
+                    panelsStopwatch.Stop();
+                    PerformanceLog.Write("View3D.Panels", threeDimensionalViewSettings.Name, panelsStopwatch.Elapsed.TotalMilliseconds);
+                }
             }
 
             bool showApertures = threeDimensionalViewSettings.IsValid(typeof(Aperture));
             Dictionary<Guid, Geometry3DObjectCollection> dictionary_Apertures = new Dictionary<Guid, Geometry3DObjectCollection>();
             if (showApertures)
             {
+                System.Diagnostics.Stopwatch aperturesStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
+
                 Legend legend_Apertures = legend_Temp is null ? null : new Legend(legend_Temp);
 
                 List<Aperture> apertures = adjacencyCluster.GetApertures();
@@ -666,6 +676,12 @@ namespace SAM.Analytical.UI
                             }
                         }
                     }
+                }
+
+                if (aperturesStopwatch != null)
+                {
+                    aperturesStopwatch.Stop();
+                    PerformanceLog.Write("View3D.Apertures", threeDimensionalViewSettings.Name, aperturesStopwatch.Elapsed.TotalMilliseconds);
                 }
             }
 
