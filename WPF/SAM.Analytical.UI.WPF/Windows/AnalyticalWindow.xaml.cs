@@ -2873,7 +2873,10 @@ namespace SAM.Analytical.UI.WPF.Windows
             UIGeometrySettings uIGeometrySettings = UpdateUIGeometrySettings(tabControl, analyticalModel, new ModifiedEventArgs());
 
             uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(uIGeometrySettings.GetViewSettings<IViewSettings>()));
+            // Syncing the current viewport/camera state back into the model (e.g. before a save) is a
+            // transient writeback, not a user edit, so skip the undo snapshot - otherwise saving pushes
+            // a spurious history entry and clears redo.
+            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(uIGeometrySettings.GetViewSettings<IViewSettings>()), false);
             uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
         }
 

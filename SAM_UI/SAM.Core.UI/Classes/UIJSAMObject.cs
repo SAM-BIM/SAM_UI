@@ -140,12 +140,23 @@ namespace SAM.Core.UI
 
         public void SetJSAMObject(T jSAMObject, IModification modification)
         {
+            SetJSAMObject(jSAMObject, modification, true);
+        }
+
+        /// <summary>
+        /// Sets the object and raises Modified. <paramref name="captureHistory"/> = false skips the
+        /// undo snapshot - used for transient writebacks that re-persist UI state rather than a user
+        /// edit (e.g. active-tab bookkeeping, save-time view-settings sync), so they must not add a
+        /// history entry.
+        /// </summary>
+        public void SetJSAMObject(T jSAMObject, IModification modification, bool captureHistory)
+        {
             if(modification == null)
             {
                 modification = new FullModification();
             }
 
-            SetJSAMObject(jSAMObject, new List<IModification>() { modification });
+            SetJSAMObject(jSAMObject, new List<IModification>() { modification }, captureHistory);
         }
 
         public void SetJSAMObject(T jSAMObject, IEnumerable<IModification> modifications)
