@@ -106,7 +106,15 @@ namespace SAM.Geometry.UI.WPF
                 BackgroundColor = Colors.White,
                 ShowCoordinateSystem = true,
                 ShowViewCube = true,
-                ModelUpDirection = new Media3D.Vector3D(0, 0, 1)
+                ModelUpDirection = new Media3D.Vector3D(0, 0, 1),
+
+                // Centre of rotation / zoom follows the cursor (issue #32 item 1, and the earlier
+                // "zoom to mouse does not work" report): rotate and zoom around the point under the
+                // mouse where the gesture starts. When the user has a selection, UpdateRotationPivot
+                // switches the rotation centre to the selected objects' centroid (FixedRotationPoint)
+                // - the "or the currently selected element" half of the request.
+                RotateAroundMouseDownPoint = true,
+                ZoomAroundMouseDownPoint = true
             };
 
             // Single white ambient light - parity with the Helix 3D path (Load adds AmbientLight
@@ -202,6 +210,9 @@ namespace SAM.Geometry.UI.WPF
             dictionary_BaseLineThickness.Clear();
             selectedGuids.Clear();
             hooveredGuid = null;
+
+            // Selection is gone after a rebuild - rotation falls back to the cursor pivot
+            UpdateRotationPivot();
 
             if (geometryObjectModel == null)
             {
@@ -300,6 +311,7 @@ namespace SAM.Geometry.UI.WPF
                 ApplyAppearance(guid);
             }
 
+            UpdateRotationPivot();
             return true;
         }
 
@@ -318,6 +330,7 @@ namespace SAM.Geometry.UI.WPF
                 ApplyAppearance(guid);
             }
 
+            UpdateRotationPivot();
             return true;
         }
 
@@ -489,18 +502,40 @@ namespace SAM.Geometry.UI.WPF
         /// Zooms to the combined extents of the given objects ("Zoom Selected", issue #32 / #13).
         /// Bounds are taken from the merged mesh/line positions (world space - the scene has no
         /// per-object transforms). Returns false when none of the guids are present or have geometry.
+        ///
+        /// Frames the object by re-aiming the camera at the bounds centre, not via
+        /// Viewport3DX.ZoomExtents(Rect3D): that overload only pulls the camera in/out along the
+        /// current look direction, so it leaves the camera pointed at the old target (the rotation
+        /// point) and the selected object off to the side - the "zooms away from the element" report
+        /// (issue #32 item 3). Here the look direction is kept but the camera is moved onto the line
+        /// through the bounds centre at a distance that fits the bounding sphere in the field of view.
         /// </summary>
         public bool Zoom(IEnumerable<Guid> guids)
         {
+            if (!TryGetBounds(guids, out Vector3 min, out Vector3 max))
+            {
+                return false;
+            }
+
+            Vector3 center = (min + max) * 0.5f;
+            float radius = (max - min).Length() * 0.5f;
+            FrameCamera(center, radius);
+            return true;
+        }
+
+        // Combined world-space bounds of the given objects' merged mesh/line geometry. False when
+        // none of the guids are present or carry geometry.
+        private bool TryGetBounds(IEnumerable<Guid> guids, out Vector3 min, out Vector3 max)
+        {
+            min = new Vector3(float.MaxValue);
+            max = new Vector3(float.MinValue);
+
             if (guids == null)
             {
                 return false;
             }
 
             bool any = false;
-            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
-            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
-
             foreach (Guid guid in guids)
             {
                 if (!dictionary_Element3D.TryGetValue(guid, out Element3D element3D) || !(element3D is GroupModel3D groupModel3D))
@@ -519,23 +554,63 @@ namespace SAM.Geometry.UI.WPF
                     foreach (Vector3 position in geometry3D.Positions)
                     {
                         any = true;
-                        if (position.X < minX) { minX = position.X; }
-                        if (position.Y < minY) { minY = position.Y; }
-                        if (position.Z < minZ) { minZ = position.Z; }
-                        if (position.X > maxX) { maxX = position.X; }
-                        if (position.Y > maxY) { maxY = position.Y; }
-                        if (position.Z > maxZ) { maxZ = position.Z; }
+                        min = Vector3.Min(min, position);
+                        max = Vector3.Max(max, position);
                     }
                 }
             }
 
-            if (!any)
+            return any;
+        }
+
+        // Centre of rotation tracks the selection (issue #32 item 1): with objects selected, rotation
+        // pivots around their combined centre (FixedRotationPoint); with nothing selected it falls back
+        // to RotateAroundMouseDownPoint (the point under the cursor). Called on every selection change.
+        private void UpdateRotationPivot()
+        {
+            if (selectedGuids.Count > 0 && TryGetBounds(selectedGuids, out Vector3 min, out Vector3 max))
             {
-                return false;
+                Vector3 center = (min + max) * 0.5f;
+                viewport3DX.FixedRotationPoint = new Media3D.Point3D(center.X, center.Y, center.Z);
+                viewport3DX.FixedRotationPointEnabled = true;
+            }
+            else
+            {
+                viewport3DX.FixedRotationPointEnabled = false;
+            }
+        }
+
+        // Moves the camera so the given world sphere fills the view, keeping the current look
+        // direction and up. Shared by Zoom (above): the distance fits the sphere in the perspective
+        // field of view, with a small margin so the object is not flush against the edges.
+        private void FrameCamera(Vector3 center, float radius)
+        {
+            HelixToolkit.Wpf.SharpDX.Camera camera = viewport3DX.Camera;
+            if (camera == null)
+            {
+                return;
             }
 
-            viewport3DX.ZoomExtents(new Media3D.Rect3D(minX, minY, minZ, maxX - minX, maxY - minY, maxZ - minZ), 0);
-            return true;
+            if (radius <= 0)
+            {
+                // A single degenerate point still deserves a sensible standoff
+                radius = 1f;
+            }
+
+            Media3D.Vector3D lookDirection = camera.LookDirection;
+            if (lookDirection.Length < 1e-6)
+            {
+                lookDirection = new Media3D.Vector3D(-1, -1, -1);
+            }
+
+            lookDirection.Normalize();
+
+            double fieldOfView = (camera as HelixToolkit.Wpf.SharpDX.PerspectiveCamera)?.FieldOfView ?? 45.0;
+            double distance = 1.1 * radius / System.Math.Sin(0.5 * fieldOfView * System.Math.PI / 180.0);
+
+            Media3D.Point3D centerPoint = new Media3D.Point3D(center.X, center.Y, center.Z);
+            camera.Position = centerPoint - lookDirection * distance;
+            camera.LookDirection = lookDirection * distance;
         }
 
         /// <summary>
@@ -792,6 +867,7 @@ namespace SAM.Geometry.UI.WPF
 
             if (changed)
             {
+                UpdateRotationPivot();
                 ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
             }
         }
