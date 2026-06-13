@@ -12,7 +12,7 @@ namespace SAM.Geometry.UI.WPF
     {
         public static MeshGeometry3D ToMedia3D(this Face3D face3D, bool doubleSided = false)
         {
-            return ToMedia3D(Spatial.Create.Mesh3D(face3D), doubleSided);
+            return ToMedia3D(CachedMesh3D(face3D), doubleSided);
         }
 
         public static MeshGeometry3D ToMedia3D(this Mesh3D mesh3D, bool doubleSided = false)

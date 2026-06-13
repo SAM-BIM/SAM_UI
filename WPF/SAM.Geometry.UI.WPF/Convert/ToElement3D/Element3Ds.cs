@@ -140,7 +140,7 @@ namespace SAM.Geometry.UI.WPF
                     return;
                 }
 
-                AddMesh(sharpDXSceneBuilder, Spatial.Create.Mesh3D(face3D), surfaceAppearance);
+                AddMesh(sharpDXSceneBuilder, CachedMesh3D(face3D), surfaceAppearance);
 
                 CurveAppearance curveAppearance = surfaceAppearance.CurveAppearance;
                 if (curveAppearance != null && curveAppearance.Thickness != 0)
