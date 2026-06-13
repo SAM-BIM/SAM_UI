@@ -5,6 +5,7 @@ using HelixToolkit;
 using HelixToolkit.Maths;
 using HelixToolkit.SharpDX;
 using HelixToolkit.Wpf.SharpDX;
+using SAM.Core.UI;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -47,6 +48,32 @@ namespace SAM.Geometry.UI.WPF
         private readonly Dictionary<int, MeshBucket> meshBuckets = new Dictionary<int, MeshBucket>();
         private readonly Dictionary<Tuple<int, double>, LineBucket> lineBuckets = new Dictionary<Tuple<int, double>, LineBucket>();
         private readonly Dictionary<int, TextBucket> textBuckets = new Dictionary<int, TextBucket>();
+
+        // Diagnostic: UpdateOctree() time accumulated across one top-level scene build. The per-object
+        // octree (one per mesh bucket, ~1 per object) is a prime suspect for the ~5-7 s that remains in
+        // ViewportControl.ToElement3D once triangulation is cached (issue #33 follow-up). Reset and read
+        // by the model-level Convert.ToElement3Ds; only timed when the performance log is enabled.
+        private static double octreeMilliseconds;
+        private static readonly object octreeStatsLock = new object();
+
+        internal static void ResetOctreeStats()
+        {
+            lock (octreeStatsLock)
+            {
+                octreeMilliseconds = 0;
+            }
+        }
+
+        internal static double OctreeMilliseconds
+        {
+            get
+            {
+                lock (octreeStatsLock)
+                {
+                    return octreeMilliseconds;
+                }
+            }
+        }
 
         private static int ToKey(System.Drawing.Color color, double opacity)
         {
@@ -154,7 +181,20 @@ namespace SAM.Geometry.UI.WPF
                 // Static per-geometry octree for hover/selection picking (issue #32 Phase C):
                 // FindHits walks it instead of every triangle, which is what makes the unthrottled
                 // mouse-move hit-test affordable on large models.
-                meshGeometry3D.UpdateOctree();
+                if (PerformanceLog.Enabled)
+                {
+                    System.Diagnostics.Stopwatch octreeStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    meshGeometry3D.UpdateOctree();
+                    octreeStopwatch.Stop();
+                    lock (octreeStatsLock)
+                    {
+                        octreeMilliseconds += octreeStopwatch.Elapsed.TotalMilliseconds;
+                    }
+                }
+                else
+                {
+                    meshGeometry3D.UpdateOctree();
+                }
 
                 // Ambient = Diffuse reproduces the flat, unshaded look of the Helix 3D path
                 // (ambient-only lighting); specular off.

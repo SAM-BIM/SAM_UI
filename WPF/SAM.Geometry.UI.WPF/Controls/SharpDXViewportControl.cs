@@ -285,44 +285,58 @@ namespace SAM.Geometry.UI.WPF
                 return;
             }
 
-            List<Element3D> element3Ds = Convert.ToElement3Ds(geometryObjectModel);
+            // Split the build (Convert.ToElement3Ds) from the viewport attach loop and the camera fit:
+            // ViewportControl.ToElement3D (one level up) wraps this whole method, so isolating the three
+            // phases shows which dominates the ~5-7 s that remains once triangulation is cached (#33).
+            List<Element3D> element3Ds;
+            using (PerformanceLog.Measure("ViewportControl.ToElement3D.Generate"))
+            {
+                element3Ds = Convert.ToElement3Ds(geometryObjectModel);
+            }
+
             if (element3Ds != null)
             {
-                foreach (Element3D element3D in element3Ds)
+                using (PerformanceLog.Measure("ViewportControl.ToElement3D.Attach", string.Format("[{0} objects]", element3Ds.Count)))
                 {
-                    viewport3DX.Items.Add(element3D);
-                    sceneElement3Ds.Add(element3D);
-
-                    SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
-                    if (sAMObject != null && !dictionary_Element3D.ContainsKey(sAMObject.Guid))
+                    foreach (Element3D element3D in element3Ds)
                     {
-                        dictionary_Element3D[sAMObject.Guid] = element3D;
-                        dictionary_Guid[element3D] = sAMObject.Guid;
-                        RegisterChildren(sAMObject.Guid, element3D);
+                        viewport3DX.Items.Add(element3D);
+                        sceneElement3Ds.Add(element3D);
 
-                        // Detached stub carrying the same attached object as the group - the
-                        // ObjectHoovered/ObjectDoubleClicked payload (see the class note)
-                        Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
-                        IJSAMObject jSAMObject = Core.UI.WPF.Query.JSAMObject<IJSAMObject>(element3D);
-                        if (jSAMObject != null)
+                        SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
+                        if (sAMObject != null && !dictionary_Element3D.ContainsKey(sAMObject.Guid))
                         {
-                            Core.UI.WPF.Modify.SetIJSAMObject(stub, jSAMObject);
-                        }
+                            dictionary_Element3D[sAMObject.Guid] = element3D;
+                            dictionary_Guid[element3D] = sAMObject.Guid;
+                            RegisterChildren(sAMObject.Guid, element3D);
 
-                        dictionary_Stub[sAMObject.Guid] = stub;
+                            // Detached stub carrying the same attached object as the group - the
+                            // ObjectHoovered/ObjectDoubleClicked payload (see the class note)
+                            Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
+                            IJSAMObject jSAMObject = Core.UI.WPF.Query.JSAMObject<IJSAMObject>(element3D);
+                            if (jSAMObject != null)
+                            {
+                                Core.UI.WPF.Modify.SetIJSAMObject(stub, jSAMObject);
+                            }
+
+                            dictionary_Stub[sAMObject.Guid] = stub;
+                        }
                     }
                 }
             }
 
             if (wasEmpty)
             {
-                if (camera != null)
+                using (PerformanceLog.Measure("ViewportControl.ToElement3D.Camera"))
                 {
-                    SetCamera(camera);
-                }
-                else
-                {
-                    ZoomExtents();
+                    if (camera != null)
+                    {
+                        SetCamera(camera);
+                    }
+                    else
+                    {
+                        ZoomExtents();
+                    }
                 }
             }
         }
