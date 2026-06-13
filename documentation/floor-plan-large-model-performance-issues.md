@@ -248,12 +248,12 @@ log file next to the timings table in this document.
 
 ---
 
-## Experimental: 2D floor plan renderer (flag-gated)
+## 2D floor plan renderer (default on)
 
 Implements the "2D canvas for floor plans" direction from issue #18 (also addresses #13 and the
-floor-plan part of #16). **Off by default** — enable with the `SAM_UI_FLOORPLAN_2D` environment
-variable (any value other than empty/`0`). With the flag off, behavior is byte-for-byte identical
-to before.
+floor-plan part of #16). **On by default** (issue #18 decision) — set `SAM_UI_FLOORPLAN_2D=0` to
+fall back to the legacy Helix orthographic 2D path (byte-for-byte the old behavior). Any other
+value, or leaving it unset, uses the 2D canvas.
 
 - `WPF/SAM.Geometry.UI.WPF/Controls/FloorPlan2DControl.cs` — renders the same
   `GeometryObjectModel` as flat WPF `DrawingVisual`s: spaces as filled `StreamGeometry`
@@ -273,6 +273,10 @@ to before.
   performance log for direct comparison against `ViewportControl.ToMedia3D` /
   `ViewportControl.HoverHitTest` on the same model.
 
-Known v1 limitations (fine for an experiment behind a flag): camera save/restore between
-sessions is not wired for the 2D path (opens at zoom-extents), and `UpdateCamera` view-settings
-modifications are a visual no-op in 2D.
+Camera persistence (added with the default flip, PR #30 review): `ViewportControl.Camera`
+bridges to the 2D canvas - `FloorPlan2DControl.GetCamera` expresses the pan/zoom as a camera
+over the section plane (height above the plane encodes the zoom level) and `SetCamera` applies
+it back (held pending until the view has a plane and a real size), so floor-plan view positions
+save/restore through the existing `ViewSettings.Camera` plumbing and `UpdateCamera` view-settings
+modifications work in 2D. Legacy cameras saved by the Helix orthographic path restore the pan
+position with a clamped zoom.

@@ -59,6 +59,10 @@ namespace SAM.Geometry.UI.WPF
         private System.Windows.Media.Matrix worldToScreen = System.Windows.Media.Matrix.Identity;
         private bool zoomExtentsPending;
 
+        // Camera waiting to be applied once the control has a plane and a real size (view-settings
+        // restore can arrive before the tab is ever shown) - see SetCamera/GetCamera.
+        private Camera pendingCamera;
+
         private bool panning;
         private System.Windows.Point panPoint;
 
@@ -98,6 +102,7 @@ namespace SAM.Geometry.UI.WPF
 
                 if (geometryObjectModel == null)
                 {
+                    plane = null;
                     return;
                 }
 
@@ -148,7 +153,14 @@ namespace SAM.Geometry.UI.WPF
                 // Keep the user's pan/zoom on regeneration; zoom to extents on first load only
                 if (firstLoad)
                 {
-                    if (ActualWidth > 0 && ActualHeight > 0)
+                    if (pendingCamera != null)
+                    {
+                        // A camera restored before the first geometry load (no plane yet) wins
+                        Camera camera = pendingCamera;
+                        pendingCamera = null;
+                        SetCamera(camera);
+                    }
+                    else if (ActualWidth > 0 && ActualHeight > 0)
                     {
                         ZoomExtents();
                     }
@@ -308,8 +320,92 @@ namespace SAM.Geometry.UI.WPF
             Select(guids);
         }
 
+        /// <summary>
+        /// The current pan/zoom expressed as a camera over the section plane, so floor-plan view
+        /// positions persist through the existing ViewSettings.Camera plumbing (PR #30 review):
+        /// the camera sits over the world point at the viewport center, looking down with the
+        /// 2D look direction convention of ViewportControl.UpdateMode, and the height above the
+        /// plane encodes the zoom level (height = world height visible in the viewport). Returns
+        /// the still-pending camera while the view has not been shown yet (so a save round-trip
+        /// does not lose it), or null when there is nothing to report (Helix fallback).
+        /// </summary>
+        public Camera GetCamera()
+        {
+            if (pendingCamera != null)
+            {
+                return pendingCamera;
+            }
+
+            double scale = worldToScreen.M11;
+            if (plane == null || ActualWidth <= 0 || ActualHeight <= 0 || scale <= 0)
+            {
+                return null;
+            }
+
+            double x = (ActualWidth / 2 - worldToScreen.OffsetX) / scale;
+            double y = (worldToScreen.OffsetY - ActualHeight / 2) / scale;
+
+            Spatial.Point3D point3D = plane.Convert(new Point2D(x, y));
+            if (point3D == null)
+            {
+                return null;
+            }
+
+            // Floor-plan planes are horizontal: encode the zoom as height straight above the plane
+            double worldHeight = ActualHeight / scale;
+
+            return new Camera(new Spatial.Point3D(point3D.X, point3D.Y, point3D.Z + worldHeight), new Spatial.Vector3D(0, 0.0001, -0.9999), new Spatial.Vector3D(0, 1, 0));
+        }
+
+        /// <summary>
+        /// Applies a camera produced by GetCamera (or a legacy Helix orthographic one): pans to
+        /// the camera location projected onto the section plane and zooms so the height above the
+        /// plane spans the viewport. Stored as pending while the plane/size are not available yet.
+        /// </summary>
+        public void SetCamera(Camera camera)
+        {
+            if (camera?.Location == null)
+            {
+                return;
+            }
+
+            if (plane == null || ActualWidth <= 0 || ActualHeight <= 0)
+            {
+                pendingCamera = camera;
+                return;
+            }
+
+            pendingCamera = null;
+
+            Point2D point2D = Spatial.Query.Convert(plane, camera.Location);
+            Spatial.Point3D point3D_OnPlane = point2D == null ? null : plane.Convert(point2D);
+            if (point2D == null || point3D_OnPlane == null)
+            {
+                return;
+            }
+
+            // Legacy cameras (saved by the Helix orthographic path) carry an arbitrary height -
+            // the clamp keeps the pan and falls back to a sane zoom instead of degenerating
+            double worldHeight = camera.Location.Distance(point3D_OnPlane);
+            double scale = worldHeight > 0 ? ActualHeight / worldHeight : double.MaxValue;
+            if (scale < minScale)
+            {
+                scale = minScale;
+            }
+
+            if (scale > maxScale)
+            {
+                scale = maxScale;
+            }
+
+            worldToScreen = new System.Windows.Media.Matrix(scale, 0, 0, -scale, ActualWidth / 2 - scale * point2D.X, ActualHeight / 2 + scale * point2D.Y);
+            ApplyTransform();
+        }
+
         public void ZoomExtents()
         {
+            pendingCamera = null;
+
             Rect bounds = Rect.Empty;
             foreach (Item item in items)
             {
@@ -353,7 +449,23 @@ namespace SAM.Geometry.UI.WPF
         {
             base.OnRenderSizeChanged(sizeInfo);
 
-            if (zoomExtentsPending && ActualWidth > 0 && ActualHeight > 0)
+            if (ActualWidth <= 0 || ActualHeight <= 0)
+            {
+                return;
+            }
+
+            // A restored camera wins over the first-load zoom-extents
+            if (pendingCamera != null && plane != null)
+            {
+                zoomExtentsPending = false;
+
+                Camera camera = pendingCamera;
+                pendingCamera = null;
+                SetCamera(camera);
+                return;
+            }
+
+            if (zoomExtentsPending)
             {
                 zoomExtentsPending = false;
                 ZoomExtents();

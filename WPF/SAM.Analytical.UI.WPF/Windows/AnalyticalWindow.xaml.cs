@@ -3270,7 +3270,16 @@ namespace SAM.Analytical.UI.WPF.Windows
         private bool TryRefreshSpaceAppearances(ViewportControl viewportControl, AnalyticalModel analyticalModel, IViewSettings viewSettings, string name)
         {
             TwoDimensionalViewSettings twoDimensionalViewSettings = viewSettings as TwoDimensionalViewSettings;
-            if (twoDimensionalViewSettings == null)
+            ThreeDimensionalViewSettings threeDimensionalViewSettings = viewSettings as ThreeDimensionalViewSettings;
+            if (twoDimensionalViewSettings == null && threeDimensionalViewSettings == null)
+            {
+                return false;
+            }
+
+            // The 3D in-place re-skin needs a renderer that can recolor per object (the SharpDX path);
+            // the legacy Helix 3D renderer has no in-place re-skin, so 3D edits there regenerate as before
+            // (issue #32). 2D always supports it.
+            if (!viewportControl.SupportsInPlaceAppearanceRefresh)
             {
                 return false;
             }
@@ -3285,7 +3294,12 @@ namespace SAM.Analytical.UI.WPF.Windows
             {
                 List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
 
-                if (!UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, twoDimensionalViewSettings, out HashSet<Guid> spaceGuids))
+                HashSet<Guid> spaceGuids;
+                bool refreshed = twoDimensionalViewSettings != null
+                    ? UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, twoDimensionalViewSettings, out spaceGuids)
+                    : UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, threeDimensionalViewSettings, out spaceGuids);
+
+                if (!refreshed)
                 {
                     return false;
                 }

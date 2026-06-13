@@ -185,6 +185,182 @@ namespace SAM.Analytical.UI
             return true;
         }
 
+        /// <summary>
+        /// 3D-view counterpart of TryRefreshSpaceAppearances(..., TwoDimensionalViewSettings): in-place
+        /// recompute of the legend and space shell colors of an existing 3D GeometryObjectModel against
+        /// the current AnalyticalModel, without rebuilding shells. Mirrors the space color/legend logic of
+        /// ToSAM_GeometryObjectModel(AnalyticalModel, ThreeDimensionalViewSettings) - keep the two in sync.
+        /// Returns false when the result could differ from a full regeneration (caller must then fall back
+        /// to ToSAM_GeometryObjectModel); on success spaceGuids holds the spaces whose appearance actually
+        /// changed. No state is modified on the false path.
+        /// </summary>
+        public static bool TryRefreshSpaceAppearances(this GeometryObjectModel geometryObjectModel, AnalyticalModel analyticalModel, ThreeDimensionalViewSettings threeDimensionalViewSettings, out HashSet<Guid> spaceGuids)
+        {
+            spaceGuids = null;
+
+            if (geometryObjectModel == null || analyticalModel == null || threeDimensionalViewSettings == null)
+            {
+                return false;
+            }
+
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
+            if (adjacencyCluster == null)
+            {
+                return false;
+            }
+
+            List<ISAMGeometryObject> sAMGeometryObjects = geometryObjectModel.GetSAMGeometryObjects<ISAMGeometryObject>();
+            if (sAMGeometryObjects == null || sAMGeometryObjects.Count == 0)
+            {
+                return false;
+            }
+
+            List<Tuple<Space, Geometry3DObjectCollection>> tuples = new List<Tuple<Space, Geometry3DObjectCollection>>();
+            foreach (ISAMGeometryObject sAMGeometryObject in sAMGeometryObjects)
+            {
+                Geometry3DObjectCollection geometry3DObjectCollection = sAMGeometryObject as Geometry3DObjectCollection;
+
+                // Spaces only - panels/apertures (also Geometry3DObjectCollection) are tagged with their
+                // own object and are unaffected by a space attribute edit, same as the 2D overload.
+                Space space = geometry3DObjectCollection?.Tag?.Value as Space;
+                if (space == null)
+                {
+                    continue;
+                }
+
+                space = adjacencyCluster.GetObject<Space>(space.Guid);
+                if (space == null)
+                {
+                    // Space no longer exists - not an attribute-only state, regenerate.
+                    return false;
+                }
+
+                tuples.Add(new Tuple<Space, Geometry3DObjectCollection>(space, geometry3DObjectCollection));
+            }
+
+            if (tuples.Count == 0)
+            {
+                return false;
+            }
+
+            // A full regeneration feeds every space into the legend, including spaces hidden by a view
+            // appearance override - which are absent from this model (skipped at build time), so their
+            // legend contribution cannot be reproduced here. Bail to the full path when any space is hidden;
+            // visibility itself cannot change under an AttributeModification. Mirrors the 2D overload.
+            List<Space> spaces = adjacencyCluster.GetSpaces();
+            if (spaces != null)
+            {
+                foreach (Space space in spaces)
+                {
+                    SurfaceAppearance surfaceAppearance = Query.SurfaceAppearance(space, threeDimensionalViewSettings);
+                    if (surfaceAppearance == null || surfaceAppearance.Opacity == 0 || !surfaceAppearance.Visible)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            List<LegendItemData> legendItemDatas = new List<LegendItemData>();
+            foreach (Tuple<Space, Geometry3DObjectCollection> tuple in tuples)
+            {
+                if (Query.TryGetValue(tuple.Item1, adjacencyCluster, threeDimensionalViewSettings, out object value, out string text, out _))
+                {
+                    legendItemDatas.Add(new LegendItemData(tuple.Item1, value, text));
+                }
+            }
+
+            bool editable = Query.Editable<SpaceAppearanceSettings>(threeDimensionalViewSettings);
+
+            Dictionary<Guid, LegendItem> dictionary_LegendItem = Query.LegendItemDictionary(legendItemDatas, editable, Query.UndefinedLegendItem());
+            if (dictionary_LegendItem == null)
+            {
+                return false;
+            }
+
+            Legend legend = threeDimensionalViewSettings.Legend;
+            if (legend != null)
+            {
+                if (dictionary_LegendItem.Count != 0)
+                {
+                    legend.Refresh(dictionary_LegendItem.Values, true, true);
+                }
+                else
+                {
+                    legend = null;
+                }
+            }
+
+            spaceGuids = new HashSet<Guid>();
+
+            foreach (Tuple<Space, Geometry3DObjectCollection> tuple in tuples)
+            {
+                Space space = tuple.Item1;
+
+                Color? color = null;
+                if (dictionary_LegendItem.TryGetValue(space.Guid, out LegendItem legendItem) && legendItem != null)
+                {
+                    if (legend != null)
+                    {
+                        LegendItem legendItem_Legend = legend.Find(legendItem.Text);
+                        if (legendItem_Legend != null)
+                        {
+                            legendItem = legendItem_Legend;
+                        }
+                    }
+
+                    // 3D builder takes the legend color as opaque RGB (the seed below adds the dark edge)
+                    color = Color.FromRgb(legendItem.Color.R, legendItem.Color.G, legendItem.Color.B);
+                }
+
+                if (color == null || !color.HasValue)
+                {
+                    color = System.Drawing.Color.FromKnownColor(System.Drawing.KnownColor.LightGray).ToMedia();
+                }
+
+                // Same seed as ToSAM_GeometryObjectModel(..., ThreeDimensionalViewSettings): fill color with a
+                // dark edge and thickness 0 (vs the 2D overload, which passes the fill color directly).
+                SurfaceAppearance surfaceAppearance = Query.SurfaceAppearance(space, threeDimensionalViewSettings, new SurfaceAppearance(color.Value.ToDrawing(), System.Windows.Forms.ControlPaint.Dark(color.Value.ToDrawing()), 0));
+                if (surfaceAppearance == null)
+                {
+                    continue;
+                }
+
+                foreach (ISAMGeometry3DObject sAMGeometry3DObject in tuple.Item2)
+                {
+                    ShellObject shellObject = sAMGeometry3DObject as ShellObject;
+                    if (shellObject == null)
+                    {
+                        continue;
+                    }
+
+                    if (SameAppearance(shellObject.SurfaceAppearance, surfaceAppearance))
+                    {
+                        continue;
+                    }
+
+                    shellObject.SurfaceAppearance = surfaceAppearance;
+                    spaceGuids.Add(space.Guid);
+                }
+            }
+
+            if (legend != null)
+            {
+                threeDimensionalViewSettings.Legend = legend;
+            }
+            else if (dictionary_LegendItem.Count != 0)
+            {
+                threeDimensionalViewSettings.Legend = new Legend(Query.LegendName<Space>(threeDimensionalViewSettings), dictionary_LegendItem.Values);
+            }
+            else
+            {
+                threeDimensionalViewSettings.Legend = null;
+            }
+
+            geometryObjectModel.SetValue(GeometryObjectModelParameter.ViewSettings, threeDimensionalViewSettings);
+
+            return true;
+        }
+
         private static bool SameAppearance(SurfaceAppearance surfaceAppearance_1, SurfaceAppearance surfaceAppearance_2)
         {
             if (surfaceAppearance_1 == null || surfaceAppearance_2 == null)

@@ -22,8 +22,16 @@ namespace SAM.Geometry.UI.WPF
     /// </summary>
     public partial class ViewportControl : UserControl
     {
-        // Experimental 2D floor plan renderer (see FloorPlan2DControl) - opt-in, off by default
-        private static readonly bool floorPlan2DEnabled = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D")) && Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D").Trim() != "0";
+        // 2D floor plan renderer (see FloorPlan2DControl) - now ON by default (issue #18). Set
+        // SAM_UI_FLOORPLAN_2D=0 to fall back to the legacy Helix orthographic 2D path.
+        private static readonly bool floorPlan2DEnabled = ResolveFloorPlan2DEnabled();
+
+        // Default on; only an explicit "0" opts back out to the Helix orthographic 2D path.
+        private static bool ResolveFloorPlan2DEnabled()
+        {
+            string value = Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D");
+            return string.IsNullOrWhiteSpace(value) || value.Trim() != "0";
+        }
 
         // Record the resolved flag state once, so the performance log shows whether the
         // 2D floor plan path is live in this process (the env var is read only at startup)
@@ -36,6 +44,14 @@ namespace SAM.Geometry.UI.WPF
         private UIGeometryObjectModel uIGeometryObjectModel;
 
         private FloorPlan2DControl floorPlan2DControl;
+
+        // DirectX 11 renderer for the 3D view (issue #18 gate 3) - null unless
+        // SAM_UI_VIEWPORT_SHARPDX is set; see SharpDXViewportControl. While active the Helix
+        // viewport stays hidden and empty. Hover and selection (issue #32 Phase C) are handled
+        // inside the control and surface through the same Object* events as the other renderers;
+        // context-menu plumbing (Phase C item 4) and the orthographic-3D camera and chrome
+        // (Phase D) still run only on the Helix path.
+        private readonly SharpDXViewportControl sharpDXViewportControl;
 
         // 2D (orthographic) floor-plan clip-plane tracking (issue #13). Helix zoom/pan moves the
         // camera while the near/far planes are otherwise set once (UpdateMode), so section geometry
@@ -66,6 +82,9 @@ namespace SAM.Geometry.UI.WPF
             {
                 string value = Environment.GetEnvironmentVariable("SAM_UI_FLOORPLAN_2D");
                 PerformanceLog.Write("ViewportControl.FloorPlan2DEnabled", string.Format("{0} [SAM_UI_FLOORPLAN_2D={1}]", floorPlan2DEnabled, value ?? "(null)"), 0);
+
+                string value_SharpDX = Environment.GetEnvironmentVariable("SAM_UI_VIEWPORT_SHARPDX");
+                PerformanceLog.Write("ViewportControl.SharpDXViewportEnabled", string.Format("{0} [SAM_UI_VIEWPORT_SHARPDX={1}]", SharpDXViewportControl.Enabled, value_SharpDX ?? "(null)"), 0);
             }
 
             helixViewport3D.PanGesture = new MouseGesture(MouseAction.LeftClick, ModifierKeys.Shift);
@@ -86,6 +105,22 @@ namespace SAM.Geometry.UI.WPF
             floorPlan2DControl.ObjectDoubleClicked += FloorPlan2DControl_ObjectDoubleClicked;
             floorPlan2DControl.ObjectSelectionChanged += FloorPlan2DControl_ObjectSelectionChanged;
             floorPlan2DControl.ContextMenuOpening += FloorPlan2DControl_ContextMenuOpening;
+
+            if (SharpDXViewportControl.Enabled)
+            {
+                sharpDXViewportControl = new SharpDXViewportControl();
+                grid.Children.Insert(grid.Children.IndexOf(floorPlan2DControl) + 1, sharpDXViewportControl);
+                sharpDXViewportControl.ObjectHoovered += SharpDXViewportControl_ObjectHoovered;
+                sharpDXViewportControl.ObjectDoubleClicked += SharpDXViewportControl_ObjectDoubleClicked;
+                sharpDXViewportControl.ObjectSelectionChanged += SharpDXViewportControl_ObjectSelectionChanged;
+                sharpDXViewportControl.ContextMenu = new ContextMenu();
+                sharpDXViewportControl.ContextMenuOpening += SharpDXViewportControl_ContextMenuOpening;
+
+                // Mode defaults to ThreeDimensional, so the SharpDX viewport starts active and
+                // the Helix one hidden; UpdateMode keeps the visibilities in sync afterwards
+                sharpDXViewportControl.Visibility = Visibility.Visible;
+                helixViewport3D.Visibility = Visibility.Collapsed;
+            }
         }
 
         public event ObjectContextMenuOpeningEventHandler ObjectContextMenuOpening;
@@ -103,6 +138,29 @@ namespace SAM.Geometry.UI.WPF
             }
         }
 
+        private bool ActiveSharpDX3D
+        {
+            get
+            {
+                return sharpDXViewportControl != null && mode == Mode.ThreeDimensional;
+            }
+        }
+
+        /// <summary>
+        /// True when an attribute-only edit on this view can be refreshed in place (recolor + legend)
+        /// instead of regenerating the whole scene. 2D always supports it (canvas reload / Helix
+        /// per-visual re-skin); the 3D view supports it only on the SharpDX path (per-object re-skin) -
+        /// the legacy Helix 3D renderer has no in-place re-skin, so 3D edits there fall back to full
+        /// regeneration (issue #32).
+        /// </summary>
+        public bool SupportsInPlaceAppearanceRefresh
+        {
+            get
+            {
+                return mode == Mode.TwoDimensional || ActiveSharpDX3D;
+            }
+        }
+
         private void FloorPlan2DControl_ObjectHoovered(object sender, ObjectHooveredEventArgs e)
         {
             ObjectHoovered?.Invoke(this, e);
@@ -114,6 +172,21 @@ namespace SAM.Geometry.UI.WPF
         }
 
         private void FloorPlan2DControl_ObjectSelectionChanged(object sender, ObjectSelectionChangedEventArgs e)
+        {
+            ObjectSelectionChanged?.Invoke(this, e);
+        }
+
+        private void SharpDXViewportControl_ObjectHoovered(object sender, ObjectHooveredEventArgs e)
+        {
+            ObjectHoovered?.Invoke(this, e);
+        }
+
+        private void SharpDXViewportControl_ObjectDoubleClicked(object sender, ObjectDoubleClickedEventArgs e)
+        {
+            ObjectDoubleClicked?.Invoke(this, e);
+        }
+
+        private void SharpDXViewportControl_ObjectSelectionChanged(object sender, ObjectSelectionChangedEventArgs e)
         {
             ObjectSelectionChanged?.Invoke(this, e);
         }
@@ -152,6 +225,46 @@ namespace SAM.Geometry.UI.WPF
             }
 
             ObjectContextMenuOpening?.Invoke(this, new ObjectContextMenuOpeningEventArgs(floorPlan2DControl.ContextMenu, e, modelVisual3Ds));
+        }
+
+        // Right-click menu for the SharpDX 3D view (issue #32 item 4) - mirrors the 2D handler above
+        // and helixViewport3D_ContextMenuOpening: builds the Zoom Extents / Zoom Selected items and
+        // fires ObjectContextMenuOpening with stub ModelVisual3Ds for the selected objects, so the
+        // AnalyticalWindow consumer (Hide/Unhide/Isolate/properties) works unchanged.
+        private void SharpDXViewportControl_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            if (Keyboard.IsKeyDown(Key.LeftCtrl) ||
+                Keyboard.IsKeyDown(Key.RightCtrl) ||
+                Keyboard.IsKeyDown(Key.LeftAlt) ||
+                Keyboard.IsKeyDown(Key.RightAlt) ||
+                Keyboard.IsKeyDown(Key.LeftShift) ||
+                Keyboard.IsKeyDown(Key.RightShift))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            sharpDXViewportControl.ContextMenu = new ContextMenu();
+
+            MenuItem menuItem = new MenuItem();
+            menuItem.Name = "MenuItem_ZoomExtents";
+            menuItem.Header = "Zoom Extents";
+            menuItem.Click += MenuItem_ZoomExtents_Click;
+            sharpDXViewportControl.ContextMenu.Items.Add(menuItem);
+
+            AddZoomSelectedMenuItem(sharpDXViewportControl.ContextMenu);
+
+            List<ModelVisual3D> modelVisual3Ds = new List<ModelVisual3D>();
+            foreach (SAMObject sAMObject in sharpDXViewportControl.SelectedSAMObjects())
+            {
+                ModelVisual3D modelVisual3D = sharpDXViewportControl.GetStubVisual3D(sAMObject.Guid);
+                if (modelVisual3D != null)
+                {
+                    modelVisual3Ds.Add(modelVisual3D);
+                }
+            }
+
+            ObjectContextMenuOpening?.Invoke(this, new ObjectContextMenuOpeningEventArgs(sharpDXViewportControl.ContextMenu, e, modelVisual3Ds));
         }
 
         public Camera Camera
@@ -245,6 +358,11 @@ namespace SAM.Geometry.UI.WPF
                 return false;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                return sharpDXViewportControl.ContainsAny<T>(guids);
+            }
+
             // 3D path: O(1) per guid via the index instead of an O(N) visual-tree walk (issue #16).
             foreach (Guid guid in guids)
             {
@@ -278,6 +396,19 @@ namespace SAM.Geometry.UI.WPF
                 }
 
                 return modelVisual3D;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                // Same stub interop as the 2D branch: a detached ModelVisual3D carrying the object,
+                // resolvable by every existing consumer (issue #32 Phase C)
+                ModelVisual3D modelVisual3D_Stub = sharpDXViewportControl.GetStubVisual3D(guid);
+                if (modelVisual3D_Stub == null || Core.UI.WPF.Query.JSAMObject<T>(modelVisual3D_Stub) == null)
+                {
+                    return null;
+                }
+
+                return modelVisual3D_Stub;
             }
 
             // 3D path: O(1) index lookup instead of an O(N) visual-tree walk (issue #16). The indexed
@@ -326,6 +457,12 @@ namespace SAM.Geometry.UI.WPF
             if (Active2D)
             {
                 floorPlan2DControl.Load(geometryObjectModel);
+            }
+            else if (ActiveSharpDX3D)
+            {
+                // In-place per-object re-skin from the (already appearance-updated) model objects -
+                // no ToElement3Ds rebuild, camera and other objects untouched (issue #32 / #11).
+                sharpDXViewportControl.RefreshAppearance(guids);
             }
             else if (guids != null)
             {
@@ -385,6 +522,17 @@ namespace SAM.Geometry.UI.WPF
                 return result2D;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                bool result_SharpDX = sAMObject == null ? sharpDXViewportControl.ClearSelection() : sharpDXViewportControl.Select([sAMObject.Guid]);
+                if (result_SharpDX)
+                {
+                    ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                }
+
+                return result_SharpDX;
+            }
+
             bool result = false;
 
             if (sAMObject == null)
@@ -432,6 +580,26 @@ namespace SAM.Geometry.UI.WPF
                 }
 
                 return result2D;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                bool result_SharpDX;
+                if (sAMObjects == null)
+                {
+                    result_SharpDX = sharpDXViewportControl.ClearSelection();
+                }
+                else
+                {
+                    result_SharpDX = sharpDXViewportControl.Select(new List<T>(sAMObjects).FindAll(x => x != null).ConvertAll(x => x.Guid));
+                }
+
+                if (result_SharpDX)
+                {
+                    ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                }
+
+                return result_SharpDX;
             }
 
             bool result = false;
@@ -494,6 +662,20 @@ namespace SAM.Geometry.UI.WPF
                 return result2D;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                List<T> result_SharpDX = new List<T>();
+                foreach (SAMObject sAMObject in sharpDXViewportControl.SelectedSAMObjects())
+                {
+                    if (sAMObject is T)
+                    {
+                        result_SharpDX.Add((T)sAMObject);
+                    }
+                }
+
+                return result_SharpDX;
+            }
+
             if (actionManager == null)
             {
                 return null;
@@ -547,6 +729,11 @@ namespace SAM.Geometry.UI.WPF
                 return true;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                return sharpDXViewportControl.Zoom([sAMObject.Guid]);
+            }
+
             Visual3D visual3D = GetVisual3D<SAMObject>(sAMObject.Guid);
             if (visual3D == null)
             {
@@ -580,6 +767,11 @@ namespace SAM.Geometry.UI.WPF
 
                 floorPlan2DControl.Zoom(guids);
                 return true;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                return sharpDXViewportControl.Zoom(new List<T>(sAMObjects).FindAll(x => x != null).ConvertAll(x => x.Guid));
             }
 
             List<Rect3D> rect3Ds = new List<Rect3D>();
@@ -618,6 +810,23 @@ namespace SAM.Geometry.UI.WPF
 
         private Camera GetCamera()
         {
+            if (Active2D)
+            {
+                // Floor-plan pan/zoom expressed as a camera, so view settings persist for the 2D
+                // canvas (PR #30 review). Null (empty/never-shown view) falls back to the Helix
+                // camera below - the same value the old orthographic path would have reported.
+                Camera camera_FloorPlan = floorPlan2DControl.GetCamera();
+                if (camera_FloorPlan != null)
+                {
+                    return camera_FloorPlan;
+                }
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                return sharpDXViewportControl.GetCamera();
+            }
+
             ProjectionCamera projectionCamera = helixViewport3D.Camera;
             if (projectionCamera == null)
             {
@@ -867,12 +1076,30 @@ namespace SAM.Geometry.UI.WPF
             // Flag-gated 2D floor plan path: render via FloorPlan2DControl, keep the Helix scene empty
             floorPlan2DControl.Load(Active2D ? geometryObjectModel : null);
 
+            // Flag-gated SharpDX 3D path (issue #18 Phase B): render via SharpDXViewportControl,
+            // keep the Helix scene empty. Timed for the direct comparison with ToMedia3D below.
+            if (sharpDXViewportControl != null)
+            {
+                GeometryObjectModel geometryObjectModel_SharpDX = ActiveSharpDX3D ? geometryObjectModel : null;
+
+                Camera camera = null;
+                if (geometryObjectModel_SharpDX != null && geometryObjectModel_SharpDX.TryGetValue(GeometryObjectModelParameter.ViewSettings, out ViewSettings viewSettings_SharpDX) && viewSettings_SharpDX != null)
+                {
+                    camera = viewSettings_SharpDX.Camera;
+                }
+
+                using (geometryObjectModel_SharpDX == null ? null : PerformanceLog.Measure("ViewportControl.ToElement3D", mode.ToString()))
+                {
+                    sharpDXViewportControl.Load(geometryObjectModel_SharpDX, camera);
+                }
+            }
+
             if (geometryObjectModel == null)
             {
                 return;
             }
 
-            if (!Active2D)
+            if (!Active2D && !ActiveSharpDX3D)
             {
                 ModelVisual3D modelVisual3D;
                 using (PerformanceLog.Measure("ViewportControl.ToMedia3D", mode.ToString()))
@@ -957,6 +1184,12 @@ namespace SAM.Geometry.UI.WPF
             if (Active2D)
             {
                 floorPlan2DControl.ZoomExtents();
+                return;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                sharpDXViewportControl.ZoomExtents();
                 return;
             }
 
@@ -1088,6 +1321,15 @@ namespace SAM.Geometry.UI.WPF
                 return;
             }
 
+            if (ActiveSharpDX3D)
+            {
+                // The RectangularSelector rect is in grid coordinates, which the SharpDX viewport
+                // fills - same coordinate space (issue #32 Phase C)
+                sharpDXViewportControl.SelectByScreenRect(rect, selectionType);
+                ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                return;
+            }
+
             List<SAMObject> sAMObjects = new List<SAMObject>();
             IEnumerable<HelixToolkit.Wpf.Viewport3DHelper.RectangleHitResult> rectangleHitResults = HelixToolkit.Wpf.Viewport3DHelper.FindHits(helixViewport3D.Viewport, rect, selectionType == SelectionType.Inside ? HelixToolkit.Wpf.SelectionHitMode.Inside : HelixToolkit.Wpf.SelectionHitMode.Touch);
             if (rectangleHitResults != null)
@@ -1129,6 +1371,18 @@ namespace SAM.Geometry.UI.WPF
         {
             if (camera == null)
             {
+                return;
+            }
+
+            if (Active2D)
+            {
+                floorPlan2DControl.SetCamera(camera);
+                return;
+            }
+
+            if (ActiveSharpDX3D)
+            {
+                sharpDXViewportControl.SetCamera(camera);
                 return;
             }
 
@@ -1207,12 +1461,17 @@ namespace SAM.Geometry.UI.WPF
 
             helixViewport3D.ZoomExtents();
 
-            if (floorPlan2DEnabled)
+            if (floorPlan2DEnabled || sharpDXViewportControl != null)
             {
                 bool active2D = Active2D;
+                bool activeSharpDX3D = ActiveSharpDX3D;
 
                 floorPlan2DControl.Visibility = active2D ? Visibility.Visible : Visibility.Collapsed;
-                helixViewport3D.Visibility = active2D ? Visibility.Collapsed : Visibility.Visible;
+                if (sharpDXViewportControl != null)
+                {
+                    sharpDXViewportControl.Visibility = activeSharpDX3D ? Visibility.Visible : Visibility.Collapsed;
+                }
+                helixViewport3D.Visibility = active2D || activeSharpDX3D ? Visibility.Collapsed : Visibility.Visible;
 
                 // Mode is assigned after UIGeometryObjectModel (see AnalyticalWindow.UpdateTabItem) - reroute the loaded model to the renderer that just became active
                 Load(uIGeometryObjectModel?.JSAMObject);
