@@ -1715,7 +1715,10 @@ namespace SAM.Analytical.UI.WPF.Windows
 
                 UpdateUIGeometrySettings(tabControl, analyticalModel, modifiedEventArgs);
 
-                uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications);
+                // Re-commit the (tab/geometry-settings-updated) model without adding an undo entry: the
+                // triggering edit was already captured by its own SetJSAMObject, so capturing here too
+                // would make undo require two clicks.
+                uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications, false);
 
                 uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
                 tabControl.SelectionChanged += TabControl_SelectionChanged;
@@ -3124,6 +3127,10 @@ namespace SAM.Analytical.UI.WPF.Windows
         {
             SetDefaultViewSettings();
             Reload(e);
+
+            // A freshly opened model starts with empty history - drop any entry created by the
+            // open-time view-settings setup above.
+            uIAnalyticalModel?.ClearHistory();
             RefreshHistoryButtons();
 
             Title = titlePrefix;

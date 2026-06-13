@@ -150,10 +150,21 @@ namespace SAM.Core.UI
 
         public void SetJSAMObject(T jSAMObject, IEnumerable<IModification> modifications)
         {
-            // Snapshot the state we are about to replace, unless this is a restore or a transient
-            // (non-undoable) change. Done before the field is overwritten so the snapshot is the
-            // pre-edit state.
-            if (!restoring && this.jSAMObject != null && IsUndoable(modifications))
+            SetJSAMObject(jSAMObject, modifications, true);
+        }
+
+        /// <summary>
+        /// Sets the object and raises Modified. <paramref name="captureHistory"/> = false skips the
+        /// undo snapshot - used for the reload re-commit (AnalyticalWindow.Reload), which re-stores the
+        /// already-current state after the edit was captured, so it must not add a second history entry
+        /// (otherwise undo needs two clicks).
+        /// </summary>
+        public void SetJSAMObject(T jSAMObject, IEnumerable<IModification> modifications, bool captureHistory)
+        {
+            // Snapshot the state we are about to replace, unless this is a restore, a transient
+            // (non-undoable) change, or an explicit no-capture re-commit. Done before the field is
+            // overwritten so the snapshot is the pre-edit state.
+            if (captureHistory && !restoring && this.jSAMObject != null && IsUndoable(modifications))
             {
                 byte[] snapshot = CreateSnapshot(this.jSAMObject);
                 if (snapshot != null && snapshot.Length > 0)
