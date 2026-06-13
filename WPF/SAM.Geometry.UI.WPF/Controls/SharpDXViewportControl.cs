@@ -117,6 +117,14 @@ namespace SAM.Geometry.UI.WPF
                 ZoomAroundMouseDownPoint = true
             };
 
+            // Middle-button drag pans (CAD convention / the "middle click does not pan" report), plus
+            // Shift+Left to mirror the legacy Helix viewport's pan gesture (ViewportControl sets
+            // helixViewport3D.PanGesture to Shift+Left). Viewport3DX configures gestures through
+            // InputBindings + ViewportCommands, not gesture properties. Left stays free for selection,
+            // right for the context menu, wheel for zoom; the stock right-button rotate is kept.
+            viewport3DX.InputBindings.Add(new MouseBinding(ViewportCommands.Pan, new MouseGesture(MouseAction.MiddleClick)));
+            viewport3DX.InputBindings.Add(new MouseBinding(ViewportCommands.Pan, new MouseGesture(MouseAction.LeftClick, ModifierKeys.Shift)));
+
             // Single white ambient light - parity with the Helix 3D path (Load adds AmbientLight
             // only), which renders flat unshaded colors.
             viewport3DX.Items.Add(new AmbientLight3D { Color = Colors.White });
@@ -625,13 +633,26 @@ namespace SAM.Geometry.UI.WPF
         {
             if (viewport3DX.IsLoaded && viewport3DX.ActualWidth > 0)
             {
-                // Level BEFORE zooming, not after: the built-in ZoomExtents animates (Helix default
-                // ~200 ms) and carries the camera's current up direction through to the animation
-                // target, so leveling afterwards is overwritten frame-by-frame by the in-flight
-                // animation. Leveling first makes the animation target a world-Z-up camera, so the
-                // view settles level (the "rotates off the Z axis" report on an isolated element).
-                LevelCameraUp();
-                viewport3DX.ZoomExtents();
+                // Frame with our own bounds + FrameCamera (the Zoom Selected path) rather than the
+                // built-in Viewport3DX.ZoomExtents. The built-in mis-frames a single small isolated
+                // object - the camera ends up too far / off to the side, so the element falls outside
+                // the view ("out of visual extent" on an isolated tiny element). FrameCamera fits the
+                // bounding sphere in the field of view and keeps world Z up (the "rotates off the Z
+                // axis" report). dictionary_Element3D holds only the currently visible objects (hidden
+                // ones are dropped from the rebuilt scene on isolate/hide), so its bounds are exactly
+                // the visible extents. Fall back to the built-in when there is no geometry to measure.
+                if (TryGetBounds(dictionary_Element3D.Keys, out Vector3 min, out Vector3 max))
+                {
+                    Vector3 center = (min + max) * 0.5f;
+                    float radius = (max - min).Length() * 0.5f;
+                    FrameCamera(center, radius);
+                }
+                else
+                {
+                    LevelCameraUp();
+                    viewport3DX.ZoomExtents();
+                }
+
                 return;
             }
 
