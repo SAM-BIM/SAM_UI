@@ -526,8 +526,9 @@ namespace SAM.Core.UI
             {
                 SaveFileDialog saveFileDialog = new SaveFileDialog()
                 {
-                    Filter = "json files (*.json)|*.json|All files (*.*)|*.*",
-                    FilterIndex = 1
+                    Filter = "SAM files (*.sam)|*.sam|json files (*.json)|*.json|All files (*.*)|*.*",
+                    FilterIndex = 1,
+                    DefaultExt = "sam"
                 };
 
                 if(saveFileDialog.ShowDialog() != true)
