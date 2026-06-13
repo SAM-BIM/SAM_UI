@@ -137,12 +137,23 @@ affected object's `MeshGeometryModel3D.Material`), and context-menu plumbing. **
 > (the `FloorPlan2DControl` interop pattern). Programmatic `Select`/`SelectedSAMObjects`/
 > `GetVisual3D` route to the SharpDX scene. Lines and text billboards are not pickable (meshes
 > define the pickable footprint; curve-only objects are still rectangle-selectable). Context-menu
-> plumbing (item 4) is outstanding.
+> plumbing (item 4) is in (`ObjectContextMenuOpening` from a right-click hit). **All four #32 items
+> implemented; the gate (hover/select < 50 ms, rectangle-select parity, recolor-without-rebuild) is
+> still to be measured under #31.**
 
 **Phase D — camera & chrome.** Perspective + orthographic-3D cameras, `ZoomExtents`, "Zoom Selected",
 view-cube/coordinate system, `SetCamera`/`GetCamera` round-trip, view-settings application. Confirm
 the legacy Helix orthographic **2D** path can be deleted (floor plans already on `FloorPlan2DControl`).
 **Gate:** camera save/restore parity; no 2D regressions.
+
+> **Phase D status: partial (camera framing landed).** Done: `ZoomExtents` and "Zoom Selected"
+> route to the SharpDX view (Zoom Selected re-aims the camera at the selection bounds centre rather
+> than only dollying along the old look direction); `ZoomExtents` re-levels the camera up to world Z
+> so isolating + rotating a small object no longer leaves the view tilted; selection-aware rotation
+> pivot (FixedRotationPoint on the selection centroid, cursor-point fallback); view cube +
+> coordinate system enabled; `Get`/`SetCamera` exist. Outstanding: orthographic-3D camera mode,
+> view-settings application, `Get`/`SetCamera` save/restore parity check, and confirming the legacy
+> Helix orthographic 2D path can be deleted.
 
 **Phase E — flip & remove.** Make SharpDX the default for 3D, keep `SAM_UI_VIEWPORT_SHARPDX=0` as the
 escape hatch for one release, then remove the `HelixToolkit.Wpf` 3D code path and the old
