@@ -55,6 +55,12 @@ namespace SAM.Geometry.UI.WPF
         private readonly List<Element3D> sceneElement3Ds = new List<Element3D>();
         private readonly Dictionary<Guid, Element3D> dictionary_Element3D = new Dictionary<Guid, Element3D>();
 
+        // Mesh geometries awaiting a deferred UpdateOctree() pass (issue #33 follow-up): the octree build
+        // is moved off the regen critical path to a Background dispatcher tick after attach. Guarded by a
+        // generation token so a newer Load cancels a stale pending pass.
+        private readonly List<HelixToolkit.SharpDX.MeshGeometry3D> pendingOctreeGeometries = new List<HelixToolkit.SharpDX.MeshGeometry3D>();
+        private int sceneGeneration;
+
         // Hover/selection state (issue #32 Phase C). dictionary_Stub: guid -> detached stub
         // ModelVisual3D carrying the object's attached IJSAMObject (event payload interop, see the
         // class note). dictionary_Guid: every scene Element3D (group and its merged child models)
@@ -261,6 +267,11 @@ namespace SAM.Geometry.UI.WPF
         {
             bool wasEmpty = sceneElement3Ds.Count == 0;
 
+            // Invalidate any pending deferred-octree pass from the previous scene (generation bump -
+            // see ScheduleOctreeBuild) before tearing it down.
+            sceneGeneration++;
+            pendingOctreeGeometries.Clear();
+
             foreach (Element3D element3D in sceneElement3Ds)
             {
                 viewport3DX.Items.Remove(element3D);
@@ -285,46 +296,64 @@ namespace SAM.Geometry.UI.WPF
                 return;
             }
 
-            List<Element3D> element3Ds = Convert.ToElement3Ds(geometryObjectModel);
+            // Split the build (Convert.ToElement3Ds) from the viewport attach and the camera fit:
+            // ViewportControl.ToElement3D (one level up) wraps this whole method, so isolating the
+            // phases shows which dominates the regen (#33).
+            List<Element3D> element3Ds;
+            using (PerformanceLog.Measure("ViewportControl.ToElement3D.Generate"))
+            {
+                element3Ds = Convert.ToElement3Ds(geometryObjectModel);
+            }
+
             if (element3Ds != null)
             {
-                foreach (Element3D element3D in element3Ds)
+                using (PerformanceLog.Measure("ViewportControl.ToElement3D.Attach", string.Format("[{0} objects]", element3Ds.Count)))
                 {
-                    viewport3DX.Items.Add(element3D);
-                    sceneElement3Ds.Add(element3D);
-
-                    SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
-                    if (sAMObject != null && !dictionary_Element3D.ContainsKey(sAMObject.Guid))
+                    foreach (Element3D element3D in element3Ds)
                     {
-                        dictionary_Element3D[sAMObject.Guid] = element3D;
-                        dictionary_Guid[element3D] = sAMObject.Guid;
-                        RegisterChildren(sAMObject.Guid, element3D);
+                        viewport3DX.Items.Add(element3D);
+                        sceneElement3Ds.Add(element3D);
 
-                        // Detached stub carrying the same attached object as the group - the
-                        // ObjectHoovered/ObjectDoubleClicked payload (see the class note)
-                        Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
-                        IJSAMObject jSAMObject = Core.UI.WPF.Query.JSAMObject<IJSAMObject>(element3D);
-                        if (jSAMObject != null)
+                        SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
+                        if (sAMObject != null && !dictionary_Element3D.ContainsKey(sAMObject.Guid))
                         {
-                            Core.UI.WPF.Modify.SetIJSAMObject(stub, jSAMObject);
-                        }
+                            dictionary_Element3D[sAMObject.Guid] = element3D;
+                            dictionary_Guid[element3D] = sAMObject.Guid;
+                            RegisterChildren(sAMObject.Guid, element3D);
+                            CollectOctreeGeometries(element3D);
 
-                        dictionary_Stub[sAMObject.Guid] = stub;
+                            // Detached stub carrying the same attached object as the group - the
+                            // ObjectHoovered/ObjectDoubleClicked payload (see the class note)
+                            Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
+                            IJSAMObject jSAMObject = Core.UI.WPF.Query.JSAMObject<IJSAMObject>(element3D);
+                            if (jSAMObject != null)
+                            {
+                                Core.UI.WPF.Modify.SetIJSAMObject(stub, jSAMObject);
+                            }
+
+                            dictionary_Stub[sAMObject.Guid] = stub;
+                        }
                     }
                 }
             }
 
             if (wasEmpty)
             {
-                if (camera != null)
+                using (PerformanceLog.Measure("ViewportControl.ToElement3D.Camera"))
                 {
-                    SetCamera(camera);
-                }
-                else
-                {
-                    ZoomExtents();
+                    if (camera != null)
+                    {
+                        SetCamera(camera);
+                    }
+                    else
+                    {
+                        ZoomExtents();
+                    }
                 }
             }
+
+            // Build the picking octrees off the regen critical path (see pendingOctreeGeometries).
+            ScheduleOctreeBuild();
         }
 
         public Element3D GetElement3D(Guid guid)
@@ -500,6 +529,10 @@ namespace SAM.Geometry.UI.WPF
                 }
 
                 RegisterChildren(guid, groupModel3D);
+
+                // Build() no longer builds octrees (deferred on the Load path); for this small per-object
+                // rebuild do it inline so the re-skinned object is immediately pickable.
+                BuildOctreesNow(groupModel3D);
 
                 // Hover/selection are appearance overrides on the children - re-apply them on the
                 // rebuilt set so a selected/hovered object stays marked through the re-skin
@@ -800,6 +833,81 @@ namespace SAM.Geometry.UI.WPF
                 {
                     dictionary_BaseLineColor.Remove(lineGeometryModel3D);
                     dictionary_BaseLineThickness.Remove(lineGeometryModel3D);
+                }
+            }
+        }
+
+        // Queues a group's mesh geometries for the deferred octree pass (the bulk Load path).
+        private void CollectOctreeGeometries(Element3D element3D)
+        {
+            if (!(element3D is GroupModel3D groupModel3D))
+            {
+                return;
+            }
+
+            foreach (Element3D element3D_Child in groupModel3D.Children)
+            {
+                if (element3D_Child is MeshGeometryModel3D meshGeometryModel3D && meshGeometryModel3D.Geometry is HelixToolkit.SharpDX.MeshGeometry3D meshGeometry3D)
+                {
+                    pendingOctreeGeometries.Add(meshGeometry3D);
+                }
+            }
+        }
+
+        // Build the per-geometry picking octrees after the scene is attached, on a Background dispatcher
+        // tick so it stays off the regen critical path (issue #33 follow-up). Until it runs, FindHits
+        // falls back to a correct linear triangle test. A newer Load bumps sceneGeneration and cancels a
+        // stale pass; the captured list keeps this independent of later pendingOctreeGeometries churn.
+        private void ScheduleOctreeBuild()
+        {
+            if (pendingOctreeGeometries.Count == 0)
+            {
+                return;
+            }
+
+            int generation = sceneGeneration;
+            List<HelixToolkit.SharpDX.MeshGeometry3D> geometries = new List<HelixToolkit.SharpDX.MeshGeometry3D>(pendingOctreeGeometries);
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (generation != sceneGeneration)
+                {
+                    return;
+                }
+
+                System.Diagnostics.Stopwatch stopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
+                foreach (HelixToolkit.SharpDX.MeshGeometry3D meshGeometry3D in geometries)
+                {
+                    if (generation != sceneGeneration)
+                    {
+                        return;
+                    }
+
+                    meshGeometry3D?.UpdateOctree();
+                }
+
+                if (stopwatch != null)
+                {
+                    stopwatch.Stop();
+                    PerformanceLog.Write("ViewportControl.SharpDX.OctreeBuild", string.Format("[{0} geometries, deferred]", geometries.Count), stopwatch.Elapsed.TotalMilliseconds);
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        // Build a single group's octrees immediately - used by the per-object RefreshAppearance path,
+        // where the object count is small and the user may hover the re-skinned object right away.
+        private void BuildOctreesNow(Element3D element3D)
+        {
+            if (!(element3D is GroupModel3D groupModel3D))
+            {
+                return;
+            }
+
+            foreach (Element3D element3D_Child in groupModel3D.Children)
+            {
+                if (element3D_Child is MeshGeometryModel3D meshGeometryModel3D && meshGeometryModel3D.Geometry is HelixToolkit.SharpDX.MeshGeometry3D meshGeometry3D)
+                {
+                    meshGeometry3D.UpdateOctree();
                 }
             }
         }

@@ -30,13 +30,17 @@ namespace SAM.Geometry.UI.WPF
 
             List<Element3D> result = new List<Element3D>();
 
-            // Reset the per-build triangulation cache counters so the diagnostic line below reflects
-            // only this build (see Mesh3DCache / issue #33). The whole-build cost is timed one level up
-            // as ViewportControl.ToElement3D; this splits out the triangulation slice and its hit rate.
+            // Reset the per-build diagnostic counters so the lines below reflect only this build. The
+            // whole-build cost is timed one level up as ViewportControl.ToElement3D; this splits it into
+            // triangulation (Mesh3DCache, #33), the SharpDX append + Build() phases, and the per-object
+            // UpdateOctree slice - to find what dominates the ~5-7 s that remains once triangulation is
+            // cached (issue #33 follow-up). All timing is opt-in (no overhead when the log is disabled).
             bool logEnabled = PerformanceLog.Enabled;
             if (logEnabled)
             {
                 ResetMesh3DCacheStats();
+                appendMilliseconds = 0;
+                buildMilliseconds = 0;
             }
 
             List<ISAMGeometryObject> sAMGeometryObjects = geometryObjectModel.GetSAMGeometryObjects<ISAMGeometryObject>();
@@ -68,11 +72,22 @@ namespace SAM.Geometry.UI.WPF
 
             if (logEnabled)
             {
-                LogMesh3DCacheStats(string.Format("[{0} objects]", result.Count));
+                string detail = string.Format("[{0} objects]", result.Count);
+                LogMesh3DCacheStats(detail);
+                // Append includes triangulation (reported separately), the per-Face3D mesh/edge build and
+                // the per-bucket copy; Build is the GPU geometry + material construction (octree is now
+                // deferred off this path by SharpDXViewportControl.Load).
+                PerformanceLog.Write("ViewportControl.ToElement3D.Append", detail, appendMilliseconds);
+                PerformanceLog.Write("ViewportControl.ToElement3D.Build", detail, buildMilliseconds);
             }
 
             return result;
         }
+
+        // Diagnostic accumulators for the per-object Append vs Build split (see ToElement3Ds above).
+        // Reset before / read after the model-level build loop; populated only when the log is enabled.
+        private static double appendMilliseconds;
+        private static double buildMilliseconds;
 
         /// <summary>
         /// Builds the merged SharpDX models for a single object (the children of its GroupModel3D),
@@ -88,8 +103,26 @@ namespace SAM.Geometry.UI.WPF
             }
 
             SharpDXSceneBuilder sharpDXSceneBuilder = new SharpDXSceneBuilder();
+
+            if (!PerformanceLog.Enabled)
+            {
+                Append(sharpDXSceneBuilder, sAMGeometryObject);
+                return sharpDXSceneBuilder.Build();
+            }
+
+            // Diagnostic split (accumulated across the model build, reported by the caller). RefreshAppearance
+            // also calls this path; its contribution is harmless because the caller resets before each build.
+            System.Diagnostics.Stopwatch appendStopwatch = System.Diagnostics.Stopwatch.StartNew();
             Append(sharpDXSceneBuilder, sAMGeometryObject);
-            return sharpDXSceneBuilder.Build();
+            appendStopwatch.Stop();
+            appendMilliseconds += appendStopwatch.Elapsed.TotalMilliseconds;
+
+            System.Diagnostics.Stopwatch buildStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            List<Element3D> result = sharpDXSceneBuilder.Build();
+            buildStopwatch.Stop();
+            buildMilliseconds += buildStopwatch.Elapsed.TotalMilliseconds;
+
+            return result;
         }
 
         // Mirrors the type dispatch of Create.Model3D, but accumulates primitives into the

@@ -151,10 +151,12 @@ namespace SAM.Geometry.UI.WPF
                     Normals = UnitNormals(keyValuePair.Value.Positions.Count)
                 };
 
-                // Static per-geometry octree for hover/selection picking (issue #32 Phase C):
-                // FindHits walks it instead of every triangle, which is what makes the unthrottled
-                // mouse-move hit-test affordable on large models.
-                meshGeometry3D.UpdateOctree();
+                // Static per-geometry octree for hover/selection picking (issue #32 Phase C): FindHits
+                // walks it instead of every triangle. NOT built here - on a large model UpdateOctree()
+                // across ~31k geometries cost ~0.45 s on the regen critical path (issue #33 follow-up),
+                // so the caller (SharpDXViewportControl.Load) builds octrees in a deferred Background
+                // dispatcher pass after attach. Until then FindHits falls back to a linear triangle test,
+                // which is correct and cheap for these small per-object meshes.
 
                 // Ambient = Diffuse reproduces the flat, unshaded look of the Helix 3D path
                 // (ambient-only lighting); specular off.
