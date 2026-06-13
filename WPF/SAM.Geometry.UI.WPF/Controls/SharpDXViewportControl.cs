@@ -35,8 +35,9 @@ namespace SAM.Geometry.UI.WPF
     /// selection (SelectByScreenRect, driven by the ViewportControl RectangularSelector overlay).
     /// Event payloads are detached stub ModelVisual3Ds carrying the same attached IJSAMObject as
     /// the Helix visuals - the FloorPlan2DControl interop pattern - so existing consumers
-    /// (AnalyticalWindow) keep working unchanged. Context-menu plumbing (Phase C item 4) and the
-    /// orthographic-3D camera and view chrome (Phase D) still run only on the Helix path.
+    /// (AnalyticalWindow) keep working unchanged. Context-menu plumbing (Phase C item 4) is in;
+    /// Phase D adds the orthographic-3D camera (Ctrl+Shift+O toggle, parity with the Helix
+    /// OrthographicToggleGesture) on top of the camera framing / view chrome already here.
     ///
     /// The DX11 device lives in a single process-wide EffectsManager shared by every instance
     /// (one per tab), created lazily and disposed on dispatcher shutdown - WPF unloads tab
@@ -91,6 +92,11 @@ namespace SAM.Geometry.UI.WPF
         private static readonly Color color_SelectionLine = Color.FromRgb(0, 0, 255);
 
         private bool zoomExtentsPending;
+
+        // Field of view of the perspective camera, remembered across an orthographic toggle so the
+        // perspective look is restored exactly when switching back (the OrthographicCamera carries a
+        // Width instead of a field of view). Defaults to the constructor PerspectiveCamera's 45.
+        private double fieldOfView_Perspective = 45.0;
 
         public event ObjectHooveredEventHandler ObjectHoovered;
         public event ObjectDoubleClickedEventHandler ObjectDoubleClicked;
@@ -598,6 +604,96 @@ namespace SAM.Geometry.UI.WPF
         }
 
         /// <summary>
+        /// True when the 3D camera is orthographic. Setting it switches projection, preserving the
+        /// view framing (issue #37 Phase D). Mirrors HelixViewport3D.Orthographic.
+        /// </summary>
+        public bool Orthographic
+        {
+            get
+            {
+                return viewport3DX.Camera is OrthographicCamera;
+            }
+
+            set
+            {
+                SetOrthographic(value);
+            }
+        }
+
+        /// <summary>
+        /// Toggles the 3D camera between perspective and orthographic projection (Ctrl+Shift+O,
+        /// parity with the Helix OrthographicToggleGesture / HelixViewport3D.Orthographic).
+        /// </summary>
+        public void ToggleProjection()
+        {
+            SetOrthographic(!(viewport3DX.Camera is OrthographicCamera));
+        }
+
+        // Swaps the viewport camera to the requested projection, carrying Position/LookDirection/
+        // UpDirection and the clip planes across so the view does not jump. Perspective -> orthographic
+        // derives the orthographic Width from the field of view and the look-at distance
+        // (width = 2 * d * tan(fov/2)), so the on-screen scale is continuous; the reverse restores the
+        // remembered field of view. Projection is intentionally not persisted in the camera/view
+        // settings - the Helix path doesn't persist it either - so a reloaded view opens in perspective.
+        private void SetOrthographic(bool orthographic)
+        {
+            // The clip planes live on ProjectionCamera (the shared base of both camera types), not the
+            // Camera base; carry them across so the switch doesn't reset the depth range.
+            HelixToolkit.Wpf.SharpDX.ProjectionCamera projectionCamera = viewport3DX.Camera as HelixToolkit.Wpf.SharpDX.ProjectionCamera;
+            if (projectionCamera == null)
+            {
+                return;
+            }
+
+            if (orthographic)
+            {
+                if (projectionCamera is OrthographicCamera)
+                {
+                    return;
+                }
+
+                if (projectionCamera is HelixToolkit.Wpf.SharpDX.PerspectiveCamera perspectiveCamera)
+                {
+                    fieldOfView_Perspective = perspectiveCamera.FieldOfView;
+                }
+
+                double distance = projectionCamera.LookDirection.Length;
+                double width = 2.0 * distance * System.Math.Tan(0.5 * fieldOfView_Perspective * System.Math.PI / 180.0);
+                if (width <= 0 || double.IsNaN(width) || double.IsInfinity(width))
+                {
+                    width = distance > 0 ? distance : 1.0;
+                }
+
+                viewport3DX.Camera = new OrthographicCamera
+                {
+                    Position = projectionCamera.Position,
+                    LookDirection = projectionCamera.LookDirection,
+                    UpDirection = projectionCamera.UpDirection,
+                    NearPlaneDistance = projectionCamera.NearPlaneDistance,
+                    FarPlaneDistance = projectionCamera.FarPlaneDistance,
+                    Width = width
+                };
+            }
+            else
+            {
+                if (projectionCamera is HelixToolkit.Wpf.SharpDX.PerspectiveCamera)
+                {
+                    return;
+                }
+
+                viewport3DX.Camera = new HelixToolkit.Wpf.SharpDX.PerspectiveCamera
+                {
+                    Position = projectionCamera.Position,
+                    LookDirection = projectionCamera.LookDirection,
+                    UpDirection = projectionCamera.UpDirection,
+                    NearPlaneDistance = projectionCamera.NearPlaneDistance,
+                    FarPlaneDistance = projectionCamera.FarPlaneDistance,
+                    FieldOfView = fieldOfView_Perspective
+                };
+            }
+        }
+
+        /// <summary>
         /// Zooms to the combined extents of the given objects ("Zoom Selected", issue #32 / #13).
         /// Bounds are taken from the merged mesh/line positions (world space - the scene has no
         /// per-object transforms). Returns false when none of the guids are present or have geometry.
@@ -704,12 +800,19 @@ namespace SAM.Geometry.UI.WPF
 
             lookDirection.Normalize();
 
-            double fieldOfView = (camera as HelixToolkit.Wpf.SharpDX.PerspectiveCamera)?.FieldOfView ?? 45.0;
+            double fieldOfView = (camera as HelixToolkit.Wpf.SharpDX.PerspectiveCamera)?.FieldOfView ?? fieldOfView_Perspective;
             double distance = 1.1 * radius / System.Math.Sin(0.5 * fieldOfView * System.Math.PI / 180.0);
 
             Media3D.Point3D centerPoint = new Media3D.Point3D(center.X, center.Y, center.Z);
             camera.Position = centerPoint - lookDirection * distance;
             camera.LookDirection = lookDirection * distance;
+
+            // An orthographic camera ignores distance for scale, so fit the sphere by its Width
+            // (the perspective branch above already framed it through position/distance).
+            if (camera is OrthographicCamera orthographicCamera)
+            {
+                orthographicCamera.Width = 2.2 * radius;
+            }
 
             // Keep world Z up here too (Zoom Selected), so framing a selection after rotating around
             // an off-axis pivot does not leave the view rolled - same intent as ZoomExtents.
@@ -1108,6 +1211,15 @@ namespace SAM.Geometry.UI.WPF
             if (e.Key == Key.Escape && ClearSelection())
             {
                 ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
+                return;
+            }
+
+            // Ctrl+Shift+O toggles perspective <-> orthographic projection - parity with the Helix
+            // path, whose HelixViewport3D.OrthographicToggleGesture defaults to Ctrl+Shift+O.
+            if (e.Key == Key.O && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                ToggleProjection();
+                e.Handled = true;
             }
         }
 

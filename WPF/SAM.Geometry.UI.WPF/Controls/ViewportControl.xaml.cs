@@ -49,8 +49,8 @@ namespace SAM.Geometry.UI.WPF
         // SAM_UI_VIEWPORT_SHARPDX is set; see SharpDXViewportControl. While active the Helix
         // viewport stays hidden and empty. Hover and selection (issue #32 Phase C) are handled
         // inside the control and surface through the same Object* events as the other renderers;
-        // context-menu plumbing (Phase C item 4) and the orthographic-3D camera and chrome
-        // (Phase D) still run only on the Helix path.
+        // the camera, view chrome and orthographic-3D toggle (Ctrl+Shift+O) are Phase D (issue #37),
+        // all handled inside the control.
         private readonly SharpDXViewportControl sharpDXViewportControl;
 
         // 2D (orthographic) floor-plan clip-plane tracking (issue #13). Helix zoom/pan moves the
