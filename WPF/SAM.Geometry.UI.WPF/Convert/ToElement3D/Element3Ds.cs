@@ -74,9 +74,9 @@ namespace SAM.Geometry.UI.WPF
             {
                 string detail = string.Format("[{0} objects]", result.Count);
                 LogMesh3DCacheStats(detail);
-                // Append includes triangulation (reported separately) + the per-Face3D mesh-array build
-                // (cached, see CachedMeshArrays) + per-bucket copy; Build is the GPU geometry + material
-                // construction (octree is now deferred off this path by SharpDXViewportControl.Load).
+                // Append includes triangulation (reported separately), the per-Face3D mesh/edge build and
+                // the per-bucket copy; Build is the GPU geometry + material construction (octree is now
+                // deferred off this path by SharpDXViewportControl.Load).
                 PerformanceLog.Write("ViewportControl.ToElement3D.Append", detail, appendMilliseconds);
                 PerformanceLog.Write("ViewportControl.ToElement3D.Build", detail, buildMilliseconds);
             }
@@ -387,41 +387,15 @@ namespace SAM.Geometry.UI.WPF
                 return;
             }
 
-            System.Tuple<Vector3[], int[]> arrays = meshArrayCache.GetValue(mesh3D, BuildMeshArrays);
-            if (arrays.Item1.Length == 0 || arrays.Item2.Length == 0)
+            List<Point3D> point3Ds = mesh3D.GetPoints();
+            if (point3Ds == null || point3Ds.Count == 0)
             {
                 return;
             }
 
-            // Arrays are consumed read-only (copied into the per-material bucket with an offset), so the
-            // one cached instance can be shared across regens.
-            sharpDXSceneBuilder.AddMesh(color, opacity, arrays.Item1, arrays.Item2);
-        }
-
-        // SharpDX positions + flattened triangle indices for a Mesh3D, cached by Mesh3D reference. Because
-        // CachedMesh3D hands back a stable Mesh3D per face geometry, a warm regen skips this conversion
-        // (GetPoints + ToVector3 + GetTriangleIndexes), which is the bulk of the non-triangulation Append
-        // cost on a large model (issue #33 follow-up). ConditionalWeakTable: an entry is released when its
-        // Mesh3D is evicted from Mesh3DCache and collected, so this never outlives the mesh cache.
-        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Mesh3D, System.Tuple<Vector3[], int[]>> meshArrayCache
-            = new System.Runtime.CompilerServices.ConditionalWeakTable<Mesh3D, System.Tuple<Vector3[], int[]>>();
-
-        private static System.Tuple<Vector3[], int[]> BuildMeshArrays(Mesh3D mesh3D)
-        {
-            List<Point3D> point3Ds = mesh3D.GetPoints();
-            if (point3Ds == null || point3Ds.Count == 0)
-            {
-                return new System.Tuple<Vector3[], int[]>(global::System.Array.Empty<Vector3>(), global::System.Array.Empty<int>());
-            }
-
             // All points are kept (invalid ones collapse to the origin) so the triangle indexes
             // stay aligned with the positions list.
-            Vector3[] positions = new Vector3[point3Ds.Count];
-            for (int i = 0; i < point3Ds.Count; i++)
-            {
-                Point3D point3D = point3Ds[i];
-                positions[i] = point3D == null || !point3D.IsValid() ? Vector3.Zero : ToVector3(point3D);
-            }
+            List<Vector3> positions = point3Ds.ConvertAll(x => x == null || !x.IsValid() ? Vector3.Zero : ToVector3(x));
 
             int count = mesh3D.TrianglesCount;
             List<int> triangleIndices = new List<int>(count * 3);
@@ -438,7 +412,7 @@ namespace SAM.Geometry.UI.WPF
                 triangleIndices.Add(tuple.Item3);
             }
 
-            return new System.Tuple<Vector3[], int[]>(positions, triangleIndices.ToArray());
+            sharpDXSceneBuilder.AddMesh(color, opacity, positions, triangleIndices);
         }
 
         private static void AddSegments(SharpDXSceneBuilder sharpDXSceneBuilder, ISegmentable3D segmentable3D, CurveAppearance curveAppearance)

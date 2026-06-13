@@ -55,12 +55,6 @@ namespace SAM.Geometry.UI.WPF
         private readonly List<Element3D> sceneElement3Ds = new List<Element3D>();
         private readonly Dictionary<Guid, Element3D> dictionary_Element3D = new Dictionary<Guid, Element3D>();
 
-        // Single parent group holding every object's GroupModel3D. The whole scene attaches/detaches as
-        // one subtree (one viewport3DX.Items add/remove) instead of ~31k incremental adds into the live
-        // viewport, which on a large model cost ~3 s of the regen (issue #33 follow-up). Built detached,
-        // populated, then added once.
-        private GroupModel3D sceneRoot;
-
         // Mesh geometries awaiting a deferred UpdateOctree() pass (issue #33 follow-up): the octree build
         // is moved off the regen critical path to a Background dispatcher tick after attach. Guarded by a
         // generation token so a newer Load cancels a stale pending pass.
@@ -273,15 +267,14 @@ namespace SAM.Geometry.UI.WPF
         {
             bool wasEmpty = sceneElement3Ds.Count == 0;
 
-            // Detach the whole previous scene as one subtree (one Items.Remove) and invalidate any
-            // pending deferred-octree pass from that scene (generation bump - see ScheduleOctreeBuild).
+            // Invalidate any pending deferred-octree pass from the previous scene (generation bump -
+            // see ScheduleOctreeBuild) before tearing it down.
             sceneGeneration++;
             pendingOctreeGeometries.Clear();
 
-            if (sceneRoot != null)
+            foreach (Element3D element3D in sceneElement3Ds)
             {
-                viewport3DX.Items.Remove(sceneRoot);
-                sceneRoot = null;
+                viewport3DX.Items.Remove(element3D);
             }
 
             sceneElement3Ds.Clear();
@@ -305,8 +298,7 @@ namespace SAM.Geometry.UI.WPF
 
             // Split the build (Convert.ToElement3Ds) from the viewport attach and the camera fit:
             // ViewportControl.ToElement3D (one level up) wraps this whole method, so isolating the
-            // phases shows which dominates the regen (#33). Attach now adds the scene as a single
-            // detached subtree instead of ~31k incremental adds into the live viewport.
+            // phases shows which dominates the regen (#33).
             List<Element3D> element3Ds;
             using (PerformanceLog.Measure("ViewportControl.ToElement3D.Generate"))
             {
@@ -317,13 +309,9 @@ namespace SAM.Geometry.UI.WPF
             {
                 using (PerformanceLog.Measure("ViewportControl.ToElement3D.Attach", string.Format("[{0} objects]", element3Ds.Count)))
                 {
-                    GroupModel3D root = new GroupModel3D();
-
                     foreach (Element3D element3D in element3Ds)
                     {
-                        // Children are added while root is still detached, so each add is a cheap list
-                        // op; the subtree attaches to the render host once when root is added below.
-                        root.Children.Add(element3D);
+                        viewport3DX.Items.Add(element3D);
                         sceneElement3Ds.Add(element3D);
 
                         SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
@@ -346,9 +334,6 @@ namespace SAM.Geometry.UI.WPF
                             dictionary_Stub[sAMObject.Guid] = stub;
                         }
                     }
-
-                    sceneRoot = root;
-                    viewport3DX.Items.Add(sceneRoot);
                 }
             }
 
