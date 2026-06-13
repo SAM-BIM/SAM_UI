@@ -106,6 +106,12 @@ namespace SAM.Geometry.UI.WPF
                 BackgroundColor = Colors.White,
                 ShowCoordinateSystem = true,
                 ShowViewCube = true,
+
+                // View-cube interaction: drag the cube to orbit (IsViewCubeMoverEnabled) and click
+                // edges/corners to snap to diagonal/isometric views (IsViewCubeEdgeClicksEnabled), not
+                // only the flat faces. Face labels are set from a custom texture below (compass).
+                IsViewCubeMoverEnabled = true,
+                IsViewCubeEdgeClicksEnabled = true,
                 ModelUpDirection = new Media3D.Vector3D(0, 0, 1),
 
                 // Centre of rotation / zoom follows the cursor (issue #32 item 1, and the earlier
@@ -124,6 +130,15 @@ namespace SAM.Geometry.UI.WPF
             // right for the context menu, wheel for zoom; the stock right-button rotate is kept.
             viewport3DX.InputBindings.Add(new MouseBinding(ViewportCommands.Pan, new MouseGesture(MouseAction.MiddleClick)));
             viewport3DX.InputBindings.Add(new MouseBinding(ViewportCommands.Pan, new MouseGesture(MouseAction.LeftClick, ModifierKeys.Shift)));
+
+            // Compass face labels on the view cube (N/E/S/W + TOP/BOTTOM) instead of the default
+            // Front/Back/...; this SharpDX view cube takes labels via a texture, not per-face strings.
+            // Keeps the library default cube if texture generation is unavailable.
+            TextureModel viewCubeTexture = GetViewCubeTexture(viewport3DX.EffectsManager);
+            if (viewCubeTexture != null)
+            {
+                viewport3DX.ViewCubeTexture = viewCubeTexture;
+            }
 
             // Single white ambient light - parity with the Helix 3D path (Load adds AmbientLight
             // only), which renders flat unshaded colors.
@@ -191,6 +206,49 @@ namespace SAM.Geometry.UI.WPF
             }
 
             return effectsManager;
+        }
+
+        // Cached compass-labelled view-cube texture (shared: it is plain image data, device-independent
+        // once generated). Built once via the Direct2D text helper from the shared EffectsManager.
+        private static TextureModel viewCubeTexture;
+
+        // Generates the N/E/S/W + TOP/BOTTOM view-cube face texture. CreateViewBoxTexture takes the
+        // faces in the order front, back, left, right, top, down. With ModelUpDirection = +Z and +Y
+        // taken as project North, the natural site-plan reading (viewer south of the model, looking
+        // north) is front = South, back = North, left = West, right = East. If a face reads wrong in
+        // the app this is a pure label swap here - no other logic depends on it. Returns null (keep the
+        // library default cube) if the texture cannot be built.
+        private static TextureModel GetViewCubeTexture(IEffectsManager effectsManager)
+        {
+            if (viewCubeTexture != null)
+            {
+                return viewCubeTexture;
+            }
+
+            if (effectsManager == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                HelixToolkit.Maths.Color4 face = new HelixToolkit.Maths.Color4(0.85f, 0.88f, 0.95f, 1f); // light steel
+                HelixToolkit.Maths.Color4 text = new HelixToolkit.Maths.Color4(0f, 0f, 0f, 1f);          // black
+
+                System.IO.Stream stream = BitmapExtensions.CreateViewBoxTexture(
+                    effectsManager,
+                    "S", "N", "W", "E", "TOP", "BOTTOM",
+                    face, face, face, face, face, face,
+                    text, text, text, text, text, text);
+
+                viewCubeTexture = new TextureModel(stream, true);
+            }
+            catch
+            {
+                viewCubeTexture = null;
+            }
+
+            return viewCubeTexture;
         }
 
         /// <summary>
