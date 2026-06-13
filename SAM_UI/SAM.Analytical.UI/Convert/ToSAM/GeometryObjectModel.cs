@@ -302,6 +302,13 @@ namespace SAM.Analytical.UI
                     System.Diagnostics.Stopwatch spaceShellsStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
                     int spaceShellCacheHits = 0;
 
+                    // Split the SpaceShells aggregate into the topological shell build vs the cut step so a
+                    // large-model run shows which dominates (shell build -> shell caching / triangulation
+                    // cache #33; cut -> the per-shell geometry overlay ops). Diagnostic only - allocations
+                    // and timing happen solely when the performance log is enabled.
+                    double shellBuildMilliseconds = 0;
+                    double shellCutMilliseconds = 0;
+
                     foreach (Space space in spaces)
                     {
                         Color? color = null;
@@ -327,7 +334,13 @@ namespace SAM.Analytical.UI
                             continue;
                         }
 
+                        System.Diagnostics.Stopwatch shellBuildStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
                         Shell shell = GetShell(adjacencyCluster, space, out bool shellCacheHit);
+                        if (shellBuildStopwatch != null)
+                        {
+                            shellBuildMilliseconds += shellBuildStopwatch.Elapsed.TotalMilliseconds;
+                        }
+
                         if (shellCacheHit)
                         {
                             spaceShellCacheHits++;
@@ -341,8 +354,13 @@ namespace SAM.Analytical.UI
                         List<Shell> shells = null;
                         if (planes != null && planes.Count != 0)
                         {
+                            System.Diagnostics.Stopwatch shellCutStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
                             shells = shell.Cut(planes);
                             shells = shells.FindAll(x => planes.TrueForAll(y => Geometry.Spatial.Query.Above(y, x.InternalPoint3D(), 0)));
+                            if (shellCutStopwatch != null)
+                            {
+                                shellCutMilliseconds += shellCutStopwatch.Elapsed.TotalMilliseconds;
+                            }
                         }
                         else
                         {
@@ -367,6 +385,8 @@ namespace SAM.Analytical.UI
                     {
                         spaceShellsStopwatch.Stop();
                         PerformanceLog.Write("View3D.SpaceShells", string.Format("{0} [{1} spaces] [{2} cached]", threeDimensionalViewSettings.Name, spaces.Count, spaceShellCacheHits), spaceShellsStopwatch.Elapsed.TotalMilliseconds);
+                        PerformanceLog.Write("View3D.SpaceShells.ShellBuild", string.Format("{0} [{1} spaces] [{2} cached]", threeDimensionalViewSettings.Name, spaces.Count, spaceShellCacheHits), shellBuildMilliseconds);
+                        PerformanceLog.Write("View3D.SpaceShells.Cut", string.Format("{0} [{1} spaces]", threeDimensionalViewSettings.Name, spaces.Count), shellCutMilliseconds);
                     }
 
                     if (!legendUpdated)
