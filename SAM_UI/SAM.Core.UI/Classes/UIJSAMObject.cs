@@ -29,6 +29,21 @@ namespace SAM.Core.UI
 
         protected bool modified;
 
+        // Undo/redo history (issue: undo). Every state-changing SetJSAMObject pushes the *previous*
+        // state as a gzip-compressed JSON snapshot onto the undo stack and clears the redo stack;
+        // Undo/Redo restore them and raise a FullModification so the views reload. JSON (not live
+        // clones) keeps memory bounded on large models, and one model snapshot captures geometry and
+        // view settings together. Capture is skipped for transient modifications (IModification.Undoable
+        // == false, e.g. a camera-only view update) and while a restore is in progress.
+        private readonly LinkedList<byte[]> undoSnapshots = new LinkedList<byte[]>();
+        private readonly LinkedList<byte[]> redoSnapshots = new LinkedList<byte[]>();
+        private bool restoring;
+
+        // Cap the depth so history memory stays bounded on large (10k-space) models; the oldest is dropped.
+        private const int maxHistoryDepth = 20;
+
+        public event EventHandler HistoryChanged;
+
         public event EventHandler Opening;
         public event OpenedEventHandler Opened;
 
@@ -118,10 +133,199 @@ namespace SAM.Core.UI
 
         public void SetJSAMObject(T jSAMObject, IEnumerable<IModification> modifications)
         {
+            // Snapshot the state we are about to replace, unless this is a restore or a transient
+            // (non-undoable) change. Done before the field is overwritten so the snapshot is the
+            // pre-edit state.
+            if (!restoring && this.jSAMObject != null && IsUndoable(modifications))
+            {
+                byte[] snapshot = CreateSnapshot(this.jSAMObject);
+                if (snapshot != null)
+                {
+                    undoSnapshots.AddLast(snapshot);
+                    while (undoSnapshots.Count > maxHistoryDepth)
+                    {
+                        undoSnapshots.RemoveFirst();
+                    }
+
+                    redoSnapshots.Clear();
+                    OnHistoryChanged();
+                }
+            }
+
             this.jSAMObject = jSAMObject;
             InvalidateClone();
             modified = true;
             OnModified(modifications);
+        }
+
+        public bool CanUndo => undoSnapshots.Count > 0;
+
+        public bool CanRedo => redoSnapshots.Count > 0;
+
+        /// <summary>
+        /// Restores the previous model state from the undo history (no-op when empty). The current
+        /// state is pushed onto the redo stack first. Raises Modified (FullModification) so consumers
+        /// reload. Returns whether anything was undone.
+        /// </summary>
+        public bool Undo()
+        {
+            if (undoSnapshots.Count == 0)
+            {
+                return false;
+            }
+
+            PushCurrent(redoSnapshots);
+
+            byte[] snapshot = undoSnapshots.Last.Value;
+            undoSnapshots.RemoveLast();
+
+            RestoreFromSnapshot(snapshot);
+            return true;
+        }
+
+        /// <summary>
+        /// Re-applies a state previously undone (no-op when empty). The current state is pushed onto the
+        /// undo stack first. Raises Modified (FullModification). Returns whether anything was redone.
+        /// </summary>
+        public bool Redo()
+        {
+            if (redoSnapshots.Count == 0)
+            {
+                return false;
+            }
+
+            PushCurrent(undoSnapshots);
+
+            byte[] snapshot = redoSnapshots.Last.Value;
+            redoSnapshots.RemoveLast();
+
+            RestoreFromSnapshot(snapshot);
+            return true;
+        }
+
+        /// <summary>Clears the undo/redo history (e.g. on open/close - history does not span documents).</summary>
+        public void ClearHistory()
+        {
+            bool changed = undoSnapshots.Count > 0 || redoSnapshots.Count > 0;
+            undoSnapshots.Clear();
+            redoSnapshots.Clear();
+
+            if (changed)
+            {
+                OnHistoryChanged();
+            }
+        }
+
+        protected void OnHistoryChanged()
+        {
+            EventHandler eventHandler = HistoryChanged;
+            if (eventHandler != null)
+            {
+                eventHandler(this, EventArgs.Empty);
+            }
+        }
+
+        // Capture only if at least one modification is undoable (a batch with a real edit + a transient
+        // change still counts). A null/empty list is treated as a full modification (undoable).
+        private static bool IsUndoable(IEnumerable<IModification> modifications)
+        {
+            if (modifications == null)
+            {
+                return true;
+            }
+
+            bool any = false;
+            foreach (IModification modification in modifications)
+            {
+                any = true;
+                if (modification == null || modification.Undoable)
+                {
+                    return true;
+                }
+            }
+
+            return !any;
+        }
+
+        private void PushCurrent(LinkedList<byte[]> snapshots)
+        {
+            byte[] snapshot = CreateSnapshot(jSAMObject);
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            snapshots.AddLast(snapshot);
+            while (snapshots.Count > maxHistoryDepth)
+            {
+                snapshots.RemoveFirst();
+            }
+        }
+
+        private void RestoreFromSnapshot(byte[] snapshot)
+        {
+            T state = RestoreSnapshot(snapshot);
+
+            restoring = true;
+            try
+            {
+                jSAMObject = state;
+                InvalidateClone();
+                modified = true;
+                OnModified(new List<IModification>() { new FullModification() });
+            }
+            finally
+            {
+                restoring = false;
+            }
+
+            OnHistoryChanged();
+        }
+
+        // gzip(UTF8(JSON)) of the object - compact and bounded vs a live clone. Null if it cannot serialize.
+        private static byte[] CreateSnapshot(T jSAMObject)
+        {
+            System.Text.Json.Nodes.JsonObject jObject = jSAMObject?.ToJsonObject();
+            if (jObject == null)
+            {
+                return null;
+            }
+
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(jObject.ToJsonString());
+            using (System.IO.MemoryStream memoryStream = new System.IO.MemoryStream())
+            {
+                using (System.IO.Compression.GZipStream gZipStream = new System.IO.Compression.GZipStream(memoryStream, System.IO.Compression.CompressionLevel.Fastest, true))
+                {
+                    gZipStream.Write(bytes, 0, bytes.Length);
+                }
+
+                return memoryStream.ToArray();
+            }
+        }
+
+        private static T RestoreSnapshot(byte[] snapshot)
+        {
+            if (snapshot == null)
+            {
+                return default;
+            }
+
+            byte[] bytes;
+            using (System.IO.MemoryStream input = new System.IO.MemoryStream(snapshot))
+            using (System.IO.Compression.GZipStream gZipStream = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress))
+            using (System.IO.MemoryStream output = new System.IO.MemoryStream())
+            {
+                gZipStream.CopyTo(output);
+                bytes = output.ToArray();
+            }
+
+            System.Text.Json.Nodes.JsonObject jObject = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Encoding.UTF8.GetString(bytes)) as System.Text.Json.Nodes.JsonObject;
+            if (jObject == null)
+            {
+                return default;
+            }
+
+            return (T)Core.Query.IJSAMObject(jObject);
         }
 
         // Subclasses that assign the jSAMObject field directly (e.g. via Load) must call this so the
@@ -160,6 +364,7 @@ namespace SAM.Core.UI
 
             if(result)
             {
+                ClearHistory();
                 OnOpened();
                 modified = false;
             }
@@ -212,6 +417,7 @@ namespace SAM.Core.UI
 
             jSAMObject = default;
             InvalidateClone();
+            ClearHistory();
 
             modified = false;
             OnClosed();

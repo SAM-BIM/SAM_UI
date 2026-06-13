@@ -1,0 +1,25 @@
+feat: undo/redo for model and view-settings edits
+
+Adds snapshot-based undo/redo. Every model change funnels through
+UIJSAMObject<T>.SetJSAMObject, which replaces the whole JSAM object, so the
+history is a stack of prior states rather than inverse operations.
+
+- Capture: SetJSAMObject snapshots the previous state before replacing it,
+  unless the change is transient (IModification.Undoable == false) or a restore
+  is in progress. Snapshots are gzip-compressed JSON (not live clones) so memory
+  stays bounded on large (10k-space) models; one model snapshot captures geometry
+  and view settings together. Depth is capped (maxHistoryDepth = 20, oldest
+  dropped); redo is cleared on a new edit; history is cleared on open/close.
+
+- Scope: model edits + view-settings edits are undoable; a camera-only view
+  update is not (ViewSettingsModification.Undoable => !(UpdateCamera &&
+  !UpdateGeometry)). New IModification.Undoable (default true on Modification).
+
+- Restore: Undo/Redo push the current state to the opposite stack, restore the
+  snapshot and raise a FullModification so the views reload (same path as open).
+
+- UI: Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo; Edit-ribbon History group with
+  Undo/Redo buttons (enabled only when there is history). Documented in
+  documentation/keyboard-shortcuts.md follow-up.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
