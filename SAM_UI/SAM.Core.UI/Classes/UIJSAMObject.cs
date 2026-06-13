@@ -31,18 +31,33 @@ namespace SAM.Core.UI
 
         // Undo/redo history (issue: undo). Every state-changing SetJSAMObject pushes the *previous*
         // state as a compressed snapshot onto the undo stack and clears the redo stack; Undo/Redo
-        // restore them and raise a FullModification so the views reload. Snapshots use the SAM-native
-        // Query.Compress/Decompress (gzip of the JSON, the same compression behind the small .sam
-        // files) rather than live clones, so memory stays bounded on large models and one model
-        // snapshot captures geometry and view settings together. Capture is skipped for transient
-        // modifications (IModification.Undoable == false, e.g. a camera-only view update) and while a
-        // restore is in progress.
-        private readonly LinkedList<string> undoSnapshots = new LinkedList<string>();
-        private readonly LinkedList<string> redoSnapshots = new LinkedList<string>();
+        // restore them and raise a FullModification so the views reload. Snapshots are compressed
+        // (not live clones), so memory stays bounded on large models and one model snapshot captures
+        // geometry and view settings together. Capture is skipped for transient modifications
+        // (IModification.Undoable == false, e.g. a camera-only view update) and while a restore is in
+        // progress.
+        private readonly LinkedList<byte[]> undoSnapshots = new LinkedList<byte[]>();
+        private readonly LinkedList<byte[]> redoSnapshots = new LinkedList<byte[]>();
         private bool restoring;
 
         // Cap the depth so history memory stays bounded on large (10k-space) models; the oldest is dropped.
         private const int maxHistoryDepth = 20;
+
+        // Two snapshot codecs are kept side by side so they can be A/B'd (size + capture/restore time
+        // are logged per snapshot via PerformanceLog):
+        //  - GZip: raw gzip(UTF8(JSON)) bytes - the most compact in-memory form (no Base64).
+        //  - Sam:  the SAM-native Query.Compress (gzip(JSON) + Base64), the same compression behind
+        //          .sam files, stored as the UTF8 bytes of that Base64 string (~33% larger).
+        // Select with the SAM_UI_UNDO_SNAPSHOT environment variable ("sam" => Sam; default => GZip).
+        private enum SnapshotCodec { GZip, Sam }
+
+        private static readonly SnapshotCodec snapshotCodec = ResolveSnapshotCodec();
+
+        private static SnapshotCodec ResolveSnapshotCodec()
+        {
+            string value = Environment.GetEnvironmentVariable("SAM_UI_UNDO_SNAPSHOT");
+            return !string.IsNullOrWhiteSpace(value) && value.Trim().Equals("sam", StringComparison.OrdinalIgnoreCase) ? SnapshotCodec.Sam : SnapshotCodec.GZip;
+        }
 
         public event EventHandler HistoryChanged;
 
@@ -140,8 +155,8 @@ namespace SAM.Core.UI
             // pre-edit state.
             if (!restoring && this.jSAMObject != null && IsUndoable(modifications))
             {
-                string snapshot = CreateSnapshot(this.jSAMObject);
-                if (!string.IsNullOrEmpty(snapshot))
+                byte[] snapshot = CreateSnapshot(this.jSAMObject);
+                if (snapshot != null && snapshot.Length > 0)
                 {
                     undoSnapshots.AddLast(snapshot);
                     while (undoSnapshots.Count > maxHistoryDepth)
@@ -178,7 +193,7 @@ namespace SAM.Core.UI
 
             PushCurrent(redoSnapshots);
 
-            string snapshot = undoSnapshots.Last.Value;
+            byte[] snapshot = undoSnapshots.Last.Value;
             undoSnapshots.RemoveLast();
 
             RestoreFromSnapshot(snapshot);
@@ -198,7 +213,7 @@ namespace SAM.Core.UI
 
             PushCurrent(undoSnapshots);
 
-            string snapshot = redoSnapshots.Last.Value;
+            byte[] snapshot = redoSnapshots.Last.Value;
             redoSnapshots.RemoveLast();
 
             RestoreFromSnapshot(snapshot);
@@ -249,10 +264,10 @@ namespace SAM.Core.UI
             return !any;
         }
 
-        private void PushCurrent(LinkedList<string> snapshots)
+        private void PushCurrent(LinkedList<byte[]> snapshots)
         {
-            string snapshot = CreateSnapshot(jSAMObject);
-            if (string.IsNullOrEmpty(snapshot))
+            byte[] snapshot = CreateSnapshot(jSAMObject);
+            if (snapshot == null || snapshot.Length == 0)
             {
                 return;
             }
@@ -264,7 +279,7 @@ namespace SAM.Core.UI
             }
         }
 
-        private void RestoreFromSnapshot(string snapshot)
+        private void RestoreFromSnapshot(byte[] snapshot)
         {
             T state = RestoreSnapshot(snapshot);
 
@@ -284,23 +299,78 @@ namespace SAM.Core.UI
             OnHistoryChanged();
         }
 
-        // Compressed snapshot of the object via the SAM-native gzip+Base64 helper (the same compression
-        // behind .sam files). Reuses Query.Compress/Decompress for consistency rather than rolling its
-        // own. Returns null/empty if it cannot serialize.
-        private static string CreateSnapshot(T jSAMObject)
+        // Compressed snapshot of the object, per the selected codec (see snapshotCodec). Size and time
+        // are logged so the two codecs can be compared. Returns null if it cannot serialize.
+        private static byte[] CreateSnapshot(T jSAMObject)
         {
-            return Core.Query.Compress(new IJSAMObject[] { jSAMObject });
+            byte[] snapshot;
+            using (PerformanceLog.Measure("UIJSAMObject.Snapshot.Create", snapshotCodec.ToString()))
+            {
+                if (snapshotCodec == SnapshotCodec.Sam)
+                {
+                    // SAM-native gzip(JSON)+Base64; store the Base64 string as UTF8 bytes.
+                    string compressed = Core.Query.Compress(new IJSAMObject[] { jSAMObject });
+                    snapshot = string.IsNullOrEmpty(compressed) ? null : System.Text.Encoding.UTF8.GetBytes(compressed);
+                }
+                else
+                {
+                    // Raw gzip(UTF8(JSON)) bytes - the most compact in-memory form.
+                    System.Text.Json.Nodes.JsonObject jObject = jSAMObject?.ToJsonObject();
+                    if (jObject == null)
+                    {
+                        snapshot = null;
+                    }
+                    else
+                    {
+                        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(jObject.ToJsonString());
+                        using (System.IO.MemoryStream memoryStream = new System.IO.MemoryStream())
+                        {
+                            using (System.IO.Compression.GZipStream gZipStream = new System.IO.Compression.GZipStream(memoryStream, System.IO.Compression.CompressionLevel.Fastest, true))
+                            {
+                                gZipStream.Write(bytes, 0, bytes.Length);
+                            }
+
+                            snapshot = memoryStream.ToArray();
+                        }
+                    }
+                }
+            }
+
+            if (PerformanceLog.Enabled && snapshot != null)
+            {
+                PerformanceLog.Write("UIJSAMObject.Snapshot.Size", string.Format("{0} [{1} bytes]", snapshotCodec, snapshot.Length), snapshot.Length);
+            }
+
+            return snapshot;
         }
 
-        private static T RestoreSnapshot(string snapshot)
+        private static T RestoreSnapshot(byte[] snapshot)
         {
-            if (string.IsNullOrEmpty(snapshot))
+            if (snapshot == null || snapshot.Length == 0)
             {
                 return default;
             }
 
-            List<T> jSAMObjects = Core.Query.Decompress<T>(snapshot);
-            return jSAMObjects == null ? default : jSAMObjects.FirstOrDefault();
+            using (PerformanceLog.Measure("UIJSAMObject.Snapshot.Restore", snapshotCodec.ToString()))
+            {
+                if (snapshotCodec == SnapshotCodec.Sam)
+                {
+                    List<T> jSAMObjects = Core.Query.Decompress<T>(System.Text.Encoding.UTF8.GetString(snapshot));
+                    return jSAMObjects == null ? default : jSAMObjects.FirstOrDefault();
+                }
+
+                byte[] bytes;
+                using (System.IO.MemoryStream input = new System.IO.MemoryStream(snapshot))
+                using (System.IO.Compression.GZipStream gZipStream = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress))
+                using (System.IO.MemoryStream output = new System.IO.MemoryStream())
+                {
+                    gZipStream.CopyTo(output);
+                    bytes = output.ToArray();
+                }
+
+                System.Text.Json.Nodes.JsonObject jObject = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Encoding.UTF8.GetString(bytes)) as System.Text.Json.Nodes.JsonObject;
+                return jObject == null ? default : (T)Core.Query.IJSAMObject(jObject);
+            }
         }
 
         // Subclasses that assign the jSAMObject field directly (e.g. via Load) must call this so the
