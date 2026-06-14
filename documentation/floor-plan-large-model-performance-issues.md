@@ -356,3 +356,85 @@ problem, cut the raw serialization cost itself:
 
 Codec A/B is already wired: `SAM_UI_UNDO_SNAPSHOT=sam` selects the SAM-native `Query.Compress`
 codec, default is raw gzip; `UIJSAMObject.Snapshot.Create` / `.Size` log time and bytes for each.
+
+---
+
+## Implemented per-regeneration caches (SAM-BIM/SAM#16)
+
+All of these memoize purely-geometric per-regeneration work in `GeometryObjectModel.cs` (and the
+renderer triangulation layer), keyed by a content signature so attribute / view-settings edits are
+cache hits while geometry edits re-compute. They share the same pattern (static dictionary + lock +
+rounded-to-mm signature + entry-count cap). Measured on the 10k-space model (`SAM_UI_PERFORMANCE_LOG=1`):
+
+| Cache | Op memoized | Warm win | PR |
+| --- | --- | --- | --- |
+| `labelSolveCache` | `Solver2D` label placement (per view) | ~150 s → ~0.2 s | #22 / SAM#15 |
+| `shellCache` / `sectionCache` | `AdjacencyCluster.Shell` + `shell.Section(plane)` (per space) | recompute → ~0 on attribute edits | #28 |
+| `panelFaceCache` | `Face3D.FixEdges()` (per panel) | ~4.2 s → ~0.25 s (~16×) | #34 |
+| `CachedMesh3D` | `Spatial.Create.Mesh3D(face3D)` triangulation (per face) | ~1.8 s → ~0 (33635/33635 hits) | #35 |
+| `panelCutCache` | `face3D.Cut(planes)` section cut (per panel) | ~1.8 s → ~0 on warm sectioned views | SAM#16 |
+
+`panelCutCache` only populates when **View → View Range** section planes are active (`View3D.Panels.Cut`
+is 0 ms otherwise); its signature combines the cut-input face geometry **and** the planes, so changing
+the section plane correctly re-cuts. It mirrors the 2D `sectionCache` exactly.
+
+### Tried and reverted (kept here so they are not re-attempted)
+
+Measurement, not the static O(N²) scan, decided each of these — see SAM-BIM/SAM#16 and SAM_UI PR #36:
+
+- **OCCT `ShellSectionByPlanes` swap for the 3D path** — ruled out: `View3D.SpaceShells`
+  (shell build + cut) measured ~0.1 s on 10k, so it was never the bottleneck. No code change.
+- **The SAM.Geometry O(N²) candidates** (`ConnectedFace3Ds`, `MergeOverlaps`, coplanar grouping,
+  `Split`/`SelfIntersectionSegment2Ds`, `Snap`, `Connected`) — confirmed benign: they run per-space
+  over a small local N, and time-per-space did not grow with model size. Left unchanged.
+- **SharpDX batch-attach** (PR #36) — adding the ~33k scene models under one parent group did **not**
+  reduce `ToElement3D.Attach` (~3.5 s); that cost is the inherent GPU attachment of 33k separate
+  models, not the number of `Items.Add` calls. Reverted (kept per-object add; avoids selection-topology
+  risk for zero gain). The real lever is model-count reduction (merge-by-material + CPU pick index),
+  parked under #32/#16.
+- **SharpDX mesh-array cache** (PR #36) — memoizing the per-`Mesh3D` array conversion did **not** move
+  `ToElement3D.Append`, whose cost is per-face edge/segment build, not the array copy. Reverted.
+
+---
+
+## Proposed next performance improvements (SAM-BIM/SAM#16 follow-ups)
+
+Ranked by expected impact on the warm 3D regen of the 10k-space model. Logged here (GitHub issues
+to be opened per item) so the backlog and its rationale live in-repo. "Status" notes prior work.
+
+### 1. Mesh batching by material — the #1 remaining lever (~3.5 s `ToElement3D.Attach`)
+The dominant warm-regen cost is the GPU **attach of ~33,635 individually-attached scene models**; it
+scales with model *count*, not triangulation (cached, #35) or `Items.Add` calls (batch-attach gave
+nothing, PR #36). Fix is a render/pick split: merge geometry into a few **frozen meshes grouped by
+material/colour** for rendering, and keep a parallel **CPU-side spatial index** (quadtree/BVH over
+object bounds) for hover/selection instead of per-object octrees. A redesign of the hit-test/selection
+layer. Status: open (#32/#16 territory) — highest value, largest effort.
+
+### 2. Move `GeometryObjectModel` + scene build off the UI thread
+Regeneration runs synchronously on the UI thread behind the modal "Reloading" window. Wrap it in a
+**cancellable `Task`** (rapid edits cancel stale work) and dispatch only the final scene swap to the
+UI; the viewport keeps showing the previous frame instead of freezing. Status: long-standing idea 2
+of Issue 3 / #33, never landed.
+
+### 3. Trim `AnalyticalWindow.Reload` (~29 s top-line on 10k)
+`Reload` is the largest single perf-log entry. Even with per-tab regen (#12) and in-place recolour
+(#11), audit that an attribute-only edit hits **only** the recolour fast-path and never re-enters
+`GeometryObjectModel`, and that `ViewRegeneration` is not redundantly invoked per modification batch.
+Status: partially addressed (#11, #12); needs an audit pass.
+
+### 4. Cache the per-face edge/segment build (~1.2 s `ToElement3D.Append`) — PROTOTYPED
+After triangulation was cached (#35), the residual `.Append` cost is the per-face **edge/segment**
+build (`GetEdge3Ds` → `GetSegments` → `ToVector3`), not the mesh-array copy (that cache was reverted,
+PR #36 — do not redo). **Prototype landed:** `Convert.CachedFaceEdgeSegments(Face3D)` in
+`WPF/SAM.Geometry.UI.WPF/Convert/Mesh3DCache.cs` memoizes the appearance-independent segment endpoints
+by the same `Face3DSignature` as the triangulation cache; the SharpDX `Face3DObject` curve build reads
+it instead of re-deriving. New diagnostic `ViewportControl.ToElement3D.EdgeSegments [hits/misses]`.
+Status: **unconfirmed** — needs a 10k re-run to verify `ToElement3D.Append` drops with `[N hits]`
+before relying on it (the previous `.Append` optimisation, the mesh-array cache, did not pan out).
+
+### 5. Cut the per-regen full-model deep clone
+`ToSAM_GeometryObjectModel` does `new AnalyticalModel(analyticalModel)` per regen, and
+`UIJSAMObject.JSAMObject` historically deep-cloned on every access (#14, mitigated by the clone cache
+in #21). On a 10k model these full clones are pure hot-path overhead — switch to a shared read-only
+snapshot / copy-on-write for the regeneration pass so geometry generation reads the live model.
+Status: partially addressed (#14/#21); the per-regen `AnalyticalModel` clone remains.
