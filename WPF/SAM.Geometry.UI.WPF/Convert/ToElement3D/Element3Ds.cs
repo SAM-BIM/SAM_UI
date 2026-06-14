@@ -99,6 +99,26 @@ namespace SAM.Geometry.UI.WPF
         /// </summary>
         public static List<Element3D> ToBatchedElement3Ds(this GeometryObjectModel geometryObjectModel)
         {
+            BatchedScene batchedScene = geometryObjectModel.ToBatchedScene();
+            return batchedScene == null ? null : batchedScene.Element3Ds;
+        }
+
+        /// <summary>
+        /// The batched scene plus the side data needed to keep object identity without one scene model per
+        /// object (issue #16 increment 2): a per-merged-mesh vertex-index -> guid pick map, and a guid ->
+        /// object map for event payloads / selection queries.
+        /// </summary>
+        internal sealed class BatchedScene
+        {
+            public List<Element3D> Element3Ds;
+            public Dictionary<MeshGeometryModel3D, PickBucket> PickMap;
+            public Dictionary<System.Guid, Core.IJSAMObject> Objects;
+        }
+
+        // See ToBatchedElement3Ds: same batched build, but with pick-range capture and the guid/object side
+        // maps populated so picking, selection and event payloads work on the batched representation.
+        internal static BatchedScene ToBatchedScene(this GeometryObjectModel geometryObjectModel)
+        {
             if (geometryObjectModel == null)
             {
                 return null;
@@ -112,7 +132,8 @@ namespace SAM.Geometry.UI.WPF
                 buildMilliseconds = 0;
             }
 
-            SharpDXSceneBuilder sharpDXSceneBuilder = new SharpDXSceneBuilder();
+            SharpDXSceneBuilder sharpDXSceneBuilder = new SharpDXSceneBuilder(true);
+            Dictionary<System.Guid, Core.IJSAMObject> objects = new Dictionary<System.Guid, Core.IJSAMObject>();
 
             int objectCount = 0;
             List<ISAMGeometryObject> sAMGeometryObjects = geometryObjectModel.GetSAMGeometryObjects<ISAMGeometryObject>();
@@ -126,6 +147,17 @@ namespace SAM.Geometry.UI.WPF
                     }
 
                     objectCount++;
+
+                    // A pickable object needs a guid; untagged objects still render (Guid.Empty range -> not
+                    // pickable), mirroring the per-object path where only tagged objects resolve to a hit.
+                    Core.SAMObject sAMObject = ResolveSAMObject(sAMGeometryObject);
+                    System.Guid guid = sAMObject == null ? System.Guid.Empty : sAMObject.Guid;
+                    sharpDXSceneBuilder.SetCurrentObject(guid);
+
+                    if (sAMObject != null && !objects.ContainsKey(guid))
+                    {
+                        objects[guid] = sAMGeometryObject as Core.IJSAMObject ?? sAMObject;
+                    }
 
                     if (!logEnabled)
                     {
@@ -158,7 +190,30 @@ namespace SAM.Geometry.UI.WPF
                 PerformanceLog.Write("ViewportControl.ToElement3D.Build", detail, buildMilliseconds);
             }
 
-            return result;
+            return new BatchedScene
+            {
+                Element3Ds = result,
+                PickMap = sharpDXSceneBuilder.PickMap,
+                Objects = objects
+            };
+        }
+
+        // Mirrors Core.UI.WPF.Query.JSAMObject<SAMObject>: the object itself if it is a SAMObject, else the
+        // SAMObject behind its ITaggable tag - so a batched object resolves to the same guid the per-object
+        // path tags onto its GroupModel3D.
+        private static Core.SAMObject ResolveSAMObject(ISAMGeometryObject sAMGeometryObject)
+        {
+            if (sAMGeometryObject is Core.SAMObject sAMObject)
+            {
+                return sAMObject;
+            }
+
+            if (sAMGeometryObject is Core.ITaggable taggable && taggable.Tag != null && taggable.Tag.Value is Core.SAMObject tagged)
+            {
+                return tagged;
+            }
+
+            return null;
         }
 
         // Diagnostic accumulators for the per-object Append vs Build split (see ToElement3Ds above).

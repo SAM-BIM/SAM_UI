@@ -85,6 +85,16 @@ namespace SAM.Geometry.UI.WPF
         private readonly HashSet<Guid> selectedGuids = new HashSet<Guid>();
         private Guid? hooveredGuid;
 
+        // Batched-scene state (issue #16 mesh-batching, when SAM_UI_VIEWPORT_BATCH is on). In this mode there
+        // is no per-object Element3D, so object identity comes from these instead of dictionary_Element3D/
+        // dictionary_Guid: dictionary_PickBucket resolves a FindHits triangle vertex -> guid per merged mesh,
+        // dictionary_BatchedObject maps guid -> object (event payloads + selection queries). Increment 2 wires
+        // picking + selection state + events; the selection/hover *visual* (overlay) is increment 3, so
+        // ApplyAppearance is a no-op while sceneBatched.
+        private bool sceneBatched;
+        private readonly Dictionary<MeshGeometryModel3D, PickBucket> dictionary_PickBucket = new Dictionary<MeshGeometryModel3D, PickBucket>();
+        private readonly Dictionary<Guid, IJSAMObject> dictionary_BatchedObject = new Dictionary<Guid, IJSAMObject>();
+
         // Selection appearance - parity with the Helix SelectAction (Query.SelectionSurfaceAppearance:
         // RGB(125,125,255) fill, blue edges). Ambient = Diffuse / no specular matches the flat
         // ambient-only look of SharpDXSceneBuilder materials. One shared instance is fine: materials
@@ -274,14 +284,24 @@ namespace SAM.Geometry.UI.WPF
             // ViewportControl.ToElement3D (one level up) wraps this whole method; the .Generate/.Attach
             // split shows which phase dominates the regen (#33).
             List<Element3D> element3Ds = null;
+            Convert.BatchedScene batchedScene = null;
             if (geometryObjectModel != null)
             {
                 using (PerformanceLog.Measure("ViewportControl.ToElement3D.Generate"))
                 {
-                    // Batched path (#16, render-only increment 1): a few merged-by-material models instead of
-                    // one GroupModel3D per object. The merged models are untagged, so the attach loop below
-                    // skips per-object indexing and picking/selection stay inert in this mode.
-                    element3Ds = BatchEnabled ? Convert.ToBatchedElement3Ds(geometryObjectModel) : Convert.ToElement3Ds(geometryObjectModel);
+                    // Batched path (#16): a few merged-by-material models for the whole model instead of one
+                    // GroupModel3D per object. ToBatchedScene also returns the per-mesh vertex -> guid pick map
+                    // and the guid -> object map, so picking/selection/events work without a model per object
+                    // (increment 2); the selection visual is the overlay path (increment 3).
+                    if (BatchEnabled)
+                    {
+                        batchedScene = geometryObjectModel.ToBatchedScene();
+                        element3Ds = batchedScene == null ? null : batchedScene.Element3Ds;
+                    }
+                    else
+                    {
+                        element3Ds = Convert.ToElement3Ds(geometryObjectModel);
+                    }
                 }
             }
 
@@ -299,6 +319,9 @@ namespace SAM.Geometry.UI.WPF
             dictionary_BaseIsTransparent.Clear();
             dictionary_BaseLineColor.Clear();
             dictionary_BaseLineThickness.Clear();
+            dictionary_PickBucket.Clear();
+            dictionary_BatchedObject.Clear();
+            sceneBatched = false;
             selectedGuids.Clear();
             hooveredGuid = null;
 
@@ -310,33 +333,42 @@ namespace SAM.Geometry.UI.WPF
                 return;
             }
 
+            sceneBatched = batchedScene != null;
+
             if (element3Ds != null)
             {
                 using (PerformanceLog.Measure("ViewportControl.ToElement3D.Attach", string.Format("[{0} objects]", element3Ds.Count)))
                 {
-                    foreach (Element3D element3D in element3Ds)
+                    if (sceneBatched)
                     {
-                        viewport3DX.Items.Add(element3D);
-                        sceneElement3Ds.Add(element3D);
-
-                        SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
-                        if (sAMObject != null && !dictionary_Element3D.ContainsKey(sAMObject.Guid))
+                        AttachBatched(batchedScene);
+                    }
+                    else
+                    {
+                        foreach (Element3D element3D in element3Ds)
                         {
-                            dictionary_Element3D[sAMObject.Guid] = element3D;
-                            dictionary_Guid[element3D] = sAMObject.Guid;
-                            RegisterChildren(sAMObject.Guid, element3D);
-                            CollectOctreeGeometries(element3D);
+                            viewport3DX.Items.Add(element3D);
+                            sceneElement3Ds.Add(element3D);
 
-                            // Detached stub carrying the same attached object as the group - the
-                            // ObjectHoovered/ObjectDoubleClicked payload (see the class note)
-                            Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
-                            IJSAMObject jSAMObject = Core.UI.WPF.Query.JSAMObject<IJSAMObject>(element3D);
-                            if (jSAMObject != null)
+                            SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
+                            if (sAMObject != null && !dictionary_Element3D.ContainsKey(sAMObject.Guid))
                             {
-                                Core.UI.WPF.Modify.SetIJSAMObject(stub, jSAMObject);
-                            }
+                                dictionary_Element3D[sAMObject.Guid] = element3D;
+                                dictionary_Guid[element3D] = sAMObject.Guid;
+                                RegisterChildren(sAMObject.Guid, element3D);
+                                CollectOctreeGeometries(element3D);
 
-                            dictionary_Stub[sAMObject.Guid] = stub;
+                                // Detached stub carrying the same attached object as the group - the
+                                // ObjectHoovered/ObjectDoubleClicked payload (see the class note)
+                                Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
+                                IJSAMObject jSAMObject = Core.UI.WPF.Query.JSAMObject<IJSAMObject>(element3D);
+                                if (jSAMObject != null)
+                                {
+                                    Core.UI.WPF.Modify.SetIJSAMObject(stub, jSAMObject);
+                                }
+
+                                dictionary_Stub[sAMObject.Guid] = stub;
+                            }
                         }
                     }
                 }
@@ -359,6 +391,66 @@ namespace SAM.Geometry.UI.WPF
 
             // Build the picking octrees off the regen critical path (see pendingOctreeGeometries).
             ScheduleOctreeBuild();
+        }
+
+        // Batched attach (#16 increment 2): add the few merged models, index the per-mesh pick map and the
+        // guid -> object map, build one event-payload stub per object (parity with the per-object path), and
+        // queue the merged mesh geometries for the deferred picking octree so FindHits stays cheap.
+        private void AttachBatched(Convert.BatchedScene batchedScene)
+        {
+            if (batchedScene.PickMap != null)
+            {
+                foreach (KeyValuePair<MeshGeometryModel3D, PickBucket> keyValuePair in batchedScene.PickMap)
+                {
+                    dictionary_PickBucket[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+
+            foreach (Element3D element3D in batchedScene.Element3Ds)
+            {
+                viewport3DX.Items.Add(element3D);
+                sceneElement3Ds.Add(element3D);
+
+                if (element3D is MeshGeometryModel3D meshGeometryModel3D && meshGeometryModel3D.Geometry is HelixToolkit.SharpDX.MeshGeometry3D meshGeometry3D)
+                {
+                    pendingOctreeGeometries.Add(meshGeometry3D);
+                }
+            }
+
+            if (batchedScene.Objects != null)
+            {
+                foreach (KeyValuePair<Guid, IJSAMObject> keyValuePair in batchedScene.Objects)
+                {
+                    dictionary_BatchedObject[keyValuePair.Key] = keyValuePair.Value;
+
+                    Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
+                    Core.UI.WPF.Modify.SetIJSAMObject(stub, keyValuePair.Value);
+                    dictionary_Stub[keyValuePair.Key] = stub;
+                }
+            }
+        }
+
+        // Object identity helpers that work in both modes: per-object (dictionary_Element3D) or batched
+        // (dictionary_BatchedObject). KnowsGuid gates selection; ResolveSAMObject mirrors
+        // Core.UI.WPF.Query.JSAMObject<SAMObject> for a batched payload object.
+        private bool KnowsGuid(Guid guid)
+        {
+            return sceneBatched ? dictionary_BatchedObject.ContainsKey(guid) : dictionary_Element3D.ContainsKey(guid);
+        }
+
+        private static SAMObject ResolveSAMObject(IJSAMObject jSAMObject)
+        {
+            if (jSAMObject is SAMObject sAMObject)
+            {
+                return sAMObject;
+            }
+
+            if (jSAMObject is ITaggable taggable && taggable.Tag != null && taggable.Tag.Value is SAMObject tagged)
+            {
+                return tagged;
+            }
+
+            return null;
         }
 
         public Element3D GetElement3D(Guid guid)
@@ -388,7 +480,7 @@ namespace SAM.Geometry.UI.WPF
             {
                 foreach (Guid guid in guids)
                 {
-                    if (dictionary_Element3D.ContainsKey(guid))
+                    if (KnowsGuid(guid))
                     {
                         selectedGuids_New.Add(guid);
                     }
@@ -439,13 +531,19 @@ namespace SAM.Geometry.UI.WPF
             List<SAMObject> result = new List<SAMObject>();
             foreach (Guid guid in selectedGuids)
             {
-                if (dictionary_Element3D.TryGetValue(guid, out Element3D element3D))
+                SAMObject sAMObject;
+                if (sceneBatched)
                 {
-                    SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
-                    if (sAMObject != null)
-                    {
-                        result.Add(sAMObject);
-                    }
+                    sAMObject = dictionary_BatchedObject.TryGetValue(guid, out IJSAMObject jSAMObject) ? ResolveSAMObject(jSAMObject) : null;
+                }
+                else
+                {
+                    sAMObject = dictionary_Element3D.TryGetValue(guid, out Element3D element3D) ? Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D) : null;
+                }
+
+                if (sAMObject != null)
+                {
+                    result.Add(sAMObject);
                 }
             }
 
@@ -554,7 +652,14 @@ namespace SAM.Geometry.UI.WPF
 
             foreach (Guid guid in guids)
             {
-                if (dictionary_Element3D.TryGetValue(guid, out Element3D element3D) && Core.UI.WPF.Query.JSAMObject<T>(element3D) != null)
+                if (sceneBatched)
+                {
+                    if (dictionary_BatchedObject.TryGetValue(guid, out IJSAMObject jSAMObject) && ResolveSAMObject(jSAMObject) is T)
+                    {
+                        return true;
+                    }
+                }
+                else if (dictionary_Element3D.TryGetValue(guid, out Element3D element3D) && Core.UI.WPF.Query.JSAMObject<T>(element3D) != null)
                 {
                     return true;
                 }
@@ -1023,6 +1128,14 @@ namespace SAM.Geometry.UI.WPF
         /// </summary>
         private void ApplyAppearance(Guid guid)
         {
+            // Batched mode has no per-object model to recolour - the selection/hover visual is the overlay
+            // mesh path (#16 increment 3). Selection state + events still flow; only the in-view highlight
+            // waits. So this is a no-op while batched.
+            if (sceneBatched)
+            {
+                return;
+            }
+
             if (!dictionary_Element3D.TryGetValue(guid, out Element3D element3D) || !(element3D is GroupModel3D groupModel3D))
             {
                 return;
@@ -1074,6 +1187,24 @@ namespace SAM.Geometry.UI.WPF
                 {
                     if (hitTestResult == null || !hitTestResult.IsValid)
                     {
+                        continue;
+                    }
+
+                    if (sceneBatched)
+                    {
+                        // Batched: one merged mesh holds many objects. Resolve the hit triangle's vertex
+                        // index to its owning object's guid via that mesh's pick map (#16 increment 2).
+                        if (hitTestResult.ModelHit is MeshGeometryModel3D meshGeometryModel3D
+                            && dictionary_PickBucket.TryGetValue(meshGeometryModel3D, out PickBucket pickBucket)
+                            && hitTestResult.TriangleIndices != null)
+                        {
+                            Guid guid_Batched = pickBucket.Resolve(hitTestResult.TriangleIndices.Item1);
+                            if (guid_Batched != Guid.Empty)
+                            {
+                                return guid_Batched;
+                            }
+                        }
+
                         continue;
                     }
 
