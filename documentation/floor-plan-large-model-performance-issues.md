@@ -339,6 +339,21 @@ the render wins the CPU and the snapshot simply finishes a little later — noth
 rare Undo/Redo of that very edit. The deeper lever remains the faster codec below (less CPU spent =
 less to contend), and using the default GZip codec instead of `Sam` (gzip + Base64) is already cheaper.
 
+**Codec comparison — GZip vs Sam, measured on the 33,635-object model (2026-06-14).** GZip (the
+default) wins on every axis; `Sam` (gzip + Base64) was only ever a debug A/B and should not be used:
+
+| Metric | `Sam` | `GZip` (default) | Win |
+| --- | --- | --- | --- |
+| `Snapshot.Create` | ~15.3–20.5 s (median ~17 s) | ~10.6–15.6 s (median ~12 s) | **~30% faster** |
+| `Snapshot.Size` | ~26.3 MB | ~16.9 MB | **~36% smaller** (no Base64) |
+| `Snapshot.Restore` | ~6.0–9.2 s | ~5.5–7.1 s | marginal |
+
+`Restore` barely moves because it is dominated by JSON parse → object-graph rebuild, not the
+Base64/decompress step. The memory win matters at the 20-deep cap: ~340 MB vs ~530 MB of retained
+snapshots. **Recommendation: leave `SAM_UI_UNDO_SNAPSHOT` unset (GZip).** `Snapshot.Create` is still
+~12 s and `Snapshot.Restore` ~6 s synchronous on the UI thread (the latter is the post-undo "white
+screen") — addressed respectively by the faster codec below and by making Restore async (next).
+
 ### Deferred follow-up — faster snapshot codec (not done; do later if needed)
 
 The async change removes the snapshot from the *blocking* path but the serialization still costs the
