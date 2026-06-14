@@ -53,6 +53,15 @@ namespace SAM.Analytical.UI
         private static readonly Dictionary<Guid, Tuple<string, List<Face3D>>> panelFaceCache = new Dictionary<Guid, Tuple<string, List<Face3D>>>();
         private static readonly object panelFaceCacheLock = new object();
 
+        // Per-panel cache of the section-cut Face3Ds (the edge-fixed faces cut by the view's section planes and
+        // filtered to the kept side). View3D.Panels.Cut is ~1.8 s on a 10k model when View Range section planes are
+        // active and was re-cut on every regeneration; it is purely geometric, so it is memoized exactly like the
+        // 2D sectionCache: keyed by panel guid with a signature combining the cut input geometry AND the planes, so
+        // a geometry edit or a section-plane change re-cuts while attribute / view-settings edits are cache hits.
+        // Without section planes the cut step does not run, so this cache is only populated for sectioned views.
+        private static readonly Dictionary<Guid, Tuple<string, List<Face3D>>> panelCutCache = new Dictionary<Guid, Tuple<string, List<Face3D>>>();
+        private static readonly object panelCutCacheLock = new object();
+
         // All of these caches are static and keyed per object guid, so a long-running session that opens many
         // large models (each with fresh guids) would otherwise grow without bound. Cap the entry count and clear
         // when a new key would exceed it - the caps are well above any single model's space / panel count, so the
@@ -130,6 +139,23 @@ namespace SAM.Analytical.UI
             AppendVectorSignature(stringBuilder, plane.AxisY?.X, plane.AxisY?.Y, plane.AxisY?.Z);
             stringBuilder.Append('|');
             AppendVectorSignature(stringBuilder, plane.Normal?.X, plane.Normal?.Y, plane.Normal?.Z);
+            return stringBuilder.ToString();
+        }
+
+        // Signature of an ordered set of cut planes - the cut result depends on every plane, so concatenate them.
+        private static string PlanesSignature(List<Plane> planes)
+        {
+            if (planes == null || planes.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (Plane plane in planes)
+            {
+                stringBuilder.Append(PlaneSignature(plane)).Append('@');
+            }
+
             return stringBuilder.ToString();
         }
 
@@ -294,6 +320,62 @@ namespace SAM.Analytical.UI
             }
 
             return face3Ds;
+        }
+
+        // Returns the panel's faces cut by the view's section planes (and filtered to the kept side), reusing a
+        // cached result when the input faces AND the planes are unchanged. face.Cut(planes) is the dominant 3D-panel
+        // cost when section planes are active (View3D.Panels.Cut ~1.8 s on a 10k model) and is purely geometric, so
+        // it is memoized like the 2D sectionCache. The signature combines the cut input geometry and the planes, so
+        // a geometry edit OR a section-plane change re-cuts while attribute / view-settings edits are cache hits.
+        // The cached faces are consumed read-only downstream (Face3DObject), so sharing an instance is safe.
+        private static List<Face3D> GetPanelCutFace3Ds(Panel panel, List<Face3D> face3Ds, List<Plane> planes, out bool cacheHit)
+        {
+            cacheHit = false;
+            if (panel == null || face3Ds == null || face3Ds.Count == 0 || planes == null || planes.Count == 0)
+            {
+                return face3Ds;
+            }
+
+            string face3DsSignature = Face3DsSignature(face3Ds);
+            string signature = face3DsSignature == null ? null : string.Concat(face3DsSignature, "\n@planes:", PlanesSignature(planes));
+
+            if (signature != null)
+            {
+                lock (panelCutCacheLock)
+                {
+                    if (panelCutCache.TryGetValue(panel.Guid, out Tuple<string, List<Face3D>> cached) && cached != null && string.Equals(cached.Item1, signature, StringComparison.Ordinal))
+                    {
+                        cacheHit = true;
+                        return cached.Item2;
+                    }
+                }
+            }
+
+            List<Face3D> face3Ds_Cut_All = new List<Face3D>();
+            foreach (Face3D face3D in face3Ds)
+            {
+                List<Face3D> face3Ds_Cut = face3D.Cut(planes);
+                face3Ds_Cut = face3Ds_Cut?.FindAll(x => planes.TrueForAll(y => Geometry.Spatial.Query.Above(y, x.GetCentroid(), 0)));
+                if (face3Ds_Cut != null && face3Ds_Cut.Count != 0)
+                {
+                    face3Ds_Cut_All.AddRange(face3Ds_Cut);
+                }
+            }
+
+            if (signature != null)
+            {
+                lock (panelCutCacheLock)
+                {
+                    if (panelCutCache.Count >= maxCachedPanels && !panelCutCache.ContainsKey(panel.Guid))
+                    {
+                        panelCutCache.Clear();
+                    }
+
+                    panelCutCache[panel.Guid] = new Tuple<string, List<Face3D>>(signature, face3Ds_Cut_All);
+                }
+            }
+
+            return face3Ds_Cut_All;
         }
 
         // Returns the 2D floor-plan section faces for a space in the given plane, reusing cached geometry when
@@ -541,6 +623,7 @@ namespace SAM.Analytical.UI
                 double panelFixEdgesMilliseconds = 0;
                 double panelCutMilliseconds = 0;
                 int panelFaceCacheHits = 0;
+                int panelCutCacheHits = 0;
 
                 Legend legend_Panels = legend_Temp is null ? null : new Legend(legend_Temp);
 
@@ -613,18 +696,12 @@ namespace SAM.Analytical.UI
                         if (planes != null && planes.Count != 0)
                         {
                             System.Diagnostics.Stopwatch panelCutStopwatch = PerformanceLog.Enabled ? System.Diagnostics.Stopwatch.StartNew() : null;
-                            List<Face3D> face3Ds_Temp = new List<Face3D>();
-                            foreach (Face3D face3D in face3Ds)
+                            face3Ds = GetPanelCutFace3Ds(panel, face3Ds, planes, out bool panelCutCacheHit);
+                            if (panelCutCacheHit)
                             {
-                                List<Face3D> face3Ds_Cut = face3D.Cut(planes);
-                                face3Ds_Cut = face3Ds_Cut?.FindAll(x => planes.TrueForAll(y => Geometry.Spatial.Query.Above(y, x.GetCentroid(), 0)));
-                                if (face3Ds_Cut != null && face3Ds_Cut.Count != 0)
-                                {
-                                    face3Ds_Temp.AddRange(face3Ds_Cut);
-                                }
+                                panelCutCacheHits++;
                             }
 
-                            face3Ds = face3Ds_Temp;
                             if (panelCutStopwatch != null)
                             {
                                 panelCutMilliseconds += panelCutStopwatch.Elapsed.TotalMilliseconds;
@@ -672,7 +749,7 @@ namespace SAM.Analytical.UI
                     panelsStopwatch.Stop();
                     PerformanceLog.Write("View3D.Panels", string.Format("{0} [{1} cached]", threeDimensionalViewSettings.Name, panelFaceCacheHits), panelsStopwatch.Elapsed.TotalMilliseconds);
                     PerformanceLog.Write("View3D.Panels.FixEdges", string.Format("{0} [{1} cached]", threeDimensionalViewSettings.Name, panelFaceCacheHits), panelFixEdgesMilliseconds);
-                    PerformanceLog.Write("View3D.Panels.Cut", threeDimensionalViewSettings.Name, panelCutMilliseconds);
+                    PerformanceLog.Write("View3D.Panels.Cut", string.Format("{0} [{1} cached]", threeDimensionalViewSettings.Name, panelCutCacheHits), panelCutMilliseconds);
                 }
             }
 

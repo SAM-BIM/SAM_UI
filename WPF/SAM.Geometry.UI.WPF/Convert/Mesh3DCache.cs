@@ -6,6 +6,7 @@ using SAM.Geometry.Spatial;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Numerics;
 using System.Text;
 using System.Threading;
 
@@ -45,6 +46,19 @@ namespace SAM.Geometry.UI.WPF
         private static long mesh3DCacheMisses;
         private static double mesh3DTriangulateMilliseconds;
         private static readonly object mesh3DStatsLock = new object();
+
+        // PROTOTYPE (SAM-BIM/SAM#16, improvement #4) - cache of the per-face edge/segment endpoints feeding
+        // the SharpDX curve build, flattened as consecutive start/end Vector3 pairs (outer boundary + holes).
+        // PR #36 measured ToElement3D.Append at ~1.2 s on the 10k model and pinned the cost to this per-face
+        // edge/segment work (GetEdge3Ds -> GetSegments -> ToVector3), NOT the mesh-array copy in AddMesh
+        // (memoizing that gave no measurable gain and was reverted - do not re-attempt). The endpoints are
+        // purely geometric and appearance-independent (color / opacity / thickness are applied at use time),
+        // so they are memoized by the same Face3D signature and cap as the triangulation cache.
+        // Unconfirmed: a 10k re-run must show ToElement3D.Append drop with [N hits] before this is relied on.
+        private static readonly Dictionary<string, List<Vector3>> faceEdgeSegmentCache = new Dictionary<string, List<Vector3>>();
+        private static readonly object faceEdgeSegmentCacheLock = new object();
+        private static long faceEdgeSegmentCacheHits;
+        private static long faceEdgeSegmentCacheMisses;
 
         // Round to mm for the cache signature so float noise does not cause spurious misses.
         private static string Mesh3DSig(double value)
@@ -150,11 +164,93 @@ namespace SAM.Geometry.UI.WPF
             return mesh3D;
         }
 
+        // PROTOTYPE (#4): returns the face's edge/segment endpoints (flattened start/end pairs), reusing a
+        // cached result when an identically shaped face has already been built. Falls back to a direct build
+        // (uncached) when the face has no signable geometry. Mirrors CachedMesh3D one level over.
+        internal static List<Vector3> CachedFaceEdgeSegments(Face3D face3D)
+        {
+            if (face3D == null)
+            {
+                return null;
+            }
+
+            string signature = Face3DSignature(face3D);
+            if (signature == null)
+            {
+                return BuildFaceEdgeSegments(face3D);
+            }
+
+            lock (faceEdgeSegmentCacheLock)
+            {
+                if (faceEdgeSegmentCache.TryGetValue(signature, out List<Vector3> cached))
+                {
+                    Interlocked.Increment(ref faceEdgeSegmentCacheHits);
+                    return cached;
+                }
+            }
+
+            List<Vector3> result = BuildFaceEdgeSegments(face3D);
+
+            lock (faceEdgeSegmentCacheLock)
+            {
+                if (faceEdgeSegmentCache.Count >= maxCachedMeshes && !faceEdgeSegmentCache.ContainsKey(signature))
+                {
+                    faceEdgeSegmentCache.Clear();
+                }
+
+                faceEdgeSegmentCache[signature] = result;
+            }
+
+            return result;
+        }
+
+        // Cache miss: derive the edge/segment endpoints (the work PR #36 pinned ToElement3D.Append to).
+        private static List<Vector3> BuildFaceEdgeSegments(Face3D face3D)
+        {
+            Interlocked.Increment(ref faceEdgeSegmentCacheMisses);
+
+            List<Vector3> result = new List<Vector3>();
+            if (face3D == null)
+            {
+                return result;
+            }
+
+            List<IClosedPlanar3D> edge3Ds = face3D.GetEdge3Ds();
+            if (edge3Ds == null)
+            {
+                return result;
+            }
+
+            foreach (IClosedPlanar3D edge3D in edge3Ds)
+            {
+                List<Segment3D> segment3Ds = (edge3D as ISegmentable3D)?.GetSegments();
+                if (segment3Ds == null)
+                {
+                    continue;
+                }
+
+                foreach (Segment3D segment3D in segment3Ds)
+                {
+                    if (segment3D == null)
+                    {
+                        continue;
+                    }
+
+                    result.Add(new Vector3((float)segment3D[0].X, (float)segment3D[0].Y, (float)segment3D[0].Z));
+                    result.Add(new Vector3((float)segment3D[1].X, (float)segment3D[1].Y, (float)segment3D[1].Z));
+                }
+            }
+
+            return result;
+        }
+
         // Zero the per-build diagnostic counters. Call once at the start of a top-level scene build.
         internal static void ResetMesh3DCacheStats()
         {
             Interlocked.Exchange(ref mesh3DCacheHits, 0);
             Interlocked.Exchange(ref mesh3DCacheMisses, 0);
+            Interlocked.Exchange(ref faceEdgeSegmentCacheHits, 0);
+            Interlocked.Exchange(ref faceEdgeSegmentCacheMisses, 0);
             lock (mesh3DStatsLock)
             {
                 mesh3DTriangulateMilliseconds = 0;
@@ -174,6 +270,12 @@ namespace SAM.Geometry.UI.WPF
             }
 
             PerformanceLog.Write("ViewportControl.ToElement3D.Triangulate", string.Format("{0} [{1} hits / {2} misses]", detail ?? string.Empty, hits, misses), milliseconds);
+
+            // PROTOTYPE (#4): edge/segment cache hit-rate for this build. No separate timer - the win shows as
+            // a drop in ToElement3D.Append; this line just confirms the cache is actually hit on warm regens.
+            long edgeHits = Interlocked.Read(ref faceEdgeSegmentCacheHits);
+            long edgeMisses = Interlocked.Read(ref faceEdgeSegmentCacheMisses);
+            PerformanceLog.Write("ViewportControl.ToElement3D.EdgeSegments", string.Format("{0} [{1} hits / {2} misses]", detail ?? string.Empty, edgeHits, edgeMisses), 0);
         }
     }
 }
