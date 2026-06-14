@@ -354,6 +354,28 @@ snapshots. **Recommendation: leave `SAM_UI_UNDO_SNAPSHOT` unset (GZip).** `Snaps
 ~12 s and `Snapshot.Restore` ~6 s synchronous on the UI thread (the latter is the post-undo "white
 screen") — addressed respectively by the faster codec below and by making Restore async (next).
 
+### Async restore — removes the post-undo UI freeze (this change)
+
+`Undo`/`Redo` used to decompress + deserialize the snapshot (`RestoreSnapshot`, ~6 s on the large
+model) **synchronously on the UI thread**, then raise `FullModification` to reload — the UI froze for
+the decompress (the reported "white screen") before the reload even started. `BeginRestore` now runs
+the decompress (and the rare wait for a still-running serialization) on the thread pool, and marshals
+only the model swap + reload back to the UI thread via the captured synchronization context. During
+the decompress the app stays responsive and the **previous scene stays on screen**.
+
+Correctness guards:
+- `restoreInProgress` ignores a second Undo/Redo until the current one applies, so overlapping restores
+  cannot corrupt the undo/redo stacks.
+- Nothing is popped/pushed until the apply step, and the apply **aborts** (touching no state) if the
+  deserialization failed, the entry was pruned, or the model changed while off-thread (a concurrent
+  edit) — `ReferenceEquals(jSAMObject, expected)`. A newer state is never clobbered, and an abort needs
+  no rollback.
+
+Scope note: this removes the ~6 s decompress freeze. The subsequent **reload still rebuilds the whole
+3D scene**, which blanks the viewport while `ToElement3D` re-attaches (~8–12 s on the big model) — that
+is the general full-regen behaviour (it affects every `FullModification`, not just undo), and is a
+separate item (incremental/double-buffered scene swap; mesh-batching #1 above).
+
 ### Deferred follow-up — faster snapshot codec (not done; do later if needed)
 
 The async change removes the snapshot from the *blocking* path but the serialization still costs the

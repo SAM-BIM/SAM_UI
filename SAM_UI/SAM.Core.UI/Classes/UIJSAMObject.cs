@@ -52,6 +52,12 @@ namespace SAM.Core.UI
         private readonly LinkedList<SnapshotEntry> redoSnapshots = new LinkedList<SnapshotEntry>();
         private bool restoring;
 
+        // True from the moment an Undo/Redo starts until its (asynchronous) restore applies. While set,
+        // further Undo/Redo are ignored so overlapping restores cannot corrupt the stacks. Decompressing a
+        // snapshot is ~6 s on a large model; doing it on the UI thread froze the app (the post-undo "white
+        // screen"), so the decompress runs off-thread and only the model swap + reload are marshalled back.
+        private bool restoreInProgress;
+
         // One queued snapshot: the pending background serialization plus the model it will serialize. When an
         // entry is pruned past maxHistoryDepth before the serializer reaches it, Drop() nulls the captured
         // model so the (large) orphaned state can be collected immediately rather than being pinned until its
@@ -255,61 +261,96 @@ namespace SAM.Core.UI
         public bool CanRedo => redoSnapshots.Count > 0;
 
         /// <summary>
-        /// Restores the previous model state from the undo history (no-op when empty). The current
-        /// state is pushed onto the redo stack first. Raises Modified (FullModification) so consumers
-        /// reload. Returns whether anything was undone.
+        /// Restores the previous model state from the undo history (no-op when empty or a restore is already
+        /// in progress). The decompress/deserialize runs off the UI thread; the model swap + reload are
+        /// marshalled back to the calling thread. The current state is pushed onto the redo stack. Returns
+        /// whether a restore was *started* (it completes asynchronously).
         /// </summary>
         public bool Undo()
         {
-            if (undoSnapshots.Count == 0)
+            if (restoreInProgress || undoSnapshots.Count == 0)
             {
                 return false;
             }
 
-            // Capture the current state onto the redo chain before we overwrite it.
-            EnqueueSnapshot(jSAMObject, redoSnapshots);
-
-            SnapshotEntry entry = undoSnapshots.Last.Value;
-            undoSnapshots.RemoveLast();
-
-            byte[] snapshot = ResolveSnapshot(entry.Task);
-            if (snapshot == null || snapshot.Length == 0)
-            {
-                // Serialization failed; drop the broken entry and report nothing was undone.
-                OnHistoryChanged();
-                return false;
-            }
-
-            RestoreFromSnapshot(snapshot);
+            BeginRestore(undoSnapshots, redoSnapshots);
             return true;
         }
 
         /// <summary>
-        /// Re-applies a state previously undone (no-op when empty). The current state is pushed onto the
-        /// undo stack first. Raises Modified (FullModification). Returns whether anything was redone.
+        /// Re-applies a state previously undone (no-op when empty or a restore is already in progress).
+        /// Same async behaviour as <see cref="Undo"/>; the current state is pushed onto the undo stack.
+        /// Returns whether a restore was *started*.
         /// </summary>
         public bool Redo()
         {
-            if (redoSnapshots.Count == 0)
+            if (restoreInProgress || redoSnapshots.Count == 0)
             {
                 return false;
             }
 
-            // Capture the current state onto the undo chain before we overwrite it.
-            EnqueueSnapshot(jSAMObject, undoSnapshots);
-
-            SnapshotEntry entry = redoSnapshots.Last.Value;
-            redoSnapshots.RemoveLast();
-
-            byte[] snapshot = ResolveSnapshot(entry.Task);
-            if (snapshot == null || snapshot.Length == 0)
-            {
-                OnHistoryChanged();
-                return false;
-            }
-
-            RestoreFromSnapshot(snapshot);
+            BeginRestore(redoSnapshots, undoSnapshots);
             return true;
+        }
+
+        // Restore the most recent snapshot from `from`, pushing the state being left onto `to`. The heavy
+        // decompress/deserialize (and the rare wait for a still-running serialization) run on the thread
+        // pool; the actual model swap + reload run back on the calling (UI) thread via the captured
+        // synchronization context. The restore is aborted - leaving all state untouched - if it fails or if
+        // the model changed while we were off-thread (e.g. a concurrent edit), so newer state is never
+        // clobbered. Nothing is popped/pushed until the apply step, so an abort needs no rollback.
+        private void BeginRestore(LinkedList<SnapshotEntry> from, LinkedList<SnapshotEntry> to)
+        {
+            SnapshotEntry entry = from.Last.Value;
+            T expected = jSAMObject;
+            restoreInProgress = true;
+            TaskScheduler uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+
+            Task.Run(() =>
+            {
+                byte[] snapshot = ResolveSnapshot(entry.Task);
+                return snapshot == null || snapshot.Length == 0 ? default : RestoreSnapshot(snapshot);
+            }).ContinueWith(
+                restoreTask =>
+                {
+                    try
+                    {
+                        T state = restoreTask.Status == TaskStatus.RanToCompletion ? restoreTask.Result : default;
+
+                        // Abort cleanly if deserialization failed, the entry is gone, or the model changed
+                        // under us - never overwrite newer state.
+                        if (state == null || from.Last == null || from.Last.Value != entry || !ReferenceEquals(jSAMObject, expected))
+                        {
+                            return;
+                        }
+
+                        // Capture the state being left onto the opposite stack, then consume the entry.
+                        EnqueueSnapshot(expected, to);
+                        from.RemoveLast();
+
+                        restoring = true;
+                        try
+                        {
+                            jSAMObject = state;
+                            InvalidateClone();
+                            modified = true;
+                            OnModified(new List<IModification>() { new FullModification() });
+                        }
+                        finally
+                        {
+                            restoring = false;
+                        }
+
+                        OnHistoryChanged();
+                    }
+                    finally
+                    {
+                        restoreInProgress = false;
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                uiScheduler);
         }
 
         /// <summary>Clears the undo/redo history (e.g. on open/close - history does not span documents).</summary>
@@ -422,9 +463,9 @@ namespace SAM.Core.UI
             }
         }
 
-        // Block for the background serialization result (only ever called from Undo/Redo, which are rare and
-        // user-initiated). Safe from the UI thread: the work runs on TaskScheduler.Default (thread pool) with
-        // no captured SynchronizationContext, so there is no .Result deadlock. Returns null on failure.
+        // Block for the background serialization result. Called from BeginRestore's Task.Run (a thread-pool
+        // thread, never the UI thread), so a still-running serialization is awaited off-thread. Returns null
+        // on failure.
         private static byte[] ResolveSnapshot(Task<byte[]> snapshotTask)
         {
             try
@@ -435,26 +476,6 @@ namespace SAM.Core.UI
             {
                 return null;
             }
-        }
-
-        private void RestoreFromSnapshot(byte[] snapshot)
-        {
-            T state = RestoreSnapshot(snapshot);
-
-            restoring = true;
-            try
-            {
-                jSAMObject = state;
-                InvalidateClone();
-                modified = true;
-                OnModified(new List<IModification>() { new FullModification() });
-            }
-            finally
-            {
-                restoring = false;
-            }
-
-            OnHistoryChanged();
         }
 
         // Compressed snapshot of the object, per the selected codec (see snapshotCodec). Size and time
