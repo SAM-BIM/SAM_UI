@@ -69,6 +69,29 @@ namespace SAM.Geometry.UI.WPF
         }
     }
 
+    /// <summary>
+    /// World-space bounds of one object, accumulated from its merged positions during a batched build
+    /// (issue #16 increment 4). Used for Zoom-Selected / Zoom-Extents / rotation pivot when there is no
+    /// per-object scene model to measure.
+    /// </summary>
+    internal sealed class ObjectBounds
+    {
+        public Vector3 Min;
+        public Vector3 Max;
+
+        public ObjectBounds(Vector3 position)
+        {
+            Min = position;
+            Max = position;
+        }
+
+        public void Add(Vector3 position)
+        {
+            Min = Vector3.Min(Min, position);
+            Max = Vector3.Max(Max, position);
+        }
+    }
+
     internal class SharpDXSceneBuilder
     {
         private class MeshBucket
@@ -110,6 +133,10 @@ namespace SAM.Geometry.UI.WPF
         // Per-merged-mesh pick map, populated by Build when capturePickRanges is on.
         public Dictionary<MeshGeometryModel3D, PickBucket> PickMap { get; private set; }
 
+        // Per-object world bounds (batched build only), accumulated from the appended positions.
+        private Dictionary<Guid, ObjectBounds> objectBoundsMap;
+        public Dictionary<Guid, ObjectBounds> ObjectBoundsMap => objectBoundsMap;
+
         public SharpDXSceneBuilder()
         {
         }
@@ -117,12 +144,34 @@ namespace SAM.Geometry.UI.WPF
         public SharpDXSceneBuilder(bool capturePickRanges)
         {
             this.capturePickRanges = capturePickRanges;
+            if (capturePickRanges)
+            {
+                objectBoundsMap = new Dictionary<Guid, ObjectBounds>();
+            }
         }
 
         // Set before appending each object's primitives (batched build) so the ranges record the right guid.
         public void SetCurrentObject(Guid guid)
         {
             currentObjectGuid = guid;
+        }
+
+        // Grow the current object's bounds (batched build). No-op when not capturing or the object is untagged.
+        private void AccumulateBounds(Vector3 position)
+        {
+            if (objectBoundsMap == null || currentObjectGuid == Guid.Empty)
+            {
+                return;
+            }
+
+            if (objectBoundsMap.TryGetValue(currentObjectGuid, out ObjectBounds bounds))
+            {
+                bounds.Add(position);
+            }
+            else
+            {
+                objectBoundsMap[currentObjectGuid] = new ObjectBounds(position);
+            }
         }
 
         private static int ToKey(System.Drawing.Color color, double opacity)
@@ -184,6 +233,7 @@ namespace SAM.Geometry.UI.WPF
             foreach (Vector3 position in positions)
             {
                 meshBucket.Positions.Add(position);
+                AccumulateBounds(position);
             }
 
             foreach (int triangleIndex in triangleIndices)
@@ -212,6 +262,8 @@ namespace SAM.Geometry.UI.WPF
             lineBucket.Positions.Add(end);
             lineBucket.Indices.Add(offset);
             lineBucket.Indices.Add(offset + 1);
+            AccumulateBounds(start);
+            AccumulateBounds(end);
         }
 
         public void AddText(System.Drawing.Color color, double opacity, string text, Vector3 position, double height)

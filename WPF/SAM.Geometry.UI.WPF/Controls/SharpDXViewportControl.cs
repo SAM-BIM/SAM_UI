@@ -94,6 +94,7 @@ namespace SAM.Geometry.UI.WPF
         private bool sceneBatched;
         private readonly Dictionary<MeshGeometryModel3D, PickBucket> dictionary_PickBucket = new Dictionary<MeshGeometryModel3D, PickBucket>();
         private readonly Dictionary<Guid, IJSAMObject> dictionary_BatchedObject = new Dictionary<Guid, IJSAMObject>();
+        private readonly Dictionary<Guid, ObjectBounds> dictionary_BatchedBounds = new Dictionary<Guid, ObjectBounds>();
 
         // Selection appearance - parity with the Helix SelectAction (Query.SelectionSurfaceAppearance:
         // RGB(125,125,255) fill, blue edges). Ambient = Diffuse / no specular matches the flat
@@ -321,6 +322,7 @@ namespace SAM.Geometry.UI.WPF
             dictionary_BaseLineThickness.Clear();
             dictionary_PickBucket.Clear();
             dictionary_BatchedObject.Clear();
+            dictionary_BatchedBounds.Clear();
             sceneBatched = false;
             selectedGuids.Clear();
             hooveredGuid = null;
@@ -426,6 +428,14 @@ namespace SAM.Geometry.UI.WPF
                     Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
                     Core.UI.WPF.Modify.SetIJSAMObject(stub, keyValuePair.Value);
                     dictionary_Stub[keyValuePair.Key] = stub;
+                }
+            }
+
+            if (batchedScene.Bounds != null)
+            {
+                foreach (KeyValuePair<Guid, ObjectBounds> keyValuePair in batchedScene.Bounds)
+                {
+                    dictionary_BatchedBounds[keyValuePair.Key] = keyValuePair.Value;
                 }
             }
         }
@@ -834,6 +844,23 @@ namespace SAM.Geometry.UI.WPF
                 return false;
             }
 
+            // Batched: no per-object model to measure - use the bounds captured during the batched build.
+            if (sceneBatched)
+            {
+                bool any_Batched = false;
+                foreach (Guid guid in guids)
+                {
+                    if (dictionary_BatchedBounds.TryGetValue(guid, out ObjectBounds bounds))
+                    {
+                        any_Batched = true;
+                        min = Vector3.Min(min, bounds.Min);
+                        max = Vector3.Max(max, bounds.Max);
+                    }
+                }
+
+                return any_Batched;
+            }
+
             bool any = false;
             foreach (Guid guid in guids)
             {
@@ -939,7 +966,8 @@ namespace SAM.Geometry.UI.WPF
                 // axis" report). dictionary_Element3D holds only the currently visible objects (hidden
                 // ones are dropped from the rebuilt scene on isolate/hide), so its bounds are exactly
                 // the visible extents. Fall back to the built-in when there is no geometry to measure.
-                if (TryGetBounds(dictionary_Element3D.Keys, out Vector3 min, out Vector3 max))
+                IEnumerable<Guid> allGuids = sceneBatched ? (IEnumerable<Guid>)dictionary_BatchedBounds.Keys : dictionary_Element3D.Keys;
+                if (TryGetBounds(allGuids, out Vector3 min, out Vector3 max))
                 {
                     Vector3 center = (min + max) * 0.5f;
                     float radius = (max - min).Length() * 0.5f;

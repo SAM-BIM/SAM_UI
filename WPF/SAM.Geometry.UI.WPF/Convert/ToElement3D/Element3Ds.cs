@@ -113,6 +113,7 @@ namespace SAM.Geometry.UI.WPF
             public List<Element3D> Element3Ds;
             public Dictionary<MeshGeometryModel3D, PickBucket> PickMap;
             public Dictionary<System.Guid, Core.IJSAMObject> Objects;
+            public Dictionary<System.Guid, ObjectBounds> Bounds;
         }
 
         // See ToBatchedElement3Ds: same batched build, but with pick-range capture and the guid/object side
@@ -194,7 +195,8 @@ namespace SAM.Geometry.UI.WPF
             {
                 Element3Ds = result,
                 PickMap = sharpDXSceneBuilder.PickMap,
-                Objects = objects
+                Objects = objects,
+                Bounds = sharpDXSceneBuilder.ObjectBoundsMap
             };
         }
 
