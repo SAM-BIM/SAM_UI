@@ -372,9 +372,26 @@ Correctness guards:
   no rollback.
 
 Scope note: this removes the ~6 s decompress freeze. The subsequent **reload still rebuilds the whole
-3D scene**, which blanks the viewport while `ToElement3D` re-attaches (~8–12 s on the big model) — that
-is the general full-regen behaviour (it affects every `FullModification`, not just undo), and is a
-separate item (incremental/double-buffered scene swap; mesh-batching #1 above).
+3D scene**, which blanks the viewport while `ToElement3D` re-attaches — see the double-buffer change
+below, which removes the build half of that blank.
+
+### Viewport double-buffer — build the new scene before tearing down the old (this change)
+
+`SharpDXViewportControl.Load` used to remove the previous scene from `viewport3DX.Items` **first**, then
+spend ~4–5 s in `Convert.ToElement3Ds` (`Generate`) and ~3–6 s attaching. The SharpDX render thread runs
+independently of the UI thread, so it kept drawing the now-empty viewport for the whole build+attach —
+the post-undo / post-edit **white screen** (~8–13 s on the 33,635-object model).
+
+`Load` now **builds the new scene before removing the old one**: `Convert.ToElement3Ds` only creates new
+objects (it never touches the live viewport), so the previous scene stays on screen during the ~4–5 s
+build; the old elements are removed only just before the new ones attach. The old scene is removed before
+the new attach (not after), so **GPU memory is not doubled** — the trade-off is that the viewport still
+goes blank during the ~3–6 s attach itself.
+
+Net: the blank shrinks from ~build+attach to ~attach only. Fully eliminating it (attach the new scene on
+top of the old, then drop the old — zero blank) would peak at ~2× GPU memory for ~33k meshes, so it was
+not done here; revisit with mesh-batching (#1 below), which cuts the attach cost and the model count at
+the same time.
 
 ### Deferred follow-up — faster snapshot codec (not done; do later if needed)
 
