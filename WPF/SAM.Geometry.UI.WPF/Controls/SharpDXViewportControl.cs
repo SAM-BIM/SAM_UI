@@ -96,6 +96,7 @@ namespace SAM.Geometry.UI.WPF
         private readonly Dictionary<Guid, IJSAMObject> dictionary_BatchedObject = new Dictionary<Guid, IJSAMObject>();
         private readonly Dictionary<Guid, ObjectBounds> dictionary_BatchedBounds = new Dictionary<Guid, ObjectBounds>();
         private readonly Dictionary<Guid, List<GeometrySlice>> dictionary_BatchedOverlay = new Dictionary<Guid, List<GeometrySlice>>();
+        private readonly Dictionary<Guid, List<LineSlice>> dictionary_BatchedOverlayLine = new Dictionary<Guid, List<LineSlice>>();
 
         // Selection/hover highlight in batched mode (#16 increment 3): the base merged meshes stay immutable;
         // these overlay meshes are the selected / hovered objects' triangles, sliced out of the merged
@@ -103,8 +104,10 @@ namespace SAM.Geometry.UI.WPF
         // negative DepthBias pulls the overlay in front of the coincident base geometry (no z-fighting); the
         // overlays are not hit-test visible so they never interfere with picking.
         private MeshGeometryModel3D selectionOverlay;
+        private LineGeometryModel3D selectionEdgeOverlay;
         private MeshGeometryModel3D hoverOverlay;
         private const int overlayDepthBias = -1000;
+        private const double overlayEdgeThickness = 2.5;
 
         // Hover tint - translucent so it reads as a highlight without hiding the object's own colour. The
         // selection fill reuses material_Selection (opaque blue, parity with the per-object SelectAction).
@@ -341,11 +344,13 @@ namespace SAM.Geometry.UI.WPF
             dictionary_BaseLineColor.Clear();
             dictionary_BaseLineThickness.Clear();
             RemoveOverlay(ref selectionOverlay);
+            RemoveOverlay(ref selectionEdgeOverlay);
             RemoveOverlay(ref hoverOverlay);
             dictionary_PickBucket.Clear();
             dictionary_BatchedObject.Clear();
             dictionary_BatchedBounds.Clear();
             dictionary_BatchedOverlay.Clear();
+            dictionary_BatchedOverlayLine.Clear();
             sceneBatched = false;
             selectedGuids.Clear();
             hooveredGuid = null;
@@ -469,10 +474,18 @@ namespace SAM.Geometry.UI.WPF
                     dictionary_BatchedOverlay[keyValuePair.Key] = keyValuePair.Value;
                 }
             }
+
+            if (batchedScene.OverlayLineMap != null)
+            {
+                foreach (KeyValuePair<Guid, List<LineSlice>> keyValuePair in batchedScene.OverlayLineMap)
+                {
+                    dictionary_BatchedOverlayLine[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
         }
 
         // Removes an overlay model from the scene (if present) and nulls the reference.
-        private void RemoveOverlay(ref MeshGeometryModel3D overlay)
+        private void RemoveOverlay<T>(ref T overlay) where T : Element3D
         {
             if (overlay != null)
             {
@@ -536,10 +549,58 @@ namespace SAM.Geometry.UI.WPF
             return new HelixToolkit.SharpDX.MeshGeometry3D { Positions = positions, Indices = indices, Normals = normals };
         }
 
-        // Rebuilds the selection overlay from the current selection (batched mode only).
+        // Builds one line geometry from the given objects' edge slices, for the selection-edge overlay.
+        private LineGeometry3D BuildOverlayLineGeometry(IEnumerable<Guid> guids)
+        {
+            if (guids == null)
+            {
+                return null;
+            }
+
+            HelixToolkit.Vector3Collection positions = new HelixToolkit.Vector3Collection();
+            HelixToolkit.IntCollection indices = new HelixToolkit.IntCollection();
+
+            foreach (Guid guid in guids)
+            {
+                if (!dictionary_BatchedOverlayLine.TryGetValue(guid, out List<LineSlice> slices))
+                {
+                    continue;
+                }
+
+                foreach (LineSlice lineSlice in slices)
+                {
+                    LineGeometry3D line = lineSlice.Line;
+                    if (line == null || line.Positions == null || line.Indices == null)
+                    {
+                        continue;
+                    }
+
+                    int baseOffset = positions.Count;
+                    for (int v = lineSlice.VertexStart; v < lineSlice.VertexEnd; v++)
+                    {
+                        positions.Add(line.Positions[v]);
+                    }
+
+                    for (int i = lineSlice.IndexStart; i < lineSlice.IndexEnd; i++)
+                    {
+                        indices.Add(line.Indices[i] - lineSlice.VertexStart + baseOffset);
+                    }
+                }
+            }
+
+            if (positions.Count == 0 || indices.Count == 0)
+            {
+                return null;
+            }
+
+            return new LineGeometry3D { Positions = positions, Indices = indices };
+        }
+
+        // Rebuilds the selection overlay (fill + edges) from the current selection (batched mode only).
         private void UpdateSelectionOverlay()
         {
             RemoveOverlay(ref selectionOverlay);
+            RemoveOverlay(ref selectionEdgeOverlay);
 
             if (!sceneBatched || selectedGuids.Count == 0)
             {
@@ -547,21 +608,36 @@ namespace SAM.Geometry.UI.WPF
             }
 
             HelixToolkit.SharpDX.MeshGeometry3D geometry = BuildOverlayGeometry(selectedGuids);
-            if (geometry == null)
+            if (geometry != null)
             {
-                return;
+                selectionOverlay = new MeshGeometryModel3D
+                {
+                    Geometry = geometry,
+                    Material = material_Selection,
+                    CullMode = global::SharpDX.Direct3D11.CullMode.None,
+                    IsHitTestVisible = false,
+                    DepthBias = overlayDepthBias
+                };
+
+                viewport3DX.Items.Add(selectionOverlay);
             }
 
-            selectionOverlay = new MeshGeometryModel3D
+            // Edge overlay on top of the fill so the selected object's own edges stay visible (the opaque
+            // fill would otherwise hide them). Added after the fill so it draws over it.
+            LineGeometry3D lineGeometry = BuildOverlayLineGeometry(selectedGuids);
+            if (lineGeometry != null)
             {
-                Geometry = geometry,
-                Material = material_Selection,
-                CullMode = global::SharpDX.Direct3D11.CullMode.None,
-                IsHitTestVisible = false,
-                DepthBias = overlayDepthBias
-            };
+                selectionEdgeOverlay = new LineGeometryModel3D
+                {
+                    Geometry = lineGeometry,
+                    Color = color_SelectionLine,
+                    Thickness = overlayEdgeThickness,
+                    IsHitTestVisible = false,
+                    DepthBias = overlayDepthBias
+                };
 
-            viewport3DX.Items.Add(selectionOverlay);
+                viewport3DX.Items.Add(selectionEdgeOverlay);
+            }
         }
 
         // Rebuilds the hover overlay from the hovered object (batched mode only; skipped when it is selected).

@@ -106,6 +106,20 @@ namespace SAM.Geometry.UI.WPF
         public int IndexEnd;
     }
 
+    /// <summary>
+    /// One object's line slice inside a merged line geometry (issue #16): the edge-segment overlay
+    /// equivalent of <see cref="GeometrySlice"/>, so a selected object's own edges can be drawn on top of
+    /// the selection fill (which would otherwise hide them).
+    /// </summary>
+    internal sealed class LineSlice
+    {
+        public LineGeometry3D Line;
+        public int VertexStart;
+        public int VertexEnd;
+        public int IndexStart;
+        public int IndexEnd;
+    }
+
     internal class SharpDXSceneBuilder
     {
         private class MeshBucket
@@ -127,6 +141,14 @@ namespace SAM.Geometry.UI.WPF
         {
             public Vector3Collection Positions = new Vector3Collection();
             public IntCollection Indices = new IntCollection();
+
+            // Overlay ranges (batched build only): per object, the starting vertex/index + guid, in append
+            // order - lets the selection-edge overlay slice this object's segments out of the merged buffer.
+            public List<int> RangeVertexStarts;
+            public List<int> RangeIndexStarts;
+            public List<Guid> RangeGuids;
+            public bool HasRange;
+            public Guid LastRangeGuid;
         }
 
         private class TextBucket
@@ -151,6 +173,9 @@ namespace SAM.Geometry.UI.WPF
 
         // guid -> its triangle slices across the merged meshes (selection/hover overlay source).
         public Dictionary<Guid, List<GeometrySlice>> OverlayMap { get; private set; }
+
+        // guid -> its line slices across the merged line geometries (selection-edge overlay source).
+        public Dictionary<Guid, List<LineSlice>> OverlayLineMap { get; private set; }
 
         // Per-object world bounds (batched build only), accumulated from the appended positions.
         private Dictionary<Guid, ObjectBounds> objectBoundsMap;
@@ -279,6 +304,25 @@ namespace SAM.Geometry.UI.WPF
                 lineBuckets[key] = lineBucket;
             }
 
+            if (capturePickRanges)
+            {
+                if (lineBucket.RangeVertexStarts == null)
+                {
+                    lineBucket.RangeVertexStarts = new List<int>();
+                    lineBucket.RangeIndexStarts = new List<int>();
+                    lineBucket.RangeGuids = new List<Guid>();
+                }
+
+                if (!lineBucket.HasRange || lineBucket.LastRangeGuid != currentObjectGuid)
+                {
+                    lineBucket.RangeVertexStarts.Add(lineBucket.Positions.Count);
+                    lineBucket.RangeIndexStarts.Add(lineBucket.Indices.Count);
+                    lineBucket.RangeGuids.Add(currentObjectGuid);
+                    lineBucket.LastRangeGuid = currentObjectGuid;
+                    lineBucket.HasRange = true;
+                }
+            }
+
             int offset = lineBucket.Positions.Count;
             lineBucket.Positions.Add(start);
             lineBucket.Positions.Add(end);
@@ -313,6 +357,7 @@ namespace SAM.Geometry.UI.WPF
             {
                 PickMap = new Dictionary<MeshGeometryModel3D, PickBucket>();
                 OverlayMap = new Dictionary<Guid, List<GeometrySlice>>();
+                OverlayLineMap = new Dictionary<Guid, List<LineSlice>>();
             }
 
             foreach (KeyValuePair<int, MeshBucket> keyValuePair in meshBuckets)
@@ -408,6 +453,37 @@ namespace SAM.Geometry.UI.WPF
                     Thickness = keyValuePair.Key.Item2,
                     IsHitTestVisible = false
                 });
+
+                if (capturePickRanges && keyValuePair.Value.RangeVertexStarts != null)
+                {
+                    LineBucket lineBucket = keyValuePair.Value;
+                    int rangeCount = lineBucket.RangeVertexStarts.Count;
+                    for (int k = 0; k < rangeCount; k++)
+                    {
+                        Guid guid = lineBucket.RangeGuids[k];
+                        if (guid == Guid.Empty)
+                        {
+                            continue;
+                        }
+
+                        LineSlice lineSlice = new LineSlice
+                        {
+                            Line = lineGeometry3D,
+                            VertexStart = lineBucket.RangeVertexStarts[k],
+                            VertexEnd = k + 1 < rangeCount ? lineBucket.RangeVertexStarts[k + 1] : lineBucket.Positions.Count,
+                            IndexStart = lineBucket.RangeIndexStarts[k],
+                            IndexEnd = k + 1 < rangeCount ? lineBucket.RangeIndexStarts[k + 1] : lineBucket.Indices.Count
+                        };
+
+                        if (!OverlayLineMap.TryGetValue(guid, out List<LineSlice> slices))
+                        {
+                            slices = new List<LineSlice>();
+                            OverlayLineMap[guid] = slices;
+                        }
+
+                        slices.Add(lineSlice);
+                    }
+                }
             }
 
             foreach (KeyValuePair<int, TextBucket> keyValuePair in textBuckets)
