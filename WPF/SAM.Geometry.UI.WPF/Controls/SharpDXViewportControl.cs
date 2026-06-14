@@ -95,6 +95,25 @@ namespace SAM.Geometry.UI.WPF
         private readonly Dictionary<MeshGeometryModel3D, PickBucket> dictionary_PickBucket = new Dictionary<MeshGeometryModel3D, PickBucket>();
         private readonly Dictionary<Guid, IJSAMObject> dictionary_BatchedObject = new Dictionary<Guid, IJSAMObject>();
         private readonly Dictionary<Guid, ObjectBounds> dictionary_BatchedBounds = new Dictionary<Guid, ObjectBounds>();
+        private readonly Dictionary<Guid, List<GeometrySlice>> dictionary_BatchedOverlay = new Dictionary<Guid, List<GeometrySlice>>();
+
+        // Selection/hover highlight in batched mode (#16 increment 3): the base merged meshes stay immutable;
+        // these overlay meshes are the selected / hovered objects' triangles, sliced out of the merged
+        // buffers, drawn on top in the highlight colour. Rebuilt when the selection / hover set changes. A
+        // negative DepthBias pulls the overlay in front of the coincident base geometry (no z-fighting); the
+        // overlays are not hit-test visible so they never interfere with picking.
+        private MeshGeometryModel3D selectionOverlay;
+        private MeshGeometryModel3D hoverOverlay;
+        private const int overlayDepthBias = -1000;
+
+        // Hover tint - translucent so it reads as a highlight without hiding the object's own colour. The
+        // selection fill reuses material_Selection (opaque blue, parity with the per-object SelectAction).
+        private static readonly PhongMaterial material_Hover = new PhongMaterial
+        {
+            DiffuseColor = new HelixToolkit.Maths.Color4(125f / 255f, 125f / 255f, 1f, 0.45f),
+            AmbientColor = new HelixToolkit.Maths.Color4(125f / 255f, 125f / 255f, 1f, 0.45f),
+            SpecularColor = new HelixToolkit.Maths.Color4(0, 0, 0, 0)
+        };
 
         // Selection appearance - parity with the Helix SelectAction (Query.SelectionSurfaceAppearance:
         // RGB(125,125,255) fill, blue edges). Ambient = Diffuse / no specular matches the flat
@@ -320,9 +339,12 @@ namespace SAM.Geometry.UI.WPF
             dictionary_BaseIsTransparent.Clear();
             dictionary_BaseLineColor.Clear();
             dictionary_BaseLineThickness.Clear();
+            RemoveOverlay(ref selectionOverlay);
+            RemoveOverlay(ref hoverOverlay);
             dictionary_PickBucket.Clear();
             dictionary_BatchedObject.Clear();
             dictionary_BatchedBounds.Clear();
+            dictionary_BatchedOverlay.Clear();
             sceneBatched = false;
             selectedGuids.Clear();
             hooveredGuid = null;
@@ -438,6 +460,136 @@ namespace SAM.Geometry.UI.WPF
                     dictionary_BatchedBounds[keyValuePair.Key] = keyValuePair.Value;
                 }
             }
+
+            if (batchedScene.OverlayMap != null)
+            {
+                foreach (KeyValuePair<Guid, List<GeometrySlice>> keyValuePair in batchedScene.OverlayMap)
+                {
+                    dictionary_BatchedOverlay[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+        }
+
+        // Removes an overlay model from the scene (if present) and nulls the reference.
+        private void RemoveOverlay(ref MeshGeometryModel3D overlay)
+        {
+            if (overlay != null)
+            {
+                viewport3DX.Items.Remove(overlay);
+                overlay = null;
+            }
+        }
+
+        // Builds one mesh from the given objects' triangle slices (sliced out of the merged buffers), for the
+        // selection / hover overlay. Returns null when there is nothing to draw.
+        private HelixToolkit.SharpDX.MeshGeometry3D BuildOverlayGeometry(IEnumerable<Guid> guids)
+        {
+            if (guids == null)
+            {
+                return null;
+            }
+
+            HelixToolkit.Vector3Collection positions = new HelixToolkit.Vector3Collection();
+            HelixToolkit.IntCollection indices = new HelixToolkit.IntCollection();
+
+            foreach (Guid guid in guids)
+            {
+                if (!dictionary_BatchedOverlay.TryGetValue(guid, out List<GeometrySlice> slices))
+                {
+                    continue;
+                }
+
+                foreach (GeometrySlice geometrySlice in slices)
+                {
+                    HelixToolkit.SharpDX.MeshGeometry3D mesh = geometrySlice.Mesh;
+                    if (mesh == null || mesh.Positions == null || mesh.Indices == null)
+                    {
+                        continue;
+                    }
+
+                    int baseOffset = positions.Count;
+                    for (int v = geometrySlice.VertexStart; v < geometrySlice.VertexEnd; v++)
+                    {
+                        positions.Add(mesh.Positions[v]);
+                    }
+
+                    for (int i = geometrySlice.IndexStart; i < geometrySlice.IndexEnd; i++)
+                    {
+                        indices.Add(mesh.Indices[i] - geometrySlice.VertexStart + baseOffset);
+                    }
+                }
+            }
+
+            if (positions.Count == 0 || indices.Count == 0)
+            {
+                return null;
+            }
+
+            Vector3 normal = Vector3.UnitZ;
+            HelixToolkit.Vector3Collection normals = new HelixToolkit.Vector3Collection(positions.Count);
+            for (int i = 0; i < positions.Count; i++)
+            {
+                normals.Add(normal);
+            }
+
+            return new HelixToolkit.SharpDX.MeshGeometry3D { Positions = positions, Indices = indices, Normals = normals };
+        }
+
+        // Rebuilds the selection overlay from the current selection (batched mode only).
+        private void UpdateSelectionOverlay()
+        {
+            RemoveOverlay(ref selectionOverlay);
+
+            if (!sceneBatched || selectedGuids.Count == 0)
+            {
+                return;
+            }
+
+            HelixToolkit.SharpDX.MeshGeometry3D geometry = BuildOverlayGeometry(selectedGuids);
+            if (geometry == null)
+            {
+                return;
+            }
+
+            selectionOverlay = new MeshGeometryModel3D
+            {
+                Geometry = geometry,
+                Material = material_Selection,
+                CullMode = global::SharpDX.Direct3D11.CullMode.None,
+                IsHitTestVisible = false,
+                DepthBias = overlayDepthBias
+            };
+
+            viewport3DX.Items.Add(selectionOverlay);
+        }
+
+        // Rebuilds the hover overlay from the hovered object (batched mode only; skipped when it is selected).
+        private void UpdateHoverOverlay()
+        {
+            RemoveOverlay(ref hoverOverlay);
+
+            if (!sceneBatched || !hooveredGuid.HasValue || selectedGuids.Contains(hooveredGuid.Value))
+            {
+                return;
+            }
+
+            HelixToolkit.SharpDX.MeshGeometry3D geometry = BuildOverlayGeometry(new[] { hooveredGuid.Value });
+            if (geometry == null)
+            {
+                return;
+            }
+
+            hoverOverlay = new MeshGeometryModel3D
+            {
+                Geometry = geometry,
+                Material = material_Hover,
+                CullMode = global::SharpDX.Direct3D11.CullMode.None,
+                IsHitTestVisible = false,
+                IsTransparent = true,
+                DepthBias = overlayDepthBias
+            };
+
+            viewport3DX.Items.Add(hoverOverlay);
         }
 
         // Object identity helpers that work in both modes: per-object (dictionary_Element3D) or batched
@@ -513,6 +665,7 @@ namespace SAM.Geometry.UI.WPF
                 ApplyAppearance(guid);
             }
 
+            UpdateSelectionOverlay();
             UpdateRotationPivot();
             return true;
         }
@@ -532,6 +685,7 @@ namespace SAM.Geometry.UI.WPF
                 ApplyAppearance(guid);
             }
 
+            UpdateSelectionOverlay();
             UpdateRotationPivot();
             return true;
         }
@@ -1289,6 +1443,8 @@ namespace SAM.Geometry.UI.WPF
                 {
                     ApplyAppearance(guid.Value);
                 }
+
+                UpdateHoverOverlay();
             }
 
             if (guid.HasValue && dictionary_Stub.TryGetValue(guid.Value, out Media3D.ModelVisual3D stub))
@@ -1304,6 +1460,7 @@ namespace SAM.Geometry.UI.WPF
                 Guid guid = hooveredGuid.Value;
                 hooveredGuid = null;
                 ApplyAppearance(guid);
+                UpdateHoverOverlay();
             }
         }
 
@@ -1370,6 +1527,7 @@ namespace SAM.Geometry.UI.WPF
 
             if (changed)
             {
+                UpdateSelectionOverlay();
                 UpdateRotationPivot();
                 ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
             }
