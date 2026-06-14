@@ -115,6 +115,7 @@ namespace SAM.Geometry.UI.WPF
             public Dictionary<System.Guid, Core.IJSAMObject> Objects;
             public Dictionary<System.Guid, ObjectBounds> Bounds;
             public Dictionary<System.Guid, List<GeometrySlice>> OverlayMap;
+            public Dictionary<System.Guid, List<LineSlice>> OverlayLineMap;
         }
 
         // See ToBatchedElement3Ds: same batched build, but with pick-range capture and the guid/object side
@@ -198,7 +199,8 @@ namespace SAM.Geometry.UI.WPF
                 PickMap = sharpDXSceneBuilder.PickMap,
                 Objects = objects,
                 Bounds = sharpDXSceneBuilder.ObjectBoundsMap,
-                OverlayMap = sharpDXSceneBuilder.OverlayMap
+                OverlayMap = sharpDXSceneBuilder.OverlayMap,
+                OverlayLineMap = sharpDXSceneBuilder.OverlayLineMap
             };
         }
 
