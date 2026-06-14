@@ -252,6 +252,24 @@ namespace SAM.Geometry.UI.WPF
             sceneGeneration++;
             pendingOctreeGeometries.Clear();
 
+            // Double-buffer the regen: build the new scene BEFORE removing the old one. Convert.ToElement3Ds
+            // is the ~4-5 s bulk of the rebuild and only creates new objects - it never touches the live
+            // viewport - so the previous scene stays on screen throughout instead of the SharpDX render
+            // thread drawing an empty viewport for the whole build (the post-undo / post-edit "white
+            // screen"). The old elements are removed just before the new ones attach (below), so GPU memory
+            // is not doubled. A null model means no new scene - just tear the old one down.
+            // ViewportControl.ToElement3D (one level up) wraps this whole method; the .Generate/.Attach
+            // split shows which phase dominates the regen (#33).
+            List<Element3D> element3Ds = null;
+            if (geometryObjectModel != null)
+            {
+                using (PerformanceLog.Measure("ViewportControl.ToElement3D.Generate"))
+                {
+                    element3Ds = Convert.ToElement3Ds(geometryObjectModel);
+                }
+            }
+
+            // The new scene is built; now swap. Remove the previous elements and reset the indices.
             foreach (Element3D element3D in sceneElement3Ds)
             {
                 viewport3DX.Items.Remove(element3D);
@@ -274,15 +292,6 @@ namespace SAM.Geometry.UI.WPF
             if (geometryObjectModel == null)
             {
                 return;
-            }
-
-            // Split the build (Convert.ToElement3Ds) from the viewport attach and the camera fit:
-            // ViewportControl.ToElement3D (one level up) wraps this whole method, so isolating the
-            // phases shows which dominates the regen (#33).
-            List<Element3D> element3Ds;
-            using (PerformanceLog.Measure("ViewportControl.ToElement3D.Generate"))
-            {
-                element3Ds = Convert.ToElement3Ds(geometryObjectModel);
             }
 
             if (element3Ds != null)
