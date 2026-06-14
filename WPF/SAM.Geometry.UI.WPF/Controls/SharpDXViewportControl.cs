@@ -735,15 +735,112 @@ namespace SAM.Geometry.UI.WPF
             Vector3 cameraLookDirection = Vector3.Normalize(viewport3DX.Camera.LookDirection.ToVector3());
 
             List<Guid> guids = new List<Guid>();
-            foreach (KeyValuePair<Guid, Element3D> keyValuePair in dictionary_Element3D)
+
+            if (sceneBatched)
             {
-                if (HitsScreenRect(keyValuePair.Value, rect, selectionType, cameraPosition, cameraLookDirection))
+                // No per-object mesh to project in batched mode - test each object's bounding box (#16).
+                foreach (KeyValuePair<Guid, ObjectBounds> keyValuePair in dictionary_BatchedBounds)
                 {
-                    guids.Add(keyValuePair.Key);
+                    if (BoundsHitsScreenRect(keyValuePair.Value, rect, selectionType, cameraPosition, cameraLookDirection))
+                    {
+                        guids.Add(keyValuePair.Key);
+                    }
+                }
+            }
+            else
+            {
+                foreach (KeyValuePair<Guid, Element3D> keyValuePair in dictionary_Element3D)
+                {
+                    if (HitsScreenRect(keyValuePair.Value, rect, selectionType, cameraPosition, cameraLookDirection))
+                    {
+                        guids.Add(keyValuePair.Key);
+                    }
                 }
             }
 
             Select(guids);
+        }
+
+        // Screen-rectangle test for a batched object via its bounding-box corners (an approximation of the
+        // per-triangle HitsScreenRect): Inside requires all 8 projected corners inside the rectangle;
+        // InsideOrIntersect accepts any corner inside or the corners' screen-AABB overlapping the rectangle.
+        private bool BoundsHitsScreenRect(ObjectBounds bounds, Rect rect, SelectionType selectionType, Vector3 cameraPosition, Vector3 cameraLookDirection)
+        {
+            if (bounds == null)
+            {
+                return false;
+            }
+
+            bool inside = selectionType == SelectionType.Inside;
+
+            Vector3 min = bounds.Min;
+            Vector3 max = bounds.Max;
+            Vector3[] corners =
+            {
+                new Vector3(min.X, min.Y, min.Z), new Vector3(max.X, min.Y, min.Z),
+                new Vector3(min.X, max.Y, min.Z), new Vector3(max.X, max.Y, min.Z),
+                new Vector3(min.X, min.Y, max.Z), new Vector3(max.X, min.Y, max.Z),
+                new Vector3(min.X, max.Y, max.Z), new Vector3(max.X, max.Y, max.Z)
+            };
+
+            bool anyValid = false;
+            bool anyInside = false;
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+
+            foreach (Vector3 corner in corners)
+            {
+                if (Vector3.Dot(corner - cameraPosition, cameraLookDirection) <= 0)
+                {
+                    // Corner behind the camera: a fully-inside test cannot pass; for intersect, skip it.
+                    if (inside)
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                Vector2 projected = viewport3DX.Project(corner);
+                Point point = new Point(projected.X, projected.Y);
+                anyValid = true;
+
+                if (inside)
+                {
+                    if (!rect.Contains(point))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    if (rect.Contains(point))
+                    {
+                        anyInside = true;
+                    }
+
+                    if (point.X < minX) minX = point.X;
+                    if (point.Y < minY) minY = point.Y;
+                    if (point.X > maxX) maxX = point.X;
+                    if (point.Y > maxY) maxY = point.Y;
+                }
+            }
+
+            if (inside)
+            {
+                return anyValid;
+            }
+
+            if (anyInside)
+            {
+                return true;
+            }
+
+            if (!anyValid)
+            {
+                return false;
+            }
+
+            return rect.IntersectsWith(new Rect(new Point(minX, minY), new Point(maxX, maxY)));
         }
 
         /// <summary>
