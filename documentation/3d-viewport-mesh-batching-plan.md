@@ -1,7 +1,16 @@
 # 3D viewport mesh-batching — design & incremental plan (SAM-BIM/SAM#16, #32)
 
-Status: **design / in progress** on branch `perf/viewport-mesh-batching`. Behind an env flag
-(`SAM_UI_VIEWPORT_BATCH`), default off, until each increment is verified in VS on the 10k-space model.
+Status: **implemented & default ON** (`SAM_UI_VIEWPORT_BATCH`, set `=0` to fall back to the per-object
+path). All increments 1–6 landed and verified in VS on the 10k-space model: 3D regen **~10 s → ~1 s**
+(`ToElement3D.Attach` ~3.5 s → ~0), with picking, click + rectangle selection, selection/hover overlay
+highlight, and zoom-selected/extents all working on the batched representation.
+
+**Known limitation (accepted):** the selection overlay is an opaque fill drawn in front of the object,
+so the selected object's own **edge lines are hidden** under the blue fill (the overlay carries mesh
+triangles only, not the object's curve segments). Fast follow-up if wanted: also slice the selected
+object's line segments into a line overlay (capture per-guid line ranges like the mesh ranges) and draw
+them on top in the selection edge colour. Rectangle select is a bounding-box approximation of the
+per-triangle test (adequate for drag-select on large models).
 
 ## Goal
 

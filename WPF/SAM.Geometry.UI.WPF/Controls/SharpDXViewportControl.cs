@@ -47,11 +47,11 @@ namespace SAM.Geometry.UI.WPF
     {
         public static readonly bool Enabled = ResolveEnabled();
 
-        // Mesh-batching (issue #16, behind SAM_UI_VIEWPORT_BATCH; off by default). When set, Load builds the
-        // scene as a few merged-by-material models for the whole model (Convert.ToBatchedElement3Ds) instead
-        // of one GroupModel3D per object, to collapse the per-model attach cost. INCREMENT 1 is render-only:
-        // the batched models carry no per-object tag, so picking/hover/selection are inert in this mode.
-        // See documentation/3d-viewport-mesh-batching-plan.md.
+        // Mesh-batching (issue #16). ON by default: Load builds the scene as a few merged-by-material models
+        // for the whole model instead of one GroupModel3D per object, collapsing the per-model attach cost
+        // (3D regen ~10 s -> ~1 s on the 10k-space model). Picking, selection, hover highlight (overlay),
+        // zoom and rectangle-select all work on the batched representation. Set SAM_UI_VIEWPORT_BATCH=0 to
+        // fall back to the per-object path. See documentation/3d-viewport-mesh-batching-plan.md.
         public static readonly bool BatchEnabled = ResolveBatchEnabled();
 
         private static IEffectsManager effectsManager;
@@ -257,8 +257,9 @@ namespace SAM.Geometry.UI.WPF
 
         private static bool ResolveBatchEnabled()
         {
+            // Default ON; only an explicit "0" falls back to the per-object path.
             string value = Environment.GetEnvironmentVariable("SAM_UI_VIEWPORT_BATCH");
-            return !string.IsNullOrWhiteSpace(value) && value.Trim() != "0";
+            return string.IsNullOrWhiteSpace(value) || value.Trim() != "0";
         }
 
         private static IEffectsManager GetEffectsManager()
