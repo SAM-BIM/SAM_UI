@@ -493,7 +493,12 @@ namespace SAM.Core.UI
                 }
                 else
                 {
-                    // Raw gzip(UTF8(JSON)) bytes - the most compact in-memory form.
+                    // Raw gzip(UTF8(JSON)) bytes - the most compact in-memory form. The node tree is written
+                    // straight into the GZipStream via a Utf8JsonWriter rather than ToJsonString() +
+                    // UTF8.GetBytes(): on the 10k-space model that string is ~50-100 MB (and the UTF-16
+                    // .NET string twice that) plus a second large byte[], so streaming removes two big
+                    // allocations and a copy from every snapshot. (The ToJsonObject() tree build remains -
+                    // a true streaming serializer would need a per-IJSAMObject writer across all of SAM.)
                     System.Text.Json.Nodes.JsonObject jObject = jSAMObject?.ToJsonObject();
                     if (jObject == null)
                     {
@@ -501,12 +506,12 @@ namespace SAM.Core.UI
                     }
                     else
                     {
-                        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(jObject.ToJsonString());
                         using (System.IO.MemoryStream memoryStream = new System.IO.MemoryStream())
                         {
                             using (System.IO.Compression.GZipStream gZipStream = new System.IO.Compression.GZipStream(memoryStream, System.IO.Compression.CompressionLevel.Fastest, true))
+                            using (System.Text.Json.Utf8JsonWriter utf8JsonWriter = new System.Text.Json.Utf8JsonWriter(gZipStream))
                             {
-                                gZipStream.Write(bytes, 0, bytes.Length);
+                                jObject.WriteTo(utf8JsonWriter);
                             }
 
                             snapshot = memoryStream.ToArray();
@@ -538,17 +543,14 @@ namespace SAM.Core.UI
                     return jSAMObjects == null ? default : jSAMObjects.FirstOrDefault();
                 }
 
-                byte[] bytes;
+                // Parse straight from the decompressing stream - no intermediate decompressed byte[] and no
+                // UTF-16 string materialization (the mirror of the streaming write in CreateSnapshot).
                 using (System.IO.MemoryStream input = new System.IO.MemoryStream(snapshot))
                 using (System.IO.Compression.GZipStream gZipStream = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress))
-                using (System.IO.MemoryStream output = new System.IO.MemoryStream())
                 {
-                    gZipStream.CopyTo(output);
-                    bytes = output.ToArray();
+                    System.Text.Json.Nodes.JsonObject jObject = System.Text.Json.Nodes.JsonNode.Parse(gZipStream) as System.Text.Json.Nodes.JsonObject;
+                    return jObject == null ? default : (T)Core.Query.IJSAMObject(jObject);
                 }
-
-                System.Text.Json.Nodes.JsonObject jObject = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Encoding.UTF8.GetString(bytes)) as System.Text.Json.Nodes.JsonObject;
-                return jObject == null ? default : (T)Core.Query.IJSAMObject(jObject);
             }
         }
 
