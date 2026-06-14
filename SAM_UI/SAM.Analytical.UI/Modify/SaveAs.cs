@@ -1,4 +1,7 @@
-﻿using System.Windows.Forms;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using System.Windows.Forms;
 
 namespace SAM.Analytical.UI
 {
@@ -14,8 +17,9 @@ namespace SAM.Analytical.UI
             string path = null;
             using (SaveFileDialog saveFileDialog = new SaveFileDialog())
             {
-                saveFileDialog.Filter = "json files (*.json)|*.json|All files (*.*)|*.*";
+                saveFileDialog.Filter = "SAM files (*.sam)|*.sam|json files (*.json)|*.json|All files (*.*)|*.*";
                 saveFileDialog.FilterIndex = 1;
+                saveFileDialog.DefaultExt = "sam";
                 saveFileDialog.RestoreDirectory = true;
                 
                 if(!string.IsNullOrWhiteSpace(uIAnalyticalModel.Path))

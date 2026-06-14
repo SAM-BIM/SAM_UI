@@ -2135,8 +2135,8 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             string path = null;
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "json files (*.json)|*.json|All files (*.*)|*.*";
-            openFileDialog.FilterIndex = 2;
+            openFileDialog.Filter = "SAM files (*.sam)|*.sam|json files (*.json)|*.json|All files (*.*)|*.*";
+            openFileDialog.FilterIndex = 1;
             openFileDialog.RestoreDirectory = true;
             if (openFileDialog.ShowDialog(this) == false)
             {
