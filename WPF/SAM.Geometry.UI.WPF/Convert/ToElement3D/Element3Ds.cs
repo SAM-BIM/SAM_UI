@@ -84,6 +84,83 @@ namespace SAM.Geometry.UI.WPF
             return result;
         }
 
+        /// <summary>
+        /// Batched SharpDX scene build (issue #16 mesh-batching, behind SAM_UI_VIEWPORT_BATCH; see
+        /// documentation/3d-viewport-mesh-batching-plan.md). Appends the primitives of EVERY object into a
+        /// SINGLE SharpDXSceneBuilder, so the whole model emits only a few merged models per material
+        /// instead of one GroupModel3D per object (~33k on the 10k-space model). This collapses the
+        /// per-model GPU attach cost (ViewportControl.ToElement3D.Attach ~3.5 s), which scales with model
+        /// count - the only proven lever (batch-attach of per-object models gave nothing, PR #36).
+        ///
+        /// INCREMENT 1 (render-only): the merged models carry NO per-object IJSAMObject tag, so picking,
+        /// hover and selection are inert on this path - they are re-implemented on the batched
+        /// representation (triangle-range -> guid map + overlay selection) in later increments. Use only
+        /// to measure the attach/regen win for now.
+        /// </summary>
+        public static List<Element3D> ToBatchedElement3Ds(this GeometryObjectModel geometryObjectModel)
+        {
+            if (geometryObjectModel == null)
+            {
+                return null;
+            }
+
+            bool logEnabled = PerformanceLog.Enabled;
+            if (logEnabled)
+            {
+                ResetMesh3DCacheStats();
+                appendMilliseconds = 0;
+                buildMilliseconds = 0;
+            }
+
+            SharpDXSceneBuilder sharpDXSceneBuilder = new SharpDXSceneBuilder();
+
+            int objectCount = 0;
+            List<ISAMGeometryObject> sAMGeometryObjects = geometryObjectModel.GetSAMGeometryObjects<ISAMGeometryObject>();
+            if (sAMGeometryObjects != null)
+            {
+                foreach (ISAMGeometryObject sAMGeometryObject in sAMGeometryObjects)
+                {
+                    if (sAMGeometryObject == null)
+                    {
+                        continue;
+                    }
+
+                    objectCount++;
+
+                    if (!logEnabled)
+                    {
+                        Append(sharpDXSceneBuilder, sAMGeometryObject);
+                        continue;
+                    }
+
+                    System.Diagnostics.Stopwatch appendStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    Append(sharpDXSceneBuilder, sAMGeometryObject);
+                    appendStopwatch.Stop();
+                    appendMilliseconds += appendStopwatch.Elapsed.TotalMilliseconds;
+                }
+            }
+
+            List<Element3D> result;
+            if (!logEnabled)
+            {
+                result = sharpDXSceneBuilder.Build();
+            }
+            else
+            {
+                System.Diagnostics.Stopwatch buildStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                result = sharpDXSceneBuilder.Build();
+                buildStopwatch.Stop();
+                buildMilliseconds += buildStopwatch.Elapsed.TotalMilliseconds;
+
+                string detail = string.Format("[{0} objects -> {1} batched models]", objectCount, result == null ? 0 : result.Count);
+                LogMesh3DCacheStats(detail);
+                PerformanceLog.Write("ViewportControl.ToElement3D.Append", detail, appendMilliseconds);
+                PerformanceLog.Write("ViewportControl.ToElement3D.Build", detail, buildMilliseconds);
+            }
+
+            return result;
+        }
+
         // Diagnostic accumulators for the per-object Append vs Build split (see ToElement3Ds above).
         // Reset before / read after the model-level build loop; populated only when the log is enabled.
         private static double appendMilliseconds;
