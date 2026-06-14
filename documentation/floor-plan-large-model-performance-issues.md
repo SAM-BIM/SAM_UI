@@ -318,3 +318,47 @@ Measurement, not the static O(N²) scan, decided each of these — see SAM-BIM/S
   parked under #32/#16.
 - **SharpDX mesh-array cache** (PR #36) — memoizing the per-`Mesh3D` array conversion did **not** move
   `ToElement3D.Append`, whose cost is per-face edge/segment build, not the array copy. Reverted.
+
+---
+
+## Proposed next performance improvements (SAM-BIM/SAM#16 follow-ups)
+
+Ranked by expected impact on the warm 3D regen of the 10k-space model. Logged here (GitHub issues
+to be opened per item) so the backlog and its rationale live in-repo. "Status" notes prior work.
+
+### 1. Mesh batching by material — the #1 remaining lever (~3.5 s `ToElement3D.Attach`)
+The dominant warm-regen cost is the GPU **attach of ~33,635 individually-attached scene models**; it
+scales with model *count*, not triangulation (cached, #35) or `Items.Add` calls (batch-attach gave
+nothing, PR #36). Fix is a render/pick split: merge geometry into a few **frozen meshes grouped by
+material/colour** for rendering, and keep a parallel **CPU-side spatial index** (quadtree/BVH over
+object bounds) for hover/selection instead of per-object octrees. A redesign of the hit-test/selection
+layer. Status: open (#32/#16 territory) — highest value, largest effort.
+
+### 2. Move `GeometryObjectModel` + scene build off the UI thread
+Regeneration runs synchronously on the UI thread behind the modal "Reloading" window. Wrap it in a
+**cancellable `Task`** (rapid edits cancel stale work) and dispatch only the final scene swap to the
+UI; the viewport keeps showing the previous frame instead of freezing. Status: long-standing idea 2
+of Issue 3 / #33, never landed.
+
+### 3. Trim `AnalyticalWindow.Reload` (~29 s top-line on 10k)
+`Reload` is the largest single perf-log entry. Even with per-tab regen (#12) and in-place recolour
+(#11), audit that an attribute-only edit hits **only** the recolour fast-path and never re-enters
+`GeometryObjectModel`, and that `ViewRegeneration` is not redundantly invoked per modification batch.
+Status: partially addressed (#11, #12); needs an audit pass.
+
+### 4. Cache the per-face edge/segment build (~1.2 s `ToElement3D.Append`) — PROTOTYPED
+After triangulation was cached (#35), the residual `.Append` cost is the per-face **edge/segment**
+build (`GetEdge3Ds` → `GetSegments` → `ToVector3`), not the mesh-array copy (that cache was reverted,
+PR #36 — do not redo). **Prototype landed:** `Convert.CachedFaceEdgeSegments(Face3D)` in
+`WPF/SAM.Geometry.UI.WPF/Convert/Mesh3DCache.cs` memoizes the appearance-independent segment endpoints
+by the same `Face3DSignature` as the triangulation cache; the SharpDX `Face3DObject` curve build reads
+it instead of re-deriving. New diagnostic `ViewportControl.ToElement3D.EdgeSegments [hits/misses]`.
+Status: **unconfirmed** — needs a 10k re-run to verify `ToElement3D.Append` drops with `[N hits]`
+before relying on it (the previous `.Append` optimisation, the mesh-array cache, did not pan out).
+
+### 5. Cut the per-regen full-model deep clone
+`ToSAM_GeometryObjectModel` does `new AnalyticalModel(analyticalModel)` per regen, and
+`UIJSAMObject.JSAMObject` historically deep-cloned on every access (#14, mitigated by the clone cache
+in #21). On a 10k model these full clones are pure hot-path overhead — switch to a shared read-only
+snapshot / copy-on-write for the regeneration pass so geometry generation reads the live model.
+Status: partially addressed (#14/#21); the per-regen `AnalyticalModel` clone remains.

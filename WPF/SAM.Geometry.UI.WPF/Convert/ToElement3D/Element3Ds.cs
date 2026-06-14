@@ -193,9 +193,17 @@ namespace SAM.Geometry.UI.WPF
                 CurveAppearance curveAppearance = surfaceAppearance.CurveAppearance;
                 if (curveAppearance != null && curveAppearance.Thickness != 0)
                 {
-                    foreach (IClosedPlanar3D edge3D in face3D.GetEdge3Ds())
+                    // PROTOTYPE (#4): reuse the cached, appearance-independent edge/segment endpoints instead of
+                    // re-deriving GetEdge3Ds -> GetSegments -> ToVector3 every regen (the measured ToElement3D.Append
+                    // cost, PR #36). The appearance is applied here at use time. Endpoints are flattened start/end
+                    // pairs, so step by two.
+                    List<Vector3> edgeSegmentEndpoints = CachedFaceEdgeSegments(face3D);
+                    if (edgeSegmentEndpoints != null)
                     {
-                        AddSegments(sharpDXSceneBuilder, edge3D as ISegmentable3D, curveAppearance);
+                        for (int i = 0; i + 1 < edgeSegmentEndpoints.Count; i += 2)
+                        {
+                            sharpDXSceneBuilder.AddSegment(curveAppearance.Color, curveAppearance.Opacity, curveAppearance.Thickness, edgeSegmentEndpoints[i], edgeSegmentEndpoints[i + 1]);
+                        }
                     }
                 }
 
