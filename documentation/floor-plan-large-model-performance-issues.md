@@ -393,23 +393,34 @@ top of the old, then drop the old — zero blank) would peak at ~2× GPU memory 
 not done here; revisit with mesh-batching (#1 below), which cuts the attach cost and the model count at
 the same time.
 
-### Deferred follow-up — faster snapshot codec (not done; do later if needed)
+### Snapshot codec — streaming write/read (this change), and what's still deferred
 
-The async change removes the snapshot from the *blocking* path but the serialization still costs the
-same CPU (~10–20 s) on a background thread, so back-to-back big edits can queue. If that becomes a
-problem, cut the raw serialization cost itself:
+The async change removes the snapshot from the *blocking* path, but the serialization still costs CPU on
+the background thread, so back-to-back big edits can queue. The GZip codec (`CreateSnapshot`) used to
+`ToJsonObject()` → **`ToJsonString()`** → **`UTF8.GetBytes()`** → gzip. On the 10k-space model that JSON
+string is ~50–100 MB (and the .NET UTF-16 string ~2× that), plus a second large `byte[]` — two big
+allocations and a copy per snapshot.
 
-- **Direct `Utf8JsonWriter` streaming** instead of `ToJsonObject()` → `ToJsonString()`. Today the
-  GZip codec (`CreateSnapshot`) builds a full `JsonObject` node tree for ~33k objects **and then**
-  re-walks it to produce the JSON string — two passes plus a large intermediate tree. Writing the
-  model straight into a `GZipStream`-wrapped `Utf8JsonWriter` would roughly halve the work and the
-  transient allocations. This requires a streaming serialization entry point in SAM core
-  (`Core.Convert` / `IJSAMObject` serialization), so it is a **SAM-repo** change, not UI-only.
+**Done:** `CreateSnapshot` now writes the `JsonObject` tree **straight into the `GZipStream` via a
+`Utf8JsonWriter`**, and `RestoreSnapshot` **parses straight from the decompressing stream**
+(`JsonNode.Parse(Stream)`) — no intermediate JSON string and no separate decompressed `byte[]`. UI-only
+change (`UIJSAMObject.cs`), no SAM-core dependency. The `ToJsonObject()` tree build itself is unchanged.
+
+**Still deferred (bigger, SAM-repo):**
+- A **true streaming serializer** that writes each object directly to a `Utf8JsonWriter` (a
+  `WriteJson(Utf8JsonWriter)` on `IJSAMObject`), eliminating the `ToJsonObject()` node tree entirely.
+  That tree build is the remaining bulk of `Snapshot.Create`, but it needs an override across **all**
+  ~hundreds of `IJSAMObject` implementations in SAM — large surface, do only if the tree build proves to
+  be the dominant residual cost.
+- Possible quick win to investigate first: many `ToJsonObject()` overrides add nested children via
+  `child.ToJsonObject().DeepClone()`; since `ToJsonObject()` already returns a fresh (parent-less) node,
+  the `DeepClone()` looks redundant and doubles allocations recursively — removing it (if the invariant
+  holds) could cut the tree-build cost without a per-class rewrite. Verify carefully before touching.
 - Or an **incremental / delta** history (store only what an edit changed). Largest redesign, biggest
   correctness surface on undo/redo — only if the full-snapshot model proves insufficient.
 
-Codec A/B is already wired: `SAM_UI_UNDO_SNAPSHOT=sam` selects the SAM-native `Query.Compress`
-codec, default is raw gzip; `UIJSAMObject.Snapshot.Create` / `.Size` log time and bytes for each.
+Codec A/B is still wired: `SAM_UI_UNDO_SNAPSHOT=sam` selects the SAM-native `Query.Compress` codec,
+default is raw gzip; `UIJSAMObject.Snapshot.Create` / `.Size` log time and bytes for each.
 
 ---
 
