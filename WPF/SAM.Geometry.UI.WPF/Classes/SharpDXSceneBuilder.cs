@@ -24,12 +24,103 @@ namespace SAM.Geometry.UI.WPF
     /// with a constant. Faces render double-sided via CullMode.None, replacing the doubled
     /// triangles of the Media3D conversion.
     /// </summary>
+    /// <summary>
+    /// Maps a hit triangle's vertex index back to the guid of the object that owns it, within one merged
+    /// (material-batched) mesh (issue #16 mesh-batching increment 2). Each object contributes a contiguous
+    /// block of vertices to a bucket - they are appended one object at a time - so the owning object is the
+    /// one whose recorded start is the greatest start &lt;= the vertex index (binary search).
+    /// </summary>
+    internal sealed class PickBucket
+    {
+        private readonly int[] vertexStarts;
+        private readonly Guid[] guids;
+
+        public PickBucket(int[] vertexStarts, Guid[] guids)
+        {
+            this.vertexStarts = vertexStarts;
+            this.guids = guids;
+        }
+
+        public Guid Resolve(int vertexIndex)
+        {
+            if (vertexStarts == null || vertexStarts.Length == 0)
+            {
+                return Guid.Empty;
+            }
+
+            int low = 0;
+            int high = vertexStarts.Length - 1;
+            int found = -1;
+            while (low <= high)
+            {
+                int mid = (low + high) / 2;
+                if (vertexStarts[mid] <= vertexIndex)
+                {
+                    found = mid;
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            return found >= 0 ? guids[found] : Guid.Empty;
+        }
+    }
+
+    /// <summary>
+    /// World-space bounds of one object, accumulated from its merged positions during a batched build
+    /// (issue #16 increment 4). Used for Zoom-Selected / Zoom-Extents / rotation pivot when there is no
+    /// per-object scene model to measure.
+    /// </summary>
+    internal sealed class ObjectBounds
+    {
+        public Vector3 Min;
+        public Vector3 Max;
+
+        public ObjectBounds(Vector3 position)
+        {
+            Min = position;
+            Max = position;
+        }
+
+        public void Add(Vector3 position)
+        {
+            Min = Vector3.Min(Min, position);
+            Max = Vector3.Max(Max, position);
+        }
+    }
+
+    /// <summary>
+    /// One object's triangle slice inside a merged mesh (issue #16 increment 3): the vertex and index
+    /// sub-ranges it occupies. Lets the selection/hover overlay be sliced straight out of the merged
+    /// buffers - no per-object geometry is stored a second time.
+    /// </summary>
+    internal sealed class GeometrySlice
+    {
+        public HelixToolkit.SharpDX.MeshGeometry3D Mesh;
+        public int VertexStart;
+        public int VertexEnd;
+        public int IndexStart;
+        public int IndexEnd;
+    }
+
     internal class SharpDXSceneBuilder
     {
         private class MeshBucket
         {
             public Vector3Collection Positions = new Vector3Collection();
             public IntCollection Indices = new IntCollection();
+
+            // Pick/overlay ranges (batched build only): per object that contributed to this bucket, the
+            // starting vertex index, starting triangle-index, and owning guid, in append order. Null unless
+            // pick capture is on.
+            public List<int> RangeVertexStarts;
+            public List<int> RangeIndexStarts;
+            public List<Guid> RangeGuids;
+            public bool HasRange;
+            public Guid LastRangeGuid;
         }
 
         private class LineBucket
@@ -47,6 +138,60 @@ namespace SAM.Geometry.UI.WPF
         private readonly Dictionary<int, MeshBucket> meshBuckets = new Dictionary<int, MeshBucket>();
         private readonly Dictionary<Tuple<int, double>, LineBucket> lineBuckets = new Dictionary<Tuple<int, double>, LineBucket>();
         private readonly Dictionary<int, TextBucket> textBuckets = new Dictionary<int, TextBucket>();
+
+        // Pick-range capture (batched scene build, issue #16 increment 2). When on, AddMesh records which
+        // object's vertices it is appending (SetCurrentObject), so Build can hand back a per-mesh
+        // vertex-index -> guid map (PickMap) for resolving a FindHits result to an object without one
+        // scene model per object. Off for the per-object path (one model already = one object).
+        private readonly bool capturePickRanges;
+        private Guid currentObjectGuid;
+
+        // Per-merged-mesh pick map, populated by Build when capturePickRanges is on.
+        public Dictionary<MeshGeometryModel3D, PickBucket> PickMap { get; private set; }
+
+        // guid -> its triangle slices across the merged meshes (selection/hover overlay source).
+        public Dictionary<Guid, List<GeometrySlice>> OverlayMap { get; private set; }
+
+        // Per-object world bounds (batched build only), accumulated from the appended positions.
+        private Dictionary<Guid, ObjectBounds> objectBoundsMap;
+        public Dictionary<Guid, ObjectBounds> ObjectBoundsMap => objectBoundsMap;
+
+        public SharpDXSceneBuilder()
+        {
+        }
+
+        public SharpDXSceneBuilder(bool capturePickRanges)
+        {
+            this.capturePickRanges = capturePickRanges;
+            if (capturePickRanges)
+            {
+                objectBoundsMap = new Dictionary<Guid, ObjectBounds>();
+            }
+        }
+
+        // Set before appending each object's primitives (batched build) so the ranges record the right guid.
+        public void SetCurrentObject(Guid guid)
+        {
+            currentObjectGuid = guid;
+        }
+
+        // Grow the current object's bounds (batched build). No-op when not capturing or the object is untagged.
+        private void AccumulateBounds(Vector3 position)
+        {
+            if (objectBoundsMap == null || currentObjectGuid == Guid.Empty)
+            {
+                return;
+            }
+
+            if (objectBoundsMap.TryGetValue(currentObjectGuid, out ObjectBounds bounds))
+            {
+                bounds.Add(position);
+            }
+            else
+            {
+                objectBoundsMap[currentObjectGuid] = new ObjectBounds(position);
+            }
+        }
 
         private static int ToKey(System.Drawing.Color color, double opacity)
         {
@@ -85,10 +230,32 @@ namespace SAM.Geometry.UI.WPF
                 meshBuckets[key] = meshBucket;
             }
 
+            // Record a pick/overlay range when the contributing object changes (its first vertices +
+            // triangle indices in this bucket).
+            if (capturePickRanges)
+            {
+                if (meshBucket.RangeVertexStarts == null)
+                {
+                    meshBucket.RangeVertexStarts = new List<int>();
+                    meshBucket.RangeIndexStarts = new List<int>();
+                    meshBucket.RangeGuids = new List<Guid>();
+                }
+
+                if (!meshBucket.HasRange || meshBucket.LastRangeGuid != currentObjectGuid)
+                {
+                    meshBucket.RangeVertexStarts.Add(meshBucket.Positions.Count);
+                    meshBucket.RangeIndexStarts.Add(meshBucket.Indices.Count);
+                    meshBucket.RangeGuids.Add(currentObjectGuid);
+                    meshBucket.LastRangeGuid = currentObjectGuid;
+                    meshBucket.HasRange = true;
+                }
+            }
+
             int offset = meshBucket.Positions.Count;
             foreach (Vector3 position in positions)
             {
                 meshBucket.Positions.Add(position);
+                AccumulateBounds(position);
             }
 
             foreach (int triangleIndex in triangleIndices)
@@ -117,6 +284,8 @@ namespace SAM.Geometry.UI.WPF
             lineBucket.Positions.Add(end);
             lineBucket.Indices.Add(offset);
             lineBucket.Indices.Add(offset + 1);
+            AccumulateBounds(start);
+            AccumulateBounds(end);
         }
 
         public void AddText(System.Drawing.Color color, double opacity, string text, Vector3 position, double height)
@@ -139,6 +308,12 @@ namespace SAM.Geometry.UI.WPF
         public List<Element3D> Build()
         {
             List<Element3D> result = new List<Element3D>();
+
+            if (capturePickRanges)
+            {
+                PickMap = new Dictionary<MeshGeometryModel3D, PickBucket>();
+                OverlayMap = new Dictionary<Guid, List<GeometrySlice>>();
+            }
 
             foreach (KeyValuePair<int, MeshBucket> keyValuePair in meshBuckets)
             {
@@ -167,13 +342,49 @@ namespace SAM.Geometry.UI.WPF
                     SpecularColor = new Color4(0, 0, 0, 0)
                 };
 
-                result.Add(new MeshGeometryModel3D
+                MeshGeometryModel3D meshGeometryModel3D = new MeshGeometryModel3D
                 {
                     Geometry = meshGeometry3D,
                     Material = phongMaterial,
                     CullMode = global::SharpDX.Direct3D11.CullMode.None,
                     IsTransparent = color4.Alpha < 1f
-                });
+                };
+
+                result.Add(meshGeometryModel3D);
+
+                if (capturePickRanges && keyValuePair.Value.RangeVertexStarts != null)
+                {
+                    MeshBucket meshBucket = keyValuePair.Value;
+                    PickMap[meshGeometryModel3D] = new PickBucket(meshBucket.RangeVertexStarts.ToArray(), meshBucket.RangeGuids.ToArray());
+
+                    // Per-guid triangle slices for the overlay: [start, next-start) in both vertices and indices.
+                    int rangeCount = meshBucket.RangeVertexStarts.Count;
+                    for (int k = 0; k < rangeCount; k++)
+                    {
+                        Guid guid = meshBucket.RangeGuids[k];
+                        if (guid == Guid.Empty)
+                        {
+                            continue;
+                        }
+
+                        GeometrySlice geometrySlice = new GeometrySlice
+                        {
+                            Mesh = meshGeometry3D,
+                            VertexStart = meshBucket.RangeVertexStarts[k],
+                            VertexEnd = k + 1 < rangeCount ? meshBucket.RangeVertexStarts[k + 1] : meshBucket.Positions.Count,
+                            IndexStart = meshBucket.RangeIndexStarts[k],
+                            IndexEnd = k + 1 < rangeCount ? meshBucket.RangeIndexStarts[k + 1] : meshBucket.Indices.Count
+                        };
+
+                        if (!OverlayMap.TryGetValue(guid, out List<GeometrySlice> slices))
+                        {
+                            slices = new List<GeometrySlice>();
+                            OverlayMap[guid] = slices;
+                        }
+
+                        slices.Add(geometrySlice);
+                    }
+                }
             }
 
             foreach (KeyValuePair<Tuple<int, double>, LineBucket> keyValuePair in lineBuckets)

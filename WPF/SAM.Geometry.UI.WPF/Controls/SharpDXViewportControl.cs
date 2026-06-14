@@ -47,6 +47,13 @@ namespace SAM.Geometry.UI.WPF
     {
         public static readonly bool Enabled = ResolveEnabled();
 
+        // Mesh-batching (issue #16). ON by default: Load builds the scene as a few merged-by-material models
+        // for the whole model instead of one GroupModel3D per object, collapsing the per-model attach cost
+        // (3D regen ~10 s -> ~1 s on the 10k-space model). Picking, selection, hover highlight (overlay),
+        // zoom and rectangle-select all work on the batched representation. Set SAM_UI_VIEWPORT_BATCH=0 to
+        // fall back to the per-object path. See documentation/3d-viewport-mesh-batching-plan.md.
+        public static readonly bool BatchEnabled = ResolveBatchEnabled();
+
         private static IEffectsManager effectsManager;
 
         private readonly Viewport3DX viewport3DX;
@@ -77,6 +84,36 @@ namespace SAM.Geometry.UI.WPF
         private readonly Dictionary<LineGeometryModel3D, double> dictionary_BaseLineThickness = new Dictionary<LineGeometryModel3D, double>();
         private readonly HashSet<Guid> selectedGuids = new HashSet<Guid>();
         private Guid? hooveredGuid;
+
+        // Batched-scene state (issue #16 mesh-batching, when SAM_UI_VIEWPORT_BATCH is on). In this mode there
+        // is no per-object Element3D, so object identity comes from these instead of dictionary_Element3D/
+        // dictionary_Guid: dictionary_PickBucket resolves a FindHits triangle vertex -> guid per merged mesh,
+        // dictionary_BatchedObject maps guid -> object (event payloads + selection queries). Increment 2 wires
+        // picking + selection state + events; the selection/hover *visual* (overlay) is increment 3, so
+        // ApplyAppearance is a no-op while sceneBatched.
+        private bool sceneBatched;
+        private readonly Dictionary<MeshGeometryModel3D, PickBucket> dictionary_PickBucket = new Dictionary<MeshGeometryModel3D, PickBucket>();
+        private readonly Dictionary<Guid, IJSAMObject> dictionary_BatchedObject = new Dictionary<Guid, IJSAMObject>();
+        private readonly Dictionary<Guid, ObjectBounds> dictionary_BatchedBounds = new Dictionary<Guid, ObjectBounds>();
+        private readonly Dictionary<Guid, List<GeometrySlice>> dictionary_BatchedOverlay = new Dictionary<Guid, List<GeometrySlice>>();
+
+        // Selection/hover highlight in batched mode (#16 increment 3): the base merged meshes stay immutable;
+        // these overlay meshes are the selected / hovered objects' triangles, sliced out of the merged
+        // buffers, drawn on top in the highlight colour. Rebuilt when the selection / hover set changes. A
+        // negative DepthBias pulls the overlay in front of the coincident base geometry (no z-fighting); the
+        // overlays are not hit-test visible so they never interfere with picking.
+        private MeshGeometryModel3D selectionOverlay;
+        private MeshGeometryModel3D hoverOverlay;
+        private const int overlayDepthBias = -1000;
+
+        // Hover tint - translucent so it reads as a highlight without hiding the object's own colour. The
+        // selection fill reuses material_Selection (opaque blue, parity with the per-object SelectAction).
+        private static readonly PhongMaterial material_Hover = new PhongMaterial
+        {
+            DiffuseColor = new HelixToolkit.Maths.Color4(125f / 255f, 125f / 255f, 1f, 0.45f),
+            AmbientColor = new HelixToolkit.Maths.Color4(125f / 255f, 125f / 255f, 1f, 0.45f),
+            SpecularColor = new HelixToolkit.Maths.Color4(0, 0, 0, 0)
+        };
 
         // Selection appearance - parity with the Helix SelectAction (Query.SelectionSurfaceAppearance:
         // RGB(125,125,255) fill, blue edges). Ambient = Diffuse / no specular matches the flat
@@ -218,6 +255,13 @@ namespace SAM.Geometry.UI.WPF
             return !string.IsNullOrWhiteSpace(value) && value.Trim() != "0";
         }
 
+        private static bool ResolveBatchEnabled()
+        {
+            // Default ON; only an explicit "0" falls back to the per-object path.
+            string value = Environment.GetEnvironmentVariable("SAM_UI_VIEWPORT_BATCH");
+            return string.IsNullOrWhiteSpace(value) || value.Trim() != "0";
+        }
+
         private static IEffectsManager GetEffectsManager()
         {
             if (effectsManager == null)
@@ -261,11 +305,24 @@ namespace SAM.Geometry.UI.WPF
             // ViewportControl.ToElement3D (one level up) wraps this whole method; the .Generate/.Attach
             // split shows which phase dominates the regen (#33).
             List<Element3D> element3Ds = null;
+            Convert.BatchedScene batchedScene = null;
             if (geometryObjectModel != null)
             {
                 using (PerformanceLog.Measure("ViewportControl.ToElement3D.Generate"))
                 {
-                    element3Ds = Convert.ToElement3Ds(geometryObjectModel);
+                    // Batched path (#16): a few merged-by-material models for the whole model instead of one
+                    // GroupModel3D per object. ToBatchedScene also returns the per-mesh vertex -> guid pick map
+                    // and the guid -> object map, so picking/selection/events work without a model per object
+                    // (increment 2); the selection visual is the overlay path (increment 3).
+                    if (BatchEnabled)
+                    {
+                        batchedScene = geometryObjectModel.ToBatchedScene();
+                        element3Ds = batchedScene == null ? null : batchedScene.Element3Ds;
+                    }
+                    else
+                    {
+                        element3Ds = Convert.ToElement3Ds(geometryObjectModel);
+                    }
                 }
             }
 
@@ -283,6 +340,13 @@ namespace SAM.Geometry.UI.WPF
             dictionary_BaseIsTransparent.Clear();
             dictionary_BaseLineColor.Clear();
             dictionary_BaseLineThickness.Clear();
+            RemoveOverlay(ref selectionOverlay);
+            RemoveOverlay(ref hoverOverlay);
+            dictionary_PickBucket.Clear();
+            dictionary_BatchedObject.Clear();
+            dictionary_BatchedBounds.Clear();
+            dictionary_BatchedOverlay.Clear();
+            sceneBatched = false;
             selectedGuids.Clear();
             hooveredGuid = null;
 
@@ -294,33 +358,42 @@ namespace SAM.Geometry.UI.WPF
                 return;
             }
 
+            sceneBatched = batchedScene != null;
+
             if (element3Ds != null)
             {
                 using (PerformanceLog.Measure("ViewportControl.ToElement3D.Attach", string.Format("[{0} objects]", element3Ds.Count)))
                 {
-                    foreach (Element3D element3D in element3Ds)
+                    if (sceneBatched)
                     {
-                        viewport3DX.Items.Add(element3D);
-                        sceneElement3Ds.Add(element3D);
-
-                        SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
-                        if (sAMObject != null && !dictionary_Element3D.ContainsKey(sAMObject.Guid))
+                        AttachBatched(batchedScene);
+                    }
+                    else
+                    {
+                        foreach (Element3D element3D in element3Ds)
                         {
-                            dictionary_Element3D[sAMObject.Guid] = element3D;
-                            dictionary_Guid[element3D] = sAMObject.Guid;
-                            RegisterChildren(sAMObject.Guid, element3D);
-                            CollectOctreeGeometries(element3D);
+                            viewport3DX.Items.Add(element3D);
+                            sceneElement3Ds.Add(element3D);
 
-                            // Detached stub carrying the same attached object as the group - the
-                            // ObjectHoovered/ObjectDoubleClicked payload (see the class note)
-                            Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
-                            IJSAMObject jSAMObject = Core.UI.WPF.Query.JSAMObject<IJSAMObject>(element3D);
-                            if (jSAMObject != null)
+                            SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
+                            if (sAMObject != null && !dictionary_Element3D.ContainsKey(sAMObject.Guid))
                             {
-                                Core.UI.WPF.Modify.SetIJSAMObject(stub, jSAMObject);
-                            }
+                                dictionary_Element3D[sAMObject.Guid] = element3D;
+                                dictionary_Guid[element3D] = sAMObject.Guid;
+                                RegisterChildren(sAMObject.Guid, element3D);
+                                CollectOctreeGeometries(element3D);
 
-                            dictionary_Stub[sAMObject.Guid] = stub;
+                                // Detached stub carrying the same attached object as the group - the
+                                // ObjectHoovered/ObjectDoubleClicked payload (see the class note)
+                                Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
+                                IJSAMObject jSAMObject = Core.UI.WPF.Query.JSAMObject<IJSAMObject>(element3D);
+                                if (jSAMObject != null)
+                                {
+                                    Core.UI.WPF.Modify.SetIJSAMObject(stub, jSAMObject);
+                                }
+
+                                dictionary_Stub[sAMObject.Guid] = stub;
+                            }
                         }
                     }
                 }
@@ -343,6 +416,204 @@ namespace SAM.Geometry.UI.WPF
 
             // Build the picking octrees off the regen critical path (see pendingOctreeGeometries).
             ScheduleOctreeBuild();
+        }
+
+        // Batched attach (#16 increment 2): add the few merged models, index the per-mesh pick map and the
+        // guid -> object map, build one event-payload stub per object (parity with the per-object path), and
+        // queue the merged mesh geometries for the deferred picking octree so FindHits stays cheap.
+        private void AttachBatched(Convert.BatchedScene batchedScene)
+        {
+            if (batchedScene.PickMap != null)
+            {
+                foreach (KeyValuePair<MeshGeometryModel3D, PickBucket> keyValuePair in batchedScene.PickMap)
+                {
+                    dictionary_PickBucket[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+
+            foreach (Element3D element3D in batchedScene.Element3Ds)
+            {
+                viewport3DX.Items.Add(element3D);
+                sceneElement3Ds.Add(element3D);
+
+                if (element3D is MeshGeometryModel3D meshGeometryModel3D && meshGeometryModel3D.Geometry is HelixToolkit.SharpDX.MeshGeometry3D meshGeometry3D)
+                {
+                    pendingOctreeGeometries.Add(meshGeometry3D);
+                }
+            }
+
+            if (batchedScene.Objects != null)
+            {
+                foreach (KeyValuePair<Guid, IJSAMObject> keyValuePair in batchedScene.Objects)
+                {
+                    dictionary_BatchedObject[keyValuePair.Key] = keyValuePair.Value;
+
+                    Media3D.ModelVisual3D stub = new Media3D.ModelVisual3D();
+                    Core.UI.WPF.Modify.SetIJSAMObject(stub, keyValuePair.Value);
+                    dictionary_Stub[keyValuePair.Key] = stub;
+                }
+            }
+
+            if (batchedScene.Bounds != null)
+            {
+                foreach (KeyValuePair<Guid, ObjectBounds> keyValuePair in batchedScene.Bounds)
+                {
+                    dictionary_BatchedBounds[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+
+            if (batchedScene.OverlayMap != null)
+            {
+                foreach (KeyValuePair<Guid, List<GeometrySlice>> keyValuePair in batchedScene.OverlayMap)
+                {
+                    dictionary_BatchedOverlay[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+        }
+
+        // Removes an overlay model from the scene (if present) and nulls the reference.
+        private void RemoveOverlay(ref MeshGeometryModel3D overlay)
+        {
+            if (overlay != null)
+            {
+                viewport3DX.Items.Remove(overlay);
+                overlay = null;
+            }
+        }
+
+        // Builds one mesh from the given objects' triangle slices (sliced out of the merged buffers), for the
+        // selection / hover overlay. Returns null when there is nothing to draw.
+        private HelixToolkit.SharpDX.MeshGeometry3D BuildOverlayGeometry(IEnumerable<Guid> guids)
+        {
+            if (guids == null)
+            {
+                return null;
+            }
+
+            HelixToolkit.Vector3Collection positions = new HelixToolkit.Vector3Collection();
+            HelixToolkit.IntCollection indices = new HelixToolkit.IntCollection();
+
+            foreach (Guid guid in guids)
+            {
+                if (!dictionary_BatchedOverlay.TryGetValue(guid, out List<GeometrySlice> slices))
+                {
+                    continue;
+                }
+
+                foreach (GeometrySlice geometrySlice in slices)
+                {
+                    HelixToolkit.SharpDX.MeshGeometry3D mesh = geometrySlice.Mesh;
+                    if (mesh == null || mesh.Positions == null || mesh.Indices == null)
+                    {
+                        continue;
+                    }
+
+                    int baseOffset = positions.Count;
+                    for (int v = geometrySlice.VertexStart; v < geometrySlice.VertexEnd; v++)
+                    {
+                        positions.Add(mesh.Positions[v]);
+                    }
+
+                    for (int i = geometrySlice.IndexStart; i < geometrySlice.IndexEnd; i++)
+                    {
+                        indices.Add(mesh.Indices[i] - geometrySlice.VertexStart + baseOffset);
+                    }
+                }
+            }
+
+            if (positions.Count == 0 || indices.Count == 0)
+            {
+                return null;
+            }
+
+            Vector3 normal = Vector3.UnitZ;
+            HelixToolkit.Vector3Collection normals = new HelixToolkit.Vector3Collection(positions.Count);
+            for (int i = 0; i < positions.Count; i++)
+            {
+                normals.Add(normal);
+            }
+
+            return new HelixToolkit.SharpDX.MeshGeometry3D { Positions = positions, Indices = indices, Normals = normals };
+        }
+
+        // Rebuilds the selection overlay from the current selection (batched mode only).
+        private void UpdateSelectionOverlay()
+        {
+            RemoveOverlay(ref selectionOverlay);
+
+            if (!sceneBatched || selectedGuids.Count == 0)
+            {
+                return;
+            }
+
+            HelixToolkit.SharpDX.MeshGeometry3D geometry = BuildOverlayGeometry(selectedGuids);
+            if (geometry == null)
+            {
+                return;
+            }
+
+            selectionOverlay = new MeshGeometryModel3D
+            {
+                Geometry = geometry,
+                Material = material_Selection,
+                CullMode = global::SharpDX.Direct3D11.CullMode.None,
+                IsHitTestVisible = false,
+                DepthBias = overlayDepthBias
+            };
+
+            viewport3DX.Items.Add(selectionOverlay);
+        }
+
+        // Rebuilds the hover overlay from the hovered object (batched mode only; skipped when it is selected).
+        private void UpdateHoverOverlay()
+        {
+            RemoveOverlay(ref hoverOverlay);
+
+            if (!sceneBatched || !hooveredGuid.HasValue || selectedGuids.Contains(hooveredGuid.Value))
+            {
+                return;
+            }
+
+            HelixToolkit.SharpDX.MeshGeometry3D geometry = BuildOverlayGeometry(new[] { hooveredGuid.Value });
+            if (geometry == null)
+            {
+                return;
+            }
+
+            hoverOverlay = new MeshGeometryModel3D
+            {
+                Geometry = geometry,
+                Material = material_Hover,
+                CullMode = global::SharpDX.Direct3D11.CullMode.None,
+                IsHitTestVisible = false,
+                IsTransparent = true,
+                DepthBias = overlayDepthBias
+            };
+
+            viewport3DX.Items.Add(hoverOverlay);
+        }
+
+        // Object identity helpers that work in both modes: per-object (dictionary_Element3D) or batched
+        // (dictionary_BatchedObject). KnowsGuid gates selection; ResolveSAMObject mirrors
+        // Core.UI.WPF.Query.JSAMObject<SAMObject> for a batched payload object.
+        private bool KnowsGuid(Guid guid)
+        {
+            return sceneBatched ? dictionary_BatchedObject.ContainsKey(guid) : dictionary_Element3D.ContainsKey(guid);
+        }
+
+        private static SAMObject ResolveSAMObject(IJSAMObject jSAMObject)
+        {
+            if (jSAMObject is SAMObject sAMObject)
+            {
+                return sAMObject;
+            }
+
+            if (jSAMObject is ITaggable taggable && taggable.Tag != null && taggable.Tag.Value is SAMObject tagged)
+            {
+                return tagged;
+            }
+
+            return null;
         }
 
         public Element3D GetElement3D(Guid guid)
@@ -372,7 +643,7 @@ namespace SAM.Geometry.UI.WPF
             {
                 foreach (Guid guid in guids)
                 {
-                    if (dictionary_Element3D.ContainsKey(guid))
+                    if (KnowsGuid(guid))
                     {
                         selectedGuids_New.Add(guid);
                     }
@@ -395,6 +666,7 @@ namespace SAM.Geometry.UI.WPF
                 ApplyAppearance(guid);
             }
 
+            UpdateSelectionOverlay();
             UpdateRotationPivot();
             return true;
         }
@@ -414,6 +686,7 @@ namespace SAM.Geometry.UI.WPF
                 ApplyAppearance(guid);
             }
 
+            UpdateSelectionOverlay();
             UpdateRotationPivot();
             return true;
         }
@@ -423,13 +696,19 @@ namespace SAM.Geometry.UI.WPF
             List<SAMObject> result = new List<SAMObject>();
             foreach (Guid guid in selectedGuids)
             {
-                if (dictionary_Element3D.TryGetValue(guid, out Element3D element3D))
+                SAMObject sAMObject;
+                if (sceneBatched)
                 {
-                    SAMObject sAMObject = Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D);
-                    if (sAMObject != null)
-                    {
-                        result.Add(sAMObject);
-                    }
+                    sAMObject = dictionary_BatchedObject.TryGetValue(guid, out IJSAMObject jSAMObject) ? ResolveSAMObject(jSAMObject) : null;
+                }
+                else
+                {
+                    sAMObject = dictionary_Element3D.TryGetValue(guid, out Element3D element3D) ? Core.UI.WPF.Query.JSAMObject<SAMObject>(element3D) : null;
+                }
+
+                if (sAMObject != null)
+                {
+                    result.Add(sAMObject);
                 }
             }
 
@@ -457,15 +736,112 @@ namespace SAM.Geometry.UI.WPF
             Vector3 cameraLookDirection = Vector3.Normalize(viewport3DX.Camera.LookDirection.ToVector3());
 
             List<Guid> guids = new List<Guid>();
-            foreach (KeyValuePair<Guid, Element3D> keyValuePair in dictionary_Element3D)
+
+            if (sceneBatched)
             {
-                if (HitsScreenRect(keyValuePair.Value, rect, selectionType, cameraPosition, cameraLookDirection))
+                // No per-object mesh to project in batched mode - test each object's bounding box (#16).
+                foreach (KeyValuePair<Guid, ObjectBounds> keyValuePair in dictionary_BatchedBounds)
                 {
-                    guids.Add(keyValuePair.Key);
+                    if (BoundsHitsScreenRect(keyValuePair.Value, rect, selectionType, cameraPosition, cameraLookDirection))
+                    {
+                        guids.Add(keyValuePair.Key);
+                    }
+                }
+            }
+            else
+            {
+                foreach (KeyValuePair<Guid, Element3D> keyValuePair in dictionary_Element3D)
+                {
+                    if (HitsScreenRect(keyValuePair.Value, rect, selectionType, cameraPosition, cameraLookDirection))
+                    {
+                        guids.Add(keyValuePair.Key);
+                    }
                 }
             }
 
             Select(guids);
+        }
+
+        // Screen-rectangle test for a batched object via its bounding-box corners (an approximation of the
+        // per-triangle HitsScreenRect): Inside requires all 8 projected corners inside the rectangle;
+        // InsideOrIntersect accepts any corner inside or the corners' screen-AABB overlapping the rectangle.
+        private bool BoundsHitsScreenRect(ObjectBounds bounds, Rect rect, SelectionType selectionType, Vector3 cameraPosition, Vector3 cameraLookDirection)
+        {
+            if (bounds == null)
+            {
+                return false;
+            }
+
+            bool inside = selectionType == SelectionType.Inside;
+
+            Vector3 min = bounds.Min;
+            Vector3 max = bounds.Max;
+            Vector3[] corners =
+            {
+                new Vector3(min.X, min.Y, min.Z), new Vector3(max.X, min.Y, min.Z),
+                new Vector3(min.X, max.Y, min.Z), new Vector3(max.X, max.Y, min.Z),
+                new Vector3(min.X, min.Y, max.Z), new Vector3(max.X, min.Y, max.Z),
+                new Vector3(min.X, max.Y, max.Z), new Vector3(max.X, max.Y, max.Z)
+            };
+
+            bool anyValid = false;
+            bool anyInside = false;
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+
+            foreach (Vector3 corner in corners)
+            {
+                if (Vector3.Dot(corner - cameraPosition, cameraLookDirection) <= 0)
+                {
+                    // Corner behind the camera: a fully-inside test cannot pass; for intersect, skip it.
+                    if (inside)
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                Vector2 projected = viewport3DX.Project(corner);
+                Point point = new Point(projected.X, projected.Y);
+                anyValid = true;
+
+                if (inside)
+                {
+                    if (!rect.Contains(point))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    if (rect.Contains(point))
+                    {
+                        anyInside = true;
+                    }
+
+                    if (point.X < minX) minX = point.X;
+                    if (point.Y < minY) minY = point.Y;
+                    if (point.X > maxX) maxX = point.X;
+                    if (point.Y > maxY) maxY = point.Y;
+                }
+            }
+
+            if (inside)
+            {
+                return anyValid;
+            }
+
+            if (anyInside)
+            {
+                return true;
+            }
+
+            if (!anyValid)
+            {
+                return false;
+            }
+
+            return rect.IntersectsWith(new Rect(new Point(minX, minY), new Point(maxX, maxY)));
         }
 
         /// <summary>
@@ -538,7 +914,14 @@ namespace SAM.Geometry.UI.WPF
 
             foreach (Guid guid in guids)
             {
-                if (dictionary_Element3D.TryGetValue(guid, out Element3D element3D) && Core.UI.WPF.Query.JSAMObject<T>(element3D) != null)
+                if (sceneBatched)
+                {
+                    if (dictionary_BatchedObject.TryGetValue(guid, out IJSAMObject jSAMObject) && ResolveSAMObject(jSAMObject) is T)
+                    {
+                        return true;
+                    }
+                }
+                else if (dictionary_Element3D.TryGetValue(guid, out Element3D element3D) && Core.UI.WPF.Query.JSAMObject<T>(element3D) != null)
                 {
                     return true;
                 }
@@ -713,6 +1096,23 @@ namespace SAM.Geometry.UI.WPF
                 return false;
             }
 
+            // Batched: no per-object model to measure - use the bounds captured during the batched build.
+            if (sceneBatched)
+            {
+                bool any_Batched = false;
+                foreach (Guid guid in guids)
+                {
+                    if (dictionary_BatchedBounds.TryGetValue(guid, out ObjectBounds bounds))
+                    {
+                        any_Batched = true;
+                        min = Vector3.Min(min, bounds.Min);
+                        max = Vector3.Max(max, bounds.Max);
+                    }
+                }
+
+                return any_Batched;
+            }
+
             bool any = false;
             foreach (Guid guid in guids)
             {
@@ -818,7 +1218,8 @@ namespace SAM.Geometry.UI.WPF
                 // axis" report). dictionary_Element3D holds only the currently visible objects (hidden
                 // ones are dropped from the rebuilt scene on isolate/hide), so its bounds are exactly
                 // the visible extents. Fall back to the built-in when there is no geometry to measure.
-                if (TryGetBounds(dictionary_Element3D.Keys, out Vector3 min, out Vector3 max))
+                IEnumerable<Guid> allGuids = sceneBatched ? (IEnumerable<Guid>)dictionary_BatchedBounds.Keys : dictionary_Element3D.Keys;
+                if (TryGetBounds(allGuids, out Vector3 min, out Vector3 max))
                 {
                     Vector3 center = (min + max) * 0.5f;
                     float radius = (max - min).Length() * 0.5f;
@@ -1007,6 +1408,14 @@ namespace SAM.Geometry.UI.WPF
         /// </summary>
         private void ApplyAppearance(Guid guid)
         {
+            // Batched mode has no per-object model to recolour - the selection/hover visual is the overlay
+            // mesh path (#16 increment 3). Selection state + events still flow; only the in-view highlight
+            // waits. So this is a no-op while batched.
+            if (sceneBatched)
+            {
+                return;
+            }
+
             if (!dictionary_Element3D.TryGetValue(guid, out Element3D element3D) || !(element3D is GroupModel3D groupModel3D))
             {
                 return;
@@ -1058,6 +1467,24 @@ namespace SAM.Geometry.UI.WPF
                 {
                     if (hitTestResult == null || !hitTestResult.IsValid)
                     {
+                        continue;
+                    }
+
+                    if (sceneBatched)
+                    {
+                        // Batched: one merged mesh holds many objects. Resolve the hit triangle's vertex
+                        // index to its owning object's guid via that mesh's pick map (#16 increment 2).
+                        if (hitTestResult.ModelHit is MeshGeometryModel3D meshGeometryModel3D
+                            && dictionary_PickBucket.TryGetValue(meshGeometryModel3D, out PickBucket pickBucket)
+                            && hitTestResult.TriangleIndices != null)
+                        {
+                            Guid guid_Batched = pickBucket.Resolve(hitTestResult.TriangleIndices.Item1);
+                            if (guid_Batched != Guid.Empty)
+                            {
+                                return guid_Batched;
+                            }
+                        }
+
                         continue;
                     }
 
@@ -1114,6 +1541,8 @@ namespace SAM.Geometry.UI.WPF
                 {
                     ApplyAppearance(guid.Value);
                 }
+
+                UpdateHoverOverlay();
             }
 
             if (guid.HasValue && dictionary_Stub.TryGetValue(guid.Value, out Media3D.ModelVisual3D stub))
@@ -1129,6 +1558,7 @@ namespace SAM.Geometry.UI.WPF
                 Guid guid = hooveredGuid.Value;
                 hooveredGuid = null;
                 ApplyAppearance(guid);
+                UpdateHoverOverlay();
             }
         }
 
@@ -1195,6 +1625,7 @@ namespace SAM.Geometry.UI.WPF
 
             if (changed)
             {
+                UpdateSelectionOverlay();
                 UpdateRotationPivot();
                 ObjectSelectionChanged?.Invoke(this, new ObjectSelectionChangedEventArgs());
             }
