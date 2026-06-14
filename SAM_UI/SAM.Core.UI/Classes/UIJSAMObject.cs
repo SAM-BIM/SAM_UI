@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
 
@@ -36,9 +38,26 @@ namespace SAM.Core.UI
         // geometry and view settings together. Capture is skipped for transient modifications
         // (IModification.Undoable == false, e.g. a camera-only view update) and while a restore is in
         // progress.
-        private readonly LinkedList<byte[]> undoSnapshots = new LinkedList<byte[]>();
-        private readonly LinkedList<byte[]> redoSnapshots = new LinkedList<byte[]>();
+        //
+        // Snapshots are serialized OFF the UI thread. On a large (10k-space / ~33k-object) model a single
+        // snapshot is ~26 MB and ~10-20 s of pure serialization (ToJsonObject -> JSON -> gzip), and it ran
+        // synchronously inside SetJSAMObject *before* the view reload - so every edit blocked the UI for
+        // (snapshot + reload) ~= 35 s, ~half of it just serialization. We instead store a Task<byte[]>:
+        // capture returns immediately and the serialization runs in the background. Undo/Redo block on the
+        // task result only when actually invoked (rare). The snapshotted reference is the *previous*
+        // jSAMObject, which SetJSAMObject replaces on the next line; because every edit operates on a deep
+        // Core.Query.Clone (see the JSAMObject getter), that replaced reference is an orphan and safe to
+        // read off-thread. See documentation/floor-plan-large-model-performance-issues.md.
+        private readonly LinkedList<Task<byte[]>> undoSnapshots = new LinkedList<Task<byte[]>>();
+        private readonly LinkedList<Task<byte[]>> redoSnapshots = new LinkedList<Task<byte[]>>();
         private bool restoring;
+
+        // Tail of the snapshot serialization chain. Snapshots are chained (not fired with independent
+        // Task.Run calls) so only ONE multi-second / tens-of-MB serialization runs at a time - rapid edits
+        // would otherwise saturate the thread pool and hold many large models + their JSON intermediates
+        // alive at once. Access is confined to the UI thread (SetJSAMObject / Undo / Redo), so the field
+        // needs no locking.
+        private Task snapshotChain = Task.CompletedTask;
 
         // Cap the depth so history memory stays bounded on large (10k-space) models; the oldest is dropped.
         private const int maxHistoryDepth = 20;
@@ -173,22 +192,14 @@ namespace SAM.Core.UI
         public void SetJSAMObject(T jSAMObject, IEnumerable<IModification> modifications, bool captureHistory)
         {
             // Snapshot the state we are about to replace, unless this is a restore, a transient
-            // (non-undoable) change, or an explicit no-capture re-commit. Done before the field is
-            // overwritten so the snapshot is the pre-edit state.
+            // (non-undoable) change, or an explicit no-capture re-commit. Captured (reference grabbed)
+            // before the field is overwritten so the snapshot is the pre-edit state; the serialization
+            // itself runs in the background (see EnqueueSnapshot).
             if (captureHistory && !restoring && this.jSAMObject != null && IsUndoable(modifications))
             {
-                byte[] snapshot = CreateSnapshot(this.jSAMObject);
-                if (snapshot != null && snapshot.Length > 0)
-                {
-                    undoSnapshots.AddLast(snapshot);
-                    while (undoSnapshots.Count > maxHistoryDepth)
-                    {
-                        undoSnapshots.RemoveFirst();
-                    }
-
-                    redoSnapshots.Clear();
-                    OnHistoryChanged();
-                }
+                EnqueueSnapshot(this.jSAMObject, undoSnapshots);
+                redoSnapshots.Clear();
+                OnHistoryChanged();
             }
 
             this.jSAMObject = jSAMObject;
@@ -213,10 +224,19 @@ namespace SAM.Core.UI
                 return false;
             }
 
-            PushCurrent(redoSnapshots);
+            // Capture the current state onto the redo chain before we overwrite it.
+            EnqueueSnapshot(jSAMObject, redoSnapshots);
 
-            byte[] snapshot = undoSnapshots.Last.Value;
+            Task<byte[]> snapshotTask = undoSnapshots.Last.Value;
             undoSnapshots.RemoveLast();
+
+            byte[] snapshot = ResolveSnapshot(snapshotTask);
+            if (snapshot == null || snapshot.Length == 0)
+            {
+                // Serialization failed; drop the broken entry and report nothing was undone.
+                OnHistoryChanged();
+                return false;
+            }
 
             RestoreFromSnapshot(snapshot);
             return true;
@@ -233,10 +253,18 @@ namespace SAM.Core.UI
                 return false;
             }
 
-            PushCurrent(undoSnapshots);
+            // Capture the current state onto the undo chain before we overwrite it.
+            EnqueueSnapshot(jSAMObject, undoSnapshots);
 
-            byte[] snapshot = redoSnapshots.Last.Value;
+            Task<byte[]> snapshotTask = redoSnapshots.Last.Value;
             redoSnapshots.RemoveLast();
+
+            byte[] snapshot = ResolveSnapshot(snapshotTask);
+            if (snapshot == null || snapshot.Length == 0)
+            {
+                OnHistoryChanged();
+                return false;
+            }
 
             RestoreFromSnapshot(snapshot);
             return true;
@@ -286,18 +314,40 @@ namespace SAM.Core.UI
             return !any;
         }
 
-        private void PushCurrent(LinkedList<byte[]> snapshots)
+        // Serialize the (now-immutable) previous state on the background snapshot chain and store the
+        // pending Task immediately, so capture order is preserved and the UI thread never blocks on the
+        // multi-second serialization. The snapshotted object must not be mutated after this call - the edit
+        // pipeline always works on a deep Core.Query.Clone (see the JSAMObject getter), so the reference
+        // handed in here is an orphan once SetJSAMObject replaces the field, hence safe to read off-thread.
+        // Chaining off snapshotChain (rather than an independent Task.Run) keeps serializations one-at-a-time.
+        private void EnqueueSnapshot(T previous, LinkedList<Task<byte[]>> snapshots)
         {
-            byte[] snapshot = CreateSnapshot(jSAMObject);
-            if (snapshot == null || snapshot.Length == 0)
-            {
-                return;
-            }
+            Task<byte[]> snapshotTask = snapshotChain.ContinueWith(
+                _ => CreateSnapshot(previous),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
+            snapshotChain = snapshotTask;
 
-            snapshots.AddLast(snapshot);
+            snapshots.AddLast(snapshotTask);
             while (snapshots.Count > maxHistoryDepth)
             {
                 snapshots.RemoveFirst();
+            }
+        }
+
+        // Block for the background serialization result (only ever called from Undo/Redo, which are rare and
+        // user-initiated). Safe from the UI thread: the work runs on TaskScheduler.Default (thread pool) with
+        // no captured SynchronizationContext, so there is no .Result deadlock. Returns null on failure.
+        private static byte[] ResolveSnapshot(Task<byte[]> snapshotTask)
+        {
+            try
+            {
+                return snapshotTask.GetAwaiter().GetResult();
+            }
+            catch
+            {
+                return null;
             }
         }
 
