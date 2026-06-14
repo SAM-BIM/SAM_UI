@@ -320,6 +320,19 @@ edits (it still appears in the log, but off-thread, overlapping the reload). Big
 drops from ≈(snapshot + reload) to ≈reload alone. Undo/redo of a *very recent* edit may still wait
 for that edit's snapshot to finish serializing, but only then.
 
+**Measured on the 33,635-object model (2026-06-14, `Sam` codec).** Before: `Snapshot.Create` 17.0 s
+**then** `Reload` 18.4 s, sequential ≈35 s. After: `Snapshot.Create` 17.6 s **overlapping** `Reload`
+26.0 s (both start together) ≈26 s wall-clock. Undo/redo verified — `Snapshot.Restore` 6–8 s with
+correct reload and redo-direction re-capture.
+
+**Contention caveat + mitigation.** With the snapshot running concurrently at equal thread priority,
+it stole enough CPU to roughly **double** the UI-thread render steps (`Append` 1.1→2.9 s, `Generate`
+2.0→5.7 s, `Attach` 3.4→5.6 s), so the net win was ~9 s rather than the full ~17 s. The snapshot
+serialization therefore runs at **`ThreadPriority.BelowNormal`** (`CreateSnapshotAtLowPriority`) so
+the render wins the CPU and the snapshot simply finishes a little later — nothing waits on it except a
+rare Undo/Redo of that very edit. The deeper lever remains the faster codec below (less CPU spent =
+less to contend), and using the default GZip codec instead of `Sam` (gzip + Base64) is already cheaper.
+
 ### Deferred follow-up — faster snapshot codec (not done; do later if needed)
 
 The async change removes the snapshot from the *blocking* path but the serialization still costs the

@@ -320,10 +320,14 @@ namespace SAM.Core.UI
         // pipeline always works on a deep Core.Query.Clone (see the JSAMObject getter), so the reference
         // handed in here is an orphan once SetJSAMObject replaces the field, hence safe to read off-thread.
         // Chaining off snapshotChain (rather than an independent Task.Run) keeps serializations one-at-a-time.
+        // The serialization runs at BelowNormal thread priority: it overlaps the view reload (on the UI
+        // thread) for the same edit, and at equal priority it steals enough CPU to roughly double the render
+        // steps. Demoting it lets the render win the CPU - the snapshot just finishes a little later, which is
+        // fine because nothing waits on it except a (rare) Undo/Redo of that very edit.
         private void EnqueueSnapshot(T previous, LinkedList<Task<byte[]>> snapshots)
         {
             Task<byte[]> snapshotTask = snapshotChain.ContinueWith(
-                _ => CreateSnapshot(previous),
+                _ => CreateSnapshotAtLowPriority(previous),
                 CancellationToken.None,
                 TaskContinuationOptions.None,
                 TaskScheduler.Default);
@@ -333,6 +337,23 @@ namespace SAM.Core.UI
             while (snapshots.Count > maxHistoryDepth)
             {
                 snapshots.RemoveFirst();
+            }
+        }
+
+        // Run CreateSnapshot on the current (thread-pool) thread at BelowNormal priority, restoring the
+        // previous priority afterwards so the pooled thread is handed back unchanged.
+        private static byte[] CreateSnapshotAtLowPriority(T previous)
+        {
+            Thread thread = Thread.CurrentThread;
+            ThreadPriority previousPriority = thread.Priority;
+            try
+            {
+                thread.Priority = ThreadPriority.BelowNormal;
+                return CreateSnapshot(previous);
+            }
+            finally
+            {
+                thread.Priority = previousPriority;
             }
         }
 
