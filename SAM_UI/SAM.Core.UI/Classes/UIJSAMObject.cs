@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
 
@@ -36,9 +38,74 @@ namespace SAM.Core.UI
         // geometry and view settings together. Capture is skipped for transient modifications
         // (IModification.Undoable == false, e.g. a camera-only view update) and while a restore is in
         // progress.
-        private readonly LinkedList<byte[]> undoSnapshots = new LinkedList<byte[]>();
-        private readonly LinkedList<byte[]> redoSnapshots = new LinkedList<byte[]>();
+        //
+        // Snapshots are serialized OFF the UI thread. On a large (10k-space / ~33k-object) model a single
+        // snapshot is ~26 MB and ~10-20 s of pure serialization (ToJsonObject -> JSON -> gzip), and it ran
+        // synchronously inside SetJSAMObject *before* the view reload - so every edit blocked the UI for
+        // (snapshot + reload) ~= 35 s, ~half of it just serialization. We instead store a Task<byte[]>:
+        // capture returns immediately and the serialization runs in the background. Undo/Redo block on the
+        // task result only when actually invoked (rare). The snapshotted reference is the *previous*
+        // jSAMObject, which SetJSAMObject replaces on the next line; because every edit operates on a deep
+        // Core.Query.Clone (see the JSAMObject getter), that replaced reference is an orphan and safe to
+        // read off-thread. See documentation/floor-plan-large-model-performance-issues.md.
+        private readonly LinkedList<SnapshotEntry> undoSnapshots = new LinkedList<SnapshotEntry>();
+        private readonly LinkedList<SnapshotEntry> redoSnapshots = new LinkedList<SnapshotEntry>();
         private bool restoring;
+
+        // True from the moment an Undo/Redo starts until its (asynchronous) restore applies. While set,
+        // further Undo/Redo are ignored so overlapping restores cannot corrupt the stacks. Decompressing a
+        // snapshot is ~6 s on a large model; doing it on the UI thread froze the app (the post-undo "white
+        // screen"), so the decompress runs off-thread and only the model swap + reload are marshalled back.
+        private bool restoreInProgress;
+
+        // One queued snapshot: the pending background serialization plus the model it will serialize. When an
+        // entry is pruned past maxHistoryDepth before the serializer reaches it, Drop() nulls the captured
+        // model so the (large) orphaned state can be collected immediately rather than being pinned until its
+        // queued slot runs, and the serializer skips it (Claim returns default) instead of spending 10-20 s on
+        // a snapshot that can no longer be undone. This keeps the depth cap a real bound on queued memory/CPU,
+        // not just on reachable history. Claim/Drop are guarded because prune (UI thread) can race the
+        // serializer (background thread).
+        private sealed class SnapshotEntry
+        {
+            private readonly object gate = new object();
+            private T model;
+
+            public SnapshotEntry(T model)
+            {
+                this.model = model;
+            }
+
+            // The pending serialization. Set once, immediately after construction; only read after that.
+            public Task<byte[]> Task { get; set; }
+
+            // Hand the model to the serializer exactly once, releasing the field's reference. Returns default
+            // if the entry was already pruned (Drop ran first) - the caller then skips the work.
+            public T Claim()
+            {
+                lock (gate)
+                {
+                    T claimed = model;
+                    model = default;
+                    return claimed;
+                }
+            }
+
+            // Pruned before serialization: release the model so it can be collected now.
+            public void Drop()
+            {
+                lock (gate)
+                {
+                    model = default;
+                }
+            }
+        }
+
+        // Tail of the snapshot serialization chain. Snapshots are chained (not fired with independent
+        // Task.Run calls) so only ONE multi-second / tens-of-MB serialization runs at a time - rapid edits
+        // would otherwise saturate the thread pool and hold many large models + their JSON intermediates
+        // alive at once. Access is confined to the UI thread (SetJSAMObject / Undo / Redo), so the field
+        // needs no locking.
+        private Task snapshotChain = Task.CompletedTask;
 
         // Cap the depth so history memory stays bounded on large (10k-space) models; the oldest is dropped.
         private const int maxHistoryDepth = 20;
@@ -173,22 +240,14 @@ namespace SAM.Core.UI
         public void SetJSAMObject(T jSAMObject, IEnumerable<IModification> modifications, bool captureHistory)
         {
             // Snapshot the state we are about to replace, unless this is a restore, a transient
-            // (non-undoable) change, or an explicit no-capture re-commit. Done before the field is
-            // overwritten so the snapshot is the pre-edit state.
+            // (non-undoable) change, or an explicit no-capture re-commit. Captured (reference grabbed)
+            // before the field is overwritten so the snapshot is the pre-edit state; the serialization
+            // itself runs in the background (see EnqueueSnapshot).
             if (captureHistory && !restoring && this.jSAMObject != null && IsUndoable(modifications))
             {
-                byte[] snapshot = CreateSnapshot(this.jSAMObject);
-                if (snapshot != null && snapshot.Length > 0)
-                {
-                    undoSnapshots.AddLast(snapshot);
-                    while (undoSnapshots.Count > maxHistoryDepth)
-                    {
-                        undoSnapshots.RemoveFirst();
-                    }
-
-                    redoSnapshots.Clear();
-                    OnHistoryChanged();
-                }
+                EnqueueSnapshot(this.jSAMObject, undoSnapshots);
+                redoSnapshots.Clear();
+                OnHistoryChanged();
             }
 
             this.jSAMObject = jSAMObject;
@@ -202,50 +261,114 @@ namespace SAM.Core.UI
         public bool CanRedo => redoSnapshots.Count > 0;
 
         /// <summary>
-        /// Restores the previous model state from the undo history (no-op when empty). The current
-        /// state is pushed onto the redo stack first. Raises Modified (FullModification) so consumers
-        /// reload. Returns whether anything was undone.
+        /// Restores the previous model state from the undo history (no-op when empty or a restore is already
+        /// in progress). The decompress/deserialize runs off the UI thread; the model swap + reload are
+        /// marshalled back to the calling thread. The current state is pushed onto the redo stack. Returns
+        /// whether a restore was *started* (it completes asynchronously).
         /// </summary>
         public bool Undo()
         {
-            if (undoSnapshots.Count == 0)
+            if (restoreInProgress || undoSnapshots.Count == 0)
             {
                 return false;
             }
 
-            PushCurrent(redoSnapshots);
-
-            byte[] snapshot = undoSnapshots.Last.Value;
-            undoSnapshots.RemoveLast();
-
-            RestoreFromSnapshot(snapshot);
+            BeginRestore(undoSnapshots, redoSnapshots);
             return true;
         }
 
         /// <summary>
-        /// Re-applies a state previously undone (no-op when empty). The current state is pushed onto the
-        /// undo stack first. Raises Modified (FullModification). Returns whether anything was redone.
+        /// Re-applies a state previously undone (no-op when empty or a restore is already in progress).
+        /// Same async behaviour as <see cref="Undo"/>; the current state is pushed onto the undo stack.
+        /// Returns whether a restore was *started*.
         /// </summary>
         public bool Redo()
         {
-            if (redoSnapshots.Count == 0)
+            if (restoreInProgress || redoSnapshots.Count == 0)
             {
                 return false;
             }
 
-            PushCurrent(undoSnapshots);
-
-            byte[] snapshot = redoSnapshots.Last.Value;
-            redoSnapshots.RemoveLast();
-
-            RestoreFromSnapshot(snapshot);
+            BeginRestore(redoSnapshots, undoSnapshots);
             return true;
+        }
+
+        // Restore the most recent snapshot from `from`, pushing the state being left onto `to`. The heavy
+        // decompress/deserialize (and the rare wait for a still-running serialization) run on the thread
+        // pool; the actual model swap + reload run back on the calling (UI) thread via the captured
+        // synchronization context. The restore is aborted - leaving all state untouched - if it fails or if
+        // the model changed while we were off-thread (e.g. a concurrent edit), so newer state is never
+        // clobbered. Nothing is popped/pushed until the apply step, so an abort needs no rollback.
+        private void BeginRestore(LinkedList<SnapshotEntry> from, LinkedList<SnapshotEntry> to)
+        {
+            SnapshotEntry entry = from.Last.Value;
+            T expected = jSAMObject;
+            restoreInProgress = true;
+            TaskScheduler uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+
+            Task.Run(() =>
+            {
+                byte[] snapshot = ResolveSnapshot(entry.Task);
+                return snapshot == null || snapshot.Length == 0 ? default : RestoreSnapshot(snapshot);
+            }).ContinueWith(
+                restoreTask =>
+                {
+                    try
+                    {
+                        T state = restoreTask.Status == TaskStatus.RanToCompletion ? restoreTask.Result : default;
+
+                        // Abort cleanly if deserialization failed, the entry is gone, or the model changed
+                        // under us - never overwrite newer state.
+                        if (state == null || from.Last == null || from.Last.Value != entry || !ReferenceEquals(jSAMObject, expected))
+                        {
+                            return;
+                        }
+
+                        // Capture the state being left onto the opposite stack, then consume the entry.
+                        EnqueueSnapshot(expected, to);
+                        from.RemoveLast();
+
+                        restoring = true;
+                        try
+                        {
+                            jSAMObject = state;
+                            InvalidateClone();
+                            modified = true;
+                            OnModified(new List<IModification>() { new FullModification() });
+                        }
+                        finally
+                        {
+                            restoring = false;
+                        }
+
+                        OnHistoryChanged();
+                    }
+                    finally
+                    {
+                        restoreInProgress = false;
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                uiScheduler);
         }
 
         /// <summary>Clears the undo/redo history (e.g. on open/close - history does not span documents).</summary>
         public void ClearHistory()
         {
             bool changed = undoSnapshots.Count > 0 || redoSnapshots.Count > 0;
+
+            // Drop so any not-yet-serialized entries release their models and skip their queued work.
+            foreach (SnapshotEntry entry in undoSnapshots)
+            {
+                entry.Drop();
+            }
+
+            foreach (SnapshotEntry entry in redoSnapshots)
+            {
+                entry.Drop();
+            }
+
             undoSnapshots.Clear();
             redoSnapshots.Clear();
 
@@ -286,39 +409,73 @@ namespace SAM.Core.UI
             return !any;
         }
 
-        private void PushCurrent(LinkedList<byte[]> snapshots)
+        // Serialize the (now-immutable) previous state on the background snapshot chain and store the
+        // pending Task immediately, so capture order is preserved and the UI thread never blocks on the
+        // multi-second serialization. The snapshotted object must not be mutated after this call - the edit
+        // pipeline always works on a deep Core.Query.Clone (see the JSAMObject getter), so the reference
+        // handed in here is an orphan once SetJSAMObject replaces the field, hence safe to read off-thread.
+        // Chaining off snapshotChain (rather than an independent Task.Run) keeps serializations one-at-a-time.
+        // The serialization runs at BelowNormal thread priority: it overlaps the view reload (on the UI
+        // thread) for the same edit, and at equal priority it steals enough CPU to roughly double the render
+        // steps. Demoting it lets the render win the CPU - the snapshot just finishes a little later, which is
+        // fine because nothing waits on it except a (rare) Undo/Redo of that very edit.
+        private void EnqueueSnapshot(T previous, LinkedList<SnapshotEntry> snapshots)
         {
-            byte[] snapshot = CreateSnapshot(jSAMObject);
-            if (snapshot == null || snapshot.Length == 0)
-            {
-                return;
-            }
+            SnapshotEntry entry = new SnapshotEntry(previous);
+            entry.Task = snapshotChain.ContinueWith(
+                _ => CreateSnapshotAtLowPriority(entry),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
+            snapshotChain = entry.Task;
 
-            snapshots.AddLast(snapshot);
+            snapshots.AddLast(entry);
             while (snapshots.Count > maxHistoryDepth)
             {
+                // Drop so the pruned entry's model is released and its queued serialization is skipped -
+                // the depth cap must bound queued memory/CPU, not just reachable history.
+                snapshots.First.Value.Drop();
                 snapshots.RemoveFirst();
             }
         }
 
-        private void RestoreFromSnapshot(byte[] snapshot)
+        // Run CreateSnapshot on the current (thread-pool) thread at BelowNormal priority, restoring the
+        // previous priority afterwards so the pooled thread is handed back unchanged. Skips entries pruned
+        // before the serializer reached them (Claim returns default).
+        private static byte[] CreateSnapshotAtLowPriority(SnapshotEntry entry)
         {
-            T state = RestoreSnapshot(snapshot);
+            T model = entry.Claim();
+            if (model == null)
+            {
+                return null;
+            }
 
-            restoring = true;
+            Thread thread = Thread.CurrentThread;
+            ThreadPriority previousPriority = thread.Priority;
             try
             {
-                jSAMObject = state;
-                InvalidateClone();
-                modified = true;
-                OnModified(new List<IModification>() { new FullModification() });
+                thread.Priority = ThreadPriority.BelowNormal;
+                return CreateSnapshot(model);
             }
             finally
             {
-                restoring = false;
+                thread.Priority = previousPriority;
             }
+        }
 
-            OnHistoryChanged();
+        // Block for the background serialization result. Called from BeginRestore's Task.Run (a thread-pool
+        // thread, never the UI thread), so a still-running serialization is awaited off-thread. Returns null
+        // on failure.
+        private static byte[] ResolveSnapshot(Task<byte[]> snapshotTask)
+        {
+            try
+            {
+                return snapshotTask.GetAwaiter().GetResult();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         // Compressed snapshot of the object, per the selected codec (see snapshotCodec). Size and time

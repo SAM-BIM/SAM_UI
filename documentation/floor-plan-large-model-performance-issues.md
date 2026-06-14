@@ -283,6 +283,119 @@ position with a clamped zoom.
 
 ---
 
+## Undo snapshot: serialized off the UI thread
+
+**Problem (found 2026-06-14, profiling the post-#16 render on the 33,635-object / 10k-space model).**
+The undo history (`SAM_UI/SAM.Core.UI/Classes/UIJSAMObject.cs`) captures the pre-edit state as a
+compressed snapshot on every undoable `SetJSAMObject`. On the large model that snapshot is **~26 MB
+and ~10–20 s** of pure serialization (`ToJsonObject()` → `ToJsonString()` → gzip), and it ran
+**synchronously on the UI thread inside `SetJSAMObject`, before** `OnModified` triggered the view
+reload. The performance log shows the two as back-to-back phases of a single edit:
+`UIJSAMObject.Snapshot.Create` ~17 s **then** `AnalyticalWindow.Reload` ~18 s — ≈35 s blocked per
+edit, roughly half of it just snapshot serialization. After #16 cut the render, the snapshot became
+the single largest cost on the blocking path.
+
+**Fix (async serialization, this change).** The undo/redo history now stores `Task<byte[]>` instead
+of `byte[]`:
+- Capture grabs the *reference* to the previous state synchronously (so order and pre-edit content
+  are correct) and returns immediately; the heavy serialization runs in the background.
+- Serializations are **chained** off a single `snapshotChain` tail (not independent `Task.Run`s) so
+  only one multi-second / tens-of-MB serialization runs at a time — rapid edits would otherwise
+  saturate the thread pool and keep many large models + their JSON intermediates alive at once.
+- The depth cap (`maxHistoryDepth`) must bound *queued* work, not just reachable history: when a burst
+  of edits prunes an entry before its serialization runs, `SnapshotEntry.Drop()` nulls the captured
+  model (so the orphaned large state is collectable immediately, not pinned until its slot runs) and
+  the serializer skips it (`Claim()` returns default) instead of spending 10–20 s on a snapshot that
+  can no longer be undone. `Claim`/`Drop` are lock-guarded because prune (UI thread) races the
+  background serializer. `ClearHistory` drops all pending entries the same way.
+- `Undo`/`Redo` block on the task result (`ResolveSnapshot`) only when actually invoked, which is
+  rare and user-initiated. Safe from the UI thread: the work runs on `TaskScheduler.Default` with no
+  captured `SynchronizationContext`, so `.GetResult()` cannot deadlock.
+
+**Safety invariant (verify on test).** The object handed to the background serializer is the
+*previous* `jSAMObject`, which `SetJSAMObject` replaces on the next line. Because every edit operates
+on a deep `Core.Query.Clone` (the `JSAMObject` getter), that replaced reference is an orphan and is
+safe to read off-thread. This holds as long as **committed states are treated as immutable** — no
+caller may mutate a model instance after handing it to `SetJSAMObject`. If a caller ever does, the
+background read could race; that would already be a latent bug (committed = immutable), but it is the
+one thing to watch when testing. `PerformanceLog.Write` is lock-guarded, so concurrent background +
+UI logging is safe.
+
+**Expected impact.** `UIJSAMObject.Snapshot.Create` disappears from the user's blocking wait on
+edits (it still appears in the log, but off-thread, overlapping the reload). Big-model edit latency
+drops from ≈(snapshot + reload) to ≈reload alone. Undo/redo of a *very recent* edit may still wait
+for that edit's snapshot to finish serializing, but only then.
+
+**Measured on the 33,635-object model (2026-06-14, `Sam` codec).** Before: `Snapshot.Create` 17.0 s
+**then** `Reload` 18.4 s, sequential ≈35 s. After: `Snapshot.Create` 17.6 s **overlapping** `Reload`
+26.0 s (both start together) ≈26 s wall-clock. Undo/redo verified — `Snapshot.Restore` 6–8 s with
+correct reload and redo-direction re-capture.
+
+**Contention caveat + mitigation.** With the snapshot running concurrently at equal thread priority,
+it stole enough CPU to roughly **double** the UI-thread render steps (`Append` 1.1→2.9 s, `Generate`
+2.0→5.7 s, `Attach` 3.4→5.6 s), so the net win was ~9 s rather than the full ~17 s. The snapshot
+serialization therefore runs at **`ThreadPriority.BelowNormal`** (`CreateSnapshotAtLowPriority`) so
+the render wins the CPU and the snapshot simply finishes a little later — nothing waits on it except a
+rare Undo/Redo of that very edit. The deeper lever remains the faster codec below (less CPU spent =
+less to contend), and using the default GZip codec instead of `Sam` (gzip + Base64) is already cheaper.
+
+**Codec comparison — GZip vs Sam, measured on the 33,635-object model (2026-06-14).** GZip (the
+default) wins on every axis; `Sam` (gzip + Base64) was only ever a debug A/B and should not be used:
+
+| Metric | `Sam` | `GZip` (default) | Win |
+| --- | --- | --- | --- |
+| `Snapshot.Create` | ~15.3–20.5 s (median ~17 s) | ~10.6–15.6 s (median ~12 s) | **~30% faster** |
+| `Snapshot.Size` | ~26.3 MB | ~16.9 MB | **~36% smaller** (no Base64) |
+| `Snapshot.Restore` | ~6.0–9.2 s | ~5.5–7.1 s | marginal |
+
+`Restore` barely moves because it is dominated by JSON parse → object-graph rebuild, not the
+Base64/decompress step. The memory win matters at the 20-deep cap: ~340 MB vs ~530 MB of retained
+snapshots. **Recommendation: leave `SAM_UI_UNDO_SNAPSHOT` unset (GZip).** `Snapshot.Create` is still
+~12 s and `Snapshot.Restore` ~6 s synchronous on the UI thread (the latter is the post-undo "white
+screen") — addressed respectively by the faster codec below and by making Restore async (next).
+
+### Async restore — removes the post-undo UI freeze (this change)
+
+`Undo`/`Redo` used to decompress + deserialize the snapshot (`RestoreSnapshot`, ~6 s on the large
+model) **synchronously on the UI thread**, then raise `FullModification` to reload — the UI froze for
+the decompress (the reported "white screen") before the reload even started. `BeginRestore` now runs
+the decompress (and the rare wait for a still-running serialization) on the thread pool, and marshals
+only the model swap + reload back to the UI thread via the captured synchronization context. During
+the decompress the app stays responsive and the **previous scene stays on screen**.
+
+Correctness guards:
+- `restoreInProgress` ignores a second Undo/Redo until the current one applies, so overlapping restores
+  cannot corrupt the undo/redo stacks.
+- Nothing is popped/pushed until the apply step, and the apply **aborts** (touching no state) if the
+  deserialization failed, the entry was pruned, or the model changed while off-thread (a concurrent
+  edit) — `ReferenceEquals(jSAMObject, expected)`. A newer state is never clobbered, and an abort needs
+  no rollback.
+
+Scope note: this removes the ~6 s decompress freeze. The subsequent **reload still rebuilds the whole
+3D scene**, which blanks the viewport while `ToElement3D` re-attaches (~8–12 s on the big model) — that
+is the general full-regen behaviour (it affects every `FullModification`, not just undo), and is a
+separate item (incremental/double-buffered scene swap; mesh-batching #1 above).
+
+### Deferred follow-up — faster snapshot codec (not done; do later if needed)
+
+The async change removes the snapshot from the *blocking* path but the serialization still costs the
+same CPU (~10–20 s) on a background thread, so back-to-back big edits can queue. If that becomes a
+problem, cut the raw serialization cost itself:
+
+- **Direct `Utf8JsonWriter` streaming** instead of `ToJsonObject()` → `ToJsonString()`. Today the
+  GZip codec (`CreateSnapshot`) builds a full `JsonObject` node tree for ~33k objects **and then**
+  re-walks it to produce the JSON string — two passes plus a large intermediate tree. Writing the
+  model straight into a `GZipStream`-wrapped `Utf8JsonWriter` would roughly halve the work and the
+  transient allocations. This requires a streaming serialization entry point in SAM core
+  (`Core.Convert` / `IJSAMObject` serialization), so it is a **SAM-repo** change, not UI-only.
+- Or an **incremental / delta** history (store only what an edit changed). Largest redesign, biggest
+  correctness surface on undo/redo — only if the full-snapshot model proves insufficient.
+
+Codec A/B is already wired: `SAM_UI_UNDO_SNAPSHOT=sam` selects the SAM-native `Query.Compress`
+codec, default is raw gzip; `UIJSAMObject.Snapshot.Create` / `.Size` log time and bytes for each.
+
+---
+
 ## Implemented per-regeneration caches (SAM-BIM/SAM#16)
 
 All of these memoize purely-geometric per-regeneration work in `GeometryObjectModel.cs` (and the
