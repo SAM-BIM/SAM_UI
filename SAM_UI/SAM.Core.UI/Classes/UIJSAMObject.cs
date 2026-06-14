@@ -48,9 +48,51 @@ namespace SAM.Core.UI
         // jSAMObject, which SetJSAMObject replaces on the next line; because every edit operates on a deep
         // Core.Query.Clone (see the JSAMObject getter), that replaced reference is an orphan and safe to
         // read off-thread. See documentation/floor-plan-large-model-performance-issues.md.
-        private readonly LinkedList<Task<byte[]>> undoSnapshots = new LinkedList<Task<byte[]>>();
-        private readonly LinkedList<Task<byte[]>> redoSnapshots = new LinkedList<Task<byte[]>>();
+        private readonly LinkedList<SnapshotEntry> undoSnapshots = new LinkedList<SnapshotEntry>();
+        private readonly LinkedList<SnapshotEntry> redoSnapshots = new LinkedList<SnapshotEntry>();
         private bool restoring;
+
+        // One queued snapshot: the pending background serialization plus the model it will serialize. When an
+        // entry is pruned past maxHistoryDepth before the serializer reaches it, Drop() nulls the captured
+        // model so the (large) orphaned state can be collected immediately rather than being pinned until its
+        // queued slot runs, and the serializer skips it (Claim returns default) instead of spending 10-20 s on
+        // a snapshot that can no longer be undone. This keeps the depth cap a real bound on queued memory/CPU,
+        // not just on reachable history. Claim/Drop are guarded because prune (UI thread) can race the
+        // serializer (background thread).
+        private sealed class SnapshotEntry
+        {
+            private readonly object gate = new object();
+            private T model;
+
+            public SnapshotEntry(T model)
+            {
+                this.model = model;
+            }
+
+            // The pending serialization. Set once, immediately after construction; only read after that.
+            public Task<byte[]> Task { get; set; }
+
+            // Hand the model to the serializer exactly once, releasing the field's reference. Returns default
+            // if the entry was already pruned (Drop ran first) - the caller then skips the work.
+            public T Claim()
+            {
+                lock (gate)
+                {
+                    T claimed = model;
+                    model = default;
+                    return claimed;
+                }
+            }
+
+            // Pruned before serialization: release the model so it can be collected now.
+            public void Drop()
+            {
+                lock (gate)
+                {
+                    model = default;
+                }
+            }
+        }
 
         // Tail of the snapshot serialization chain. Snapshots are chained (not fired with independent
         // Task.Run calls) so only ONE multi-second / tens-of-MB serialization runs at a time - rapid edits
@@ -227,10 +269,10 @@ namespace SAM.Core.UI
             // Capture the current state onto the redo chain before we overwrite it.
             EnqueueSnapshot(jSAMObject, redoSnapshots);
 
-            Task<byte[]> snapshotTask = undoSnapshots.Last.Value;
+            SnapshotEntry entry = undoSnapshots.Last.Value;
             undoSnapshots.RemoveLast();
 
-            byte[] snapshot = ResolveSnapshot(snapshotTask);
+            byte[] snapshot = ResolveSnapshot(entry.Task);
             if (snapshot == null || snapshot.Length == 0)
             {
                 // Serialization failed; drop the broken entry and report nothing was undone.
@@ -256,10 +298,10 @@ namespace SAM.Core.UI
             // Capture the current state onto the undo chain before we overwrite it.
             EnqueueSnapshot(jSAMObject, undoSnapshots);
 
-            Task<byte[]> snapshotTask = redoSnapshots.Last.Value;
+            SnapshotEntry entry = redoSnapshots.Last.Value;
             redoSnapshots.RemoveLast();
 
-            byte[] snapshot = ResolveSnapshot(snapshotTask);
+            byte[] snapshot = ResolveSnapshot(entry.Task);
             if (snapshot == null || snapshot.Length == 0)
             {
                 OnHistoryChanged();
@@ -274,6 +316,18 @@ namespace SAM.Core.UI
         public void ClearHistory()
         {
             bool changed = undoSnapshots.Count > 0 || redoSnapshots.Count > 0;
+
+            // Drop so any not-yet-serialized entries release their models and skip their queued work.
+            foreach (SnapshotEntry entry in undoSnapshots)
+            {
+                entry.Drop();
+            }
+
+            foreach (SnapshotEntry entry in redoSnapshots)
+            {
+                entry.Drop();
+            }
+
             undoSnapshots.Clear();
             redoSnapshots.Clear();
 
@@ -324,32 +378,43 @@ namespace SAM.Core.UI
         // thread) for the same edit, and at equal priority it steals enough CPU to roughly double the render
         // steps. Demoting it lets the render win the CPU - the snapshot just finishes a little later, which is
         // fine because nothing waits on it except a (rare) Undo/Redo of that very edit.
-        private void EnqueueSnapshot(T previous, LinkedList<Task<byte[]>> snapshots)
+        private void EnqueueSnapshot(T previous, LinkedList<SnapshotEntry> snapshots)
         {
-            Task<byte[]> snapshotTask = snapshotChain.ContinueWith(
-                _ => CreateSnapshotAtLowPriority(previous),
+            SnapshotEntry entry = new SnapshotEntry(previous);
+            entry.Task = snapshotChain.ContinueWith(
+                _ => CreateSnapshotAtLowPriority(entry),
                 CancellationToken.None,
                 TaskContinuationOptions.None,
                 TaskScheduler.Default);
-            snapshotChain = snapshotTask;
+            snapshotChain = entry.Task;
 
-            snapshots.AddLast(snapshotTask);
+            snapshots.AddLast(entry);
             while (snapshots.Count > maxHistoryDepth)
             {
+                // Drop so the pruned entry's model is released and its queued serialization is skipped -
+                // the depth cap must bound queued memory/CPU, not just reachable history.
+                snapshots.First.Value.Drop();
                 snapshots.RemoveFirst();
             }
         }
 
         // Run CreateSnapshot on the current (thread-pool) thread at BelowNormal priority, restoring the
-        // previous priority afterwards so the pooled thread is handed back unchanged.
-        private static byte[] CreateSnapshotAtLowPriority(T previous)
+        // previous priority afterwards so the pooled thread is handed back unchanged. Skips entries pruned
+        // before the serializer reached them (Claim returns default).
+        private static byte[] CreateSnapshotAtLowPriority(SnapshotEntry entry)
         {
+            T model = entry.Claim();
+            if (model == null)
+            {
+                return null;
+            }
+
             Thread thread = Thread.CurrentThread;
             ThreadPriority previousPriority = thread.Priority;
             try
             {
                 thread.Priority = ThreadPriority.BelowNormal;
-                return CreateSnapshot(previous);
+                return CreateSnapshot(model);
             }
             finally
             {

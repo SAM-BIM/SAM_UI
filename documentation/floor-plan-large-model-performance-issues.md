@@ -302,6 +302,12 @@ of `byte[]`:
 - Serializations are **chained** off a single `snapshotChain` tail (not independent `Task.Run`s) so
   only one multi-second / tens-of-MB serialization runs at a time — rapid edits would otherwise
   saturate the thread pool and keep many large models + their JSON intermediates alive at once.
+- The depth cap (`maxHistoryDepth`) must bound *queued* work, not just reachable history: when a burst
+  of edits prunes an entry before its serialization runs, `SnapshotEntry.Drop()` nulls the captured
+  model (so the orphaned large state is collectable immediately, not pinned until its slot runs) and
+  the serializer skips it (`Claim()` returns default) instead of spending 10–20 s on a snapshot that
+  can no longer be undone. `Claim`/`Drop` are lock-guarded because prune (UI thread) races the
+  background serializer. `ClearHistory` drops all pending entries the same way.
 - `Undo`/`Redo` block on the task result (`ResolveSnapshot`) only when actually invoked, which is
   rare and user-initiated. Safe from the UI thread: the work runs on `TaskScheduler.Default` with no
   captured `SynchronizationContext`, so `.GetResult()` cannot deadlock.
