@@ -2,7 +2,6 @@
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using System.Windows;
-using System.Windows.Forms;
 using System.Windows.Interop;
 
 namespace SAM.Core.UI.WPF
@@ -15,7 +14,7 @@ namespace SAM.Core.UI.WPF
         /// owner and expect a DialogResult) to the WPF dialog model. Returns the nullable
         /// bool from <see cref="Window.ShowDialog"/> (true = OK, false/null = cancelled).
         /// </summary>
-        public static bool? ShowDialog(this Window window, IWin32Window owner)
+        public static bool? ShowDialog(this Window window, System.Windows.Forms.IWin32Window owner)
         {
             if (window == null)
             {
