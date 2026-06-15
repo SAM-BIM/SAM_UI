@@ -1,11 +1,11 @@
-﻿// SPDX-License-Identifier: LGPL-3.0-or-later
-// Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Tas;
-using SAM.Analytical.Windows;
+using SAM.Analytical.UI;
 using SAM.Core;
 using SAM.Core.Tas;
-using SAM.Core.Windows.Forms;
+using SAM.Core.UI.WPF;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,9 +15,9 @@ namespace SAM.Analytical.UI.WPF
 {
     public static partial class Modify
     {
-        public static void EditApertureConstructions(this UIAnalyticalModel uIAnalyticalModel, IWin32Window? owner = null)
+        public static void EditApertureConstructions(this UIAnalyticalModel uIAnalyticalModel, IWin32Window owner = null)
         {
-            AdjacencyCluster? adjacencyCluster = uIAnalyticalModel?.JSAMObject?.AdjacencyCluster;
+            AdjacencyCluster adjacencyCluster = uIAnalyticalModel?.JSAMObject?.AdjacencyCluster;
             if (adjacencyCluster == null)
             {
                 adjacencyCluster = new AdjacencyCluster();
@@ -27,65 +27,58 @@ namespace SAM.Analytical.UI.WPF
             ApertureConstructionLibrary apertureConstructionLibrary = new ApertureConstructionLibrary(uIAnalyticalModel?.JSAMObject?.Name ?? string.Empty);
             apertureConstructions?.ForEach(x => apertureConstructionLibrary.Add(x));
 
-            MaterialLibrary? materialLibrary = uIAnalyticalModel?.JSAMObject.MaterialLibrary;
+            MaterialLibrary materialLibrary = uIAnalyticalModel?.JSAMObject.MaterialLibrary;
 
-            using (Analytical.Windows.Forms.ApertureConstructionLibraryForm apertureConstructionLibraryForm = new Analytical.Windows.Forms.ApertureConstructionLibraryForm(materialLibrary, apertureConstructionLibrary))
+            ApertureConstructionLibraryWindow apertureConstructionLibraryWindow = new ApertureConstructionLibraryWindow(materialLibrary, apertureConstructionLibrary)
             {
-                apertureConstructionLibraryForm.ConstructionManagerImporting += ApertureConstructionLibraryForm_ConstructionManagerImporting;
-                apertureConstructionLibraryForm.ConstructionManagerExporting += ApertureConstructionLibraryForm_ConstructionManagerExporting;
-                apertureConstructionLibraryForm.MultiSelect = true;
+                Title = "Aperture Constructions"
+            };
+            apertureConstructionLibraryWindow.ConstructionManagerImporting += ApertureConstructionLibraryWindow_ConstructionManagerImporting;
+            apertureConstructionLibraryWindow.ConstructionManagerExporting += ApertureConstructionLibraryWindow_ConstructionManagerExporting;
+            apertureConstructionLibraryWindow.MultiSelect = true;
 
-                apertureConstructionLibraryForm.Text = "Aperture Constructions";
-                if (apertureConstructionLibraryForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                apertureConstructionLibrary = apertureConstructionLibraryForm.ApertureConstructionLibrary;
-                materialLibrary = apertureConstructionLibraryForm.MaterialLibrary;
+            if (apertureConstructionLibraryWindow.ShowDialog(owner) != true)
+            {
+                return;
             }
+
+            apertureConstructionLibrary = apertureConstructionLibraryWindow.ApertureConstructionLibrary;
+            materialLibrary = apertureConstructionLibraryWindow.MaterialLibrary;
 
             adjacencyCluster.ReplaceApertureConstructions(apertureConstructionLibrary);
 
             uIAnalyticalModel.JSAMObject = new AnalyticalModel(uIAnalyticalModel.JSAMObject, adjacencyCluster, materialLibrary, uIAnalyticalModel.JSAMObject.ProfileLibrary);
         }
 
-        private static void ApertureConstructionLibraryForm_ConstructionManagerExporting(object sender, SAM.Analytical.Windows.ConstructionManagerExportingEventArgs e)
+        private static void ApertureConstructionLibraryWindow_ConstructionManagerExporting(object sender, ConstructionManagerExportingEventArgs e)
         {
-            IWin32Window? win32Widnow = sender as IWin32Window;
+            System.Windows.Window owner = sender as System.Windows.Window;
 
             e.Handled = true;
 
             ConstructionManager constructionManager = e.ConstructionManager;
             if (constructionManager == null)
             {
-                MessageBox.Show("Nothing to be exported");
+                System.Windows.MessageBox.Show("Nothing to be exported");
+                return;
             }
 
             MaterialLibrary materialLibrary = constructionManager.MaterialLibrary;
 
-            string path = null;
-            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+            Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog
             {
-                saveFileDialog.Filter = "json files (*.json)|*.json|Tas Construction Databases (*.tcd)|*.tcd|All files (*.*)|*.*";
-                saveFileDialog.FilterIndex = 1;
-                saveFileDialog.RestoreDirectory = true;
-                if (materialLibrary == null || materialLibrary.GetMaterials() == null)
-                {
-                    saveFileDialog.FileName = "SAM_ConstructionLibrary_CustomVer00.json";
-                }
-                else
-                {
-                    saveFileDialog.FileName = "SAM_ConstructionManager_CustomVer00.json";
-                }
+                Filter = "json files (*.json)|*.json|Tas Construction Databases (*.tcd)|*.tcd|All files (*.*)|*.*",
+                FilterIndex = 1,
+                RestoreDirectory = true,
+                FileName = (materialLibrary == null || materialLibrary.GetMaterials() == null) ? "SAM_ConstructionLibrary_CustomVer00.json" : "SAM_ConstructionManager_CustomVer00.json"
+            };
 
-                if (saveFileDialog.ShowDialog(win32Widnow) != DialogResult.OK)
-                {
-                    return;
-                }
-                path = saveFileDialog.FileName;
+            if (saveFileDialog.ShowDialog(owner) != true)
+            {
+                return;
             }
 
+            string path = saveFileDialog.FileName;
             if (path == null)
             {
                 return;
@@ -111,11 +104,11 @@ namespace SAM.Analytical.UI.WPF
                         {
                             foreach (IMaterial material in materials)
                             {
-                                if(material == null)
+                                if (material == null)
                                 {
                                     continue;
                                 }
-                                
+
                                 if (!material.TryGetValue(ParameterizedSAMObjectParameter.Category, out Category category))
                                 {
                                     category = new Category(document.materialRoot.name);
@@ -172,41 +165,34 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            if (result)
-            {
-                MessageBox.Show("Data exported successfully.");
-            }
-            else
-            {
-                MessageBox.Show("Data could not be exported.");
-            }
+            System.Windows.MessageBox.Show(result ? "Data exported successfully." : "Data could not be exported.");
         }
 
-        private static void ApertureConstructionLibraryForm_ConstructionManagerImporting(object sender, SAM.Analytical.Windows.ConstructionManagerImportingEventArgs e)
+        private static void ApertureConstructionLibraryWindow_ConstructionManagerImporting(object sender, ConstructionManagerImportingEventArgs e)
         {
-            IWin32Window win32Widnow = sender as IWin32Window;
+            System.Windows.Window owner = sender as System.Windows.Window;
 
             e.Handled = true;
 
-            string path = null;
-            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog
             {
-                string directory = Analytical.Query.ResourcesDirectory();
-                if (System.IO.Directory.Exists(directory))
-                {
-                    openFileDialog.InitialDirectory = directory;
-                }
+                Filter = "json files (*.json)|*.json|Tas Construction Databases (*.tcd)|*.tcd|All files (*.*)|*.*",
+                FilterIndex = 3,
+                RestoreDirectory = true
+            };
 
-                openFileDialog.Filter = "json files (*.json)|*.json|Tas Construction Databases (*.tcd)|*.tcd|All files (*.*)|*.*";
-                openFileDialog.FilterIndex = 3;
-                openFileDialog.RestoreDirectory = true;
-                if (openFileDialog.ShowDialog(win32Widnow) != DialogResult.OK)
-                {
-                    return;
-                }
-                path = openFileDialog.FileName;
+            string directory = Analytical.Query.ResourcesDirectory();
+            if (System.IO.Directory.Exists(directory))
+            {
+                openFileDialog.InitialDirectory = directory;
             }
 
+            if (openFileDialog.ShowDialog(owner) != true)
+            {
+                return;
+            }
+
+            string path = openFileDialog.FileName;
             if (path == null)
             {
                 return;
@@ -214,32 +200,38 @@ namespace SAM.Analytical.UI.WPF
 
             if (System.IO.Path.GetExtension(path) == ".tcd")
             {
-                MarqueeProgressForm marqueeProgressForm = new MarqueeProgressForm("Importing");
-                marqueeProgressForm.Show();
+                ProgressBarWindow progressBarWindow = new ProgressBarWindow("Importing", "Importing");
+                progressBarWindow.Show();
 
                 ConstructionManager constructionManager = Tas.Convert.ToSAM_ConstructionManager(path);
 
-                marqueeProgressForm.Close();
+                progressBarWindow.Close();
 
-                if(constructionManager?.Constructions == null || constructionManager?.Constructions.Count == 0)
+                if (constructionManager?.Constructions == null || constructionManager?.Constructions.Count == 0)
                 {
-                    MessageBox.Show("Data could not be imported. No ApertureConstructions in source file.");
+                    System.Windows.MessageBox.Show("Data could not be imported. No ApertureConstructions in source file.");
                 }
 
                 ApertureType apertureType = ApertureType.Window;
-                using (ComboBoxForm<ApertureType> comboBoxForm = new ComboBoxForm<ApertureType>("Aperture Type", Enum.GetValues(typeof(ApertureType)).Cast<ApertureType>(), x => x == ApertureType.Undefined ? string.Empty : x.Description()))
+                ComboBoxWindow<ApertureType> comboBoxWindow = new ComboBoxWindow<ApertureType>("Aperture Type", Enum.GetValues(typeof(ApertureType)).Cast<ApertureType>(), x => x == ApertureType.Undefined ? string.Empty : Core.Query.Description(x))
                 {
-                    comboBoxForm.SelectedItem = apertureType;
-                    if(comboBoxForm.ShowDialog() == DialogResult.OK)
-                    {
-                        apertureType = comboBoxForm.SelectedItem;
-                    }
+                    Owner = owner,
+                    SelectedItem = apertureType
+                };
+                if (comboBoxWindow.ShowDialog() == true)
+                {
+                    apertureType = comboBoxWindow.SelectedItem;
                 }
 
-                Core.UI.WPF.MultipleSelectionTreeViewWindow treeViewWindow = new Core.UI.WPF.MultipleSelectionTreeViewWindow();
+                MultipleSelectionTreeViewWindow treeViewWindow = new MultipleSelectionTreeViewWindow();
                 treeViewWindow.GettingCategory += TreeViewWindow_GettingConstructionCategory;
                 treeViewWindow.GettingText += TreeViewWindow_GettingConstructionText;
                 treeViewWindow.SetObjects(constructionManager?.Constructions);
+                if (owner != null)
+                {
+                    treeViewWindow.Owner = owner;
+                }
+
                 if (treeViewWindow.ShowDialog() != true)
                 {
                     return;
@@ -249,10 +241,10 @@ namespace SAM.Analytical.UI.WPF
                 List<Construction> constructions = constructionManager?.Constructions;
                 if (constructions != null)
                 {
-                    foreach(Construction construction in constructions)
+                    foreach (Construction construction in constructions)
                     {
                         ApertureConstruction apertureConstruction = Analytical.Create.ApertureConstruction(apertureType, construction.Name, construction);
-                        if(apertureConstruction == null)
+                        if (apertureConstruction == null)
                         {
                             continue;
                         }
@@ -277,11 +269,9 @@ namespace SAM.Analytical.UI.WPF
             }
             else
             {
-                AnalyticalModel analyticalModel = new AnalyticalModel(Guid.NewGuid(), "Temporary AnalyticalModel");
-                Func<IJSAMObject, bool> func = new Func<IJSAMObject, bool>(x => { return x is Material || x is ApertureConstruction; });
+                Func<IJSAMObject, bool> func = x => x is Material || x is ApertureConstruction;
 
-                analyticalModel = Analytical.Windows.Query.Import(analyticalModel, path, func, new SAM.Analytical.Windows.ImportOptions() { UserSelection = false, SuppressMessages = false }, win32Widnow);
-                e.ConstructionManager = analyticalModel?.ConstructionManager;
+                e.ConstructionManager = SAM.Analytical.UI.Query.ImportConstructionManager(path, func, new ImportOptions() { UserSelection = false, SuppressMessages = false }, owner);
             }
         }
     }
