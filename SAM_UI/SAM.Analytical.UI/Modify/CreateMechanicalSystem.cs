@@ -1,7 +1,7 @@
 ﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
-using SAM.Core.Windows.Forms;
+using SAM.Core.UI.WPF;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
@@ -36,15 +36,13 @@ namespace SAM.Analytical.UI
                     return null;
                 }
 
-                using (ComboBoxForm<MechanicalSystemType> comboBoxForm = new ComboBoxForm<MechanicalSystemType>("Mechanical System Type", mechanicalSystemTypes, (MechanicalSystemType x) => x?.Name))
+                ComboBoxWindow<MechanicalSystemType> comboBoxWindow = new ComboBoxWindow<MechanicalSystemType>("Mechanical System Type", mechanicalSystemTypes, (MechanicalSystemType x) => x?.Name);
+                if (comboBoxWindow.ShowDialog(owner) != true)
                 {
-                    if(comboBoxForm.ShowDialog(owner) != DialogResult.OK)
-                    {
-                        return null;
-                    }
-
-                    mechanicalSystemType = comboBoxForm.SelectedItem;
+                    return null;
                 }
+
+                mechanicalSystemType = comboBoxWindow.SelectedItem;
             }
 
             if(mechanicalSystemType == null)

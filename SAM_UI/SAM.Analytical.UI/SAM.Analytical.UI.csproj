@@ -83,6 +83,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\WPF\SAM.Core.Mollier.UI.WPF\SAM.Core.Mollier.UI.WPF.csproj" />
+    <ProjectReference Include="..\..\WPF\SAM.Core.UI.WPF\SAM.Core.UI.WPF.csproj" />
     <ProjectReference Include="..\SAM.Core.UI\SAM.Core.UI.csproj" />
     <ProjectReference Include="..\SAM.Geometry.UI\SAM.Geometry.UI.csproj" />
   </ItemGroup>
