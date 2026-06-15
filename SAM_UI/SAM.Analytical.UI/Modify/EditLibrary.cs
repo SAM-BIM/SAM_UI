@@ -105,15 +105,13 @@ namespace SAM.Analytical.UI
                     return;
                 }
 
-                using (Windows.Forms.ConstructionLibraryForm constructionLibraryForm = new Windows.Forms.ConstructionLibraryForm(materialLibrary, (ConstructionLibrary)library))
+                ConstructionLibraryWindow constructionLibraryWindow = new ConstructionLibraryWindow(materialLibrary, (ConstructionLibrary)library);
+                if (constructionLibraryWindow.ShowDialog(owner) != true)
                 {
-                    if (constructionLibraryForm.ShowDialog(owner) != DialogResult.OK)
-                    {
-                        return;
-                    }
-
-                    library = constructionLibraryForm.ConstructionLibrary;
+                    return;
                 }
+
+                library = constructionLibraryWindow.ConstructionLibrary;
             }
             else if (library is MaterialLibrary)
             {

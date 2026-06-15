@@ -14,7 +14,7 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            analyticalModel = Windows.Query.Import(analyticalModel, new ImportOptions(), owner);
+            analyticalModel = Windows.Query.Import(analyticalModel, new Windows.ImportOptions(), owner);
             if(analyticalModel == null)
             {
                 return;
@@ -31,7 +31,7 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            analyticalModel = Windows.Query.Import<T>(analyticalModel, new ImportOptions(), owner);
+            analyticalModel = Windows.Query.Import<T>(analyticalModel, new Windows.ImportOptions(), owner);
             if (analyticalModel == null)
             {
                 return;

@@ -50,7 +50,7 @@ namespace SAM.Analytical.UI.WPF
             uIAnalyticalModel.JSAMObject = new AnalyticalModel(uIAnalyticalModel.JSAMObject, adjacencyCluster, materialLibrary, uIAnalyticalModel.JSAMObject.ProfileLibrary);
         }
 
-        private static void ApertureConstructionLibraryForm_ConstructionManagerExporting(object sender, ConstructionManagerExportingEventArgs e)
+        private static void ApertureConstructionLibraryForm_ConstructionManagerExporting(object sender, SAM.Analytical.Windows.ConstructionManagerExportingEventArgs e)
         {
             IWin32Window? win32Widnow = sender as IWin32Window;
 
@@ -182,7 +182,7 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        private static void ApertureConstructionLibraryForm_ConstructionManagerImporting(object sender, ConstructionManagerImportingEventArgs e)
+        private static void ApertureConstructionLibraryForm_ConstructionManagerImporting(object sender, SAM.Analytical.Windows.ConstructionManagerImportingEventArgs e)
         {
             IWin32Window win32Widnow = sender as IWin32Window;
 
@@ -280,7 +280,7 @@ namespace SAM.Analytical.UI.WPF
                 AnalyticalModel analyticalModel = new AnalyticalModel(Guid.NewGuid(), "Temporary AnalyticalModel");
                 Func<IJSAMObject, bool> func = new Func<IJSAMObject, bool>(x => { return x is Material || x is ApertureConstruction; });
 
-                analyticalModel = Analytical.Windows.Query.Import(analyticalModel, path, func, new ImportOptions() { UserSelection = false, SuppressMessages = false }, win32Widnow);
+                analyticalModel = Analytical.Windows.Query.Import(analyticalModel, path, func, new SAM.Analytical.Windows.ImportOptions() { UserSelection = false, SuppressMessages = false }, win32Widnow);
                 e.ConstructionManager = analyticalModel?.ConstructionManager;
             }
         }

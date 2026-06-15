@@ -185,7 +185,7 @@ namespace SAM.Analytical.UI.WPF
                 AnalyticalModel analyticalModel = new AnalyticalModel(Guid.NewGuid(), "Temporary AnalyticalModel");
                 Func<IJSAMObject, bool> func = new Func<IJSAMObject, bool>(x => { return x is Material; });
 
-                analyticalModel = Analytical.Windows.Query.Import(analyticalModel, path, func, new ImportOptions() { UserSelection = false, SuppressMessages = false }, win32Widnow);
+                analyticalModel = Analytical.Windows.Query.Import(analyticalModel, path, func, new SAM.Analytical.Windows.ImportOptions() { UserSelection = false, SuppressMessages = false }, win32Widnow);
                 e.MaterialLibrary = analyticalModel?.MaterialLibrary;
             }
         }
