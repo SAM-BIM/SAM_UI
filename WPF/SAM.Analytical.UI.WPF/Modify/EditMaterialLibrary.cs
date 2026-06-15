@@ -21,22 +21,20 @@ namespace SAM.Analytical.UI.WPF
 
             MaterialLibrary materialLibrary = uIAnalyticalModel.JSAMObject.MaterialLibrary;
 
-            using (MaterialLibraryForm materialLibraryForm = new MaterialLibraryForm(materialLibrary, Core.Query.Enums(typeof(IMaterial))))
+            MaterialLibraryWindow materialLibraryWindow = new MaterialLibraryWindow(materialLibrary, Core.Query.Enums(typeof(IMaterial)));
+            materialLibraryWindow.MaterialLibraryImporting += MaterialLibraryForm_MaterialLibraryImporting;
+            materialLibraryWindow.MaterialLibraryExporting += MaterialLibraryForm_MaterialLibraryExporting;
+            if (materialLibraryWindow.ShowDialog(owner) != true)
             {
-                materialLibraryForm.MaterialLibraryImporting += MaterialLibraryForm_MaterialLibraryImporting;
-                materialLibraryForm.MaterialLibraryExporting += MaterialLibraryForm_MaterialLibraryExporting;
-                if (materialLibraryForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                materialLibrary = materialLibraryForm.MaterialLibrary;
+                return;
             }
+
+            materialLibrary = materialLibraryWindow.MaterialLibrary;
 
             uIAnalyticalModel.JSAMObject = new AnalyticalModel(uIAnalyticalModel.JSAMObject, uIAnalyticalModel.JSAMObject.AdjacencyCluster, materialLibrary, uIAnalyticalModel.JSAMObject.ProfileLibrary);
         }
 
-        private static void MaterialLibraryForm_MaterialLibraryExporting(object sender, Core.Windows.MaterialLibraryExportingEventArgs e)
+        private static void MaterialLibraryForm_MaterialLibraryExporting(object sender, SAM.Core.UI.MaterialLibraryExportingEventArgs e)
         {
             IWin32Window win32Widnow = sender as IWin32Window;
 
@@ -124,7 +122,7 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        private static void MaterialLibraryForm_MaterialLibraryImporting(object sender, Core.Windows.MaterialLibraryImportingEventArgs e)
+        private static void MaterialLibraryForm_MaterialLibraryImporting(object sender, SAM.Core.UI.MaterialLibraryImportingEventArgs e)
         {
             IWin32Window win32Widnow = sender as IWin32Window;
 
