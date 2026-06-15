@@ -184,7 +184,7 @@ namespace SAM.Core.UI.WPF
 
         private void comboBox_Value_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            e.Handled = System.Text.RegularExpressions.Regex.IsMatch(e.Text, "[^0-9.-]+");
         }
     }
 }

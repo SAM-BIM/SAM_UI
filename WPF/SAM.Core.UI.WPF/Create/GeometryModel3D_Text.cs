@@ -23,7 +23,7 @@ namespace SAM.Core.UI.WPF
             diffuseMaterial.Brush = new VisualBrush(textBlock);
 
             //calculation of text width (assumming that characters are square):
-            double width = Windows.Query.Width(text, new System.Drawing.Font(fontFamilyName, (float)height), height);//text.Length * height;
+            double width = Query.Width(text, new System.Drawing.Font(fontFamilyName, (float)height), height);//text.Length * height;
             
             // we need to find the four corners
             // p0: the lower left corner;  p1: the upper left

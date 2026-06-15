@@ -179,10 +179,10 @@ namespace SAM.Core.UI.WPF
 
             string key_New = null;
 
-            using (Windows.Forms.TextBoxForm<string> textBoxForm = new Windows.Forms.TextBoxForm<string>("Keyword", "Keyword:"))
+            TextBoxWindow textBoxForm = new TextBoxWindow("Keyword", "Keyword:");
             {
                 textBoxForm.Value = key_Old;
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                if (textBoxForm.ShowDialog() != true)
                 {
                     return;
                 }
@@ -226,10 +226,10 @@ namespace SAM.Core.UI.WPF
 
             string value_New = null;
 
-            using (Windows.Forms.TextBoxForm<string> textBoxForm = new Windows.Forms.TextBoxForm<string>("Value", "Value:"))
+            TextBoxWindow textBoxForm = new TextBoxWindow("Value", "Value:");
             {
                 textBoxForm.Value = value_Old;
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                if (textBoxForm.ShowDialog() != true)
                 {
                     return;
                 }
@@ -331,9 +331,9 @@ namespace SAM.Core.UI.WPF
         {
             string key = null;
 
-            using (Windows.Forms.TextBoxForm<string> textBoxForm = new Windows.Forms.TextBoxForm<string>("Keyword", "Keyword:"))
+            TextBoxWindow textBoxForm = new TextBoxWindow("Keyword", "Keyword:");
             {
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                if (textBoxForm.ShowDialog() != true)
                 {
                     return;
                 }
@@ -444,9 +444,9 @@ namespace SAM.Core.UI.WPF
 
             string value = null;
 
-            using (Windows.Forms.TextBoxForm<string> textBoxForm = new Windows.Forms.TextBoxForm<string>("Value", "Value:"))
+            TextBoxWindow textBoxForm = new TextBoxWindow("Value", "Value:");
             {
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                if (textBoxForm.ShowDialog() != true)
                 {
                     return;
                 }
@@ -566,9 +566,9 @@ namespace SAM.Core.UI.WPF
                 if (dictionary != null)
                 {
                     object[,] values = null;
-                    using (Windows.Forms.ComboBoxForm<string> comboBoxForm = new Windows.Forms.ComboBoxForm<string>("Select worksheet name", dictionary.Keys))
+                    ComboBoxWindow<string> comboBoxForm = new ComboBoxWindow<string>("Select worksheet name", dictionary.Keys);
                     {
-                        if (comboBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                        if (comboBoxForm.ShowDialog() != true)
                         {
                             return;
                         }
