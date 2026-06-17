@@ -1,6 +1,7 @@
-﻿using SAM.Analytical.Windows;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
 using SAM.Core;
-using SAM.Core.Windows.Forms;
 using System.Collections.Generic;
 using System;
 using System.Windows.Forms;
@@ -185,7 +186,7 @@ namespace SAM.Analytical.UI.WPF
                 AnalyticalModel analyticalModel = new AnalyticalModel(Guid.NewGuid(), "Temporary AnalyticalModel");
                 Func<IJSAMObject, bool> func = new Func<IJSAMObject, bool>(x => { return x is Material; });
 
-                analyticalModel = Analytical.Windows.Query.Import(analyticalModel, path, func, new SAM.Analytical.Windows.ImportOptions() { UserSelection = false, SuppressMessages = false }, win32Widnow);
+                analyticalModel = SAM.Analytical.UI.Query.Import(analyticalModel, path, func, new SAM.Analytical.UI.ImportOptions() { UserSelection = false, SuppressMessages = false }, null);
                 e.MaterialLibrary = analyticalModel?.MaterialLibrary;
             }
         }

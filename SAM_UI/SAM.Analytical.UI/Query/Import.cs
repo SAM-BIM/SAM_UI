@@ -471,5 +471,258 @@ namespace SAM.Analytical.UI
 
             return constructionManager;
         }
+
+        /// <summary>
+        /// WPF replacement for the merging SAM.Analytical.Windows.Query.Import(AnalyticalModel, ...)
+        /// overloads: opens a JSON file, lets the user pick objects, and merges them into a COPY of
+        /// <paramref name="analyticalModel"/> (materials/profiles into the libraries; constructions,
+        /// aperture constructions, internal conditions and mechanical system types into the
+        /// AdjacencyCluster). Returns null when nothing was imported. Imports everything (no type filter).
+        /// </summary>
+        public static AnalyticalModel Import(this AnalyticalModel analyticalModel, ImportOptions importOptions = null, Window owner = null)
+        {
+            Func<IJSAMObject, bool> func = null;
+
+            return Import(analyticalModel, func, importOptions, owner);
+        }
+
+        /// <summary>Merging import restricted to objects of type <typeparamref name="T"/>.</summary>
+        public static AnalyticalModel Import<T>(this AnalyticalModel analyticalModel, ImportOptions importOptions = null, Window owner = null) where T : IJSAMObject
+        {
+            return Import(analyticalModel, (IJSAMObject x) => x is T, importOptions, owner);
+        }
+
+        /// <summary>Merging import from a known file path, filtered by <paramref name="func"/>.</summary>
+        public static AnalyticalModel Import<T>(this AnalyticalModel analyticalModel, string path, Func<T, bool> func = null, ImportOptions importOptions = null, Window owner = null) where T : IJSAMObject
+        {
+            List<T> jSAMObjects = Import(path, out List<IJSAMObject> jSAMObjects_All, func, importOptions, owner);
+
+            return Merge(analyticalModel, jSAMObjects, jSAMObjects_All, importOptions, owner);
+        }
+
+        /// <summary>Merging import (file chosen via dialog), filtered by <paramref name="func"/>.</summary>
+        public static AnalyticalModel Import<T>(this AnalyticalModel analyticalModel, Func<T, bool> func = null, ImportOptions importOptions = null, Window owner = null) where T : IJSAMObject
+        {
+            List<T> jSAMObjects = Import(out List<IJSAMObject> jSAMObjects_All, func, importOptions, owner);
+
+            return Merge(analyticalModel, jSAMObjects, jSAMObjects_All, importOptions, owner);
+        }
+
+        // Merges the user-selected objects into a copy of analyticalModel. Mirrors the legacy
+        // SAM.Analytical.Windows merge, except the two batch calls it relied on
+        // (AdjacencyCluster.UpdateConstructions/UpdateApertureConstructions taking a List) are gone
+        // from SAM - imported constructions/aperture constructions are added to the cluster directly
+        // via AddObject, which is how modern SAM stores them.
+        private static AnalyticalModel Merge<T>(AnalyticalModel analyticalModel, IEnumerable<T> jSAMObjects, IEnumerable<IJSAMObject> jSAMObjects_All, ImportOptions importOptions = null, Window owner = null) where T : IJSAMObject
+        {
+            if (analyticalModel == null || jSAMObjects == null)
+            {
+                return null;
+            }
+
+            if (importOptions == null)
+            {
+                importOptions = new ImportOptions();
+            }
+
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
+            if (adjacencyCluster == null)
+            {
+                adjacencyCluster = new AdjacencyCluster();
+            }
+
+            List<Construction> constructions = new List<Construction>();
+            List<ApertureConstruction> apertureConstructions = new List<ApertureConstruction>();
+            List<InternalCondition> internalConditions = new List<InternalCondition>();
+
+            foreach (T jSAMObject in jSAMObjects)
+            {
+                if (jSAMObject == null)
+                {
+                    continue;
+                }
+
+                if (jSAMObject is IMaterial)
+                {
+                    analyticalModel.AddMaterial((IMaterial)jSAMObject);
+                }
+                else if (jSAMObject is Profile)
+                {
+                    analyticalModel.AddProfile((Profile)(object)jSAMObject);
+                }
+                else if (jSAMObject is Construction)
+                {
+                    constructions.Add((Construction)(object)jSAMObject);
+                }
+                else if (jSAMObject is ApertureConstruction)
+                {
+                    apertureConstructions.Add((ApertureConstruction)(object)jSAMObject);
+                }
+                else if (jSAMObject is InternalCondition)
+                {
+                    internalConditions.Add((InternalCondition)(object)jSAMObject);
+                }
+                else if (jSAMObject is MechanicalSystemType)
+                {
+                    adjacencyCluster.AddObject((MechanicalSystemType)(object)jSAMObject);
+                }
+            }
+
+            foreach (Construction construction in constructions)
+            {
+                adjacencyCluster.AddObject(construction);
+            }
+
+            foreach (ApertureConstruction apertureConstruction in apertureConstructions)
+            {
+                adjacencyCluster.AddObject(apertureConstruction);
+            }
+
+            // Pull in any materials referenced by imported (aperture) construction layers but not yet
+            // present in the model's MaterialLibrary.
+            if (constructions.Count != 0 || apertureConstructions.Count != 0)
+            {
+                HashSet<string> names = new HashSet<string>();
+
+                foreach (Construction construction in constructions)
+                {
+                    List<ConstructionLayer> constructionLayers = construction?.ConstructionLayers;
+                    if (constructionLayers != null)
+                    {
+                        foreach (ConstructionLayer constructionLayer in constructionLayers)
+                        {
+                            names.Add(constructionLayer.Name);
+                        }
+                    }
+                }
+
+                foreach (ApertureConstruction apertureConstruction in apertureConstructions)
+                {
+                    List<ConstructionLayer> constructionLayers = apertureConstruction?.PaneConstructionLayers;
+                    if (constructionLayers != null)
+                    {
+                        foreach (ConstructionLayer constructionLayer in constructionLayers)
+                        {
+                            names.Add(constructionLayer.Name);
+                        }
+                    }
+
+                    constructionLayers = apertureConstruction?.FrameConstructionLayers;
+                    if (constructionLayers != null)
+                    {
+                        foreach (ConstructionLayer constructionLayer in constructionLayers)
+                        {
+                            names.Add(constructionLayer.Name);
+                        }
+                    }
+                }
+
+                List<IMaterial> materials = jSAMObjects_All?.ToList().FindAll(x => x is IMaterial).ConvertAll(x => (IMaterial)x);
+                if (materials != null && materials.Count != 0)
+                {
+                    MaterialLibrary materialLibrary = analyticalModel.MaterialLibrary;
+
+                    HashSet<string> names_Missing = new HashSet<string>();
+                    foreach (string name in names)
+                    {
+                        if (materialLibrary?.GetMaterial(name) == null)
+                        {
+                            names_Missing.Add(name);
+                        }
+                    }
+
+                    if (names_Missing.Count != 0)
+                    {
+                        bool import = importOptions.SuppressMessages || Confirm("Try to import missing materials?", "Materials", owner);
+                        if (import)
+                        {
+                            foreach (string name in names_Missing)
+                            {
+                                IMaterial material = materials.Find(x => x.Name == name);
+                                if (material != null)
+                                {
+                                    analyticalModel.AddMaterial(material);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (internalConditions.Count != 0)
+            {
+                ProfileLibrary profileLibrary = analyticalModel.ProfileLibrary;
+
+                List<Profile> profiles = jSAMObjects_All?.ToList().FindAll(x => x is Profile).ConvertAll(x => (Profile)x);
+
+                Dictionary<ProfileType, HashSet<string>> dictionary_Profile = new Dictionary<ProfileType, HashSet<string>>();
+                foreach (InternalCondition internalCondition in internalConditions)
+                {
+                    adjacencyCluster.AddObject(internalCondition);
+
+                    if (profiles != null && profiles.Count != 0)
+                    {
+                        IEnumerable<ProfileType> profileTypes = internalCondition.GetProfileTypes();
+                        if (profileTypes != null)
+                        {
+                            foreach (ProfileType profileType in profileTypes)
+                            {
+                                string name = internalCondition.GetProfileName(profileType);
+                                if (string.IsNullOrEmpty(name))
+                                {
+                                    continue;
+                                }
+
+                                Profile profile = internalCondition.GetProfile(profileType, profileLibrary);
+                                if (profile != null)
+                                {
+                                    continue;
+                                }
+
+                                if (!dictionary_Profile.TryGetValue(profileType, out HashSet<string> names))
+                                {
+                                    names = new HashSet<string>();
+                                    dictionary_Profile[profileType] = names;
+                                }
+
+                                names.Add(name);
+                            }
+                        }
+                    }
+                }
+
+                if (dictionary_Profile.Count != 0)
+                {
+                    bool import = importOptions.SuppressMessages || Confirm("Try to import missing profiles?", "Profiles", owner);
+                    if (import)
+                    {
+                        foreach (KeyValuePair<ProfileType, HashSet<string>> keyValuePair in dictionary_Profile)
+                        {
+                            foreach (string name in keyValuePair.Value)
+                            {
+                                Profile profile = Analytical.Query.Profile(profiles, name, keyValuePair.Key, true);
+                                if (profile != null)
+                                {
+                                    analyticalModel.AddProfile(profile);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            analyticalModel = new AnalyticalModel(analyticalModel);
+
+            return new AnalyticalModel(analyticalModel, adjacencyCluster);
+        }
+
+        private static bool Confirm(string text, string caption, Window owner)
+        {
+            MessageBoxResult result = owner == null
+                ? MessageBox.Show(text, caption, MessageBoxButton.YesNo)
+                : MessageBox.Show(owner, text, caption, MessageBoxButton.YesNo);
+
+            return result == MessageBoxResult.Yes;
+        }
     }
 }

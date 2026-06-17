@@ -1999,7 +1999,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_ImportObjects_Click(object sender, RoutedEventArgs e)
         {
-            uIAnalyticalModel?.Import(windowHandle);
+            uIAnalyticalModel?.Import(this);
 
             AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
             if (analyticalModel != null)
