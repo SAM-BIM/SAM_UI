@@ -962,16 +962,17 @@ namespace SAM.Core.Mollier.UI
             }
 
             double sensibleHeatRatio = double.NaN;
-            using (Windows.Forms.TextBoxForm<double> textBoxForm = new Windows.Forms.TextBoxForm<double>("Sensible Heat Ratio", "Sensible Heat Ratio (SHR) [0-1]"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Sensible Heat Ratio", "Sensible Heat Ratio (SHR) [0-1]")
             {
-                textBoxForm.Value = 0.85;
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                sensibleHeatRatio = textBoxForm.Value;
+                Owner = System.Windows.Window.GetWindow(this),
+                Value = "0.85"
+            };
+            if (textBoxWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            sensibleHeatRatio = textBoxWindow.TryGetValue(out double sensibleHeatRatio_Temp) ? sensibleHeatRatio_Temp : double.NaN;
 
             if (double.IsNaN(sensibleHeatRatio))
             {
@@ -994,16 +995,17 @@ namespace SAM.Core.Mollier.UI
             }
 
             double epsilon = double.NaN;
-            using (Windows.Forms.TextBoxForm<double> textBoxForm = new Windows.Forms.TextBoxForm<double>("Epsilon", "Epsilon [ε=Δh/Δx]"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Epsilon", "Epsilon [ε=Δh/Δx]")
             {
-                textBoxForm.Value = 2501;
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                epsilon = textBoxForm.Value;
+                Owner = System.Windows.Window.GetWindow(this),
+                Value = "2501"
+            };
+            if (textBoxWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            epsilon = textBoxWindow.TryGetValue(out double epsilon_Temp) ? epsilon_Temp : double.NaN;
 
             if (double.IsNaN(epsilon))
             {
@@ -1011,16 +1013,17 @@ namespace SAM.Core.Mollier.UI
             }
 
             double enthalpyDifference = double.NaN;
-            using (Windows.Forms.TextBoxForm<double> textBoxForm = new Windows.Forms.TextBoxForm<double>("Enthalpy Difference", "Enthalpy Difference (kJ/kg)"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow_EnthalpyDifference = new SAM.Core.UI.WPF.TextBoxWindow("Enthalpy Difference", "Enthalpy Difference (kJ/kg)")
             {
-                textBoxForm.Value = 10;
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                enthalpyDifference = textBoxForm.Value;
+                Owner = System.Windows.Window.GetWindow(this),
+                Value = "10"
+            };
+            if (textBoxWindow_EnthalpyDifference.ShowDialog() != true)
+            {
+                return;
             }
+
+            enthalpyDifference = textBoxWindow_EnthalpyDifference.TryGetValue(out double enthalpyDifference_Temp) ? enthalpyDifference_Temp : double.NaN;
 
             if (double.IsNaN(enthalpyDifference))
             {
@@ -1055,16 +1058,17 @@ namespace SAM.Core.Mollier.UI
             }
 
             double epsilon = double.NaN;
-            using (Windows.Forms.TextBoxForm<double> textBoxForm = new Windows.Forms.TextBoxForm<double>("Epsilon", "Epsilon [ε=Δh/Δx]"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Epsilon", "Epsilon [ε=Δh/Δx]")
             {
-                textBoxForm.Value = 2501;
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                epsilon = textBoxForm.Value;
+                Owner = System.Windows.Window.GetWindow(this),
+                Value = "2501"
+            };
+            if (textBoxWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            epsilon = textBoxWindow.TryGetValue(out double epsilon_Temp) ? epsilon_Temp : double.NaN;
 
             if (double.IsNaN(epsilon))
             {
@@ -1072,18 +1076,17 @@ namespace SAM.Core.Mollier.UI
             }
 
             double humidityRatio = double.NaN;
-            using (Windows.Forms.TextBoxForm<double> textBoxForm = new Windows.Forms.TextBoxForm<double>("Humidity Ratio", "Humidity Ratio [g/kg] of the end of the process"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow_HumidityRatio = new SAM.Core.UI.WPF.TextBoxWindow("Humidity Ratio", "Humidity Ratio [g/kg] of the end of the process")
             {
-                textBoxForm.Value = 10;
-                textBoxForm.Size = new System.Drawing.Size((int)(textBoxForm.Size.Width * 1.2), textBoxForm.Size.Height);
-
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                humidityRatio = textBoxForm.Value;
+                Owner = System.Windows.Window.GetWindow(this),
+                Value = "10"
+            };
+            if (textBoxWindow_HumidityRatio.ShowDialog() != true)
+            {
+                return;
             }
+
+            humidityRatio = textBoxWindow_HumidityRatio.TryGetValue(out double humidityRatio_Temp) ? humidityRatio_Temp : double.NaN;
 
             if (double.IsNaN(humidityRatio))
             {

@@ -62,4 +62,9 @@
     <PackageReference Include="System.Drawing.Common" Version="7.0.0" />
   </ItemGroup>
 
+  <!-- WPF replacement dialogs (TextBoxWindow) used by the Mollier process prompts. -->
+  <ItemGroup>
+    <ProjectReference Include="..\SAM.Core.UI.WPF\SAM.Core.UI.WPF.csproj" />
+  </ItemGroup>
+
 </Project>
