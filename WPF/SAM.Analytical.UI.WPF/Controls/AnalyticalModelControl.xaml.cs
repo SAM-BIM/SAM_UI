@@ -222,7 +222,7 @@ namespace SAM.Analytical.UI.WPF
             }
             else if (jSAMObject is InternalCondition)
             {
-                UI.Modify.EditInternalCondition(uIAnalyticalModel, jSAMObject as dynamic);
+                Modify.EditInternalCondition(uIAnalyticalModel, jSAMObject as dynamic);
             }
         }
 
@@ -1609,7 +1609,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (analyticalObject is InternalCondition)
             {
-                UI.Modify.EditInternalCondition(uIAnalyticalModel, (InternalCondition)analyticalObject);
+                Modify.EditInternalCondition(uIAnalyticalModel, (InternalCondition)analyticalObject);
             }
             else if (analyticalObject is Profile)
             {
