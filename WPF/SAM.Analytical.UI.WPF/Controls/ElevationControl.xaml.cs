@@ -120,7 +120,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void textBox_Elevation_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_NumberOnly(sender, e);
             
             ValueChanged?.Invoke(this, new EventArgs());
         }

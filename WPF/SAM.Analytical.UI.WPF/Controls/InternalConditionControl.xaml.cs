@@ -167,7 +167,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void MultipleValueComboBoxControl_Number_TextInput(object sender, TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_NumberOnly(sender, e);
         }
 
         private void MultipleValueComboBoxControl_Occupancy_TextChanged(object sender, EventArgs e)
@@ -944,7 +944,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void multipleValueComboBoxControl_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_NumberOnly(sender, e);
         }
 
         public List<Space> Spaces
