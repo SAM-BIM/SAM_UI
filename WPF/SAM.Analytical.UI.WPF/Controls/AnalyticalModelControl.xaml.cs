@@ -198,7 +198,7 @@ namespace SAM.Analytical.UI.WPF
         {
             if (jSAMObject is Space)
             {
-                UI.Modify.EditSpace(uIAnalyticalModel, jSAMObject as dynamic, windowHandle);
+                Modify.EditSpace(uIAnalyticalModel, jSAMObject as dynamic, windowHandle);
             }
             else if (jSAMObject is Panel)
             {
