@@ -1628,16 +1628,17 @@ namespace SAM.Analytical.UI.WPF
                 index++;
             }
 
-            using (TextBoxForm<string> textBoxForm = new TextBoxForm<string>("Internal Condition Name", "Name"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Internal Condition Name", "Name")
             {
-                textBoxForm.Value = name_Temp;
-                if (textBoxForm.ShowDialog() != DialogResult.OK)
-                {
-                    return;
-                }
-
-                internalCondition = internalCondition == null ? new InternalCondition(textBoxForm.Value) : new InternalCondition(textBoxForm.Value, internalCondition);
+                Owner = System.Windows.Window.GetWindow(this),
+                Value = name_Temp
+            };
+            if (textBoxWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            internalCondition = internalCondition == null ? new InternalCondition(textBoxWindow.Value) : new InternalCondition(textBoxWindow.Value, internalCondition);
 
             adjacencyCluster.AddObject(internalCondition);
 
@@ -1695,15 +1696,19 @@ namespace SAM.Analytical.UI.WPF
             tuples.RemoveAll(x => x == null || x.Item2 == null || string.IsNullOrWhiteSpace(x.Item2.Name));
             tuples.Sort((x, y) => x.Item2.Name.CompareTo(y.Item2.Name));
 
-            using (TreeViewForm<Tuple<Enum, Core.Attributes.ParameterProperties>> treeViewForm = new TreeViewForm<Tuple<Enum, Core.Attributes.ParameterProperties>>("Select Parameters", tuples, x => x.Item2.Name))
+            SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow treeViewWindow = new SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow
             {
-                if (treeViewForm.ShowDialog() != DialogResult.OK)
-                {
-                    return;
-                }
-
-                tuples = treeViewForm.SelectedItems;
+                Title = "Select Parameters",
+                Owner = System.Windows.Window.GetWindow(this)
+            };
+            treeViewWindow.GettingText += (sender, e) => { if (e.Object is Tuple<Enum, Core.Attributes.ParameterProperties> tuple) { e.Text = tuple.Item2.Name; } };
+            treeViewWindow.SetObjects(tuples);
+            if (treeViewWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            tuples = treeViewWindow.GetObjects<Tuple<Enum, Core.Attributes.ParameterProperties>>();
 
             if (tuples == null || tuples.Count == 0)
             {
