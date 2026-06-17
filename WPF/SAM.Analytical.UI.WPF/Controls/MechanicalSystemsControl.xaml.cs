@@ -316,16 +316,17 @@ namespace SAM.Analytical.UI.WPF
 
 
             MechanicalSystemType mechanicalSystemType = null;
-            using (Core.Windows.Forms.ComboBoxForm<MechanicalSystemType> comboBoxForm = new Core.Windows.Forms.ComboBoxForm<MechanicalSystemType>("Select System Type", mechanicalSystemTypes, x => x.Name))
+            SAM.Core.UI.WPF.ComboBoxWindow<MechanicalSystemType> comboBoxWindow = new SAM.Core.UI.WPF.ComboBoxWindow<MechanicalSystemType>("Select System Type", mechanicalSystemTypes, x => x.Name)
             {
-                comboBoxForm.TopMost = true;
-                if (comboBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                mechanicalSystemType = comboBoxForm.SelectedItem;
+                Owner = System.Windows.Window.GetWindow(this),
+                Topmost = true
+            };
+            if (comboBoxWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            mechanicalSystemType = comboBoxWindow.SelectedItem;
 
             if(mechanicalSystemType == null)
             {

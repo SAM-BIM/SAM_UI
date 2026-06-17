@@ -31,21 +31,22 @@ namespace SAM.Analytical.UI.WPF
             }
 
             ApertureConstruction apertureConstruction = null;
-            using (Core.Windows.Forms.SearchForm<ApertureConstruction> searchForm = new Core.Windows.Forms.SearchForm<ApertureConstruction>("Select ApertureConstruction", apertureConstructions, (ApertureConstruction x) => x.Name, false))
+            SAM.Core.UI.WPF.SearchWindow searchWindow = new SAM.Core.UI.WPF.SearchWindow(apertureConstructions, x => (x as ApertureConstruction)?.Name)
             {
-                if(names != null && names.Count == 1)
-                {
-                    searchForm.SearchText = names.First();
-                }
-
-                searchForm.SelectionMode = System.Windows.Forms.SelectionMode.One;
-                if(searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                apertureConstruction = searchForm.SelectedItems?.FirstOrDefault();
+                SelectionMode = System.Windows.Controls.SelectionMode.Single,
+                Title = "Select ApertureConstruction"
+            };
+            if (names != null && names.Count == 1)
+            {
+                searchWindow.SearchText = names.First();
             }
+
+            if (searchWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            apertureConstruction = searchWindow.GetSelectedItems<ApertureConstruction>()?.FirstOrDefault();
 
             if(apertureConstruction == null)
             {

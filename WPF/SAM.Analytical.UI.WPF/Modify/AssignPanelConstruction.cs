@@ -31,21 +31,22 @@ namespace SAM.Analytical.UI.WPF
             }
 
             Construction construction = null;
-            using (Core.Windows.Forms.SearchForm<Construction> searchForm = new Core.Windows.Forms.SearchForm<Construction>("Select Construction", constructions, (Construction x) => x.Name, false))
+            SAM.Core.UI.WPF.SearchWindow searchWindow = new SAM.Core.UI.WPF.SearchWindow(constructions, x => (x as Construction)?.Name)
             {
-                if(names != null && names.Count == 1)
-                {
-                    searchForm.SearchText = names.First();
-                }
-
-                searchForm.SelectionMode = System.Windows.Forms.SelectionMode.One;
-                if(searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                construction = searchForm.SelectedItems?.FirstOrDefault();
+                SelectionMode = System.Windows.Controls.SelectionMode.Single,
+                Title = "Select Construction"
+            };
+            if (names != null && names.Count == 1)
+            {
+                searchWindow.SearchText = names.First();
             }
+
+            if (searchWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            construction = searchWindow.GetSelectedItems<Construction>()?.FirstOrDefault();
 
             if(construction == null)
             {

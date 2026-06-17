@@ -40,22 +40,20 @@ namespace SAM.Analytical.UI.WPF
         {
             e.Handled = true;
 
-            using (Core.Windows.Forms.TextBoxForm<string> textBoxForm = new Core.Windows.Forms.TextBoxForm<string>("Filter", "Filter Name"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Filter", "Filter Name") { Owner = this };
+            if (textBoxWindow.ShowDialog() != true)
             {
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                string name = textBoxForm.Value;
-
-                if(string.IsNullOrWhiteSpace(name))
-                {
-                    return;
-                }
-
-                e.UIFilter = filterControl.GetUIFilter(name);
+                return;
             }
+
+            string name = textBoxWindow.Value;
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+
+            e.UIFilter = filterControl.GetUIFilter(name);
         }
 
         private void FiltersControl_SelectionChanged(object sender, SelectionChangedEventArgs e)

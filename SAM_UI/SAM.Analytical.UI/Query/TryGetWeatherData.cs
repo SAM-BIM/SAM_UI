@@ -1,4 +1,5 @@
-﻿using SAM.Weather;
+﻿using SAM.Core.UI.WPF;
+using SAM.Weather;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
@@ -61,15 +62,14 @@ namespace SAM.Analytical.UI
                     {
                         weatherDatas.Sort((x, y) => x.Name.CompareTo(y.Name));
 
-                        using (Core.Windows.Forms.ComboBoxForm<WeatherData> comboBoxForm = new Core.Windows.Forms.ComboBoxForm<WeatherData>("Select Weather Data", weatherDatas, (WeatherData x) => x.Name))
+                        SAM.Core.UI.WPF.ComboBoxWindow<WeatherData> comboBoxWindow = new SAM.Core.UI.WPF.ComboBoxWindow<WeatherData>("Select Weather Data", weatherDatas, (WeatherData x) => x.Name);
+                        bool? comboBoxResult = owner == null ? comboBoxWindow.ShowDialog() : comboBoxWindow.ShowDialog(owner);
+                        if (comboBoxResult != true)
                         {
-                            if (comboBoxForm.ShowDialog(owner) != DialogResult.OK)
-                            {
-                                return false;
-                            }
-
-                            weatherData = comboBoxForm.SelectedItem;
+                            return false;
                         }
+
+                        weatherData = comboBoxWindow.SelectedItem;
 
                     }
 

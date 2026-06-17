@@ -4017,11 +4017,8 @@ namespace SAM.Analytical.UI.WPF.Windows
                     List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
                     if (sAMObjects != null)
                     {
-                        using (JsonForm<SAMObject> jsonForm = new JsonForm<SAMObject>(sAMObjects))
-                        {
-                            jsonForm.ShowDialog();
-
-                        }
+                        SAM.Core.UI.WPF.JsonWindow jsonWindow = new SAM.Core.UI.WPF.JsonWindow(sAMObjects) { Owner = this };
+                        jsonWindow.ShowDialog();
                     }
 
                 }
