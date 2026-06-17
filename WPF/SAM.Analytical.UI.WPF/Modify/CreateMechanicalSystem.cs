@@ -1,11 +1,12 @@
-﻿// SPDX-License-Identifier: LGPL-3.0-or-later
-// Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Analytical.UI;
 using SAM.Core.UI.WPF;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
-namespace SAM.Analytical.UI
+namespace SAM.Analytical.UI.WPF
 {
     public static partial class Modify
     {
@@ -23,21 +24,22 @@ namespace SAM.Analytical.UI
                 adjacencyCluster = new AdjacencyCluster();
             }
 
-            if(mechanicalSystemType == null)
+            if (mechanicalSystemType == null)
             {
                 List<MechanicalSystemType> mechanicalSystemTypes = adjacencyCluster.GetMechanicalSystemTypes<MechanicalSystemType>();
-                if(mechanicalSystemTypes == null || mechanicalSystemTypes.Count == 0)
+                if (mechanicalSystemTypes == null || mechanicalSystemTypes.Count == 0)
                 {
                     mechanicalSystemTypes = Analytical.Query.DefaultSystemTypeLibrary().GetSystemTypes<MechanicalSystemType>();
                 }
 
-                if(mechanicalSystemTypes == null || mechanicalSystemTypes.Count == 0)
+                if (mechanicalSystemTypes == null || mechanicalSystemTypes.Count == 0)
                 {
                     return null;
                 }
 
                 ComboBoxWindow<MechanicalSystemType> comboBoxWindow = new ComboBoxWindow<MechanicalSystemType>("Mechanical System Type", mechanicalSystemTypes, (MechanicalSystemType x) => x?.Name);
-                if (comboBoxWindow.ShowDialog(owner) != true)
+                bool? comboBoxResult = owner == null ? comboBoxWindow.ShowDialog() : comboBoxWindow.ShowDialog(owner);
+                if (comboBoxResult != true)
                 {
                     return null;
                 }
@@ -45,7 +47,7 @@ namespace SAM.Analytical.UI
                 mechanicalSystemType = comboBoxWindow.SelectedItem;
             }
 
-            if(mechanicalSystemType == null)
+            if (mechanicalSystemType == null)
             {
                 return null;
             }
@@ -54,16 +56,15 @@ namespace SAM.Analytical.UI
 
             MechanicalSystem mechanicalSystem = Analytical.Create.MechanicalSystem(mechanicalSystemType, null, id);
 
-            using (Windows.Forms.MechanicalSystemForm mechanicalSystemForm = new Windows.Forms.MechanicalSystemForm(mechanicalSystem, uIAnalyticalModel.JSAMObject.AdjacencyCluster))
+            MechanicalSystemWindow mechanicalSystemWindow = new MechanicalSystemWindow(mechanicalSystem, adjacencyCluster);
+            bool? dialogResult = owner == null ? mechanicalSystemWindow.ShowDialog() : mechanicalSystemWindow.ShowDialog(owner);
+            if (dialogResult != true)
             {
-                if (mechanicalSystemForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return null;
-                }
-
-                adjacencyCluster = mechanicalSystemForm.AdjacencyCluster;
-                mechanicalSystem = mechanicalSystemForm.MechanicalSystem;
+                return null;
             }
+
+            adjacencyCluster = mechanicalSystemWindow.AdjacencyCluster;
+            mechanicalSystem = mechanicalSystemWindow.MechanicalSystem;
 
             uIAnalyticalModel.JSAMObject = new AnalyticalModel(analyticalModel, adjacencyCluster);
 
