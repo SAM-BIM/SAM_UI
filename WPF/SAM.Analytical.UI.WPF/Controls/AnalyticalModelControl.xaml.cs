@@ -25,7 +25,7 @@ namespace SAM.Analytical.UI.WPF
         private TreeViewHighlightManager treeViewHighlightManager_Model;
         private TreeViewHighlightManager treeViewHighlightManager_Views;
         private UIAnalyticalModel uIAnalyticalModel;
-        private Core.Windows.WindowHandle windowHandle;
+        private SAM.Core.UI.WPF.WindowHandle windowHandle;
 
         // Content signature of the model tree last built by LoadModel; used to skip a rebuild that would
         // produce an identical tree (see LoadAnalyticalModel / ModelTreeSignature).
@@ -1655,7 +1655,7 @@ namespace SAM.Analytical.UI.WPF
             System.Windows.Window window = Geometry.UI.WPF.Query.Window(this);
             if(window != null)
             {
-                windowHandle = new Core.Windows.WindowHandle(window);
+                windowHandle = new SAM.Core.UI.WPF.WindowHandle(window);
             }
         }
     }

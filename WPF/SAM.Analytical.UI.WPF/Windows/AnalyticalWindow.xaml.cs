@@ -33,7 +33,7 @@ namespace SAM.Analytical.UI.WPF.Windows
         private ProgressBarWindowManager progressBarWindowManager = new ProgressBarWindowManager();
 
         private UIAnalyticalModel uIAnalyticalModel = null;
-        private Core.Windows.WindowHandle windowHandle = null;
+        private SAM.Core.UI.WPF.WindowHandle windowHandle = null;
         public AnalyticalWindow()
         {
             InitializeWindow();
@@ -641,7 +641,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             Title = titlePrefix;
 
-            windowHandle = new Core.Windows.WindowHandle(this);
+            windowHandle = new SAM.Core.UI.WPF.WindowHandle(this);
 
             Icon = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM);
 
@@ -1365,7 +1365,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
-            Core.Windows.WindowHandle windowHandle = new Core.Windows.WindowHandle(this);
+            SAM.Core.UI.WPF.WindowHandle windowHandle = new SAM.Core.UI.WPF.WindowHandle(this);
 
             IJSAMObject jSAMObject = menuItem.Tag as IJSAMObject;
             if (jSAMObject is Panel)
@@ -3872,17 +3872,17 @@ namespace SAM.Analytical.UI.WPF.Windows
             if (tag.Value is Panel)
             {
                 Panel panel = (Panel)tag.Value;
-                uIAnalyticalModel.EditPanel(panel, new Core.Windows.WindowHandle(this));
+                uIAnalyticalModel.EditPanel(panel, new SAM.Core.UI.WPF.WindowHandle(this));
             }
             else if (tag.Value is Space)
             {
                 Space space = (Space)tag.Value;
-                uIAnalyticalModel.EditSpace(space, new Core.Windows.WindowHandle(this));
+                uIAnalyticalModel.EditSpace(space, new SAM.Core.UI.WPF.WindowHandle(this));
             }
             else if (tag.Value is Aperture)
             {
                 Aperture aperture = (Aperture)tag.Value;
-                uIAnalyticalModel.EditAperture(aperture, new Core.Windows.WindowHandle(this));
+                uIAnalyticalModel.EditAperture(aperture, new SAM.Core.UI.WPF.WindowHandle(this));
             }
         }
 

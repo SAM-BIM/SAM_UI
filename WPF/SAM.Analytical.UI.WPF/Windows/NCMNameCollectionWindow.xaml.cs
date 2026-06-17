@@ -75,7 +75,7 @@ namespace SAM.Analytical.UI.WPF
                     }
                 };
 
-                MarqueeProgressForm.Show("Collecting data", action);
+                SAM.Core.UI.WPF.ProgressBarWindow.Show("Collecting data", action);
             }
             else
             {

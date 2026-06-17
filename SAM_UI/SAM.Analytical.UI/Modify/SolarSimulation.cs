@@ -22,7 +22,7 @@ namespace SAM.Analytical.UI
 
             });
 
-            Core.Windows.Forms.MarqueeProgressForm.Show("Solar Simulation", action);
+            SAM.Core.UI.WPF.ProgressBarWindow.Show("Solar Simulation", action);
 
             if (analyticalModel == null)
             {

@@ -22,7 +22,7 @@ namespace SAM.Analytical.UI
                 log = analyticalModel.Log();
             });
 
-            Core.Windows.Forms.MarqueeProgressForm.Show("Loading Data", action, owner);
+            SAM.Core.UI.WPF.ProgressBarWindow.Show("Loading Data", action, owner);
             if(log == null)
             {
                 return;
