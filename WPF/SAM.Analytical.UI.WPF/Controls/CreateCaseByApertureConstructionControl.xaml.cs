@@ -149,13 +149,18 @@ namespace SAM.Analytical.UI.WPF
                     return apertureConstructions[0];
                 }
 
-                SearchForm<ApertureConstruction> searchForm = new SearchForm<ApertureConstruction>("Aperture Constructions", apertureConstructions, x => x?.Name, false);
-                if(searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                SAM.Core.UI.WPF.SearchWindow searchWindow = new SAM.Core.UI.WPF.SearchWindow(apertureConstructions, x => (x as ApertureConstruction)?.Name)
+                {
+                    Owner = System.Windows.Window.GetWindow(this),
+                    Title = "Aperture Constructions",
+                    SelectionMode = System.Windows.Controls.SelectionMode.Single
+                };
+                if (searchWindow.ShowDialog() != true)
                 {
                     return null;
                 }
 
-                return searchForm.SelectedItems?.FirstOrDefault();
+                return searchWindow.GetSelectedItems<ApertureConstruction>()?.FirstOrDefault();
 
             });
 
@@ -210,16 +215,18 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            using (SearchForm<IUIFilter> searchForm = new SearchForm<IUIFilter>("Select Filter", uIFilters, x => x.Name))
+            SAM.Core.UI.WPF.SearchWindow searchWindow = new SAM.Core.UI.WPF.SearchWindow(uIFilters, x => (x as IUIFilter)?.Name)
             {
-                searchForm.SelectionMode = System.Windows.Forms.SelectionMode.One;
-                if (searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                e.UIFilter = searchForm.SelectedItems.FirstOrDefault();
+                Owner = System.Windows.Window.GetWindow(this),
+                Title = "Select Filter",
+                SelectionMode = System.Windows.Controls.SelectionMode.Single
+            };
+            if (searchWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            e.UIFilter = searchWindow.GetSelectedItems<IUIFilter>().FirstOrDefault();
         }
 
         private void SelectSAMObjectComboBoxControl_SelectionChanged(object sender, SelectionChangedEventArgs e)

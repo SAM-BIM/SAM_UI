@@ -129,16 +129,18 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            using (SearchForm<IUIFilter> searchForm = new SearchForm<IUIFilter>("Select Filter", uIFilters, x => x.Name))
+            SAM.Core.UI.WPF.SearchWindow searchWindow = new SAM.Core.UI.WPF.SearchWindow(uIFilters, x => (x as IUIFilter)?.Name)
             {
-                searchForm.SelectionMode = System.Windows.Forms.SelectionMode.One;
-                if (searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                e.UIFilter = searchForm.SelectedItems.FirstOrDefault();
+                Owner = System.Windows.Window.GetWindow(this),
+                Title = "Select Filter",
+                SelectionMode = System.Windows.Controls.SelectionMode.Single
+            };
+            if (searchWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            e.UIFilter = searchWindow.GetSelectedItems<IUIFilter>().FirstOrDefault();
         }
     }
 }

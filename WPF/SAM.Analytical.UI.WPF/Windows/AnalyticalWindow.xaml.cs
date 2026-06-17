@@ -454,16 +454,18 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
-            using (SearchForm<IUIFilter> searchForm = new SearchForm<IUIFilter>("Select Filter", uIFilters, x => x.Name))
+            SAM.Core.UI.WPF.SearchWindow searchWindow = new SAM.Core.UI.WPF.SearchWindow(uIFilters, x => (x as IUIFilter)?.Name)
             {
-                searchForm.SelectionMode = System.Windows.Forms.SelectionMode.One;
-                if (searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                e.UIFilter = searchForm.SelectedItems.FirstOrDefault();
+                Owner = this,
+                Title = "Select Filter",
+                SelectionMode = System.Windows.Controls.SelectionMode.Single
+            };
+            if (searchWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            e.UIFilter = searchWindow.GetSelectedItems<IUIFilter>().FirstOrDefault();
         }
 
         private Guid GetActiveGuid()
@@ -1799,12 +1801,10 @@ namespace SAM.Analytical.UI.WPF.Windows
         {
             List<AboutInfoType> abouInfoTypes = Enum.GetValues(typeof(AboutInfoType)).Cast<AboutInfoType>().ToList();
 
-            using (ComboBoxForm<AboutInfoType> comboBoxForm = new ComboBoxForm<AboutInfoType>("Info", abouInfoTypes, x => x.Description()))
+            SAM.Core.UI.WPF.ComboBoxWindow<AboutInfoType> comboBoxWindow = new SAM.Core.UI.WPF.ComboBoxWindow<AboutInfoType>("Info", abouInfoTypes, x => x.Description()) { Owner = this };
+            if (comboBoxWindow.ShowDialog() == true)
             {
-                if (comboBoxForm.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    MessageBox.Show(Core.Query.AboutInfoTypeText(comboBoxForm.SelectedItem), "Info");
-                }
+                MessageBox.Show(Core.Query.AboutInfoTypeText(comboBoxWindow.SelectedItem), "Info");
             }
         }
 
@@ -2578,14 +2578,12 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
-            using (TextBoxForm<string> textBoxControl = new TextBoxForm<string>("Select By Guid", "Insert Guids"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Select By Guid", "Insert Guids") { Owner = this };
+            if (textBoxWindow.ShowDialog() != true)
             {
-                if (textBoxControl.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-                value = textBoxControl.Value;
+                return;
             }
+            value = textBoxWindow.Value;
 
             if (string.IsNullOrWhiteSpace(value))
             {
