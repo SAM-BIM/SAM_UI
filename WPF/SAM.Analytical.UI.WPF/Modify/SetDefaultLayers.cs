@@ -2,6 +2,7 @@
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Core;
+using SAM.Core.UI.WPF;
 using SAM.Core.Windows.Forms;
 using System;
 using System.Collections.Generic;
@@ -45,21 +46,18 @@ namespace SAM.Analytical.UI.WPF
             HashSet<string> groups = new HashSet<string>();
             tuples_All.ForEach(x => groups.Add(x.Item1));
 
-            List<IJSAMObject>? jSAMObjects;
-            using (TreeViewForm<Tuple<string, string, IJSAMObject>> treeViewForm = new TreeViewForm<Tuple<string, string, IJSAMObject>>("Select Construction", tuples_All, (Tuple<string, string, IJSAMObject> x) => x.Item2, (Tuple<string, string, IJSAMObject> x) => x.Item1))
+            SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow treeViewWindow = new SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow { Title = "Select Construction" };
+            treeViewWindow.GettingText += (sender, e) => { if (e.Object is Tuple<string, string, IJSAMObject> tuple) { e.Text = tuple.Item2; } };
+            treeViewWindow.GettingCategory += (sender, e) => { if (e.Object is Tuple<string, string, IJSAMObject> tuple) { e.Category = new Core.Category(tuple.Item1); } };
+            treeViewWindow.SetObjects(tuples_All);
+
+            bool? dialogResult = owner == null ? treeViewWindow.ShowDialog() : treeViewWindow.ShowDialog(owner);
+            if (dialogResult != true)
             {
-                if (groups.Count < 2)
-                {
-                    treeViewForm.ExpandAll();
-                }
-
-                if (treeViewForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                jSAMObjects = treeViewForm?.SelectedItems?.ConvertAll(x => x.Item3);
+                return;
             }
+
+            List<IJSAMObject>? jSAMObjects = treeViewWindow.GetObjects<Tuple<string, string, IJSAMObject>>()?.ConvertAll(x => x.Item3);
 
             if(jSAMObjects is null)
             {

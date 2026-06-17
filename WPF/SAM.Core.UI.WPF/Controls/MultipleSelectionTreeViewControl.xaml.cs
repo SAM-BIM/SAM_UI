@@ -296,6 +296,12 @@ namespace SAM.Core.UI.WPF
             }
         }
 
+        /// <summary>Checks every node (mirrors the WinForms TreeViewForm `@checked: x =&gt; true` initial state).</summary>
+        public void SelectAll()
+        {
+            SetSelection(true);
+        }
+
         private void Button_SelectAll_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             SetSelection(true);

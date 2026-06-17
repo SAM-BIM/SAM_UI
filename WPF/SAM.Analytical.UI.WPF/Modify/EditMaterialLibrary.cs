@@ -154,12 +154,12 @@ namespace SAM.Analytical.UI.WPF
 
             if (System.IO.Path.GetExtension(path) == ".tcd")
             {
-                MarqueeProgressForm marqueeProgressForm = new MarqueeProgressForm("Importing");
-                marqueeProgressForm.Show();
+                SAM.Core.UI.WPF.ProgressBarWindow progressBarWindow = new SAM.Core.UI.WPF.ProgressBarWindow("Importing", "Importing...");
+                progressBarWindow.Show();
 
                 ConstructionManager constructionManager = Tas.Convert.ToSAM_ConstructionManager(path, 0.0001);
 
-                marqueeProgressForm.Close();
+                progressBarWindow.Close();
 
                 if (constructionManager?.Materials == null || constructionManager?.Materials.Count == 0)
                 {
