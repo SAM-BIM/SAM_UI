@@ -1,6 +1,7 @@
 ﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Core.UI.WPF;
 using System.Windows.Forms;
 
 namespace SAM.Analytical.UI
@@ -30,12 +31,14 @@ namespace SAM.Analytical.UI
 
             log.Sort();
 
-            using (Core.Windows.Forms.LogForm logForm = new (log))
+            SAM.Core.UI.WPF.LogWindow logWindow = new SAM.Core.UI.WPF.LogWindow(log);
+            if (owner == null)
             {
-                if(logForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
+                logWindow.ShowDialog();
+            }
+            else
+            {
+                logWindow.ShowDialog(owner);
             }
         }
     }
