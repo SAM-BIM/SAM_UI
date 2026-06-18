@@ -128,16 +128,35 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            PlotModel plotModel = new PlotModel { Title = profile.Name };
-            plotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, MinimumPadding = 0, MaximumPadding = 0, MajorGridlineStyle = LineStyle.Solid, MajorGridlineColor = OxyColors.LightGray });
-            plotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, MajorGridlineStyle = LineStyle.Solid, MajorGridlineColor = OxyColors.LightGray });
+            double dataMin = values.Min();
+            double dataMax = values.Max();
 
-            LinearBarSeries linearBarSeries = new LinearBarSeries { FillColor = OxyColor.FromRgb(79, 129, 189), StrokeThickness = 0 };
+            // Bars are drawn from a baseline up to each value. Anchor the baseline at the data
+            // minimum (not 0) so small off-zero ranges - e.g. a 26-28 thermostat - still show their
+            // variation instead of collapsing into one flat block. For a flat profile fall back to a
+            // 0-based baseline so the bars are still visible.
+            double baseline = dataMin;
+            double axisMax = dataMax;
+            if (dataMin == dataMax)
+            {
+                baseline = System.Math.Min(0, dataMin);
+                axisMax = dataMax > 0 ? dataMax : dataMin + 1;
+            }
+
+            // A little headroom above the tallest bar (explicit Maximum makes MaximumPadding a no-op).
+            axisMax += (axisMax - baseline) * 0.05;
+
+            PlotModel plotModel = new PlotModel { Title = profile.Name };
+
+            plotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Minimum = -0.5, Maximum = values.Length - 0.5, MinimumPadding = 0, MaximumPadding = 0, MajorGridlineStyle = LineStyle.None });
+            plotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Minimum = baseline, Maximum = axisMax, MajorGridlineStyle = LineStyle.Solid, MajorGridlineColor = OxyColors.LightGray });
+
+            RectangleBarSeries rectangleBarSeries = new RectangleBarSeries { FillColor = OxyColor.FromRgb(79, 129, 189), StrokeThickness = 0 };
             for (int i = 0; i < values.Length; i++)
             {
-                linearBarSeries.Points.Add(new DataPoint(i, values[i]));
+                rectangleBarSeries.Items.Add(new RectangleBarItem(i - 0.45, baseline, i + 0.45, values[i]));
             }
-            plotModel.Series.Add(linearBarSeries);
+            plotModel.Series.Add(rectangleBarSeries);
 
             Chart_Main.Model = plotModel;
         }
