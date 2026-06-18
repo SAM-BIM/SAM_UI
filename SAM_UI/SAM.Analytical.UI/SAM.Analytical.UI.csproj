@@ -69,9 +69,6 @@
     <Reference Include="SAM.Weather.Tas">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Weather.Tas.dll</HintPath>
     </Reference>
-    <Reference Include="SAM.Weather.Windows">
-      <HintPath>..\..\..\SAM_Windows\build\SAM.Weather.Windows.dll</HintPath>
-    </Reference>
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
@@ -84,6 +81,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\WPF\SAM.Core.Mollier.UI.WPF\SAM.Core.Mollier.UI.WPF.csproj" />
     <ProjectReference Include="..\..\WPF\SAM.Core.UI.WPF\SAM.Core.UI.WPF.csproj" />
+    <ProjectReference Include="..\..\WPF\SAM.Weather.UI.WPF\SAM.Weather.UI.WPF.csproj" />
     <ProjectReference Include="..\SAM.Core.UI\SAM.Core.UI.csproj" />
     <ProjectReference Include="..\SAM.Geometry.UI\SAM.Geometry.UI.csproj" />
   </ItemGroup>
