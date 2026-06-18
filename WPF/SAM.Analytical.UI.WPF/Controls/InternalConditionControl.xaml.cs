@@ -1,6 +1,5 @@
 ﻿using SAM.Analytical.Windows.Forms;
 using SAM.Core.UI.WPF;
-using SAM.Core.Windows.Forms;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1384,7 +1383,7 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            Profile profile = Analytical.Windows.Modify.SelectProfile(profileLibrary, profileType);
+            Profile profile = SAM.Analytical.UI.Modify.SelectProfile(profileLibrary, profileType, System.Windows.Window.GetWindow(this));
 
             AnalyticalModel = new AnalyticalModel(AnalyticalModel, AnalyticalModel.AdjacencyCluster, AnalyticalModel.MaterialLibrary, profileLibrary);
 

@@ -1,10 +1,11 @@
-﻿using System.Windows.Forms;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 namespace SAM.Analytical.UI
 {
     public static partial class Modify
     {
-        public static void EditProfileLibrary(this UIAnalyticalModel uIAnalyticalModel, IWin32Window owner = null)
+        public static void EditProfileLibrary(this UIAnalyticalModel uIAnalyticalModel, System.Windows.Forms.IWin32Window owner = null)
         {
             if (uIAnalyticalModel?.JSAMObject == null)
             {
@@ -13,15 +14,20 @@ namespace SAM.Analytical.UI
 
             ProfileLibrary profileLibrary = uIAnalyticalModel.JSAMObject.ProfileLibrary;
 
-            using (Windows.Forms.ProfileLibraryForm profileLibraryForm = new Windows.Forms.ProfileLibraryForm(profileLibrary))
-            {
-                if (profileLibraryForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
+            ProfileLibraryWindow profileLibraryWindow = new ProfileLibraryWindow(profileLibrary);
 
-                profileLibrary = profileLibraryForm.ProfileLibrary;
+            // Bridge the WinForms IWin32Window owner to the WPF window's native owner handle.
+            if (owner != null)
+            {
+                new System.Windows.Interop.WindowInteropHelper(profileLibraryWindow).Owner = owner.Handle;
             }
+
+            if (profileLibraryWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            profileLibrary = profileLibraryWindow.ProfileLibrary;
 
             uIAnalyticalModel.JSAMObject = new AnalyticalModel(uIAnalyticalModel.JSAMObject, uIAnalyticalModel.JSAMObject.AdjacencyCluster, uIAnalyticalModel.JSAMObject.MaterialLibrary, profileLibrary);
         }
