@@ -52,7 +52,7 @@
 
                 <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
 
-                <DataGrid x:Name="DataGrid_Main" Grid.Column="2" IsReadOnly="True" AutoGenerateColumns="True"
+                <DataGrid x:Name="DataGrid_Main" Grid.Column="2" IsReadOnly="True" AutoGenerateColumns="False"
                           CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
                           SelectionUnit="FullRow" GridLinesVisibility="All"/>
             </Grid>

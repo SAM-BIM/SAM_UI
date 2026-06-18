@@ -13,6 +13,7 @@ using System.Data;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 
 namespace SAM.Weather.UI.WPF
 {
@@ -84,6 +85,7 @@ namespace SAM.Weather.UI.WPF
 
             TabControl_Main.Items.Clear();
             DataGrid_Main.ItemsSource = null;
+            DataGrid_Main.Columns.Clear();
 
             if (weatherData == null)
             {
@@ -162,12 +164,15 @@ namespace SAM.Weather.UI.WPF
 
         private void LoadDataGrid(List<WeatherDataType> weatherDataTypes, Dictionary<DateTime, Dictionary<WeatherDataType, double>> dictionary_Values)
         {
+            // DataTable column names are the (identifier-safe) enum names; the descriptions used as
+            // grid headers contain '[', ']' and '/' which would break WPF auto-generated binding
+            // paths - so columns are built explicitly with indexer bindings (which tolerate any name).
             DataTable dataTable = new DataTable();
             dataTable.Columns.Add("Date", typeof(string));
 
             foreach (WeatherDataType weatherDataType in weatherDataTypes)
             {
-                dataTable.Columns.Add(Core.Query.Description(weatherDataType), typeof(double));
+                dataTable.Columns.Add(weatherDataType.ToString(), typeof(double));
             }
 
             foreach (KeyValuePair<DateTime, Dictionary<WeatherDataType, double>> keyValuePair_DateTime in dictionary_Values.OrderBy(x => x.Key))
@@ -177,10 +182,20 @@ namespace SAM.Weather.UI.WPF
 
                 foreach (KeyValuePair<WeatherDataType, double> keyValuePair_WeatherDataType in keyValuePair_DateTime.Value)
                 {
-                    dataRow[Core.Query.Description(keyValuePair_WeatherDataType.Key)] = keyValuePair_WeatherDataType.Value;
+                    dataRow[keyValuePair_WeatherDataType.Key.ToString()] = keyValuePair_WeatherDataType.Value;
                 }
 
                 dataTable.Rows.Add(dataRow);
+            }
+
+            DataGrid_Main.Columns.Add(new DataGridTextColumn { Header = "Date", Binding = new Binding("[Date]") });
+            foreach (WeatherDataType weatherDataType in weatherDataTypes)
+            {
+                DataGrid_Main.Columns.Add(new DataGridTextColumn
+                {
+                    Header = Core.Query.Description(weatherDataType),
+                    Binding = new Binding("[" + weatherDataType.ToString() + "]")
+                });
             }
 
             DataGrid_Main.ItemsSource = dataTable.DefaultView;
