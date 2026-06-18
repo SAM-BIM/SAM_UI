@@ -1317,13 +1317,8 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            using (ProfileForm profileForm = new ProfileForm(profile, false))
-            {
-                if (profileForm.ShowDialog() != DialogResult.OK)
-                {
-                    return;
-                }
-            }
+            SAM.Analytical.UI.ProfileWindow profileWindow = new SAM.Analytical.UI.ProfileWindow(profile, false) { Owner = System.Windows.Window.GetWindow(this) };
+            profileWindow.ShowDialog();
         }
 
         private void button_ViewHeatingProfile_Click(object sender, RoutedEventArgs e)
