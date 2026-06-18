@@ -643,214 +643,214 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             windowHandle = new SAM.Core.UI.WPF.WindowHandle(this);
 
-            Icon = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM);
+            Icon = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM);
 
-            RibbonButton_OpenAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
+            RibbonButton_OpenAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
             RibbonButton_OpenAnalyticalModel.Click += RibbonButton_OpenAnalyticalModel_Click;
 
-            RibbonButton_NewAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_New);
+            RibbonButton_NewAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_New);
             RibbonButton_NewAnalyticalModel.Click += RibbonButton_NewAnalyticalModel_Click;
 
-            RibbonButton_SaveAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Save);
+            RibbonButton_SaveAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Save);
             RibbonButton_SaveAnalyticalModel.Click += RibbonButton_SaveAnalyticalModel_Click;
 
-            RibbonButton_SaveAsAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_SaveAs);
+            RibbonButton_SaveAsAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_SaveAs);
             RibbonButton_SaveAsAnalyticalModel.Click += RibbonButton_SaveAsAnalyticalModel_Click;
 
-            RibbonButton_CloseAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
+            RibbonButton_CloseAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
             RibbonButton_CloseAnalyticalModel.Click += RibbonButton_CloseAnalyticalModel_Click;
 
-            RibbonButton_ImportAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
+            RibbonButton_ImportAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
             RibbonButton_ImportAnalyticalModel.Click += RibbonButton_ImportAnalyticalModel_Click;
 
-            RibbonButton_ExportAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Save);
+            RibbonButton_ExportAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Save);
             RibbonButton_ExportAnalyticalModel.Click += RibbonButton_ExportAnalyticalModel_Click;
 
-            RibbonButton_NewSectionViews.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_NewSectionViews.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_NewSectionViews.Click += RibbonButton_NewSectionViews_Click;
 
-            RibbonButton_NewSectionView.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_NewSectionView.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_NewSectionView.Click += RibbonButton_NewSectionView_Click;
 
-            RibbonButton_New3DView.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_New3DView.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_New3DView.Click += RibbonButton_New3DView_Click;
 
-            RibbonButton_ViewSettings.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_ViewSettings.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_ViewSettings.Click += RibbonButton_ViewSettings_Click;
 
-            RibbonButton_CloseView.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_CloseView.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_CloseView.Click += RibbonButton_CloseView_Click;
 
-            RibbonButton_AnalyticalModelLocation.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Location);
+            RibbonButton_AnalyticalModelLocation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Location);
             RibbonButton_AnalyticalModelLocation.Click += RibbonButton_AnalyticalModelLocation_Click;
 
-            RibbonButton_AnalyticalModelProperties.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_AnalyticalModelProperties);
+            RibbonButton_AnalyticalModelProperties.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_AnalyticalModelProperties);
             RibbonButton_AnalyticalModelProperties.Click += RibbonButton_AnalyticalModelProperties_Click;
 
-            RibbonButton_ImportObjects.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Import);
+            RibbonButton_ImportObjects.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Import);
             RibbonButton_ImportObjects.Click += RibbonButton_ImportObjects_Click;
 
-            RibbonButton_AnalyticalModelCheck.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ModelCheck);
+            RibbonButton_AnalyticalModelCheck.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ModelCheck);
             RibbonButton_AnalyticalModelCheck.Click += RibbonButton_AnalyticalModelCheck_Click;
 
-            RibbonButton_EditMaterialLibrary.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_MaterialLibrary);
+            RibbonButton_EditMaterialLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_MaterialLibrary);
             RibbonButton_EditMaterialLibrary.Click += RibbonButton_EditMaterialLibrary_Click;
 
-            RibbonButton_EditInternalConditionLibrary.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_InternalCondition);
+            RibbonButton_EditInternalConditionLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_InternalCondition);
             RibbonButton_EditInternalConditionLibrary.Click += RibbonButton_EditInternalConditionLibrary_Click;
 
-            RibbonButton_EditProfileLibrary.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ProfileLibrary);
+            RibbonButton_EditProfileLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ProfileLibrary);
             RibbonButton_EditProfileLibrary.Click += RibbonButton_EditProfileLibrary_Click;
 
-            RibbonButton_EditSpaces.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_EditSpaces.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditSpaces.Click += RibbonButton_EditSpaces_Click;
 
-            RibbonButton_EditConstructions.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ConstructionLibrary);
+            RibbonButton_EditConstructions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ConstructionLibrary);
             RibbonButton_EditConstructions.Click += RibbonButton_EditConstructions_Click;
 
-            RibbonButton_EditApertureConstructions.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ApertureConstruction);
+            RibbonButton_EditApertureConstructions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ApertureConstruction);
             RibbonButton_EditApertureConstructions.Click += RibbonButton_EditApertureConstructions_Click;
 
-            RibbonButton_EditWeatherData.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_WeatherData);
+            RibbonButton_EditWeatherData.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_WeatherData);
             RibbonButton_EditWeatherData.Click += RibbonButton_EditWeatherData_Click;
 
-            RibbonButton_ImportWeatherData.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Import);
+            RibbonButton_ImportWeatherData.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Import);
             RibbonButton_ImportWeatherData.Click += RibbonButton_ImportWeatherData_Click;
 
-            RibbonButton_SolarSimulation.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_SolarCalculator);
+            RibbonButton_SolarSimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_SolarCalculator);
             RibbonButton_SolarSimulation.Click += RibbonButton_SolarSimulation_Click;
 
-            RibbonButton_EnergySimulation.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EnergySimulation);
+            RibbonButton_EnergySimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EnergySimulation);
             RibbonButton_EnergySimulation.Click += RibbonButton_EnergySimulation_Click;
 
-            RibbonButton_EditLibrary.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
+            RibbonButton_EditLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_EditLibrary.Click += RibbonButton_EditLibrary_Click;
 
-            RibbonButton_SetDefaultLayers.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ConstructionLibrary);
+            RibbonButton_SetDefaultLayers.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ConstructionLibrary);
             RibbonButton_SetDefaultLayers.Click += RibbonButton_SetDefaultLayers_Click;
 
-            RibbonButton_AssignMechanicalSystems.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
+            RibbonButton_AssignMechanicalSystems.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_AssignMechanicalSystems.Click += RibbonButton_AssignMechanicalSystems_Click;
 
-            RibbonButton_OpenT3D.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
+            RibbonButton_OpenT3D.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
             RibbonButton_OpenT3D.Click += RibbonButton_OpenT3D_Click;
 
-            RibbonButton_OpenTBD.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_TBD);
+            RibbonButton_OpenTBD.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_TBD);
             RibbonButton_OpenTBD.Click += RibbonButton_OpenTBD_Click;
 
-            RibbonButton_OpenTSD.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_TSD);
+            RibbonButton_OpenTSD.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_TSD);
             RibbonButton_OpenTSD.Click += RibbonButton_OpenTSD_Click;
 
-            RibbonButton_OpenTPD.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_TPD);
+            RibbonButton_OpenTPD.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_TPD);
             RibbonButton_OpenTPD.Click += RibbonButton_OpenTPD_Click;
 
-            RibbonButton_ThermalTransmittanceCalculator.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
+            RibbonButton_ThermalTransmittanceCalculator.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
             RibbonButton_ThermalTransmittanceCalculator.Click += RibbonButton_ThermalTransmittanceCalculator_Click;
 
-            RibbonButton_GlazingCalculator.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
+            RibbonButton_GlazingCalculator.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
             RibbonButton_GlazingCalculator.Click += RibbonButton_GlazingCalculator_Click;
 
-            RibbonButton_CreateCases.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
+            RibbonButton_CreateCases.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
             RibbonButton_CreateCases.Click += RibbonButton_CreateCases_Click;
 
-            RibbonButton_SimulateCases.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
+            RibbonButton_SimulateCases.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
             RibbonButton_SimulateCases.Click += RibbonButton_SimulateCases_Click;
 
-            RibbonButton_CreateSimulateCases.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
+            RibbonButton_CreateSimulateCases.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
             RibbonButton_CreateSimulateCases.Click += RibbonButton_CreateSimulateCases_Click;
 
-            RibbonButton_Solve.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
+            RibbonButton_Solve.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
             RibbonButton_Solve.Click += RibbonButton_Solve_Click;
 
-            RibbonMenuButton_PartL.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PartL);
+            RibbonMenuButton_PartL.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PartL);
 
-            RibbonButton_OpenPartL.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PartL);
+            RibbonButton_OpenPartL.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PartL);
             RibbonButton_OpenPartL.Click += RibbonButton_OpenPartL_Click;
 
-            RibbonButton_UpdateUKBRFile.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PartL_UKBR);
+            RibbonButton_UpdateUKBRFile.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PartL_UKBR);
             RibbonButton_UpdateUKBRFile.Click += RibbonButton_UpdateUKBRFile_Click;
 
-            RibbonButton_Hydra.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Hydra);
+            RibbonButton_Hydra.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Hydra);
             RibbonButton_Hydra.Click += RibbonButton_Hydra_Click;
 
-            RibbonButton_NCMNames.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
+            RibbonButton_NCMNames.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_NCMNames.Click += RibbonButton_NCMNames_Click;
 
-            RibbonButton_FixNames.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
+            RibbonButton_FixNames.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_FixNames.Click += RibbonButton_FixNames_Click;
 
-            RibbonButton_CleanAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Clean);
+            RibbonButton_CleanAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Clean);
             RibbonButton_CleanAnalyticalModel.Click += RibbonButton_CleanAnalyticalModel_Click;
 
-            RibbonButton_RemoveAirMovementObjects.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Clean);
+            RibbonButton_RemoveAirMovementObjects.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Clean);
             RibbonButton_RemoveAirMovementObjects.Click += RibbonButton_RemoveAirMovementObjects_Click;
 
-            //RibbonButton_CreateTBD.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_TBD);
+            //RibbonButton_CreateTBD.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_TBD);
             //RibbonButton_CreateTBD.Click += RibbonButton_CreateTBD_Click;
 
-            RibbonButton_AddMissingObjects.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_AddMissingObjects);
+            RibbonButton_AddMissingObjects.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_AddMissingObjects);
             RibbonButton_AddMissingObjects.Click += RibbonButton_AddMissingObjects_Click;
 
-            RibbonButton_PrintRoomDataSheets.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_PrintRoomDataSheets.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_PrintRoomDataSheets.Click += RibbonButton_PrintRoomDataSheets_Click;
 
-            RibbonButton_OpenMollierChart.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_MollierDiagram);
+            RibbonButton_OpenMollierChart.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_MollierDiagram);
             RibbonButton_OpenMollierChart.Click += RibbonButton_OpenMollierChart_Click;
 
-            RibbonButton_ViewGeometry.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_ViewGeometry.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_ViewGeometry.Click += RibbonButton_ViewGeometry_Click;
 
-            RibbonButton_MapInternalConditions.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_MapInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_MapInternalConditions.Click += RibbonButton_MapInternalConditions_Click;
 
-            RibbonButton_MapInternalConditionsByTM59.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_MapInternalConditionsByTM59.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_MapInternalConditionsByTM59.Click += RibbonButton_MapInternalConditionsByTM59_Click;
 
-            RibbonButton_EditInternalConditions.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_EditInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditInternalConditions.Click += RibbonButton_EditInternalConditions_Click;
 
-            RibbonButton_TextMap.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_TextMap.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_TextMap.Click += RibbonButton_TextMap_Click;
 
-            RibbonButton_SelectByFilter.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_SelectByFilter.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_SelectByFilter.Click += RibbonButton_SelectByFilter_Click;
 
-            RibbonButton_SelectByGuid.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_SelectByGuid.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_SelectByGuid.Click += RibbonButton_SelectByGuid_Click;
 
-            RibbonButton_RevealHidden.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_RevealHidden.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_RevealHidden.Click += RibbonButton_RevealHidden_Click;
 
-            RibbonButton_ViewRange.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_ViewRange.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_ViewRange.Click += RibbonButton_ViewRange_Click;
 
-            RibbonButton_AirHandlingUnitDiagram.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_AirHandlingUnitDiagram);
+            RibbonButton_AirHandlingUnitDiagram.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_AirHandlingUnitDiagram);
             RibbonButton_AirHandlingUnitDiagram.Click += RibbonButton_AirHandlingUnitDiagram_Click;
 
-            RibbonButton_SpaceDiagram.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_SpaceDiagram);
+            RibbonButton_SpaceDiagram.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_SpaceDiagram);
             RibbonButton_SpaceDiagram.Click += RibbonButton_SpaceDiagram_Click;
 
-            RibbonButton_RemoveResults.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
+            RibbonButton_RemoveResults.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
             RibbonButton_RemoveResults.Click += RibbonButton_RemoveResults_Click;
 
-            RibbonButton_Wiki.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Wiki.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_Wiki.Click += RibbonButton_Wiki_Click;
 
-            RibbonButton_KeyboardShortcuts.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_KeyboardShortcuts.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_KeyboardShortcuts.Click += RibbonButton_KeyboardShortcuts_Click;
 
-            RibbonButton_Undo.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Undo.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_Undo.Click += RibbonButton_Undo_Click;
             RibbonButton_Undo.IsEnabled = false;
 
-            RibbonButton_Redo.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Redo.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_Redo.Click += RibbonButton_Redo_Click;
             RibbonButton_Redo.IsEnabled = false;
 
-            RibbonButton_About.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_About.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_About.Click += RibbonButton_About_Click;
 
-            RibbonButton_Test.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Test.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_Test.Click += RibbonButton_Test_Click;
 
             AnalyticalModelControl.ZoomRequested += AnalyticalModelControl_ZoomRequested;
