@@ -1,5 +1,4 @@
-﻿using SAM.Analytical.Windows.Forms;
-using SAM.Core.UI.WPF;
+﻿using SAM.Core.UI.WPF;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1566,17 +1565,15 @@ namespace SAM.Analytical.UI.WPF
                 internalCondition = internalConditionLibrary.GetInternalConditions(multipleValueComboBoxControl_Name.Value)?.FirstOrDefault();
             }
 
-            using (InternalConditionLibraryForm internalConditionForm = new InternalConditionLibraryForm(internalConditionLibrary, profileLibrary, adjacencyCluster, internalCondition))
+            InternalConditionLibraryWindow internalConditionLibraryWindow = new InternalConditionLibraryWindow(internalConditionLibrary, profileLibrary, adjacencyCluster, internalCondition) { Owner = System.Windows.Window.GetWindow(this) };
+            if (internalConditionLibraryWindow.ShowDialog() != true)
             {
-                if (internalConditionForm.ShowDialog() != DialogResult.OK)
-                {
-                    return;
-                }
-
-                profileLibrary = internalConditionForm.ProfileLibrary;
-                adjacencyCluster = internalConditionForm.AdjacencyCluster;
-                internalCondition = internalConditionForm.GetInternalConditions(true)?.FirstOrDefault();
+                return;
             }
+
+            profileLibrary = internalConditionLibraryWindow.ProfileLibrary;
+            adjacencyCluster = internalConditionLibraryWindow.AdjacencyCluster;
+            internalCondition = internalConditionLibraryWindow.GetInternalConditions(true)?.FirstOrDefault();
 
             AnalyticalModel = new AnalyticalModel(AnalyticalModel, adjacencyCluster, AnalyticalModel.MaterialLibrary, profileLibrary);
 
