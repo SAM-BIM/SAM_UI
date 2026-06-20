@@ -33,9 +33,6 @@
     <Reference Include="SAM.Analytical.Tas">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.dll</HintPath>
     </Reference>
-    <Reference Include="SAM.Analytical.Windows">
-      <HintPath>..\..\..\SAM_Windows\build\SAM.Analytical.Windows.dll</HintPath>
-    </Reference>
     <Reference Include="SAM.Architectural">
       <HintPath>..\..\..\SAM\build\SAM.Architectural.dll</HintPath>
     </Reference>

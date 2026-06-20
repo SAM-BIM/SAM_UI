@@ -14,7 +14,7 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            analyticalModel = Windows.Query.AddMissingObjects(analyticalModel, new string[] { Analytical.Query.ResourcesDirectory() }, out List<IJSAMObject> jSAMObjects, owner);
+            analyticalModel = Query.AddMissingObjects(analyticalModel, new string[] { Analytical.Query.ResourcesDirectory() }, out List<IJSAMObject> jSAMObjects);
             if (analyticalModel == null)
             {
                 return;

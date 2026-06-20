@@ -793,7 +793,7 @@ namespace SAM.Analytical.UI.WPF
 
             foreach (InternalCondition internalCondition in jSAMObjects.FindAll(x => x is InternalCondition))
             {
-                UI.Modify.DuplicateInternalCondition(uIAnalyticalModel, internalCondition);
+                Modify.DuplicateInternalCondition(uIAnalyticalModel, internalCondition);
             }
         }
 

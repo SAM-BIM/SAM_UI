@@ -12,7 +12,7 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            analyticalModel = Windows.Query.Clean(analyticalModel, owner);
+            analyticalModel = Query.Clean(analyticalModel);
             if(analyticalModel == null)
             {
                 return;
