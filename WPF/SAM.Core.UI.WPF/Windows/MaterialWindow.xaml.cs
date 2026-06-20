@@ -98,10 +98,13 @@ namespace SAM.Core.UI.WPF
         {
             get
             {
-                if (material == null)
-                {
-                    return null;
-                }
+                // An existing material keeps its own type; a new material (Add) takes the
+                // type currently selected in the combo box so the dialog can create one.
+                MaterialType materialType = material != null
+                    ? material.MaterialType()
+                    : Core.Query.Enum<MaterialType>(ComboBox_MaterialType.SelectedItem as string);
+
+                Guid guid = material != null ? material.Guid : Guid.NewGuid();
 
                 string name = TextBox_Name.Text;
                 string displayName = TextBox_DisplayName.Text;
@@ -127,7 +130,7 @@ namespace SAM.Core.UI.WPF
                 CustomParameters customParameters = ParametersControl_Main.CustomParameters;
 
                 IMaterial result = null;
-                switch (material.MaterialType())
+                switch (materialType)
                 {
                     case MaterialType.Gas:
 
@@ -142,17 +145,15 @@ namespace SAM.Core.UI.WPF
                             }
                         }
 
-                        result = new GasMaterial(material.Guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity, dynamicViscosity);
+                        result = new GasMaterial(guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity, dynamicViscosity);
                         break;
 
                     case MaterialType.Opaque:
-                        Material opaqueMaterial = (OpaqueMaterial)material;
-                        result = new OpaqueMaterial(opaqueMaterial.Guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity);
+                        result = new OpaqueMaterial(guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity);
                         break;
 
                     case MaterialType.Transparent:
-                        Material transparentMaterial = (TransparentMaterial)material;
-                        result = new OpaqueMaterial(transparentMaterial.Guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity);
+                        result = new TransparentMaterial(guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity);
                         break;
 
                     default:

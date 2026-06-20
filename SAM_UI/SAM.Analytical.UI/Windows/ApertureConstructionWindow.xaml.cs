@@ -95,6 +95,10 @@ namespace SAM.Analytical.UI
                 {
                     result = new ApertureConstruction(apertureConstruction, PaneConstructionLayers, FrameConstructionLayers);
                     result = new ApertureConstruction(result.Guid, result, TextBox_Name.Text);
+
+                    // Apply the aperture type currently selected in the combo box so edits to it are saved.
+                    ApertureType apertureType = Core.Query.Enum<ApertureType>(ComboBox_ApertureType.SelectedItem as string);
+                    result = new ApertureConstruction(result, apertureType);
                 }
 
                 if (result == null)

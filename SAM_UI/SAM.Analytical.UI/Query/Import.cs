@@ -150,6 +150,20 @@ namespace SAM.Analytical.UI
                         }
                     }
 
+                    List<ApertureConstruction> apertureConstructions_Temp = adjacencyCluster.GetApertureConstructions();
+                    if (apertureConstructions_Temp != null)
+                    {
+                        foreach (ApertureConstruction apertureConstruction in apertureConstructions_Temp)
+                        {
+                            if (apertureConstruction is T)
+                            {
+                                tuples_All.Add(new Tuple<string, string, T>(typeof(ApertureConstruction).Name, apertureConstruction.Name, (T)(object)apertureConstruction));
+                            }
+
+                            jSAMObjects.Add(apertureConstruction);
+                        }
+                    }
+
                     IEnumerable<InternalCondition> internalConditions = adjacencyCluster.GetInternalConditions(false, true);
                     if (internalConditions != null)
                     {
