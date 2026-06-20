@@ -6,7 +6,6 @@ using Microsoft.Win32;
 using SAM.Core;
 using SAM.Core.UI;
 using SAM.Core.UI.WPF;
-using SAM.Core.Windows.Forms;
 using SAM.Geometry.Object;
 using SAM.Geometry.UI;
 using SAM.Geometry.UI.WPF;

@@ -1,5 +1,4 @@
 ﻿using SAM.Analytical.Tas;
-using SAM.Core.Windows.Forms;
 using System;
 using System.Collections.Generic;
 using System.Linq;

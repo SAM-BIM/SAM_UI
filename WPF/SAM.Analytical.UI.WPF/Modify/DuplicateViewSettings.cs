@@ -29,16 +29,13 @@ namespace SAM.Analytical.UI.WPF
             string name = string.IsNullOrWhiteSpace(viewSettings.Name) ? viewSettings.DefaultName() : viewSettings.Name;
             name = string.Format("New {0}", name);
 
-            using (Core.Windows.Forms.TextBoxForm<string> textBoxForm = new ("Duplicate View", "Name"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Duplicate View", "Name") { Value = name };
+            if (textBoxWindow.ShowDialog() != true)
             {
-                textBoxForm.Value = name;
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                name = textBoxForm.Value;
+                return;
             }
+
+            name = textBoxWindow.Value;
 
             if (viewSettings is TwoDimensionalViewSettings)
             {

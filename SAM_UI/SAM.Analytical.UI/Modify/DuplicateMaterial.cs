@@ -19,7 +19,7 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            material = Core.Windows.Modify.Duplicate(materialLibrary, material, owner, Core.Query.Enums(typeof(IMaterial)));
+            material = SAM.Core.UI.WPF.Modify.Duplicate(materialLibrary, material, null, Core.Query.Enums(typeof(IMaterial)));
             if (material == null)
             {
                 return;

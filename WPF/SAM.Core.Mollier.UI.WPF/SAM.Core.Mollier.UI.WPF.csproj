@@ -31,9 +31,6 @@
     <Reference Include="SAM.Core.Mollier">
       <HintPath>..\..\..\SAM_Mollier\build\SAM.Core.Mollier.dll</HintPath>
     </Reference>
-    <Reference Include="SAM.Core.Windows">
-      <HintPath>..\..\..\SAM_Windows\build\SAM.Core.Windows.dll</HintPath>
-    </Reference>
     <Reference Include="SAM.Geometry">
       <HintPath>..\..\..\SAM\build\SAM.Geometry.dll</HintPath>
     </Reference>

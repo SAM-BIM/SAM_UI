@@ -118,7 +118,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void TextBox_IntegerOnly_TextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_IntegerOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_IntegerOnly(sender, e);
         }
 
         private List<SpaceData> GetSpaceDatas()
