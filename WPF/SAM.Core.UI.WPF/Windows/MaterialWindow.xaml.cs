@@ -49,6 +49,11 @@ namespace SAM.Core.UI.WPF
         {
             foreach (MaterialType materialType in Enum.GetValues(typeof(MaterialType)))
             {
+                if (materialType == MaterialType.Undefined)
+                {
+                    continue;
+                }
+
                 ComboBox_MaterialType.Items.Add(Core.Query.Description(materialType));
             }
         }
@@ -68,6 +73,13 @@ namespace SAM.Core.UI.WPF
                 TextBox_Density.Text = double.IsNaN(material_Temp.Density) ? null : material_Temp.Density.ToString();
 
                 ComboBox_MaterialType.Text = Core.Query.Description(Core.Query.MaterialType(material_Temp));
+            }
+            else
+            {
+                // Adding a new material: the type is otherwise locked when editing, so enable the
+                // combo and default to Opaque so the user can pick a type and Add actually creates one.
+                ComboBox_MaterialType.IsEnabled = true;
+                ComboBox_MaterialType.SelectedItem = Core.Query.Description(MaterialType.Opaque);
             }
 
             LoadParameters();
