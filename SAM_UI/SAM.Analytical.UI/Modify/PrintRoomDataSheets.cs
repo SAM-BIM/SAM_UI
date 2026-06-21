@@ -1,4 +1,6 @@
-﻿using NetOffice.ExcelApi;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+using NetOffice.ExcelApi;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -56,7 +58,7 @@ namespace SAM.Analytical.UI
                 }
             }
 
-            using (Core.Windows.Forms.ProgressForm progressForm = new Core.Windows.Forms.ProgressForm("Print RDS", 4))
+            using (SAM.Core.UI.WPF.ProgressWindow progressForm = new SAM.Core.UI.WPF.ProgressWindow("Print RDS", 4))
             {
                 progressForm.Update("Collecting Data");
 

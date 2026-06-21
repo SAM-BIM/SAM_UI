@@ -23,7 +23,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void TextBox_Offset_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_NumberOnly(sender, e);
         }
 
         public AdjacencyCluster AdjacencyCluster
@@ -197,7 +197,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void textBox_TextSize_TextInput(object sender, TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_NumberOnly(sender, e);
         }
     }
 }

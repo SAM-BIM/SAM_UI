@@ -53,20 +53,11 @@ namespace SAM.Geometry.UI.WPF
                         continue;
                     }
 
-                    List<Element3D> element3Ds = ToElement3Ds(sAMGeometryObject);
-                    if (element3Ds == null || element3Ds.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    GroupModel3D groupModel3D = new GroupModel3D();
-                    foreach (Element3D element3D in element3Ds)
-                    {
-                        groupModel3D.Children.Add(element3D);
-                    }
-
-                    Core.UI.WPF.Modify.SetIJSAMObject(groupModel3D, sAMGeometryObject);
-                    result.Add(groupModel3D);
+                    // A nested Geometry3DObjectCollection that carries its own SAMObject tag (an Aperture
+                    // hosted inside its Panel - see SAM.Analytical GeometryObjectModel) is a SEPARATE
+                    // selectable object: emit its own tagged group instead of folding it into the parent's
+                    // (lost aperture selection after the SharpDX port, matching the old Helix ToMedia3D path).
+                    AddPickableGroups(sAMGeometryObject, result);
                 }
             }
 
@@ -151,25 +142,17 @@ namespace SAM.Geometry.UI.WPF
 
                     objectCount++;
 
-                    // A pickable object needs a guid; untagged objects still render (Guid.Empty range -> not
-                    // pickable), mirroring the per-object path where only tagged objects resolve to a hit.
-                    Core.SAMObject sAMObject = ResolveSAMObject(sAMGeometryObject);
-                    System.Guid guid = sAMObject == null ? System.Guid.Empty : sAMObject.Guid;
-                    sharpDXSceneBuilder.SetCurrentObject(guid);
-
-                    if (sAMObject != null && !objects.ContainsKey(guid))
-                    {
-                        objects[guid] = sAMGeometryObject as Core.IJSAMObject ?? sAMObject;
-                    }
-
+                    // AppendPickable keys each object's primitives under ITS own guid - including a nested
+                    // Geometry3DObjectCollection that carries its own SAMObject tag (an Aperture hosted inside
+                    // its Panel), which would otherwise inherit the panel's guid and stop being selectable.
                     if (!logEnabled)
                     {
-                        Append(sharpDXSceneBuilder, sAMGeometryObject);
+                        AppendPickable(sharpDXSceneBuilder, sAMGeometryObject, objects);
                         continue;
                     }
 
                     System.Diagnostics.Stopwatch appendStopwatch = System.Diagnostics.Stopwatch.StartNew();
-                    Append(sharpDXSceneBuilder, sAMGeometryObject);
+                    AppendPickable(sharpDXSceneBuilder, sAMGeometryObject, objects);
                     appendStopwatch.Stop();
                     appendMilliseconds += appendStopwatch.Elapsed.TotalMilliseconds;
                 }
@@ -222,6 +205,95 @@ namespace SAM.Geometry.UI.WPF
             return null;
         }
 
+        // True when a child is a Geometry3DObjectCollection that carries its own SAMObject tag - i.e. a
+        // separate selectable object nested inside another (an Aperture hosted inside its Panel). Such a
+        // child must NOT be folded into its parent's pickable unit, or it inherits the parent's guid and
+        // becomes unselectable (the lost-aperture-selection regression after the SharpDX/batched port).
+        private static bool IsNestedPickable(ISAMGeometryObject sAMGeometryObject)
+        {
+            return sAMGeometryObject is Geometry3DObjectCollection && ResolveSAMObject(sAMGeometryObject) != null;
+        }
+
+        // Batched build: append one pickable unit (and recursively its nested pickable units) so each
+        // object's primitives are recorded under ITS guid. Mirrors how the old Helix ToMedia3D path gave a
+        // nested tagged collection its own tagged ModelVisual3D.
+        private static void AppendPickable(SharpDXSceneBuilder sharpDXSceneBuilder, ISAMGeometryObject sAMGeometryObject, Dictionary<System.Guid, Core.IJSAMObject> objects)
+        {
+            if (sharpDXSceneBuilder == null || sAMGeometryObject == null)
+            {
+                return;
+            }
+
+            // A pickable object needs a guid; untagged objects still render (Guid.Empty range -> not
+            // pickable), mirroring the per-object path where only tagged objects resolve to a hit.
+            Core.SAMObject sAMObject = ResolveSAMObject(sAMGeometryObject);
+            System.Guid guid = sAMObject == null ? System.Guid.Empty : sAMObject.Guid;
+            sharpDXSceneBuilder.SetCurrentObject(guid);
+
+            if (sAMObject != null && objects != null && !objects.ContainsKey(guid))
+            {
+                objects[guid] = sAMGeometryObject as Core.IJSAMObject ?? sAMObject;
+            }
+
+            // Only a Geometry3DObjectCollection can host a nested pickable; anything else is wholly this guid's.
+            if (!(sAMGeometryObject is Geometry3DObjectCollection geometry3DObjectCollection))
+            {
+                Append(sharpDXSceneBuilder, sAMGeometryObject);
+                return;
+            }
+
+            foreach (ISAMGeometry3DObject sAMGeometry3DObject in geometry3DObjectCollection)
+            {
+                if (IsNestedPickable(sAMGeometry3DObject))
+                {
+                    AppendPickable(sharpDXSceneBuilder, sAMGeometry3DObject, objects);
+
+                    // Resume this object's context for its remaining direct primitives.
+                    sharpDXSceneBuilder.SetCurrentObject(guid);
+                    continue;
+                }
+
+                Append(sharpDXSceneBuilder, sAMGeometry3DObject);
+            }
+        }
+
+        // Per-object build: emit one tagged GroupModel3D for this object's OWN primitives, then one per
+        // nested pickable child (recursively) - so each is independently selectable, the same split as the
+        // batched AppendPickable above.
+        private static void AddPickableGroups(ISAMGeometryObject sAMGeometryObject, List<Element3D> result)
+        {
+            if (sAMGeometryObject == null)
+            {
+                return;
+            }
+
+            // ToElement3Ds(ISAMGeometryObject) builds only this object's own primitives (AppendDirect skips
+            // nested pickables), so the parent group does not duplicate the aperture geometry.
+            List<Element3D> element3Ds = ToElement3Ds(sAMGeometryObject);
+            if (element3Ds != null && element3Ds.Count != 0)
+            {
+                GroupModel3D groupModel3D = new GroupModel3D();
+                foreach (Element3D element3D in element3Ds)
+                {
+                    groupModel3D.Children.Add(element3D);
+                }
+
+                Core.UI.WPF.Modify.SetIJSAMObject(groupModel3D, sAMGeometryObject);
+                result.Add(groupModel3D);
+            }
+
+            if (sAMGeometryObject is Geometry3DObjectCollection geometry3DObjectCollection)
+            {
+                foreach (ISAMGeometry3DObject sAMGeometry3DObject in geometry3DObjectCollection)
+                {
+                    if (IsNestedPickable(sAMGeometry3DObject))
+                    {
+                        AddPickableGroups(sAMGeometry3DObject, result);
+                    }
+                }
+            }
+        }
+
         // Diagnostic accumulators for the per-object Append vs Build split (see ToElement3Ds above).
         // Reset before / read after the model-level build loop; populated only when the log is enabled.
         private static double appendMilliseconds;
@@ -244,14 +316,14 @@ namespace SAM.Geometry.UI.WPF
 
             if (!PerformanceLog.Enabled)
             {
-                Append(sharpDXSceneBuilder, sAMGeometryObject);
+                AppendDirect(sharpDXSceneBuilder, sAMGeometryObject);
                 return sharpDXSceneBuilder.Build();
             }
 
             // Diagnostic split (accumulated across the model build, reported by the caller). RefreshAppearance
             // also calls this path; its contribution is harmless because the caller resets before each build.
             System.Diagnostics.Stopwatch appendStopwatch = System.Diagnostics.Stopwatch.StartNew();
-            Append(sharpDXSceneBuilder, sAMGeometryObject);
+            AppendDirect(sharpDXSceneBuilder, sAMGeometryObject);
             appendStopwatch.Stop();
             appendMilliseconds += appendStopwatch.Elapsed.TotalMilliseconds;
 
@@ -261,6 +333,35 @@ namespace SAM.Geometry.UI.WPF
             buildMilliseconds += buildStopwatch.Elapsed.TotalMilliseconds;
 
             return result;
+        }
+
+        // Appends only sAMGeometryObject's OWN primitives: a nested pickable child (a tagged
+        // Geometry3DObjectCollection, e.g. an Aperture inside its Panel) is a separate selectable object and
+        // is skipped here so it is not folded into - and re-tagged as - its parent (see AddPickableGroups /
+        // AppendPickable). For anything that is not such a parent collection this is identical to Append.
+        private static void AppendDirect(SharpDXSceneBuilder sharpDXSceneBuilder, ISAMGeometryObject sAMGeometryObject)
+        {
+            if (sharpDXSceneBuilder == null || sAMGeometryObject == null)
+            {
+                return;
+            }
+
+            if (sAMGeometryObject is Geometry3DObjectCollection geometry3DObjectCollection)
+            {
+                foreach (ISAMGeometry3DObject sAMGeometry3DObject in geometry3DObjectCollection)
+                {
+                    if (IsNestedPickable(sAMGeometry3DObject))
+                    {
+                        continue;
+                    }
+
+                    Append(sharpDXSceneBuilder, sAMGeometry3DObject);
+                }
+
+                return;
+            }
+
+            Append(sharpDXSceneBuilder, sAMGeometryObject);
         }
 
         // Mirrors the type dispatch of Create.Model3D, but accumulates primitives into the

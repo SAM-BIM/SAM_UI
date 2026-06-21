@@ -160,16 +160,14 @@ namespace SAM.Core.UI.WPF
                     return;
                 }
 
-                using (Windows.Forms.SearchForm<IUIFilter> searchForm = new Windows.Forms.SearchForm<IUIFilter>("Select Filter", uIFilters, x => x.Name))
+                SearchWindow searchWindow = new SearchWindow(uIFilters, x => (x as IUIFilter)?.Name) { Title = "Select Filter" };
+                searchWindow.SelectionMode = SelectionMode.Single;
+                if (searchWindow.ShowDialog() != true)
                 {
-                    searchForm.SelectionMode = System.Windows.Forms.SelectionMode.One;
-                    if (searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                    {
-                        return;
-                    }
-
-                    filterAddingEventArgs.UIFilter = searchForm.SelectedItems.FirstOrDefault();
+                    return;
                 }
+
+                filterAddingEventArgs.UIFilter = searchWindow.GetSelectedItems<IUIFilter>().FirstOrDefault();
             }
 
             Add(filterAddingEventArgs.UIFilter);

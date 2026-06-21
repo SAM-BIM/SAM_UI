@@ -72,9 +72,6 @@
     <Reference Include="SAM.Analytical.Tas.TM59">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.TM59.dll</HintPath>
     </Reference>
-    <Reference Include="SAM.Analytical.Windows">
-      <HintPath>..\..\..\SAM_Windows\build\SAM.Analytical.Windows.dll</HintPath>
-    </Reference>
     <Reference Include="SAM.Architectural">
       <HintPath>..\..\..\SAM\build\SAM.Architectural.dll</HintPath>
     </Reference>
@@ -93,9 +90,6 @@
     <Reference Include="SAM.Core.Tas.UKBR">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Core.Tas.UKBR.dll</HintPath>
     </Reference>
-    <Reference Include="SAM.Core.Windows">
-      <HintPath>..\..\..\SAM_Windows\build\SAM.Core.Windows.dll</HintPath>
-    </Reference>
     <Reference Include="SAM.Geometry">
       <HintPath>..\..\..\SAM\build\SAM.Geometry.dll</HintPath>
     </Reference>
@@ -110,9 +104,6 @@
     </Reference>
     <Reference Include="SAM.Weather.Tas">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Weather.Tas.dll</HintPath>
-    </Reference>
-    <Reference Include="SAM.Weather.Windows">
-      <HintPath>..\..\..\SAM_Windows\build\SAM.Weather.Windows.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.Data.DataSetExtensions" />

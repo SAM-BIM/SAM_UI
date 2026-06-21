@@ -1,4 +1,7 @@
-﻿using SAM.Core.Windows.Forms;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core.UI.WPF;
 using System.Windows.Forms;
 
 namespace SAM.Analytical.UI
@@ -13,15 +16,13 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            using (AddressAndLocationForm addressAndLocationForm = new AddressAndLocationForm(analyticalModel.Address, analyticalModel.Location))
+            AddressAndLocationWindow addressAndLocationWindow = new AddressAndLocationWindow(analyticalModel.Address, analyticalModel.Location);
+            if (addressAndLocationWindow.ShowDialog(owner) != true)
             {
-                if (addressAndLocationForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                analyticalModel = new AnalyticalModel(analyticalModel.Name, analyticalModel.Description, addressAndLocationForm.Location, addressAndLocationForm.Address, analyticalModel.AdjacencyCluster);
+                return;
             }
+
+            analyticalModel = new AnalyticalModel(analyticalModel.Name, analyticalModel.Description, addressAndLocationWindow.Location, addressAndLocationWindow.Address, analyticalModel.AdjacencyCluster);
 
             uIAnalyticalModel.JSAMObject = analyticalModel;
         }

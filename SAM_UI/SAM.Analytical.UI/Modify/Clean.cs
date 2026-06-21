@@ -1,4 +1,6 @@
-﻿using System.Windows.Forms;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+using System.Windows.Forms;
 
 namespace SAM.Analytical.UI
 {
@@ -12,7 +14,7 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            analyticalModel = Windows.Query.Clean(analyticalModel, owner);
+            analyticalModel = Query.Clean(analyticalModel);
             if(analyticalModel == null)
             {
                 return;

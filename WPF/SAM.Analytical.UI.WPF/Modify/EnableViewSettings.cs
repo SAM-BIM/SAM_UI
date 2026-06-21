@@ -1,4 +1,6 @@
-﻿using SAM.Geometry.UI;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+using SAM.Geometry.UI;
 using System.Collections.Generic;
 
 namespace SAM.Analytical.UI.WPF
@@ -108,15 +110,15 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            using (Core.Windows.Forms.TreeViewForm<ViewSettings> treeViewForm = new Core.Windows.Forms.TreeViewForm<ViewSettings>("Select Views", viewSettingsList, func))
+            SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow treeViewWindow = new SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow { Title = "Select Views" };
+            treeViewWindow.GettingText += (sender, e) => { if (e.Object is ViewSettings viewSettings) { e.Text = func(viewSettings); } };
+            treeViewWindow.SetObjects(viewSettingsList);
+            if (treeViewWindow.ShowDialog() != true)
             {
-                if(treeViewForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                viewSettingsList = treeViewForm.SelectedItems;
+                return;
             }
+
+            viewSettingsList = treeViewWindow.GetObjects<ViewSettings>();
 
             if(viewSettingsList == null || viewSettingsList.Count == 0)
             {

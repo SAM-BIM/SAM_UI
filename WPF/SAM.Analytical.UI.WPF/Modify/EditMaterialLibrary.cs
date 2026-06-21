@@ -1,6 +1,7 @@
-﻿using SAM.Analytical.Windows;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
 using SAM.Core;
-using SAM.Core.Windows.Forms;
 using System.Collections.Generic;
 using System;
 using System.Windows.Forms;
@@ -21,22 +22,20 @@ namespace SAM.Analytical.UI.WPF
 
             MaterialLibrary materialLibrary = uIAnalyticalModel.JSAMObject.MaterialLibrary;
 
-            using (MaterialLibraryForm materialLibraryForm = new MaterialLibraryForm(materialLibrary, Core.Query.Enums(typeof(IMaterial))))
+            MaterialLibraryWindow materialLibraryWindow = new MaterialLibraryWindow(materialLibrary, Core.Query.Enums(typeof(IMaterial)));
+            materialLibraryWindow.MaterialLibraryImporting += MaterialLibraryForm_MaterialLibraryImporting;
+            materialLibraryWindow.MaterialLibraryExporting += MaterialLibraryForm_MaterialLibraryExporting;
+            if (materialLibraryWindow.ShowDialog(owner) != true)
             {
-                materialLibraryForm.MaterialLibraryImporting += MaterialLibraryForm_MaterialLibraryImporting;
-                materialLibraryForm.MaterialLibraryExporting += MaterialLibraryForm_MaterialLibraryExporting;
-                if (materialLibraryForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                materialLibrary = materialLibraryForm.MaterialLibrary;
+                return;
             }
+
+            materialLibrary = materialLibraryWindow.MaterialLibrary;
 
             uIAnalyticalModel.JSAMObject = new AnalyticalModel(uIAnalyticalModel.JSAMObject, uIAnalyticalModel.JSAMObject.AdjacencyCluster, materialLibrary, uIAnalyticalModel.JSAMObject.ProfileLibrary);
         }
 
-        private static void MaterialLibraryForm_MaterialLibraryExporting(object sender, Core.Windows.MaterialLibraryExportingEventArgs e)
+        private static void MaterialLibraryForm_MaterialLibraryExporting(object sender, SAM.Core.UI.MaterialLibraryExportingEventArgs e)
         {
             IWin32Window win32Widnow = sender as IWin32Window;
 
@@ -124,7 +123,7 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        private static void MaterialLibraryForm_MaterialLibraryImporting(object sender, Core.Windows.MaterialLibraryImportingEventArgs e)
+        private static void MaterialLibraryForm_MaterialLibraryImporting(object sender, SAM.Core.UI.MaterialLibraryImportingEventArgs e)
         {
             IWin32Window win32Widnow = sender as IWin32Window;
 
@@ -156,12 +155,12 @@ namespace SAM.Analytical.UI.WPF
 
             if (System.IO.Path.GetExtension(path) == ".tcd")
             {
-                MarqueeProgressForm marqueeProgressForm = new MarqueeProgressForm("Importing");
-                marqueeProgressForm.Show();
+                SAM.Core.UI.WPF.ProgressBarWindow progressBarWindow = new SAM.Core.UI.WPF.ProgressBarWindow("Importing", "Importing...");
+                progressBarWindow.Show();
 
                 ConstructionManager constructionManager = Tas.Convert.ToSAM_ConstructionManager(path, 0.0001);
 
-                marqueeProgressForm.Close();
+                progressBarWindow.Close();
 
                 if (constructionManager?.Materials == null || constructionManager?.Materials.Count == 0)
                 {
@@ -187,7 +186,7 @@ namespace SAM.Analytical.UI.WPF
                 AnalyticalModel analyticalModel = new AnalyticalModel(Guid.NewGuid(), "Temporary AnalyticalModel");
                 Func<IJSAMObject, bool> func = new Func<IJSAMObject, bool>(x => { return x is Material; });
 
-                analyticalModel = Analytical.Windows.Query.Import(analyticalModel, path, func, new ImportOptions() { UserSelection = false, SuppressMessages = false }, win32Widnow);
+                analyticalModel = SAM.Analytical.UI.Query.Import(analyticalModel, path, func, new SAM.Analytical.UI.ImportOptions() { UserSelection = false, SuppressMessages = false }, null);
                 e.MaterialLibrary = analyticalModel?.MaterialLibrary;
             }
         }

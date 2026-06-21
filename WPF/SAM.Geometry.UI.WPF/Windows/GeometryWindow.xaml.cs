@@ -32,9 +32,9 @@ namespace SAM.Geometry.UI.WPF
         {
             InitializeComponent();
 
-            ribbonButton_General_OpenModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
-            ribbonButton_General_CloseModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
-            ribbonButton_View_Json.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
+            ribbonButton_General_OpenModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
+            ribbonButton_General_CloseModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
+            ribbonButton_View_Json.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
 
             viewportControl.Mode = Mode.ThreeDimensional;
 
@@ -43,12 +43,12 @@ namespace SAM.Geometry.UI.WPF
             switch (viewportControl.Mode)
             {
                 case Mode.ThreeDimensional:
-                    ribbonButton_View_Mode.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
+                    ribbonButton_View_Mode.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
                     ribbonButton_View_Mode.Label = "2D";
                     break;
 
                 case Mode.TwoDimensional:
-                    ribbonButton_View_Mode.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
+                    ribbonButton_View_Mode.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
                     ribbonButton_View_Mode.Label = "3D";
                     break;
             }
@@ -135,13 +135,13 @@ namespace SAM.Geometry.UI.WPF
             {
                 case Mode.ThreeDimensional:
                     viewportControl.Mode = Mode.TwoDimensional;
-                    ribbonButton_View_Mode.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
+                    ribbonButton_View_Mode.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
                     ribbonButton_View_Mode.Label = "3D";
                     break;
 
                 case Mode.TwoDimensional:
                     viewportControl.Mode = Mode.ThreeDimensional;
-                    ribbonButton_View_Mode.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
+                    ribbonButton_View_Mode.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
                     ribbonButton_View_Mode.Label = "2D";
                     break;
             }

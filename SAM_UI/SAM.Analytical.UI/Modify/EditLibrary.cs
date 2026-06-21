@@ -1,5 +1,8 @@
-﻿using SAM.Core;
-using SAM.Core.Windows.Forms;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core;
+using SAM.Core.UI.WPF;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -102,27 +105,23 @@ namespace SAM.Analytical.UI
                     return;
                 }
 
-                using (Windows.Forms.ConstructionLibraryForm constructionLibraryForm = new Windows.Forms.ConstructionLibraryForm(materialLibrary, (ConstructionLibrary)library))
+                ConstructionLibraryWindow constructionLibraryWindow = new ConstructionLibraryWindow(materialLibrary, (ConstructionLibrary)library);
+                if (constructionLibraryWindow.ShowDialog(owner) != true)
                 {
-                    if (constructionLibraryForm.ShowDialog(owner) != DialogResult.OK)
-                    {
-                        return;
-                    }
-
-                    library = constructionLibraryForm.ConstructionLibrary;
+                    return;
                 }
+
+                library = constructionLibraryWindow.ConstructionLibrary;
             }
             else if (library is MaterialLibrary)
             {
-                using (MaterialLibraryForm materialLibraryForm = new MaterialLibraryForm((MaterialLibrary)library, Core.Query.Enums(typeof(IMaterial))))
+                MaterialLibraryWindow materialLibraryWindow = new MaterialLibraryWindow((MaterialLibrary)library, Core.Query.Enums(typeof(IMaterial)));
+                if (materialLibraryWindow.ShowDialog(owner) != true)
                 {
-                    if (materialLibraryForm.ShowDialog(owner) != DialogResult.OK)
-                    {
-                        return;
-                    }
-
-                    library = materialLibraryForm.MaterialLibrary;
+                    return;
                 }
+
+                library = materialLibraryWindow.MaterialLibrary;
             }
 
             if (library == null)

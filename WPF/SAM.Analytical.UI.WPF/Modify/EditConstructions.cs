@@ -1,9 +1,11 @@
-﻿using SAM.Analytical.Tas;
-using SAM.Analytical.Windows;
-using SAM.Analytical.Windows.Forms;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Analytical.Tas;
+using SAM.Analytical.UI;
 using SAM.Core;
 using SAM.Core.Tas;
-using SAM.Core.Windows.Forms;
+using SAM.Core.UI.WPF;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,63 +34,56 @@ namespace SAM.Analytical.UI.WPF
                 materialLibrary = new MaterialLibrary(string.Format("MaterialLibrary"));
             }
 
-            using (ConstructionLibraryForm constructionLibraryForm = new ConstructionLibraryForm(materialLibrary, constructionLibrary))
+            ConstructionLibraryWindow constructionLibraryWindow = new ConstructionLibraryWindow(materialLibrary, constructionLibrary)
             {
-                constructionLibraryForm.ConstructionManagerImporting += ConstructionLibraryForm_ConstructionManagerImporting;
-                constructionLibraryForm.ConstructionManagerExporting += ConstructionLibraryForm_ConstructionManagerExporting;
-                constructionLibraryForm.MultiSelect = true;
+                Title = "Constructions"
+            };
+            constructionLibraryWindow.ConstructionManagerImporting += ConstructionLibraryWindow_ConstructionManagerImporting;
+            constructionLibraryWindow.ConstructionManagerExporting += ConstructionLibraryWindow_ConstructionManagerExporting;
+            constructionLibraryWindow.MultiSelect = true;
 
-                constructionLibraryForm.Text = "Constructions";
-                if (constructionLibraryForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                constructionLibrary = constructionLibraryForm.ConstructionLibrary;
-                materialLibrary = constructionLibraryForm.MaterialLibrary;
+            if (constructionLibraryWindow.ShowDialog(owner) != true)
+            {
+                return;
             }
+
+            constructionLibrary = constructionLibraryWindow.ConstructionLibrary;
+            materialLibrary = constructionLibraryWindow.MaterialLibrary;
 
             adjacencyCluster.ReplaceConstructions(constructionLibrary);
 
             uIAnalyticalModel.JSAMObject = new AnalyticalModel(uIAnalyticalModel.JSAMObject, adjacencyCluster, materialLibrary, uIAnalyticalModel.JSAMObject.ProfileLibrary);
         }
 
-        private static void ConstructionLibraryForm_ConstructionManagerExporting(object sender, ConstructionManagerExportingEventArgs e)
+        private static void ConstructionLibraryWindow_ConstructionManagerExporting(object sender, ConstructionManagerExportingEventArgs e)
         {
-            IWin32Window win32Widnow = sender as IWin32Window;
+            System.Windows.Window owner = sender as System.Windows.Window;
 
             e.Handled = true;
 
             ConstructionManager constructionManager = e.ConstructionManager;
             if(constructionManager == null)
             {
-                MessageBox.Show("Nothing to be exported");
+                System.Windows.MessageBox.Show("Nothing to be exported");
+                return;
             }
 
             MaterialLibrary materialLibrary = constructionManager.MaterialLibrary;
 
-            string path = null;
-            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+            Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog
             {
-                saveFileDialog.Filter = "json files (*.json)|*.json|Tas Construction Databases (*.tcd)|*.tcd|All files (*.*)|*.*";
-                saveFileDialog.FilterIndex = 1;
-                saveFileDialog.RestoreDirectory = true;
-                if (materialLibrary == null || materialLibrary.GetMaterials() == null)
-                {
-                    saveFileDialog.FileName = "SAM_ConstructionLibrary_CustomVer00.json";
-                }
-                else
-                {
-                    saveFileDialog.FileName = "SAM_ConstructionManager_CustomVer00.json";
-                }
+                Filter = "json files (*.json)|*.json|Tas Construction Databases (*.tcd)|*.tcd|All files (*.*)|*.*",
+                FilterIndex = 1,
+                RestoreDirectory = true,
+                FileName = (materialLibrary == null || materialLibrary.GetMaterials() == null) ? "SAM_ConstructionLibrary_CustomVer00.json" : "SAM_ConstructionManager_CustomVer00.json"
+            };
 
-                if (saveFileDialog.ShowDialog(win32Widnow) != DialogResult.OK)
-                {
-                    return;
-                }
-                path = saveFileDialog.FileName;
+            if (saveFileDialog.ShowDialog(owner) != true)
+            {
+                return;
             }
 
+            string path = saveFileDialog.FileName;
             if (path == null)
             {
                 return;
@@ -102,7 +97,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     System.IO.File.Delete(path);
                 }
-                
+
                 using (SAMTCDDocument sAMTCDDocument = new SAMTCDDocument())
                 {
                     if(sAMTCDDocument.Create(path))
@@ -170,42 +165,34 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            if (result)
-            {
-                MessageBox.Show("Data exported successfully.");
-            }
-            else
-            {
-                MessageBox.Show("Data could not be exported.");
-            }
-
+            System.Windows.MessageBox.Show(result ? "Data exported successfully." : "Data could not be exported.");
         }
 
-        private static void ConstructionLibraryForm_ConstructionManagerImporting(object sender, ConstructionManagerImportingEventArgs e)
+        private static void ConstructionLibraryWindow_ConstructionManagerImporting(object sender, ConstructionManagerImportingEventArgs e)
         {
-            IWin32Window win32Widnow = sender as IWin32Window;
+            System.Windows.Window owner = sender as System.Windows.Window;
 
             e.Handled = true;
 
-            string path = null;
-            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog
             {
-                string directory = Analytical.Query.ResourcesDirectory();
-                if (System.IO.Directory.Exists(directory))
-                {
-                    openFileDialog.InitialDirectory = directory;
-                }
+                Filter = "json files (*.json)|*.json|Tas Construction Databases (*.tcd)|*.tcd|All files (*.*)|*.*",
+                FilterIndex = 3,
+                RestoreDirectory = true
+            };
 
-                openFileDialog.Filter = "json files (*.json)|*.json|Tas Construction Databases (*.tcd)|*.tcd|All files (*.*)|*.*";
-                openFileDialog.FilterIndex = 3;
-                openFileDialog.RestoreDirectory = true;
-                if (openFileDialog.ShowDialog(win32Widnow) != DialogResult.OK)
-                {
-                    return;
-                }
-                path = openFileDialog.FileName;
+            string directory = Analytical.Query.ResourcesDirectory();
+            if (System.IO.Directory.Exists(directory))
+            {
+                openFileDialog.InitialDirectory = directory;
             }
 
+            if (openFileDialog.ShowDialog(owner) != true)
+            {
+                return;
+            }
+
+            string path = openFileDialog.FileName;
             if (path == null)
             {
                 return;
@@ -213,33 +200,39 @@ namespace SAM.Analytical.UI.WPF
 
             if (System.IO.Path.GetExtension(path) == ".tcd")
             {
-                MarqueeProgressForm marqueeProgressForm = new MarqueeProgressForm("Importing");
-                marqueeProgressForm.Show();
+                ProgressBarWindow progressBarWindow = new ProgressBarWindow("Importing", "Importing");
+                progressBarWindow.Show();
 
                 ConstructionManager constructionManager = Tas.Convert.ToSAM_ConstructionManager(path, 0.0001);
 
-                marqueeProgressForm.Close();
+                progressBarWindow.Close();
 
                 if (constructionManager?.Constructions == null || constructionManager?.Constructions.Count == 0)
                 {
-                    MessageBox.Show("Data could not be imported. No ApertureConstructions in source file.");
+                    System.Windows.MessageBox.Show("Data could not be imported. No ApertureConstructions in source file.");
                 }
 
                 PanelType panelType = PanelType.Undefined;
-                using (ComboBoxForm<PanelType> comboBoxForm = new ComboBoxForm<PanelType>("PanelType", Enum.GetValues(typeof(PanelType)).Cast<PanelType>(), x => x == PanelType.Undefined ? string.Empty : x.Description()))
+                ComboBoxWindow<PanelType> comboBoxWindow = new ComboBoxWindow<PanelType>("PanelType", Enum.GetValues(typeof(PanelType)).Cast<PanelType>(), x => x == PanelType.Undefined ? string.Empty : Core.Query.Description(x))
                 {
-                    comboBoxForm.SelectedItem = panelType;
-                    if (comboBoxForm.ShowDialog() == DialogResult.OK)
-                    {
-                        panelType = comboBoxForm.SelectedItem;
-                    }
+                    Owner = owner,
+                    SelectedItem = panelType
+                };
+                if (comboBoxWindow.ShowDialog() == true)
+                {
+                    panelType = comboBoxWindow.SelectedItem;
                 }
 
-                Core.UI.WPF.MultipleSelectionTreeViewWindow treeViewWindow = new Core.UI.WPF.MultipleSelectionTreeViewWindow();
+                MultipleSelectionTreeViewWindow treeViewWindow = new MultipleSelectionTreeViewWindow();
                 treeViewWindow.GettingCategory += TreeViewWindow_GettingConstructionCategory;
                 treeViewWindow.GettingText += TreeViewWindow_GettingConstructionText;
                 treeViewWindow.SetObjects(constructionManager?.Constructions);
-                if(treeViewWindow.ShowDialog() != true)
+                if (owner != null)
+                {
+                    treeViewWindow.Owner = owner;
+                }
+
+                if (treeViewWindow.ShowDialog() != true)
                 {
                     return;
                 }
@@ -259,20 +252,18 @@ namespace SAM.Analytical.UI.WPF
             }
             else
             {
-                AnalyticalModel analyticalModel = new AnalyticalModel(Guid.NewGuid(), "Temporary AnalyticalModel");
-                Func<IJSAMObject, bool> func = new Func<IJSAMObject, bool>(x => { return x is Material || x is Construction; });
+                Func<IJSAMObject, bool> func = x => x is Material || x is Construction;
 
-                analyticalModel = Analytical.Windows.Query.Import(analyticalModel, path, func, new ImportOptions() { UserSelection = false, SuppressMessages = false }, win32Widnow);
-                e.ConstructionManager = analyticalModel?.ConstructionManager;
+                e.ConstructionManager = SAM.Analytical.UI.Query.ImportConstructionManager(path, func, new ImportOptions() { UserSelection = false, SuppressMessages = false }, owner);
             }
         }
 
-        private static void TreeViewWindow_GettingConstructionText(object sender, Core.UI.WPF.GettingTextEventArgs e)
+        private static void TreeViewWindow_GettingConstructionText(object sender, GettingTextEventArgs e)
         {
             e.Text = (e?.Object as Construction)?.Name;
         }
 
-        private static void TreeViewWindow_GettingConstructionCategory(object sender, Core.UI.WPF.GettingCategoryEventArgs e)
+        private static void TreeViewWindow_GettingConstructionCategory(object sender, GettingCategoryEventArgs e)
         {
             e.Category = (e?.Object as Construction)?.GetValue<Category>(ParameterizedSAMObjectParameter.Category);
         }

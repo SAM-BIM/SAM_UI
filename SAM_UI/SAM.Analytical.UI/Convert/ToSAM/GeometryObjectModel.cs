@@ -1140,7 +1140,7 @@ namespace SAM.Analytical.UI
 
                         TextAppearance textAppearance = Query.TextAppearance(space, twoDimensionalViewSettings);
                         double height = textAppearance.Height;
-                        double width = Core.Windows.Query.Width(name, new System.Drawing.Font(textAppearance.FontFamilyName, System.Convert.ToSingle(height)), height);
+                        double width = SAM.Core.UI.WPF.Query.Width(name, new System.Drawing.Font(textAppearance.FontFamilyName, System.Convert.ToSingle(height)), height);
 
                         List<Face2D> face2Ds = keyValuePair.Value;
 

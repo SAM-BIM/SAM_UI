@@ -3,7 +3,7 @@
 	  <TargetFramework>net8.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
     <RootNamespace>SAM.Weather.UI</RootNamespace>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
     <OutputPath>..\..\build\</OutputPath>
 	  <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -22,11 +22,11 @@
     <Reference Include="SAM.Weather">
       <HintPath>..\..\..\SAM\build\SAM.Weather.dll</HintPath>
     </Reference>
-    <Reference Include="SAM.Weather.Windows">
-      <HintPath>..\..\..\SAM_Windows\build\SAM.Weather.Windows.dll</HintPath>
-    </Reference>
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\WPF\SAM.Weather.UI.WPF\SAM.Weather.UI.WPF.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="SAM.ico" />

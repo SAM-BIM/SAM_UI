@@ -1,6 +1,4 @@
-﻿using SAM.Analytical.Windows.Forms;
-using SAM.Core.UI.WPF;
-using SAM.Core.Windows.Forms;
+﻿using SAM.Core.UI.WPF;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -167,7 +165,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void MultipleValueComboBoxControl_Number_TextInput(object sender, TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_NumberOnly(sender, e);
         }
 
         private void MultipleValueComboBoxControl_Occupancy_TextChanged(object sender, EventArgs e)
@@ -944,7 +942,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void multipleValueComboBoxControl_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_NumberOnly(sender, e);
         }
 
         public List<Space> Spaces
@@ -1317,13 +1315,8 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            using (ProfileForm profileForm = new ProfileForm(profile, false))
-            {
-                if (profileForm.ShowDialog() != DialogResult.OK)
-                {
-                    return;
-                }
-            }
+            SAM.Analytical.UI.ProfileWindow profileWindow = new SAM.Analytical.UI.ProfileWindow(profile, false) { Owner = System.Windows.Window.GetWindow(this) };
+            profileWindow.ShowDialog();
         }
 
         private void button_ViewHeatingProfile_Click(object sender, RoutedEventArgs e)
@@ -1389,7 +1382,7 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            Profile profile = Analytical.Windows.Modify.SelectProfile(profileLibrary, profileType);
+            Profile profile = SAM.Analytical.UI.Modify.SelectProfile(profileLibrary, profileType, System.Windows.Window.GetWindow(this));
 
             AnalyticalModel = new AnalyticalModel(AnalyticalModel, AnalyticalModel.AdjacencyCluster, AnalyticalModel.MaterialLibrary, profileLibrary);
 
@@ -1572,17 +1565,15 @@ namespace SAM.Analytical.UI.WPF
                 internalCondition = internalConditionLibrary.GetInternalConditions(multipleValueComboBoxControl_Name.Value)?.FirstOrDefault();
             }
 
-            using (InternalConditionLibraryForm internalConditionForm = new InternalConditionLibraryForm(internalConditionLibrary, profileLibrary, adjacencyCluster, internalCondition))
+            InternalConditionLibraryWindow internalConditionLibraryWindow = new InternalConditionLibraryWindow(internalConditionLibrary, profileLibrary, adjacencyCluster, internalCondition) { Owner = System.Windows.Window.GetWindow(this) };
+            if (internalConditionLibraryWindow.ShowDialog() != true)
             {
-                if (internalConditionForm.ShowDialog() != DialogResult.OK)
-                {
-                    return;
-                }
-
-                profileLibrary = internalConditionForm.ProfileLibrary;
-                adjacencyCluster = internalConditionForm.AdjacencyCluster;
-                internalCondition = internalConditionForm.GetInternalConditions(true)?.FirstOrDefault();
+                return;
             }
+
+            profileLibrary = internalConditionLibraryWindow.ProfileLibrary;
+            adjacencyCluster = internalConditionLibraryWindow.AdjacencyCluster;
+            internalCondition = internalConditionLibraryWindow.GetInternalConditions(true)?.FirstOrDefault();
 
             AnalyticalModel = new AnalyticalModel(AnalyticalModel, adjacencyCluster, AnalyticalModel.MaterialLibrary, profileLibrary);
 
@@ -1628,16 +1619,17 @@ namespace SAM.Analytical.UI.WPF
                 index++;
             }
 
-            using (TextBoxForm<string> textBoxForm = new TextBoxForm<string>("Internal Condition Name", "Name"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Internal Condition Name", "Name")
             {
-                textBoxForm.Value = name_Temp;
-                if (textBoxForm.ShowDialog() != DialogResult.OK)
-                {
-                    return;
-                }
-
-                internalCondition = internalCondition == null ? new InternalCondition(textBoxForm.Value) : new InternalCondition(textBoxForm.Value, internalCondition);
+                Owner = System.Windows.Window.GetWindow(this),
+                Value = name_Temp
+            };
+            if (textBoxWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            internalCondition = internalCondition == null ? new InternalCondition(textBoxWindow.Value) : new InternalCondition(textBoxWindow.Value, internalCondition);
 
             adjacencyCluster.AddObject(internalCondition);
 
@@ -1695,15 +1687,19 @@ namespace SAM.Analytical.UI.WPF
             tuples.RemoveAll(x => x == null || x.Item2 == null || string.IsNullOrWhiteSpace(x.Item2.Name));
             tuples.Sort((x, y) => x.Item2.Name.CompareTo(y.Item2.Name));
 
-            using (TreeViewForm<Tuple<Enum, Core.Attributes.ParameterProperties>> treeViewForm = new TreeViewForm<Tuple<Enum, Core.Attributes.ParameterProperties>>("Select Parameters", tuples, x => x.Item2.Name))
+            SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow treeViewWindow = new SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow
             {
-                if (treeViewForm.ShowDialog() != DialogResult.OK)
-                {
-                    return;
-                }
-
-                tuples = treeViewForm.SelectedItems;
+                Title = "Select Parameters",
+                Owner = System.Windows.Window.GetWindow(this)
+            };
+            treeViewWindow.GettingText += (sender, e) => { if (e.Object is Tuple<Enum, Core.Attributes.ParameterProperties> tuple) { e.Text = tuple.Item2.Name; } };
+            treeViewWindow.SetObjects(tuples);
+            if (treeViewWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            tuples = treeViewWindow.GetObjects<Tuple<Enum, Core.Attributes.ParameterProperties>>();
 
             if (tuples == null || tuples.Count == 0)
             {
