@@ -98,6 +98,14 @@ namespace SAM.Geometry.UI.WPF
         private readonly Dictionary<Guid, List<GeometrySlice>> dictionary_BatchedOverlay = new Dictionary<Guid, List<GeometrySlice>>();
         private readonly Dictionary<Guid, List<LineSlice>> dictionary_BatchedOverlayLine = new Dictionary<Guid, List<LineSlice>>();
 
+        // In-place batched recolor (#53 Section D): attribute-only edits change only space fill colours, but the
+        // merged base meshes are grouped BY colour, so an object can't be recoloured in place there. Instead its
+        // stale-colour triangles are degenerated in the base mesh and a small, correctly-coloured per-object fill
+        // mesh is attached on top - tracked here (guid -> its extracted fill models) so a repeat recolor of the
+        // same object replaces the previous extraction and Load tears them all down. Edges/text are untouched
+        // (the attribute fast path doesn't change them), so they stay in the base buckets.
+        private readonly Dictionary<Guid, List<Element3D>> dictionary_RecolorExtracted = new Dictionary<Guid, List<Element3D>>();
+
         // Selection/hover highlight in batched mode (#16 increment 3): the base merged meshes stay immutable;
         // these overlay meshes are the selected / hovered objects' triangles, sliced out of the merged
         // buffers, drawn on top in the highlight colour. Rebuilt when the selection / hover set changes. A
@@ -353,6 +361,7 @@ namespace SAM.Geometry.UI.WPF
             dictionary_BatchedBounds.Clear();
             dictionary_BatchedOverlay.Clear();
             dictionary_BatchedOverlayLine.Clear();
+            dictionary_RecolorExtracted.Clear();
             sceneBatched = false;
             selectedGuids.Clear();
             hooveredGuid = null;
@@ -932,9 +941,10 @@ namespace SAM.Geometry.UI.WPF
         ///
         /// Returns true when the in-place re-skin serviced this scene, false when it could not - the
         /// caller then falls back to a full regeneration so colors don't go stale. The batched scene
-        /// (#16/#46) merges every object into a few material-grouped meshes, so there are no per-object
-        /// GroupModel3Ds to re-skin (dictionary_Element3D is empty); it returns false until a true
-        /// in-place batched recolor (recoloring an object's triangle range) is implemented (#53).
+        /// (#16/#46) merges every object into a few colour-grouped meshes, so there is no per-object
+        /// GroupModel3D to re-skin; RefreshAppearanceBatched handles it by extracting the recoloured
+        /// objects into small per-object fill meshes (#53 Section D), and only falls back when an object
+        /// can't be rebuilt from its stored payload.
         /// </summary>
         public bool RefreshAppearance(IEnumerable<Guid> guids)
         {
@@ -945,7 +955,7 @@ namespace SAM.Geometry.UI.WPF
 
             if (sceneBatched)
             {
-                return false;
+                return RefreshAppearanceBatched(guids);
             }
 
             foreach (Guid guid in guids)
@@ -994,6 +1004,213 @@ namespace SAM.Geometry.UI.WPF
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// In-place recolor for the batched scene (#53 Section D). The merged base meshes are grouped by
+        /// colour, so an object's fill can't be recoloured where it sits; instead its stale-colour triangles
+        /// are degenerated (collapsed to zero area, so they stop rendering) in the base mesh and a small,
+        /// correctly-coloured per-object fill mesh - rebuilt from the object's already-updated
+        /// SurfaceAppearances - is attached on top. Edges/text are left in the base buckets untouched (the
+        /// attribute fast path changes fill colours only). Returns false (caller falls back to a full
+        /// regeneration) only if an in-view object with fill can't be rebuilt from its stored payload; no
+        /// scene mutation happens before that check, so the fallback is clean.
+        /// </summary>
+        private bool RefreshAppearanceBatched(IEnumerable<Guid> guids)
+        {
+            // Phase 1 - resolve and build everything off to the side, no scene mutation yet.
+            List<RecolorOp> ops = new List<RecolorOp>();
+            foreach (Guid guid in guids)
+            {
+                if (guid == Guid.Empty)
+                {
+                    continue;
+                }
+
+                // Only objects that are in this view and currently have fill triangles can be recoloured;
+                // anything else (not displayed, or fill-less) needs no update here.
+                if (!dictionary_BatchedOverlay.TryGetValue(guid, out List<GeometrySlice> overlaySlices) || overlaySlices == null || overlaySlices.Count == 0)
+                {
+                    continue;
+                }
+
+                // On the FIRST recolor the overlay slices still point at the merged base mesh, so they are
+                // what must be degenerated. On a repeat recolor they already point at the previous extracted
+                // mesh (which RemoveExtracted detaches), and the base triangles are already degenerate - so
+                // there is nothing more to degenerate in the base.
+                bool alreadyExtracted = dictionary_RecolorExtracted.ContainsKey(guid);
+
+                // The batched payload is normally the ISAMGeometryObject itself (shared cached graph, #14),
+                // whose SurfaceAppearances the analytical refresh already mutated. If only the domain SAMObject
+                // was stored (the geometry object isn't IJSAMObject), we can't rebuild it - fall back.
+                if (!dictionary_BatchedObject.TryGetValue(guid, out IJSAMObject jSAMObject) || !(jSAMObject is ISAMGeometryObject sAMGeometryObject))
+                {
+                    return false;
+                }
+
+                // Keep only the fill meshes from the rebuild; the object's edges/text already live (unchanged)
+                // in the base line/text buckets, so re-attaching them would double-draw.
+                List<MeshGeometryModel3D> fills = new List<MeshGeometryModel3D>();
+                List<Element3D> element3Ds = Convert.ToElement3Ds(sAMGeometryObject);
+                if (element3Ds != null)
+                {
+                    foreach (Element3D element3D in element3Ds)
+                    {
+                        if (element3D is MeshGeometryModel3D meshGeometryModel3D && meshGeometryModel3D.Geometry is HelixToolkit.SharpDX.MeshGeometry3D)
+                        {
+                            fills.Add(meshGeometryModel3D);
+                        }
+                    }
+                }
+
+                // fills may be empty (object lost its fill entirely) - then the commit just hides the stale
+                // triangles and attaches nothing, which is the correct result.
+                ops.Add(new RecolorOp { Guid = guid, BaseSlices = alreadyExtracted ? null : overlaySlices, Fills = fills });
+            }
+
+            if (ops.Count == 0)
+            {
+                return true;
+            }
+
+            // Phase 2a - hide every first-extraction object's stale base triangles in one pass. Batching across
+            // objects means each shared base mesh re-uploads its index buffer once, not once per object.
+            List<GeometrySlice> baseSlicesToDegenerate = new List<GeometrySlice>();
+            foreach (RecolorOp op in ops)
+            {
+                if (op.BaseSlices != null)
+                {
+                    baseSlicesToDegenerate.AddRange(op.BaseSlices);
+                }
+            }
+
+            DegenerateBaseSlices(baseSlicesToDegenerate);
+
+            // Phase 2b - per object: drop any earlier extraction, attach the fresh fill meshes, make them
+            // pickable, and repoint the object's overlay slices at them.
+            foreach (RecolorOp op in ops)
+            {
+                RemoveExtracted(op.Guid);
+
+                List<Element3D> attached = new List<Element3D>();
+                List<GeometrySlice> newSlices = new List<GeometrySlice>();
+                foreach (MeshGeometryModel3D meshGeometryModel3D in op.Fills)
+                {
+                    HelixToolkit.SharpDX.MeshGeometry3D meshGeometry3D = (HelixToolkit.SharpDX.MeshGeometry3D)meshGeometryModel3D.Geometry;
+
+                    viewport3DX.Items.Add(meshGeometryModel3D);
+                    sceneElement3Ds.Add(meshGeometryModel3D);
+                    attached.Add(meshGeometryModel3D);
+
+                    // Single-object pick map: every vertex on this mesh resolves to op.Guid.
+                    dictionary_PickBucket[meshGeometryModel3D] = new PickBucket(new[] { 0 }, new[] { op.Guid });
+
+                    // Small mesh - build its picking octree now so the recoloured object is hittable immediately.
+                    meshGeometry3D.UpdateOctree();
+
+                    // Whole-mesh overlay slice so selection/hover highlight tracks the extracted fill.
+                    newSlices.Add(new GeometrySlice
+                    {
+                        Mesh = meshGeometry3D,
+                        VertexStart = 0,
+                        VertexEnd = meshGeometry3D.Positions == null ? 0 : meshGeometry3D.Positions.Count,
+                        IndexStart = 0,
+                        IndexEnd = meshGeometry3D.Indices == null ? 0 : meshGeometry3D.Indices.Count
+                    });
+                }
+
+                if (attached.Count != 0)
+                {
+                    dictionary_RecolorExtracted[op.Guid] = attached;
+                }
+
+                // The overlay now slices the extracted fill (or nothing, if the object lost its fill).
+                dictionary_BatchedOverlay[op.Guid] = newSlices;
+            }
+
+            // A currently selected/hovered recoloured object was painting its highlight on the now-degenerate
+            // base triangles - rebuild the overlays from the repointed slices. (The caller also re-applies the
+            // selection after this returns; rebuilding here keeps the view correct even if it doesn't.)
+            UpdateSelectionOverlay();
+            UpdateHoverOverlay();
+
+            return true;
+        }
+
+        // One pending recolor: the object, the base-mesh fill slices to hide (only on first extraction; null on
+        // a repeat, where the base is already degenerate), and its freshly-coloured fill meshes to attach.
+        private sealed class RecolorOp
+        {
+            public Guid Guid;
+            public List<GeometrySlice> BaseSlices;
+            public List<MeshGeometryModel3D> Fills;
+        }
+
+        // Removes a previous in-place extraction for an object (repeat recolor / cleanup): detaches its fill
+        // models from the scene and drops their pick entries. The base triangles stay degenerate (correct -
+        // the new extraction will re-hide them, and Load rebuilds the base from scratch anyway).
+        private void RemoveExtracted(Guid guid)
+        {
+            if (!dictionary_RecolorExtracted.TryGetValue(guid, out List<Element3D> element3Ds))
+            {
+                return;
+            }
+
+            foreach (Element3D element3D in element3Ds)
+            {
+                viewport3DX.Items.Remove(element3D);
+                sceneElement3Ds.Remove(element3D);
+                if (element3D is MeshGeometryModel3D meshGeometryModel3D)
+                {
+                    dictionary_PickBucket.Remove(meshGeometryModel3D);
+                }
+            }
+
+            dictionary_RecolorExtracted.Remove(guid);
+        }
+
+        // Collapses the given triangle slices to zero area so they stop rendering, hiding an object's
+        // stale-colour fill inside the merged base meshes. Each affected base mesh re-uploads its index
+        // buffer once (slices grouped by mesh), pointing every index in a slice at that slice's first vertex.
+        private static void DegenerateBaseSlices(IEnumerable<GeometrySlice> slices)
+        {
+            if (slices == null)
+            {
+                return;
+            }
+
+            Dictionary<HelixToolkit.SharpDX.MeshGeometry3D, List<GeometrySlice>> byMesh = new Dictionary<HelixToolkit.SharpDX.MeshGeometry3D, List<GeometrySlice>>();
+            foreach (GeometrySlice slice in slices)
+            {
+                if (slice == null || slice.Mesh == null || slice.Mesh.Indices == null)
+                {
+                    continue;
+                }
+
+                if (!byMesh.TryGetValue(slice.Mesh, out List<GeometrySlice> meshSlices))
+                {
+                    meshSlices = new List<GeometrySlice>();
+                    byMesh[slice.Mesh] = meshSlices;
+                }
+
+                meshSlices.Add(slice);
+            }
+
+            foreach (KeyValuePair<HelixToolkit.SharpDX.MeshGeometry3D, List<GeometrySlice>> keyValuePair in byMesh)
+            {
+                HelixToolkit.SharpDX.MeshGeometry3D mesh = keyValuePair.Key;
+                HelixToolkit.IntCollection indices = new HelixToolkit.IntCollection(mesh.Indices);
+                foreach (GeometrySlice slice in keyValuePair.Value)
+                {
+                    for (int i = slice.IndexStart; i < slice.IndexEnd && i < indices.Count; i++)
+                    {
+                        indices[i] = slice.VertexStart;
+                    }
+                }
+
+                // Reassign (not in-place mutate) so the geometry raises its change notification and re-uploads.
+                mesh.Indices = indices;
+            }
         }
 
         public bool ContainsAny<T>(IEnumerable<Guid> guids) where T : SAMObject
