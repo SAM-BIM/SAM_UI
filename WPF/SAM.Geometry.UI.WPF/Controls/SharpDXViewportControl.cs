@@ -254,8 +254,10 @@ namespace SAM.Geometry.UI.WPF
 
         private static bool ResolveEnabled()
         {
+            // Default ON (#53 Phase E): the SharpDX viewport is now the default 3D renderer. An explicit
+            // "0" is the escape hatch that falls back to the legacy Helix 3D path (kept for one release).
             string value = Environment.GetEnvironmentVariable("SAM_UI_VIEWPORT_SHARPDX");
-            return !string.IsNullOrWhiteSpace(value) && value.Trim() != "0";
+            return string.IsNullOrWhiteSpace(value) || value.Trim() != "0";
         }
 
         private static bool ResolveBatchEnabled()
@@ -927,12 +929,23 @@ namespace SAM.Geometry.UI.WPF
         /// GroupModel3D's children. Geometry is unchanged by construction, so this re-triangulates only
         /// the edited objects (cheap), leaving the camera and every other object untouched - no full
         /// ToElement3Ds. Mirrors Modify.RefreshAppearance on the Helix path.
+        ///
+        /// Returns true when the in-place re-skin serviced this scene, false when it could not - the
+        /// caller then falls back to a full regeneration so colors don't go stale. The batched scene
+        /// (#16/#46) merges every object into a few material-grouped meshes, so there are no per-object
+        /// GroupModel3Ds to re-skin (dictionary_Element3D is empty); it returns false until a true
+        /// in-place batched recolor (recoloring an object's triangle range) is implemented (#53).
         /// </summary>
-        public void RefreshAppearance(IEnumerable<Guid> guids)
+        public bool RefreshAppearance(IEnumerable<Guid> guids)
         {
             if (guids == null)
             {
-                return;
+                return false;
+            }
+
+            if (sceneBatched)
+            {
+                return false;
             }
 
             foreach (Guid guid in guids)
@@ -979,6 +992,8 @@ namespace SAM.Geometry.UI.WPF
                 // rebuilt set so a selected/hovered object stays marked through the re-skin
                 ApplyAppearance(guid);
             }
+
+            return true;
         }
 
         public bool ContainsAny<T>(IEnumerable<Guid> guids) where T : SAMObject

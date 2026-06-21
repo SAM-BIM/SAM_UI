@@ -472,7 +472,13 @@ namespace SAM.Geometry.UI.WPF
             {
                 // In-place per-object re-skin from the (already appearance-updated) model objects -
                 // no ToElement3Ds rebuild, camera and other objects untouched (issue #32 / #11).
-                sharpDXViewportControl.RefreshAppearance(guids);
+                // The batched scene has no per-object models to re-skin in place, so this returns
+                // false; report failure so the caller falls back to a full regeneration instead of
+                // leaving the rendered colors stale (#53).
+                if (!sharpDXViewportControl.RefreshAppearance(guids))
+                {
+                    return false;
+                }
             }
             else if (guids != null)
             {

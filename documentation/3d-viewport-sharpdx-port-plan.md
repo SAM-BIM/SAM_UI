@@ -181,6 +181,20 @@ the legacy Helix orthographic **2D** path can be deleted (floor plans already on
 escape hatch for one release, then remove the `HelixToolkit.Wpf` 3D code path and the old
 `ToMedia3D`/`Create.Model3D` 3D conversion. **Gate:** sign-off on real models; PR.
 
+> **Phase E status: flip DONE (#53, this PR).** `SharpDXViewportControl.ResolveEnabled()` now defaults
+> ON — the SharpDX viewport is the default 3D renderer; `SAM_UI_VIEWPORT_SHARPDX=0` is the escape
+> hatch that falls back to the intact legacy Helix 3D path for one release. Gate evidence: the Phase B
+> A/B above (`ToElement3D` ~15–20× faster than `ToMedia3D`, full warm 3D well under 1 s) plus
+> functional sign-off on a large (10k-space) model. **Removal deferred:** the legacy Helix 3D + Helix
+> ortho-2D paths and the `ToMedia3D`/`Create.Model3D` conversion layer are removed in a follow-up PR
+> after the flipped default proves stable (so the `=0` escape hatch stays usable until then).
+>
+> **B (Phase D leftovers) — verified, no change:** saved-camera application is already at Helix parity
+> — both renderers apply `ViewSettings.Camera` once on first scene load (Helix `helixViewport3D_Loaded`;
+> SharpDX `Load` `wasEmpty` branch) and preserve the live camera afterward; the explicit "Load camera"
+> action round-trips position/look/up through `ViewportControl.Camera` → `SharpDXViewportControl.SetCamera`.
+> Projection is intentionally not persisted by either path, so SharpDX matches Helix there too.
+
 ---
 
 ## Risks / open questions
