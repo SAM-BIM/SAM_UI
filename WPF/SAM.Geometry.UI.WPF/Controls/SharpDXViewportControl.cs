@@ -1105,8 +1105,11 @@ namespace SAM.Geometry.UI.WPF
                     // Single-object pick map: every vertex on this mesh resolves to op.Guid.
                     dictionary_PickBucket[meshGeometryModel3D] = new PickBucket(new[] { 0 }, new[] { op.Guid });
 
-                    // Small mesh - build its picking octree now so the recoloured object is hittable immediately.
-                    meshGeometry3D.UpdateOctree();
+                    // No octree built here: these are small per-object fill meshes, for which FindHits falls
+                    // back to a correct linear triangle test (the same fallback the base scene relies on during
+                    // its deferred-octree window, see ScheduleOctreeBuild). Building octrees inline would put a
+                    // synchronous per-object build on the UI thread for every recoloured object - the stall the
+                    // deferred Load pass exists to avoid on a large multi-select recolor.
 
                     // Whole-mesh overlay slice so selection/hover highlight tracks the extracted fill.
                     newSlices.Add(new GeometrySlice
