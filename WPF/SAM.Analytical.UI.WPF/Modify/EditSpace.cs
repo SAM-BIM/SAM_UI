@@ -1,7 +1,11 @@
-﻿using SAM.Analytical.Windows.Forms;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Analytical.UI;
+using SAM.Core.UI.WPF;
 using System.Windows.Forms;
 
-namespace SAM.Analytical.UI
+namespace SAM.Analytical.UI.WPF
 {
     public static partial class Modify
     {
@@ -16,21 +20,15 @@ namespace SAM.Analytical.UI
             AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
             ProfileLibrary profileLibrary = analyticalModel.ProfileLibrary;
 
-
-            Space space_Temp = null;
-            using (SpaceForm spaceForm = new SpaceForm(space, analyticalModel.ProfileLibrary, analyticalModel.AdjacencyCluster, Core.Query.Enums(typeof(Space))))
+            SpaceWindow spaceWindow = new SpaceWindow(space, analyticalModel, Core.Query.Enums(typeof(Space)));
+            bool? dialogResult = owner == null ? spaceWindow.ShowDialog() : spaceWindow.ShowDialog(owner);
+            if (dialogResult != true)
             {
-                if(spaceForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                adjacencyCluster = spaceForm.AdjacencyCluster;
-                profileLibrary = spaceForm.ProfileLibrary;
-                space_Temp = spaceForm.Space;
+                return;
             }
 
-            if(space_Temp != null)
+            Space space_Temp = spaceWindow.Space;
+            if (space_Temp != null)
             {
                 adjacencyCluster?.AddObject(space_Temp);
             }

@@ -4,7 +4,7 @@
 using SAM.Analytical.Mollier;
 using SAM.Core.Mollier;
 using SAM.Core.Mollier.UI;
-using SAM.Core.Windows.Forms;
+using SAM.Core.UI.WPF;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
@@ -37,17 +37,15 @@ namespace SAM.Analytical.UI
             }
 
             airHandlingUnits.Sort((x, y) => x.Name.CompareTo(y.Name));
-            using (ComboBoxForm<AirHandlingUnit> comboBoxForm = new ComboBoxForm<AirHandlingUnit>("Air Handling Units", airHandlingUnits, (AirHandlingUnit x) => x?.Name))
+            ComboBoxWindow<AirHandlingUnit> comboBoxWindow = new ComboBoxWindow<AirHandlingUnit>("Air Handling Units", airHandlingUnits, (AirHandlingUnit x) => x?.Name);
+            comboBoxWindow.SelectedItem = airHandlingUnits.FirstOrDefault();
+
+            if (comboBoxWindow.ShowDialog(owner) != true)
             {
-                comboBoxForm.SelectedItem = airHandlingUnits.FirstOrDefault();
-
-                if (comboBoxForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                airHandlingUnit = comboBoxForm.SelectedItem;
+                return;
             }
+
+            airHandlingUnit = comboBoxWindow.SelectedItem;
 
             if(airHandlingUnit == null)
             {

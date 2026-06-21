@@ -1,5 +1,8 @@
-﻿using SAM.Core;
-using SAM.Core.Windows.Forms;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core;
+using SAM.Core.UI.WPF;
 using System.Windows.Forms;
 
 namespace SAM.Analytical.UI
@@ -23,15 +26,13 @@ namespace SAM.Analytical.UI
             string uniqueId = materialLibrary.GetUniqueId(material);
 
 
-            using (MaterialForm materialForm = new MaterialForm(material, Core.Query.Enums(typeof(IMaterial))))
+            MaterialWindow materialWindow = new MaterialWindow(material, Core.Query.Enums(typeof(IMaterial)));
+            if (materialWindow.ShowDialog(owner) != true)
             {
-                if (materialForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                material = materialForm.Material;
+                return;
             }
+
+            material = materialWindow.Material;
 
             materialLibrary.Replace(uniqueId, material);
 

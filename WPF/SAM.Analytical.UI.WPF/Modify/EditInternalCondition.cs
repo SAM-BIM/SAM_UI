@@ -1,7 +1,11 @@
-﻿using SAM.Analytical.Windows.Forms;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Analytical.UI;
+using SAM.Core.UI.WPF;
 using System.Windows.Forms;
 
-namespace SAM.Analytical.UI
+namespace SAM.Analytical.UI.WPF
 {
     public static partial class Modify
     {
@@ -21,21 +25,15 @@ namespace SAM.Analytical.UI
 
             ProfileLibrary profileLibrary = analyticalModel.ProfileLibrary;
 
-
-            using (InternalConditionForm internalConditionForm = new InternalConditionForm(internalCondition, profileLibrary, adjacencyCluster))
+            InternalConditionWindow internalConditionWindow = new InternalConditionWindow(analyticalModel, internalCondition);
+            bool? dialogResult = owner == null ? internalConditionWindow.ShowDialog() : internalConditionWindow.ShowDialog(owner);
+            if (dialogResult != true)
             {
-                internalConditionForm.UseColors = true;
-                if (internalConditionForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                internalCondition = internalConditionForm.InternalCondition;
-                profileLibrary = internalConditionForm.ProfileLibrary;
+                return;
             }
 
-
-            if(internalCondition == null)
+            internalCondition = internalConditionWindow.InternalCondition;
+            if (internalCondition == null)
             {
                 return;
             }

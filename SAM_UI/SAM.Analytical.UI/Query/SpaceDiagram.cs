@@ -4,7 +4,7 @@
 using SAM.Analytical.Mollier;
 using SAM.Core.Mollier;
 using SAM.Core.Mollier.UI;
-using SAM.Core.Windows.Forms;
+using SAM.Core.UI.WPF;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
@@ -37,17 +37,15 @@ namespace SAM.Analytical.UI
             }
 
             spaces.Sort((x, y) => x.Name.CompareTo(y.Name));
-            using (ComboBoxForm<Space> comboBoxForm = new ComboBoxForm<Space>("Spaces", spaces, (Space x) => x?.Name))
+            ComboBoxWindow<Space> comboBoxWindow = new ComboBoxWindow<Space>("Spaces", spaces, (Space x) => x?.Name);
+            comboBoxWindow.SelectedItem = spaces.FirstOrDefault();
+
+            if (comboBoxWindow.ShowDialog(owner) != true)
             {
-                comboBoxForm.SelectedItem = spaces.FirstOrDefault();
-
-                if (comboBoxForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                space = comboBoxForm.SelectedItem;
+                return;
             }
+
+            space = comboBoxWindow.SelectedItem;
 
             if(space == null)
             {

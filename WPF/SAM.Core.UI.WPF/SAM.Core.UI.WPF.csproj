@@ -20,9 +20,6 @@
     <Reference Include="SAM.Core.Excel">
       <HintPath>..\..\..\SAM_Excel\build\SAM.Core.Excel.dll</HintPath>
     </Reference>
-    <Reference Include="SAM.Core.Windows">
-      <HintPath>..\..\..\SAM_Windows\build\SAM.Core.Windows.dll</HintPath>
-    </Reference>
     <Reference Include="System.Data.DataSetExtensions" />
   </ItemGroup>
   <ItemGroup>

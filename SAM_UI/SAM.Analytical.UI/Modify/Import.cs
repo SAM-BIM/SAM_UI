@@ -1,12 +1,13 @@
-﻿using SAM.Analytical.Windows;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
 using SAM.Core;
-using System.Windows.Forms;
 
 namespace SAM.Analytical.UI
 {
     public static partial class Modify
     {
-        public static void Import(this UIAnalyticalModel uIAnalyticalModel, IWin32Window owner = null)
+        public static void Import(this UIAnalyticalModel uIAnalyticalModel, System.Windows.Window owner = null)
         {
             AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
             if (analyticalModel == null)
@@ -14,7 +15,7 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            analyticalModel = Windows.Query.Import(analyticalModel, new ImportOptions(), owner);
+            analyticalModel = Query.Import(analyticalModel, new ImportOptions(), owner);
             if(analyticalModel == null)
             {
                 return;
@@ -23,7 +24,7 @@ namespace SAM.Analytical.UI
             uIAnalyticalModel.JSAMObject = analyticalModel;
         }
 
-        public static void Import<T>(this UIAnalyticalModel uIAnalyticalModel, IWin32Window owner = null) where T : IJSAMObject
+        public static void Import<T>(this UIAnalyticalModel uIAnalyticalModel, System.Windows.Window owner = null) where T : IJSAMObject
         {
             AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
             if (analyticalModel == null)
@@ -31,7 +32,7 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            analyticalModel = Windows.Query.Import<T>(analyticalModel, new ImportOptions(), owner);
+            analyticalModel = Query.Import<T>(analyticalModel, new ImportOptions(), owner);
             if (analyticalModel == null)
             {
                 return;

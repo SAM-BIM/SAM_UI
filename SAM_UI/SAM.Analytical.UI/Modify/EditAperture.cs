@@ -1,5 +1,8 @@
-﻿using SAM.Analytical.Windows.Forms;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
 using SAM.Core;
+using SAM.Core.UI.WPF;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
@@ -32,16 +35,14 @@ namespace SAM.Analytical.UI
                 apertureConstructions.ForEach(x => apertureConstructionLibrary.Add(x));
             }
 
-            using (ApertureForm apertureForm = new ApertureForm(aperture, materialLibrary, apertureConstructionLibrary, Core.Query.Enums(typeof(Aperture))))
+            ApertureWindow apertureWindow = new ApertureWindow(aperture, materialLibrary, apertureConstructionLibrary, Core.Query.Enums(typeof(Aperture)));
+            if (apertureWindow.ShowDialog(owner) != true)
             {
-                if (apertureForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                aperture = apertureForm.Aperture;
-                apertureConstructionLibrary = apertureForm.ApertureConstructionLibrary;
+                return;
             }
+
+            aperture = apertureWindow.Aperture;
+            apertureConstructionLibrary = apertureWindow.ApertureConstructionLibrary;
 
             Panel panel = adjacencyCluster.GetPanel(aperture);
             if (panel != null)

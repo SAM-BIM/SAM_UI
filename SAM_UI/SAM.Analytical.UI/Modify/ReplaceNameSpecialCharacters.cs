@@ -2,7 +2,7 @@
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Core;
-using SAM.Core.Windows.Forms;
+using SAM.Core.UI.WPF;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
@@ -28,17 +28,15 @@ namespace SAM.Analytical.UI
 
             string name = null;
 
-            using (ComboBoxForm<string> comboBoxForm = new ("Select language", names))
+            ComboBoxWindow<string> comboBoxWindow = new ComboBoxWindow<string>("Select language", names);
+            comboBoxWindow.SelectedItem = names.Find(x => x == "ISO");
+
+            if (comboBoxWindow.ShowDialog(owner) != true)
             {
-                comboBoxForm.SelectedItem = names.Find(x => x == "ISO");
-
-                if(comboBoxForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return; 
-                }
-
-                name = comboBoxForm.SelectedItem;
+                return;
             }
+
+            name = comboBoxWindow.SelectedItem;
 
             if(string.IsNullOrWhiteSpace(name))
             {

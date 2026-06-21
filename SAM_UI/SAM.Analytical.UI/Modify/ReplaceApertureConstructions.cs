@@ -1,4 +1,8 @@
-﻿using System.Collections.Generic;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SAM.Analytical.UI
 {
@@ -14,7 +18,7 @@ namespace SAM.Analytical.UI
             List<ApertureConstruction> apertureConstructions_Temp = adjacencyCluster.GetObjects<ApertureConstruction>();
             adjacencyCluster.Remove(apertureConstructions_Temp);
 
-            Windows.Modify.UpdateApertureConstructions(adjacencyCluster, apertureConstructionLibrary);
+            UpdateApertureConstructions(adjacencyCluster, apertureConstructionLibrary);
         }
 
         public static void ReplaceApertureConstructions(this UIAnalyticalModel uIAnalyticalModel, ApertureConstructionLibrary apertureConstructionLibrary)

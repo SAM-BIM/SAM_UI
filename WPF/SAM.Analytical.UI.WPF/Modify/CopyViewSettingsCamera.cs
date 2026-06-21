@@ -44,15 +44,13 @@ namespace SAM.Analytical.UI.WPF
             }
 
             IViewSettings? viewSettings_Source = null;
-            using (Core.Windows.Forms.ComboBoxForm<IViewSettings> textBoxForm = new ("Copy View", viewSettings_Compatible, x => x.Name))
+            SAM.Core.UI.WPF.ComboBoxWindow<IViewSettings> comboBoxWindow = new SAM.Core.UI.WPF.ComboBoxWindow<IViewSettings>("Copy View", viewSettings_Compatible, x => x.Name);
+            if (comboBoxWindow.ShowDialog() != true)
             {
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                viewSettings_Source = textBoxForm.SelectedItem;
+                return;
             }
+
+            viewSettings_Source = comboBoxWindow.SelectedItem;
 
             if(viewSettings_Source is null)
             {

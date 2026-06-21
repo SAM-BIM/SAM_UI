@@ -1,4 +1,6 @@
-﻿using System.Windows;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
@@ -23,7 +25,7 @@ namespace SAM.Core.UI.WPF
             diffuseMaterial.Brush = new VisualBrush(textBlock);
 
             //calculation of text width (assumming that characters are square):
-            double width = Windows.Query.Width(text, new System.Drawing.Font(fontFamilyName, (float)height), height);//text.Length * height;
+            double width = Query.Width(text, new System.Drawing.Font(fontFamilyName, (float)height), height);//text.Length * height;
             
             // we need to find the four corners
             // p0: the lower left corner;  p1: the upper left

@@ -105,7 +105,7 @@ namespace SAM.Analytical.UI.WPF
 
             if(simulateWindow.Simulate)
             {
-                using (Core.Windows.Forms.ProgressForm progressForm = new Core.Windows.Forms.ProgressForm("Preparing Model", 8))
+                using (SAM.Core.UI.WPF.ProgressWindow progressForm = new SAM.Core.UI.WPF.ProgressWindow("Preparing Model", 8))
                 {
                     progressForm.Update("Update Materials");
 
@@ -441,7 +441,7 @@ namespace SAM.Analytical.UI.WPF
 
             bool shadingUpdated = false;
 
-            using (Core.Windows.Forms.ProgressForm progressForm = new Core.Windows.Forms.ProgressForm("Preparing Model", 8))
+            using (SAM.Core.UI.WPF.ProgressWindow progressForm = new SAM.Core.UI.WPF.ProgressWindow("Preparing Model", 8))
             {
                 progressForm.Update("Update Materials");
 

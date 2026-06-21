@@ -25,7 +25,7 @@ namespace SAM.Analytical.UI.WPF
         private TreeViewHighlightManager treeViewHighlightManager_Model;
         private TreeViewHighlightManager treeViewHighlightManager_Views;
         private UIAnalyticalModel uIAnalyticalModel;
-        private Core.Windows.WindowHandle windowHandle;
+        private SAM.Core.UI.WPF.WindowHandle windowHandle;
 
         // Content signature of the model tree last built by LoadModel; used to skip a rebuild that would
         // produce an identical tree (see LoadAnalyticalModel / ModelTreeSignature).
@@ -198,7 +198,7 @@ namespace SAM.Analytical.UI.WPF
         {
             if (jSAMObject is Space)
             {
-                UI.Modify.EditSpace(uIAnalyticalModel, jSAMObject as dynamic, windowHandle);
+                Modify.EditSpace(uIAnalyticalModel, jSAMObject as dynamic, windowHandle);
             }
             else if (jSAMObject is Panel)
             {
@@ -222,7 +222,7 @@ namespace SAM.Analytical.UI.WPF
             }
             else if (jSAMObject is InternalCondition)
             {
-                UI.Modify.EditInternalCondition(uIAnalyticalModel, jSAMObject as dynamic);
+                Modify.EditInternalCondition(uIAnalyticalModel, jSAMObject as dynamic);
             }
         }
 
@@ -793,7 +793,7 @@ namespace SAM.Analytical.UI.WPF
 
             foreach (InternalCondition internalCondition in jSAMObjects.FindAll(x => x is InternalCondition))
             {
-                UI.Modify.DuplicateInternalCondition(uIAnalyticalModel, internalCondition);
+                Modify.DuplicateInternalCondition(uIAnalyticalModel, internalCondition);
             }
         }
 
@@ -1609,7 +1609,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (analyticalObject is InternalCondition)
             {
-                UI.Modify.EditInternalCondition(uIAnalyticalModel, (InternalCondition)analyticalObject);
+                Modify.EditInternalCondition(uIAnalyticalModel, (InternalCondition)analyticalObject);
             }
             else if (analyticalObject is Profile)
             {
@@ -1655,7 +1655,7 @@ namespace SAM.Analytical.UI.WPF
             System.Windows.Window window = Geometry.UI.WPF.Query.Window(this);
             if(window != null)
             {
-                windowHandle = new Core.Windows.WindowHandle(window);
+                windowHandle = new SAM.Core.UI.WPF.WindowHandle(window);
             }
         }
     }
