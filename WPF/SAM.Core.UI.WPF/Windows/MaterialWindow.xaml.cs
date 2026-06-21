@@ -49,6 +49,11 @@ namespace SAM.Core.UI.WPF
         {
             foreach (MaterialType materialType in Enum.GetValues(typeof(MaterialType)))
             {
+                if (materialType == MaterialType.Undefined)
+                {
+                    continue;
+                }
+
                 ComboBox_MaterialType.Items.Add(Core.Query.Description(materialType));
             }
         }
@@ -68,6 +73,13 @@ namespace SAM.Core.UI.WPF
                 TextBox_Density.Text = double.IsNaN(material_Temp.Density) ? null : material_Temp.Density.ToString();
 
                 ComboBox_MaterialType.Text = Core.Query.Description(Core.Query.MaterialType(material_Temp));
+            }
+            else
+            {
+                // Adding a new material: the type is otherwise locked when editing, so enable the
+                // combo and default to Opaque so the user can pick a type and Add actually creates one.
+                ComboBox_MaterialType.IsEnabled = true;
+                ComboBox_MaterialType.SelectedItem = Core.Query.Description(MaterialType.Opaque);
             }
 
             LoadParameters();
@@ -98,10 +110,13 @@ namespace SAM.Core.UI.WPF
         {
             get
             {
-                if (material == null)
-                {
-                    return null;
-                }
+                // An existing material keeps its own type; a new material (Add) takes the
+                // type currently selected in the combo box so the dialog can create one.
+                MaterialType materialType = material != null
+                    ? material.MaterialType()
+                    : Core.Query.Enum<MaterialType>(ComboBox_MaterialType.SelectedItem as string);
+
+                Guid guid = material != null ? material.Guid : Guid.NewGuid();
 
                 string name = TextBox_Name.Text;
                 string displayName = TextBox_DisplayName.Text;
@@ -127,7 +142,7 @@ namespace SAM.Core.UI.WPF
                 CustomParameters customParameters = ParametersControl_Main.CustomParameters;
 
                 IMaterial result = null;
-                switch (material.MaterialType())
+                switch (materialType)
                 {
                     case MaterialType.Gas:
 
@@ -142,17 +157,15 @@ namespace SAM.Core.UI.WPF
                             }
                         }
 
-                        result = new GasMaterial(material.Guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity, dynamicViscosity);
+                        result = new GasMaterial(guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity, dynamicViscosity);
                         break;
 
                     case MaterialType.Opaque:
-                        Material opaqueMaterial = (OpaqueMaterial)material;
-                        result = new OpaqueMaterial(opaqueMaterial.Guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity);
+                        result = new OpaqueMaterial(guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity);
                         break;
 
                     case MaterialType.Transparent:
-                        Material transparentMaterial = (TransparentMaterial)material;
-                        result = new OpaqueMaterial(transparentMaterial.Guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity);
+                        result = new TransparentMaterial(guid, name, displayName, description, thermalConductivity, density, specificHeatCapacity);
                         break;
 
                     default:
