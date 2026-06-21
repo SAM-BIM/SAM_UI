@@ -254,8 +254,10 @@ namespace SAM.Geometry.UI.WPF
 
         private static bool ResolveEnabled()
         {
+            // Default ON (#53 Phase E): the SharpDX viewport is now the default 3D renderer. An explicit
+            // "0" is the escape hatch that falls back to the legacy Helix 3D path (kept for one release).
             string value = Environment.GetEnvironmentVariable("SAM_UI_VIEWPORT_SHARPDX");
-            return !string.IsNullOrWhiteSpace(value) && value.Trim() != "0";
+            return string.IsNullOrWhiteSpace(value) || value.Trim() != "0";
         }
 
         private static bool ResolveBatchEnabled()
