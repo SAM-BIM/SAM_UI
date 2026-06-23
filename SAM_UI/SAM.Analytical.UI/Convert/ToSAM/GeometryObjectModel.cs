@@ -445,9 +445,11 @@ namespace SAM.Analytical.UI
                 return null;
             }
 
-            AnalyticalModel analyticalModel_Temp = new AnalyticalModel(analyticalModel);
-
-            AdjacencyCluster adjacencyCluster = analyticalModel_Temp.AdjacencyCluster;
+            // AnalyticalModel.AdjacencyCluster already returns a fresh, isolated clone, so reading it straight
+            // off the source model gives the same isolated cluster this regen needs - without also deep-cloning
+            // the whole model (panels/spaces/apertures + material/profile libraries + relations) every regen.
+            // The cluster was the only thing taken from the (previously cloned) model here.
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
 
             Legend legend = threeDimensionalViewSettings.Legend;
 
@@ -954,11 +956,11 @@ namespace SAM.Analytical.UI
 
             Plane plane = twoDimensionalViewSettings.Plane;
 
-            AnalyticalModel analyticalModel_Temp = new AnalyticalModel(analyticalModel);
-
             Legend legend = twoDimensionalViewSettings.Legend;
 
-            AdjacencyCluster adjacencyCluster = analyticalModel_Temp.AdjacencyCluster;
+            // AnalyticalModel.AdjacencyCluster already returns a fresh, isolated clone, so reading it straight
+            // off the source model avoids deep-cloning the whole model every regen (see the 3D path above).
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
 
             bool showPanels = twoDimensionalViewSettings.IsValid(typeof(Panel));
             bool showApertures = twoDimensionalViewSettings.IsValid(typeof(Aperture));
