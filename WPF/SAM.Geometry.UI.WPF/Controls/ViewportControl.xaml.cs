@@ -470,11 +470,11 @@ namespace SAM.Geometry.UI.WPF
             }
             else if (ActiveSharpDX3D)
             {
-                // In-place per-object re-skin from the (already appearance-updated) model objects -
-                // no ToElement3Ds rebuild, camera and other objects untouched (issue #32 / #11).
-                // The batched scene has no per-object models to re-skin in place, so this returns
-                // false; report failure so the caller falls back to a full regeneration instead of
-                // leaving the rendered colors stale (#53).
+                // In-place re-skin from the (already appearance-updated) model objects - camera and other
+                // objects untouched (issue #32 / #11). Per-object mode rebuilds each object's GroupModel3D;
+                // batched mode extracts the recoloured objects into small per-object fill meshes (#53). Returns
+                // false only when the batched scene can't recolor an object in place, so the caller falls back
+                // to a full regeneration instead of leaving the rendered colors stale.
                 if (!sharpDXViewportControl.RefreshAppearance(guids))
                 {
                     return false;
