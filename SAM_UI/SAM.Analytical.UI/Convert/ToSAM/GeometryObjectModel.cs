@@ -1190,7 +1190,17 @@ namespace SAM.Analytical.UI
                         solver2DData.Tag = new Tuple<Space, List<Face2D>, string, Point2D>(keyValuePair.Key, keyValuePair.Value, name, point2D);
 
                         Solver2DSettings solver2DSettings = new Solver2DSettings();
-                        solver2DSettings.IterationCount = 100;
+
+                        // The solver searches a disk of radius ~farthestPointDistance around the anchor (StartingDistance
+                        // is 0, so the max reach over the sweep is IterationCount * ShiftDistance = farthestPointDistance).
+                        // When that whole reach is smaller than the label itself, the solver cannot move the label clear of
+                        // an overlapping neighbour no matter how many iterations it runs - so the full sweep is pure cost.
+                        // A section taken at the wrong elevation collapses every space to a coincident sliver, making this
+                        // true for all 1703 labels at once and turning the solve into a ~2-minute hang on a 10k-space model.
+                        // In that case run a single iteration (place at the anchor) instead of the full sweep. Real rooms
+                        // have a reach of metres, far larger than a label, so this never triggers for them.
+                        bool degenerateSection = farthestPointDistance < System.Math.Min(width, height);
+                        solver2DSettings.IterationCount = degenerateSection ? 1 : 100;
                         solver2DSettings.ShiftDistance = (farthestPointDistance - solver2DSettings.StartingDistance) / solver2DSettings.IterationCount;
                         solver2DSettings.LimitArea = face2Ds[0];
                         solver2DData.Solver2DSettings = solver2DSettings;
