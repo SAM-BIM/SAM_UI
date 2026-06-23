@@ -1191,15 +1191,19 @@ namespace SAM.Analytical.UI
 
                         Solver2DSettings solver2DSettings = new Solver2DSettings();
 
-                        // The solver searches a disk of radius ~farthestPointDistance around the anchor (StartingDistance
-                        // is 0, so the max reach over the sweep is IterationCount * ShiftDistance = farthestPointDistance).
-                        // When that whole reach is smaller than the label itself, the solver cannot move the label clear of
-                        // an overlapping neighbour no matter how many iterations it runs - so the full sweep is pure cost.
-                        // A section taken at the wrong elevation collapses every space to a coincident sliver, making this
-                        // true for all 1703 labels at once and turning the solve into a ~2-minute hang on a 10k-space model.
-                        // In that case run a single iteration (place at the anchor) instead of the full sweep. Real rooms
-                        // have a reach of metres, far larger than a label, so this never triggers for them.
-                        bool degenerateSection = farthestPointDistance < System.Math.Min(width, height);
+                        // Degenerate section guard. A floor-plan plane taken at the wrong elevation (e.g. grazing the
+                        // tops of the spaces) collapses each space's section to a sliver - near-zero area, often long
+                        // and thin. The solver constrains a label's centre to LimitArea (this section), so for a sliver
+                        // almost no candidate qualifies and the label exhausts the full IterationCount * 8 sweep before
+                        // failing; across every space at once this turned the solve into a multi-minute hang on a 10k
+                        // model. A sliver is identified by its *minimum* extent (the bounding-box short side - a long
+                        // thin sliver still has a large farthestPointDistance, so reach alone misses it): when the
+                        // section is thinner than the label in its short dimension, a label cannot meaningfully sit in
+                        // it, so run a single iteration (place at the anchor) instead of the futile sweep. Real rooms
+                        // are metres across, far larger than a label, so this never triggers for them.
+                        BoundingBox2D sectionBoundingBox2D = face2Ds[0].GetBoundingBox();
+                        double sectionMinExtent = sectionBoundingBox2D == null ? 0 : System.Math.Min(sectionBoundingBox2D.Width, sectionBoundingBox2D.Height);
+                        bool degenerateSection = sectionMinExtent < System.Math.Min(width, height);
                         solver2DSettings.IterationCount = degenerateSection ? 1 : 100;
                         solver2DSettings.ShiftDistance = (farthestPointDistance - solver2DSettings.StartingDistance) / solver2DSettings.IterationCount;
                         solver2DSettings.LimitArea = face2Ds[0];
