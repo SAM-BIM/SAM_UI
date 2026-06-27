@@ -445,9 +445,11 @@ namespace SAM.Analytical.UI
                 return null;
             }
 
-            AnalyticalModel analyticalModel_Temp = new AnalyticalModel(analyticalModel);
-
-            AdjacencyCluster adjacencyCluster = analyticalModel_Temp.AdjacencyCluster;
+            // AnalyticalModel.AdjacencyCluster already returns a fresh, isolated clone, so reading it straight
+            // off the source model gives the same isolated cluster this regen needs - without also deep-cloning
+            // the whole model (panels/spaces/apertures + material/profile libraries + relations) every regen.
+            // The cluster was the only thing taken from the (previously cloned) model here.
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
 
             Legend legend = threeDimensionalViewSettings.Legend;
 
@@ -954,11 +956,11 @@ namespace SAM.Analytical.UI
 
             Plane plane = twoDimensionalViewSettings.Plane;
 
-            AnalyticalModel analyticalModel_Temp = new AnalyticalModel(analyticalModel);
-
             Legend legend = twoDimensionalViewSettings.Legend;
 
-            AdjacencyCluster adjacencyCluster = analyticalModel_Temp.AdjacencyCluster;
+            // AnalyticalModel.AdjacencyCluster already returns a fresh, isolated clone, so reading it straight
+            // off the source model avoids deep-cloning the whole model every regen (see the 3D path above).
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
 
             bool showPanels = twoDimensionalViewSettings.IsValid(typeof(Panel));
             bool showApertures = twoDimensionalViewSettings.IsValid(typeof(Aperture));
@@ -1132,6 +1134,7 @@ namespace SAM.Analytical.UI
 
                     List<Solver2DData> solver2DDatas = new List<Solver2DData>();
                     List<string> labelSignatureParts = new List<string>();
+                    int degenerateSectionCount = 0;
 
                     foreach (KeyValuePair<Space, List<Face2D>> keyValuePair in dictionary_Space)
                     {
@@ -1188,7 +1191,25 @@ namespace SAM.Analytical.UI
                         solver2DData.Tag = new Tuple<Space, List<Face2D>, string, Point2D>(keyValuePair.Key, keyValuePair.Value, name, point2D);
 
                         Solver2DSettings solver2DSettings = new Solver2DSettings();
-                        solver2DSettings.IterationCount = 100;
+
+                        // Degenerate section guard. A floor-plan plane taken at the wrong elevation (e.g. grazing the
+                        // tops of the spaces) collapses each space's section to a sliver - near-zero area, often long
+                        // and thin. The solver constrains a label's centre to LimitArea (this section), so for a sliver
+                        // almost no candidate qualifies and the label exhausts the full IterationCount * 8 sweep before
+                        // failing; across every space at once this turned the solve into a multi-minute hang on a 10k
+                        // model. A sliver is identified by its *minimum* extent (the bounding-box short side - a long
+                        // thin sliver still has a large farthestPointDistance, so reach alone misses it): when the
+                        // section is thinner than the label in its short dimension, a label cannot meaningfully sit in
+                        // it, so run a single iteration (place at the anchor) instead of the futile sweep. Real rooms
+                        // are metres across, far larger than a label, so this never triggers for them.
+                        BoundingBox2D sectionBoundingBox2D = face2Ds[0].GetBoundingBox();
+                        double sectionMinExtent = sectionBoundingBox2D == null ? 0 : System.Math.Min(sectionBoundingBox2D.Width, sectionBoundingBox2D.Height);
+                        bool degenerateSection = sectionMinExtent < System.Math.Min(width, height);
+                        if (degenerateSection)
+                        {
+                            degenerateSectionCount++;
+                        }
+                        solver2DSettings.IterationCount = degenerateSection ? 1 : 100;
                         solver2DSettings.ShiftDistance = (farthestPointDistance - solver2DSettings.StartingDistance) / solver2DSettings.IterationCount;
                         solver2DSettings.LimitArea = face2Ds[0];
                         solver2DData.Solver2DSettings = solver2DSettings;
@@ -1247,6 +1268,15 @@ namespace SAM.Analytical.UI
                         using (PerformanceLog.Measure("FloorPlan.LabelSolver", string.Format("{0} [{1} labels]", twoDimensionalViewSettings.Name, solver2DDatas.Count)))
                         {
                             solver2DResults = solver2D.Solve();
+                        }
+
+                        // Diagnostic: how many labels the solver actually placed vs left at their anchor, and how
+                        // many sections were flagged degenerate. Reveals which way a slow solve is failing (all
+                        // placed but expensively, vs all unplaceable) so the bound can be targeted, not guessed.
+                        if (PerformanceLog.Enabled)
+                        {
+                            int placedCount = solver2DResults == null ? 0 : solver2DResults.FindAll(x => x?.Closed2D<Rectangle2D>() != null).Count;
+                            PerformanceLog.Write("FloorPlan.LabelSolver.Placement", string.Format("{0} [{1} placed / {2} anchored of {3}] [{4} degenerate sections]", twoDimensionalViewSettings.Name, placedCount, solver2DDatas.Count - placedCount, solver2DDatas.Count, degenerateSectionCount), 0);
                         }
 
                         labelPositions = new Dictionary<Guid, Tuple<Point2D, bool>>();
