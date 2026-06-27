@@ -184,7 +184,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void TextBox_PreviewTextInput_NumberOnly(object sender, TextCompositionEventArgs e)
         {
-            Core.Windows.EventHandler.ControlText_NumberOnly(sender, e);
+            SAM.Core.UI.WPF.Query.ControlText_NumberOnly(sender, e);
         }
 
     }

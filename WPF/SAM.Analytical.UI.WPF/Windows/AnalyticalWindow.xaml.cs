@@ -6,7 +6,6 @@ using Microsoft.Win32;
 using SAM.Core;
 using SAM.Core.UI;
 using SAM.Core.UI.WPF;
-using SAM.Core.Windows.Forms;
 using SAM.Geometry.Object;
 using SAM.Geometry.UI;
 using SAM.Geometry.UI.WPF;
@@ -33,7 +32,7 @@ namespace SAM.Analytical.UI.WPF.Windows
         private ProgressBarWindowManager progressBarWindowManager = new ProgressBarWindowManager();
 
         private UIAnalyticalModel uIAnalyticalModel = null;
-        private Core.Windows.WindowHandle windowHandle = null;
+        private SAM.Core.UI.WPF.WindowHandle windowHandle = null;
         public AnalyticalWindow()
         {
             InitializeWindow();
@@ -454,16 +453,18 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
-            using (SearchForm<IUIFilter> searchForm = new SearchForm<IUIFilter>("Select Filter", uIFilters, x => x.Name))
+            SAM.Core.UI.WPF.SearchWindow searchWindow = new SAM.Core.UI.WPF.SearchWindow(uIFilters, x => (x as IUIFilter)?.Name)
             {
-                searchForm.SelectionMode = System.Windows.Forms.SelectionMode.One;
-                if (searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                e.UIFilter = searchForm.SelectedItems.FirstOrDefault();
+                Owner = this,
+                Title = "Select Filter",
+                SelectionMode = System.Windows.Controls.SelectionMode.Single
+            };
+            if (searchWindow.ShowDialog() != true)
+            {
+                return;
             }
+
+            e.UIFilter = searchWindow.GetSelectedItems<IUIFilter>().FirstOrDefault();
         }
 
         private Guid GetActiveGuid()
@@ -639,205 +640,216 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             Title = titlePrefix;
 
-            windowHandle = new Core.Windows.WindowHandle(this);
+            windowHandle = new SAM.Core.UI.WPF.WindowHandle(this);
 
-            Icon = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM);
+            Icon = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM);
 
-            RibbonButton_OpenAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
+            RibbonButton_OpenAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
             RibbonButton_OpenAnalyticalModel.Click += RibbonButton_OpenAnalyticalModel_Click;
 
-            RibbonButton_NewAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_New);
+            RibbonButton_NewAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_New);
             RibbonButton_NewAnalyticalModel.Click += RibbonButton_NewAnalyticalModel_Click;
 
-            RibbonButton_SaveAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Save);
+            RibbonButton_SaveAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Save);
             RibbonButton_SaveAnalyticalModel.Click += RibbonButton_SaveAnalyticalModel_Click;
 
-            RibbonButton_SaveAsAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_SaveAs);
+            RibbonButton_SaveAsAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_SaveAs);
             RibbonButton_SaveAsAnalyticalModel.Click += RibbonButton_SaveAsAnalyticalModel_Click;
 
-            RibbonButton_CloseAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
+            RibbonButton_CloseAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
             RibbonButton_CloseAnalyticalModel.Click += RibbonButton_CloseAnalyticalModel_Click;
 
-            RibbonButton_ImportAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
+            RibbonButton_ImportAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Open);
             RibbonButton_ImportAnalyticalModel.Click += RibbonButton_ImportAnalyticalModel_Click;
 
-            RibbonButton_ExportAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Save);
+            RibbonButton_ExportAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Save);
             RibbonButton_ExportAnalyticalModel.Click += RibbonButton_ExportAnalyticalModel_Click;
 
-            RibbonButton_NewSectionViews.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_NewSectionViews.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_NewSectionViews.Click += RibbonButton_NewSectionViews_Click;
 
-            RibbonButton_NewSectionView.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_NewSectionView.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_NewSectionView.Click += RibbonButton_NewSectionView_Click;
 
-            RibbonButton_New3DView.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_New3DView.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_New3DView.Click += RibbonButton_New3DView_Click;
 
-            RibbonButton_ViewSettings.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_ViewSettings.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_ViewSettings.Click += RibbonButton_ViewSettings_Click;
 
-            RibbonButton_CloseView.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
+            RibbonButton_CloseView.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Section);
             RibbonButton_CloseView.Click += RibbonButton_CloseView_Click;
 
-            RibbonButton_AnalyticalModelLocation.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Location);
+            RibbonButton_AnalyticalModelLocation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Location);
             RibbonButton_AnalyticalModelLocation.Click += RibbonButton_AnalyticalModelLocation_Click;
 
-            RibbonButton_AnalyticalModelProperties.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_AnalyticalModelProperties);
+            RibbonButton_AnalyticalModelProperties.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_AnalyticalModelProperties);
             RibbonButton_AnalyticalModelProperties.Click += RibbonButton_AnalyticalModelProperties_Click;
 
-            RibbonButton_ImportObjects.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Import);
+            RibbonButton_ImportObjects.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Import);
             RibbonButton_ImportObjects.Click += RibbonButton_ImportObjects_Click;
 
-            RibbonButton_AnalyticalModelCheck.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ModelCheck);
+            RibbonButton_AnalyticalModelCheck.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ModelCheck);
             RibbonButton_AnalyticalModelCheck.Click += RibbonButton_AnalyticalModelCheck_Click;
 
-            RibbonButton_EditMaterialLibrary.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_MaterialLibrary);
+            RibbonButton_EditMaterialLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_MaterialLibrary);
             RibbonButton_EditMaterialLibrary.Click += RibbonButton_EditMaterialLibrary_Click;
 
-            RibbonButton_EditInternalConditionLibrary.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_InternalCondition);
+            RibbonButton_EditInternalConditionLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_InternalCondition);
             RibbonButton_EditInternalConditionLibrary.Click += RibbonButton_EditInternalConditionLibrary_Click;
 
-            RibbonButton_EditProfileLibrary.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ProfileLibrary);
+            RibbonButton_EditProfileLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ProfileLibrary);
             RibbonButton_EditProfileLibrary.Click += RibbonButton_EditProfileLibrary_Click;
 
-            RibbonButton_EditSpaces.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_EditSpaces.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditSpaces.Click += RibbonButton_EditSpaces_Click;
 
-            RibbonButton_EditConstructions.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ConstructionLibrary);
+            RibbonButton_EditConstructions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ConstructionLibrary);
             RibbonButton_EditConstructions.Click += RibbonButton_EditConstructions_Click;
 
-            RibbonButton_EditApertureConstructions.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ApertureConstruction);
+            RibbonButton_EditApertureConstructions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ApertureConstruction);
             RibbonButton_EditApertureConstructions.Click += RibbonButton_EditApertureConstructions_Click;
 
-            RibbonButton_EditWeatherData.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_WeatherData);
+            RibbonButton_EditWeatherData.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_WeatherData);
             RibbonButton_EditWeatherData.Click += RibbonButton_EditWeatherData_Click;
 
-            RibbonButton_ImportWeatherData.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Import);
+            RibbonButton_ImportWeatherData.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Import);
             RibbonButton_ImportWeatherData.Click += RibbonButton_ImportWeatherData_Click;
 
-            RibbonButton_SolarSimulation.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_SolarCalculator);
+            RibbonButton_SolarSimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_SolarCalculator);
             RibbonButton_SolarSimulation.Click += RibbonButton_SolarSimulation_Click;
 
-            RibbonButton_EnergySimulation.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EnergySimulation);
+            RibbonButton_EnergySimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EnergySimulation);
             RibbonButton_EnergySimulation.Click += RibbonButton_EnergySimulation_Click;
 
-            RibbonButton_EditLibrary.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
+            RibbonButton_EditLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_EditLibrary.Click += RibbonButton_EditLibrary_Click;
 
-            RibbonButton_SetDefaultLayers.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_ConstructionLibrary);
+            RibbonButton_SetDefaultLayers.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_ConstructionLibrary);
             RibbonButton_SetDefaultLayers.Click += RibbonButton_SetDefaultLayers_Click;
 
-            RibbonButton_AssignMechanicalSystems.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
+            RibbonButton_AssignMechanicalSystems.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_AssignMechanicalSystems.Click += RibbonButton_AssignMechanicalSystems_Click;
 
-            RibbonButton_OpenT3D.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
+            RibbonButton_OpenT3D.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
             RibbonButton_OpenT3D.Click += RibbonButton_OpenT3D_Click;
 
-            RibbonButton_OpenTBD.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_TBD);
+            RibbonButton_OpenTBD.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_TBD);
             RibbonButton_OpenTBD.Click += RibbonButton_OpenTBD_Click;
 
-            RibbonButton_OpenTSD.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_TSD);
+            RibbonButton_OpenTSD.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_TSD);
             RibbonButton_OpenTSD.Click += RibbonButton_OpenTSD_Click;
 
-            RibbonButton_OpenTPD.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_TPD);
+            RibbonButton_OpenTPD.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_TPD);
             RibbonButton_OpenTPD.Click += RibbonButton_OpenTPD_Click;
 
-            RibbonButton_ThermalTransmittanceCalculator.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
+            RibbonButton_ThermalTransmittanceCalculator.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
             RibbonButton_ThermalTransmittanceCalculator.Click += RibbonButton_ThermalTransmittanceCalculator_Click;
 
-            RibbonButton_GlazingCalculator.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
+            RibbonButton_GlazingCalculator.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_T3D);
             RibbonButton_GlazingCalculator.Click += RibbonButton_GlazingCalculator_Click;
 
-            RibbonButton_CreateCases.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
+            RibbonButton_CreateCases.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
             RibbonButton_CreateCases.Click += RibbonButton_CreateCases_Click;
 
-            RibbonButton_SimulateCases.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
+            RibbonButton_SimulateCases.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
             RibbonButton_SimulateCases.Click += RibbonButton_SimulateCases_Click;
 
-            RibbonButton_CreateSimulateCases.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
+            RibbonButton_CreateSimulateCases.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
             RibbonButton_CreateSimulateCases.Click += RibbonButton_CreateSimulateCases_Click;
 
-            RibbonButton_Solve.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
+            RibbonButton_Solve.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_CreateCases);
             RibbonButton_Solve.Click += RibbonButton_Solve_Click;
 
-            RibbonMenuButton_PartL.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PartL);
+            RibbonMenuButton_PartL.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PartL);
 
-            RibbonButton_OpenPartL.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PartL);
+            RibbonButton_OpenPartL.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PartL);
             RibbonButton_OpenPartL.Click += RibbonButton_OpenPartL_Click;
 
-            RibbonButton_UpdateUKBRFile.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PartL_UKBR);
+            RibbonButton_UpdateUKBRFile.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PartL_UKBR);
             RibbonButton_UpdateUKBRFile.Click += RibbonButton_UpdateUKBRFile_Click;
 
-            RibbonButton_Hydra.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Hydra);
+            RibbonButton_Hydra.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Hydra);
             RibbonButton_Hydra.Click += RibbonButton_Hydra_Click;
 
-            RibbonButton_NCMNames.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
+            RibbonButton_NCMNames.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_NCMNames.Click += RibbonButton_NCMNames_Click;
 
-            RibbonButton_FixNames.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
+            RibbonButton_FixNames.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_FixNames.Click += RibbonButton_FixNames_Click;
 
-            RibbonButton_CleanAnalyticalModel.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Clean);
+            RibbonButton_CleanAnalyticalModel.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Clean);
             RibbonButton_CleanAnalyticalModel.Click += RibbonButton_CleanAnalyticalModel_Click;
 
-            RibbonButton_RemoveAirMovementObjects.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Clean);
+            RibbonButton_RemoveAirMovementObjects.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Clean);
             RibbonButton_RemoveAirMovementObjects.Click += RibbonButton_RemoveAirMovementObjects_Click;
 
-            //RibbonButton_CreateTBD.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_TBD);
+            //RibbonButton_CreateTBD.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_TBD);
             //RibbonButton_CreateTBD.Click += RibbonButton_CreateTBD_Click;
 
-            RibbonButton_AddMissingObjects.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_AddMissingObjects);
+            RibbonButton_AddMissingObjects.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_AddMissingObjects);
             RibbonButton_AddMissingObjects.Click += RibbonButton_AddMissingObjects_Click;
 
-            RibbonButton_PrintRoomDataSheets.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_PrintRoomDataSheets.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_PrintRoomDataSheets.Click += RibbonButton_PrintRoomDataSheets_Click;
 
-            RibbonButton_OpenMollierChart.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_MollierDiagram);
+            RibbonButton_OpenMollierChart.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_MollierDiagram);
             RibbonButton_OpenMollierChart.Click += RibbonButton_OpenMollierChart_Click;
 
-            RibbonButton_ViewGeometry.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_ViewGeometry.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_ViewGeometry.Click += RibbonButton_ViewGeometry_Click;
 
-            RibbonButton_MapInternalConditions.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_MapInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_MapInternalConditions.Click += RibbonButton_MapInternalConditions_Click;
 
-            RibbonButton_MapInternalConditionsByTM59.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_MapInternalConditionsByTM59.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_MapInternalConditionsByTM59.Click += RibbonButton_MapInternalConditionsByTM59_Click;
 
-            RibbonButton_EditInternalConditions.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_EditInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditInternalConditions.Click += RibbonButton_EditInternalConditions_Click;
 
-            RibbonButton_TextMap.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_TextMap.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_TextMap.Click += RibbonButton_TextMap_Click;
 
-            RibbonButton_SelectByFilter.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_SelectByFilter.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_SelectByFilter.Click += RibbonButton_SelectByFilter_Click;
 
-            RibbonButton_SelectByGuid.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_SelectByGuid.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_SelectByGuid.Click += RibbonButton_SelectByGuid_Click;
 
-            RibbonButton_RevealHidden.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_RevealHidden.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_RevealHidden.Click += RibbonButton_RevealHidden_Click;
 
-            RibbonButton_ViewRange.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
+            RibbonButton_ViewRange.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_ViewRange.Click += RibbonButton_ViewRange_Click;
 
-            RibbonButton_AirHandlingUnitDiagram.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_AirHandlingUnitDiagram);
+            RibbonButton_AirHandlingUnitDiagram.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_AirHandlingUnitDiagram);
             RibbonButton_AirHandlingUnitDiagram.Click += RibbonButton_AirHandlingUnitDiagram_Click;
 
-            RibbonButton_SpaceDiagram.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_SpaceDiagram);
+            RibbonButton_SpaceDiagram.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_SpaceDiagram);
             RibbonButton_SpaceDiagram.Click += RibbonButton_SpaceDiagram_Click;
 
-            RibbonButton_RemoveResults.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
+            RibbonButton_RemoveResults.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Close);
             RibbonButton_RemoveResults.Click += RibbonButton_RemoveResults_Click;
 
-            RibbonButton_Wiki.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Wiki.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_Wiki.Click += RibbonButton_Wiki_Click;
 
-            RibbonButton_About.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_KeyboardShortcuts.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_KeyboardShortcuts.Click += RibbonButton_KeyboardShortcuts_Click;
+
+            RibbonButton_Undo.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Undo.Click += RibbonButton_Undo_Click;
+            RibbonButton_Undo.IsEnabled = false;
+
+            RibbonButton_Redo.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Redo.Click += RibbonButton_Redo_Click;
+            RibbonButton_Redo.IsEnabled = false;
+
+            RibbonButton_About.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_About.Click += RibbonButton_About_Click;
 
-            RibbonButton_Test.LargeImageSource = Core.Windows.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
+            RibbonButton_Test.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Wiki);
             RibbonButton_Test.Click += RibbonButton_Test_Click;
 
             AnalyticalModelControl.ZoomRequested += AnalyticalModelControl_ZoomRequested;
@@ -1352,7 +1364,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
-            Core.Windows.WindowHandle windowHandle = new Core.Windows.WindowHandle(this);
+            SAM.Core.UI.WPF.WindowHandle windowHandle = new SAM.Core.UI.WPF.WindowHandle(this);
 
             IJSAMObject jSAMObject = menuItem.Tag as IJSAMObject;
             if (jSAMObject is Panel)
@@ -1680,28 +1692,40 @@ namespace SAM.Analytical.UI.WPF.Windows
             doubleRangeWindow.Range = range;
         }
 
+        // View guids whose geometry regeneration was deferred because the tab was not active
+        // when a modification arrived. Regenerated lazily on activation (see RegenerateIfDirty).
+        private readonly HashSet<Guid> dirtyViewGuids = new HashSet<Guid>();
+
         private void Reload(ModifiedEventArgs modifiedEventArgs)
         {
-            progressBarWindowManager.Show("Reloading", "Reloading...");
+            string modifications = modifiedEventArgs?.Modifications == null ? null : string.Join(",", modifiedEventArgs.Modifications.ConvertAll(x => x?.GetType().Name));
 
-            SetEnabled();
-            //SetActiveGuid();
+            using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.Reload", modifications))
+            {
+                progressBarWindowManager.Show("Reloading", "Reloading...");
 
-            uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
-            tabControl.SelectionChanged -= TabControl_SelectionChanged;
+                SetEnabled();
+                //SetActiveGuid();
 
-            AnalyticalModel analyticalModel = uIAnalyticalModel.JSAMObject;
+                uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
+                tabControl.SelectionChanged -= TabControl_SelectionChanged;
 
-            UpdateTabItems(tabControl, analyticalModel, modifiedEventArgs);
+                AnalyticalModel analyticalModel = uIAnalyticalModel.JSAMObject;
 
-            UpdateUIGeometrySettings(tabControl, analyticalModel, modifiedEventArgs);
+                UpdateTabItems(tabControl, analyticalModel, modifiedEventArgs);
 
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications);
+                UpdateUIGeometrySettings(tabControl, analyticalModel, modifiedEventArgs);
 
-            uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
-            tabControl.SelectionChanged += TabControl_SelectionChanged;
+                // Re-commit the (tab/geometry-settings-updated) model without adding an undo entry: the
+                // triggering edit was already captured by its own SetJSAMObject, so capturing here too
+                // would make undo require two clicks.
+                uIAnalyticalModel.SetJSAMObject(analyticalModel, modifiedEventArgs.Modifications, false);
 
-            progressBarWindowManager.Close();
+                uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
+                tabControl.SelectionChanged += TabControl_SelectionChanged;
+
+                progressBarWindowManager.Close();
+            }
         }
 
         private void RemoveViewSettings()
@@ -1776,13 +1800,27 @@ namespace SAM.Analytical.UI.WPF.Windows
         {
             List<AboutInfoType> abouInfoTypes = Enum.GetValues(typeof(AboutInfoType)).Cast<AboutInfoType>().ToList();
 
-            using (ComboBoxForm<AboutInfoType> comboBoxForm = new ComboBoxForm<AboutInfoType>("Info", abouInfoTypes, x => x.Description()))
+            SAM.Core.UI.WPF.ComboBoxWindow<AboutInfoType> comboBoxWindow = new SAM.Core.UI.WPF.ComboBoxWindow<AboutInfoType>("Info", abouInfoTypes, x => x.Description()) { Owner = this };
+            if (comboBoxWindow.ShowDialog() == true)
             {
-                if (comboBoxForm.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    MessageBox.Show(Core.Query.AboutInfoTypeText(comboBoxForm.SelectedItem), "Info");
-                }
+                MessageBox.Show(Core.Query.AboutInfoTypeText(comboBoxWindow.SelectedItem), "Info");
             }
+        }
+
+        private void RibbonButton_Undo_Click(object sender, RoutedEventArgs e)
+        {
+            Undo();
+        }
+
+        private void RibbonButton_Redo_Click(object sender, RoutedEventArgs e)
+        {
+            Redo();
+        }
+
+        private void RibbonButton_KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
+        {
+            KeyboardShortcutsWindow keyboardShortcutsWindow = new KeyboardShortcutsWindow() { Owner = this };
+            keyboardShortcutsWindow.ShowDialog();
         }
 
         private void RibbonButton_AddMissingObjects_Click(object sender, RoutedEventArgs e)
@@ -1960,7 +1998,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_ImportObjects_Click(object sender, RoutedEventArgs e)
         {
-            uIAnalyticalModel?.Import(windowHandle);
+            uIAnalyticalModel?.Import(this);
 
             AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
             if (analyticalModel != null)
@@ -2096,8 +2134,8 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             string path = null;
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "json files (*.json)|*.json|All files (*.*)|*.*";
-            openFileDialog.FilterIndex = 2;
+            openFileDialog.Filter = "SAM files (*.sam)|*.sam|json files (*.json)|*.json|All files (*.*)|*.*";
+            openFileDialog.FilterIndex = 1;
             openFileDialog.RestoreDirectory = true;
             if (openFileDialog.ShowDialog(this) == false)
             {
@@ -2110,13 +2148,9 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_OpenMollierChart_Click(object sender, RoutedEventArgs e)
         {
-            using (Core.Mollier.UI.MollierForm mollierForm = new Core.Mollier.UI.MollierForm())
-            {
-                if (mollierForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-            }
+            // MollierForm is now a WPF Window (not IDisposable; ShowDialog returns bool?).
+            Core.Mollier.UI.MollierForm mollierForm = new Core.Mollier.UI.MollierForm();
+            mollierForm.ShowDialog();
         }
 
         private void RibbonButton_OpenPartL_Click(object sender, RoutedEventArgs e)
@@ -2543,14 +2577,12 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
-            using (TextBoxForm<string> textBoxControl = new TextBoxForm<string>("Select By Guid", "Insert Guids"))
+            SAM.Core.UI.WPF.TextBoxWindow textBoxWindow = new SAM.Core.UI.WPF.TextBoxWindow("Select By Guid", "Insert Guids") { Owner = this };
+            if (textBoxWindow.ShowDialog() != true)
             {
-                if (textBoxControl.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-                value = textBoxControl.Value;
+                return;
             }
+            value = textBoxWindow.Value;
 
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -2838,7 +2870,10 @@ namespace SAM.Analytical.UI.WPF.Windows
             UIGeometrySettings uIGeometrySettings = UpdateUIGeometrySettings(tabControl, analyticalModel, new ModifiedEventArgs());
 
             uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(uIGeometrySettings.GetViewSettings<IViewSettings>()));
+            // Syncing the current viewport/camera state back into the model (e.g. before a save) is a
+            // transient writeback, not a user edit, so skip the undo snapshot - otherwise saving pushes
+            // a spurious history entry and clears redo.
+            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(uIGeometrySettings.GetViewSettings<IViewSettings>()), false);
             uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
         }
 
@@ -2913,6 +2948,44 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
             Modify.SetActiveGuid(uIAnalyticalModel, guid);
+            uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
+
+            RegenerateIfDirty(guid);
+        }
+
+        // Regenerate a view tab whose geometry update was deferred while it was inactive.
+        // No-op if the tab is not dirty, so activating an up-to-date tab stays free.
+        private void RegenerateIfDirty(Guid guid)
+        {
+            if (guid == Guid.Empty || !dirtyViewGuids.Contains(guid))
+            {
+                return;
+            }
+
+            AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
+            if (analyticalModel == null)
+            {
+                return;
+            }
+
+            IViewSettings viewSettings = Query.ViewSettings<ViewSettings>(uIAnalyticalModel, guid);
+            if (viewSettings == null)
+            {
+                dirtyViewGuids.Remove(guid);
+                return;
+            }
+
+            uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
+            tabControl.SelectionChanged -= TabControl_SelectionChanged;
+
+            progressBarWindowManager?.Show("Reloading", "Reloading...");
+
+            // FullModification forces the geometry regeneration; UpdateTabItem clears the dirty flag.
+            UpdateTabItem(tabControl, analyticalModel, new ModifiedEventArgs(new FullModification()), viewSettings, true);
+
+            progressBarWindowManager?.Close();
+
+            tabControl.SelectionChanged += TabControl_SelectionChanged;
             uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
         }
 
@@ -3039,6 +3112,7 @@ namespace SAM.Analytical.UI.WPF.Windows
         private void UIAnalyticalModel_Closed(object sender, ClosedEventArgs e)
         {
             Reload(e);
+            RefreshHistoryButtons();
 
             Title = titlePrefix;
         }
@@ -3046,12 +3120,18 @@ namespace SAM.Analytical.UI.WPF.Windows
         private void UIAnalyticalModel_Modified(object sender, ModifiedEventArgs e)
         {
             Reload(e);
+            RefreshHistoryButtons();
         }
 
         private void UIAnalyticalModel_Opened(object sender, OpenedEventArgs e)
         {
             SetDefaultViewSettings();
             Reload(e);
+
+            // A freshly opened model starts with empty history - drop any entry created by the
+            // open-time view-settings setup above.
+            uIAnalyticalModel?.ClearHistory();
+            RefreshHistoryButtons();
 
             Title = titlePrefix;
 
@@ -3062,7 +3142,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
         }
 
-        private TabItem UpdateTabItem(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs, IViewSettings viewSettings = null)
+        private TabItem UpdateTabItem(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs, IViewSettings viewSettings = null, bool active = true)
         {
             if (tabControl == null || analyticalModel == null)
             {
@@ -3127,9 +3207,10 @@ namespace SAM.Analytical.UI.WPF.Windows
             UIGeometryObjectModel uIGeometryObjectModel = viewportControl.UIGeometryObjectModel;
 
             bool updateGeometry = uIGeometryObjectModel?.JSAMObject == null || modifiedEventArgs.Modifications.Find(x => x is FullModification) != null;
+
+            List<ViewSettingsModification> viewSettingsModifications = modifiedEventArgs.GetModifications<ViewSettingsModification>((x) => x.ViewSettings?.Find(y => y.Guid == viewSettings.Guid) != null);
             if (!updateGeometry)
             {
-                List<ViewSettingsModification> viewSettingsModifications = modifiedEventArgs.GetModifications<ViewSettingsModification>((x) => x.ViewSettings?.Find(y => y.Guid == viewSettings.Guid) != null);
                 if(viewSettingsModifications != null && viewSettingsModifications.Count != 0)
                 {
                     if(viewSettingsModifications.Any(x => x.UpdateCamera))
@@ -3143,6 +3224,13 @@ namespace SAM.Analytical.UI.WPF.Windows
                             viewportControl.Camera = threeDimensionalViewSettings.Camera;
                         }
                     }
+
+                    // A view-settings change flagged to update geometry (e.g. "Load view", which copies
+                    // the whole source view settings) regenerates the scene as well as applying the camera.
+                    if (viewSettingsModifications.Any(x => x.UpdateGeometry))
+                    {
+                        updateGeometry = true;
+                    }
                 }
             }
 
@@ -3150,14 +3238,46 @@ namespace SAM.Analytical.UI.WPF.Windows
             {
                 List<AnalyticalModelModification> analyticalModelModifications = modifiedEventArgs.GetModifications<AnalyticalModelModification>();
                 HashSet<Guid> guids = analyticalModelModifications?.Guids();
-                if (guids == null || guids.Count == 0 || viewportControl.ContainsAny<SAMObject>(guids))
+
+                // A camera-only view-settings change ("Load camera") carries no geometry change, so don't
+                // let the catch-all below force a full regeneration. This guard is precise: it only applies
+                // when every matching view-settings modification is camera-only (UpdateCamera, not
+                // UpdateGeometry) and there are no model edits to react to - the general view-settings edit
+                // path (single-arg ViewSettingsModification, UpdateCamera false) still regenerates as before.
+                bool cameraOnlyViewSettingsUpdate = viewSettingsModifications != null && viewSettingsModifications.Count != 0
+                    && viewSettingsModifications.TrueForAll(x => x.UpdateCamera && !x.UpdateGeometry)
+                    && (analyticalModelModifications == null || analyticalModelModifications.Count == 0);
+
+                if (!cameraOnlyViewSettingsUpdate && (guids == null || guids.Count == 0 || viewportControl.ContainsAny<SAMObject>(guids)))
                 {
                     updateGeometry = true;
+
+                    // Attribute-only fast path (#11): when every model modification is an AttributeModification
+                    // (attribute edits that cannot change geometry, visibility or label text - e.g. assigning an
+                    // InternalCondition), the view only needs new space fill colors and a refreshed legend.
+                    // Update those in place instead of regenerating sections, labels and the scene.
+                    if (guids != null && guids.Count != 0
+                        && analyticalModelModifications.TrueForAll(x => x is AttributeModification)
+                        && TryRefreshSpaceAppearances(viewportControl, analyticalModel, viewSettings, name))
+                    {
+                        updateGeometry = false;
+                    }
                 }
+            }
+
+            if (updateGeometry && !active && uIGeometryObjectModel?.JSAMObject != null)
+            {
+                // Defer regeneration of this already-populated background tab until it is activated.
+                // Keeps edit latency independent of the number of open view tabs (the tab keeps showing
+                // its previous content meanwhile). A never-loaded tab is still generated eagerly below.
+                dirtyViewGuids.Add(viewSettings.Guid);
+                updateGeometry = false;
             }
 
             if (updateGeometry)
             {
+                dirtyViewGuids.Remove(viewSettings.Guid);
+
                 if (progressBarWindowManager != null)
                 {
                     progressBarWindowManager.Text = string.Format("View Regeneration [{0}]", string.IsNullOrWhiteSpace(name) ? "???" : name);
@@ -3165,8 +3285,16 @@ namespace SAM.Analytical.UI.WPF.Windows
 
                 List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
 
-                GeometryObjectModel geometryObjectModel = analyticalModel.ToSAM_GeometryObjectModel(viewSettings);
-                viewportControl.UIGeometryObjectModel = new UIGeometryObjectModel(geometryObjectModel);
+                GeometryObjectModel geometryObjectModel;
+                using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.GeometryObjectModel", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+                {
+                    geometryObjectModel = analyticalModel.ToSAM_GeometryObjectModel(viewSettings);
+                }
+
+                using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.Viewport", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+                {
+                    viewportControl.UIGeometryObjectModel = new UIGeometryObjectModel(geometryObjectModel);
+                }
 
                 viewportControl.Select(sAMObjects);
             }
@@ -3191,6 +3319,62 @@ namespace SAM.Analytical.UI.WPF.Windows
             return tabItem;
         }
 
+        // In-place refresh of space colors + legend for attribute-only edits (see AttributeModification).
+        // Returns false when the in-place result could differ from a full regeneration; the caller then
+        // falls back to the regular ToSAM_GeometryObjectModel path.
+        private bool TryRefreshSpaceAppearances(ViewportControl viewportControl, AnalyticalModel analyticalModel, IViewSettings viewSettings, string name)
+        {
+            TwoDimensionalViewSettings twoDimensionalViewSettings = viewSettings as TwoDimensionalViewSettings;
+            ThreeDimensionalViewSettings threeDimensionalViewSettings = viewSettings as ThreeDimensionalViewSettings;
+            if (twoDimensionalViewSettings == null && threeDimensionalViewSettings == null)
+            {
+                return false;
+            }
+
+            // The 3D in-place re-skin needs a renderer that can recolor per object (the SharpDX path);
+            // the legacy Helix 3D renderer has no in-place re-skin, so 3D edits there regenerate as before
+            // (issue #32). 2D always supports it.
+            if (!viewportControl.SupportsInPlaceAppearanceRefresh)
+            {
+                return false;
+            }
+
+            GeometryObjectModel geometryObjectModel = viewportControl.UIGeometryObjectModel?.JSAMObject;
+            if (geometryObjectModel == null)
+            {
+                return false;
+            }
+
+            using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.AttributeRefresh", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+            {
+                List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
+
+                HashSet<Guid> spaceGuids;
+                bool refreshed = twoDimensionalViewSettings != null
+                    ? UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, twoDimensionalViewSettings, out spaceGuids)
+                    : UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, threeDimensionalViewSettings, out spaceGuids);
+
+                if (!refreshed)
+                {
+                    return false;
+                }
+
+                if (!viewportControl.RefreshAppearances(spaceGuids))
+                {
+                    return false;
+                }
+
+                // Re-skinning replaces the Model3Ds selection visuals were painted on - re-apply the
+                // selection, mirroring what the full regeneration path does after a scene rebuild.
+                if (sAMObjects != null && sAMObjects.Count != 0)
+                {
+                    viewportControl.Select(sAMObjects);
+                }
+            }
+
+            return true;
+        }
+
         private void TabItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             TabItem? tabItem = sender as TabItem;
@@ -3199,7 +3383,33 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
+            // Only a double-click on the tab header itself should open View Settings. A double-click on an
+            // object inside the viewport opens that object's properties; that same double-click bubbles up
+            // to the TabItem, so without this guard View Settings would also open the moment the properties
+            // dialog is dismissed.
+            if (tabItem.Content is DependencyObject content && e.OriginalSource is DependencyObject source && IsDescendantOf(source, content))
+            {
+                return;
+            }
+
             EditViewSettings(tabItem);
+        }
+
+        private static bool IsDescendantOf(DependencyObject node, DependencyObject ancestor)
+        {
+            while (node != null)
+            {
+                if (node == ancestor)
+                {
+                    return true;
+                }
+
+                node = node is System.Windows.Media.Visual || node is System.Windows.Media.Media3D.Visual3D
+                    ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                    : System.Windows.LogicalTreeHelper.GetParent(node);
+            }
+
+            return false;
         }
 
         private List<TabItem> UpdateTabItems(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs)
@@ -3216,6 +3426,17 @@ namespace SAM.Analytical.UI.WPF.Windows
                 List<IViewSettings> viewSettingsList = uIGeometrySettings.GetViewSettings<IViewSettings>();
                 if (viewSettingsList != null)
                 {
+                    // Only the active tab regenerates its geometry now; others are deferred (see UpdateTabItem).
+                    // Fall back to the selected tab when ActiveGuid is empty or points to a view that is not
+                    // rendered here (disabled/removed - those paths do not clear ActiveGuid); otherwise every
+                    // tab would be deferred. A final reconciliation below guarantees the visible tab is fresh.
+                    Guid activeGuid = uIGeometrySettings.ActiveGuid;
+                    bool activeGuidRendered = activeGuid != Guid.Empty && viewSettingsList.Any(x => x != null && x.Guid == activeGuid && !(x is ViewSettings viewSettings_Active && !viewSettings_Active.Enabled));
+                    if (!activeGuidRendered)
+                    {
+                        activeGuid = (tabControl.SelectedItem as TabItem)?.Content is ViewportControl viewportControl_Active ? viewportControl_Active.Guid : Guid.Empty;
+                    }
+
                     foreach (IViewSettings viewSettings in viewSettingsList)
                     {
                         if (viewSettings is ViewSettings)
@@ -3226,7 +3447,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                             }
                         }
 
-                        TabItem tabItem = UpdateTabItem(tabControl, analyticalModel, modifiedEventArgs, viewSettings);
+                        TabItem tabItem = UpdateTabItem(tabControl, analyticalModel, modifiedEventArgs, viewSettings, viewSettings.Guid == activeGuid);
                         if (tabItem != null)
                         {
                             result.Add(tabItem);
@@ -3248,6 +3469,19 @@ namespace SAM.Analytical.UI.WPF.Windows
                 }
 
                 tabControl.Items.RemoveAt(i);
+            }
+
+            // Reconcile: the tab that is actually visible must never be left stale. This covers the case
+            // where the saved active view was removed/disabled and WPF selected a deferred tab during the
+            // removal above. Runs inside Reload (event handlers already detached), so no extra plumbing.
+            if (tabControl.SelectedItem is TabItem selectedTabItem && selectedTabItem.Content is ViewportControl selectedViewportControl && dirtyViewGuids.Contains(selectedViewportControl.Guid)
+                && analyticalModel != null && analyticalModel.TryGetValue(AnalyticalModelParameter.UIGeometrySettings, out UIGeometrySettings uIGeometrySettings_Selected) && uIGeometrySettings_Selected != null)
+            {
+                IViewSettings viewSettings_Selected = uIGeometrySettings_Selected.GetViewSettings<IViewSettings>()?.Find(x => x != null && x.Guid == selectedViewportControl.Guid);
+                if (viewSettings_Selected != null)
+                {
+                    UpdateTabItem(tabControl, analyticalModel, modifiedEventArgs, viewSettings_Selected, true);
+                }
             }
 
             return result;
@@ -3284,6 +3518,13 @@ namespace SAM.Analytical.UI.WPF.Windows
                 }
 
                 if (!geometryObjectModel.TryGetValue(GeometryObjectModelParameter.ViewSettings, out IViewSettings viewSettings) || viewSettings == null)
+                {
+                    continue;
+                }
+
+                // Skip tabs with deferred (stale) geometry: their current view settings were already
+                // applied by UpdateTabItem, so reading the stale stored copy back here would revert the edit.
+                if (dirtyViewGuids.Contains(viewSettings.Guid))
                 {
                     continue;
                 }
@@ -3630,17 +3871,17 @@ namespace SAM.Analytical.UI.WPF.Windows
             if (tag.Value is Panel)
             {
                 Panel panel = (Panel)tag.Value;
-                uIAnalyticalModel.EditPanel(panel, new Core.Windows.WindowHandle(this));
+                uIAnalyticalModel.EditPanel(panel, new SAM.Core.UI.WPF.WindowHandle(this));
             }
             else if (tag.Value is Space)
             {
                 Space space = (Space)tag.Value;
-                uIAnalyticalModel.EditSpace(space, new Core.Windows.WindowHandle(this));
+                uIAnalyticalModel.EditSpace(space, new SAM.Core.UI.WPF.WindowHandle(this));
             }
             else if (tag.Value is Aperture)
             {
                 Aperture aperture = (Aperture)tag.Value;
-                uIAnalyticalModel.EditAperture(aperture, new Core.Windows.WindowHandle(this));
+                uIAnalyticalModel.EditAperture(aperture, new SAM.Core.UI.WPF.WindowHandle(this));
             }
         }
 
@@ -3699,8 +3940,62 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
         }
 
+        // Two-letter chord state (Rhino-style "ZE"/"ZS"). A prefix key (Z) is remembered for a short
+        // window; the next key completes the chord. Z has no single-key action of its own, so there is
+        // nothing to defer - a lone Z, or Z followed by a non-chord key, simply does nothing for the Z.
+        private Key? pendingChordKey;
+        private int pendingChordTick;
+        private const int chordTimeoutMilliseconds = 1000;
+
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
+            // Undo / redo. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Checked before the Z chord
+            // prefix below (that only starts on a modifier-free Z).
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Z)
+            {
+                Undo();
+                return;
+            }
+
+            if ((Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Y)
+                || (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.Z))
+            {
+                Redo();
+                return;
+            }
+
+            // Complete a pending chord (e.g. Z then E). unchecked handles TickCount wraparound.
+            if (pendingChordKey.HasValue)
+            {
+                Key prefix = pendingChordKey.Value;
+                pendingChordKey = null;
+
+                if (unchecked(Environment.TickCount - pendingChordTick) <= chordTimeoutMilliseconds && prefix == Key.Z)
+                {
+                    if (e.Key == Key.E)
+                    {
+                        ZoomExtents();
+                        return;
+                    }
+
+                    if (e.Key == Key.S)
+                    {
+                        ZoomSelected();
+                        return;
+                    }
+
+                    // Not a Z-chord - fall through and handle e.Key as a normal shortcut below.
+                }
+            }
+
+            // Start the Z chord prefix; Z on its own does nothing.
+            if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.None)
+            {
+                pendingChordKey = Key.Z;
+                pendingChordTick = Environment.TickCount;
+                return;
+            }
+
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.S)
             {
                 SaveAs();
@@ -3721,11 +4016,8 @@ namespace SAM.Analytical.UI.WPF.Windows
                     List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
                     if (sAMObjects != null)
                     {
-                        using (JsonForm<SAMObject> jsonForm = new JsonForm<SAMObject>(sAMObjects))
-                        {
-                            jsonForm.ShowDialog();
-
-                        }
+                        SAM.Core.UI.WPF.JsonWindow jsonWindow = new SAM.Core.UI.WPF.JsonWindow(sAMObjects) { Owner = this };
+                        jsonWindow.ShowDialog();
                     }
 
                 }
@@ -3757,6 +4049,44 @@ namespace SAM.Analytical.UI.WPF.Windows
             else if (e.Key == Key.P)
             {
                 ShowProperties();
+            }
+        }
+
+        private void Undo()
+        {
+            uIAnalyticalModel?.Undo();
+        }
+
+        private void Redo()
+        {
+            uIAnalyticalModel?.Redo();
+        }
+
+        // Keep the ribbon Undo/Redo buttons enabled only when there is something to undo/redo. Called
+        // after every model change (UIAnalyticalModel_Modified) and after open/new/close.
+        private void RefreshHistoryButtons()
+        {
+            RibbonButton_Undo.IsEnabled = uIAnalyticalModel != null && uIAnalyticalModel.CanUndo;
+            RibbonButton_Redo.IsEnabled = uIAnalyticalModel != null && uIAnalyticalModel.CanRedo;
+        }
+
+        private void ZoomExtents()
+        {
+            GetActiveViewportControl()?.ZoomExtents();
+        }
+
+        private void ZoomSelected()
+        {
+            ViewportControl viewportControl = GetActiveViewportControl();
+            if (viewportControl == null)
+            {
+                return;
+            }
+
+            List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
+            if (sAMObjects != null && sAMObjects.Count != 0)
+            {
+                viewportControl.Zoom(sAMObjects);
             }
         }
     }

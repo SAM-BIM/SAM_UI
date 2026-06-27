@@ -1,0 +1,47 @@
+<UserControl x:Class="SAM.Analytical.UI.MaterialLayersControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:SAM.Analytical.UI"
+             mc:Ignorable="d"
+             d:DesignHeight="300" d:DesignWidth="350" MinWidth="350" MinHeight="300">
+    <Grid Margin="3">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="34"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Internal Side" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+        <DataGrid x:Name="DataGrid_Layers" Grid.Row="1"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  CanUserSortColumns="False"
+                  HeadersVisibility="Column"
+                  SelectionMode="Extended"
+                  SelectionUnit="FullRow"
+                  MouseDoubleClick="DataGrid_Layers_MouseDoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn x:Name="Column_MaterialName" Header="Material Name" Binding="{Binding Name}" Width="65*" IsReadOnly="True"/>
+                <DataGridTextColumn x:Name="Column_Thickness" Header="Thickness [m]" Binding="{Binding Thickness}" Width="35*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock Grid.Row="2" Text="External Side" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+        <Grid Grid.Row="3">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <Button x:Name="Button_Up" Content="Up" Width="65" Height="28" Margin="0,0,3,0" Click="Button_Up_Click"/>
+                <Button x:Name="Button_Down" Content="Down" Width="65" Height="28" Click="Button_Down_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button x:Name="Button_Add" Content="Add" Width="75" Height="28" Margin="0,0,6,0" Click="Button_Add_Click"/>
+                <Button x:Name="Button_Remove" Content="Remove" Width="75" Height="28" Click="Button_Remove_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

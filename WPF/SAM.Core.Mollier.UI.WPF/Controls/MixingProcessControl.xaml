@@ -1,0 +1,18 @@
+<UserControl x:Class="SAM.Core.Mollier.UI.Controls.MixingProcessControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:SAM.Core.Mollier.UI.Controls"
+             Width="489" Height="295"
+             d:DesignHeight="295" d:DesignWidth="489"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid>
+        <TextBlock x:Name="label2" Text="First Airflow Point" FontSize="13.333" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="24,4,0,0" />
+        <TextBlock x:Name="label1" Text="Second Airflow Point" FontSize="13.333" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="286,4,0,0" />
+        <local:MollierPointControl x:Name="MollierPointControl_FirstPoint" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,27,0,0" Width="205" Height="206" Pressure="101325" />
+        <local:MollierPointControl x:Name="MollierPointControl_SecondPoint" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="272,27,0,0" Width="205" Height="206" Pressure="101325" />
+        <local:ParameterControl x:Name="FirstAirflowControl" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4,229,0,0" Width="200" Height="51" />
+        <local:ParameterControl x:Name="SecondAirflowControl" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="272,229,0,0" Width="200" Height="51" />
+    </Grid>
+</UserControl>

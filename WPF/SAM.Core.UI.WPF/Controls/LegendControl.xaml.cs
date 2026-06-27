@@ -153,15 +153,13 @@ namespace SAM.Core.UI.WPF
 
             PaletteDefinition paletteDefinition = null;
 
-            using (Windows.Forms.ComboBoxForm<PaletteDefinition> comboBoxForm = new Windows.Forms.ComboBoxForm<PaletteDefinition>("Select Palette", paletteDefinitions, x => x?.Name ?? string.Empty))
+            ComboBoxWindow<PaletteDefinition> comboBoxForm = new ComboBoxWindow<PaletteDefinition>("Select Palette", paletteDefinitions, x => x?.Name ?? string.Empty);
+            if (comboBoxForm.ShowDialog() != true)
             {
-                if (comboBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                paletteDefinition = comboBoxForm.SelectedItem;
+                return;
             }
+
+            paletteDefinition = comboBoxForm.SelectedItem;
 
             if (paletteDefinition is null)
             {

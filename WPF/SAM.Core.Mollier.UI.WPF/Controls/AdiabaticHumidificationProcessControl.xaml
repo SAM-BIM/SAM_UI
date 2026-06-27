@@ -1,0 +1,18 @@
+<UserControl x:Class="SAM.Core.Mollier.UI.Controls.AdiabaticHumidificationProcessControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:SAM.Core.Mollier.UI.Controls"
+             Width="645" Height="280"
+             d:DesignHeight="280" d:DesignWidth="645"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid>
+        <TextBlock x:Name="label2" Text="Air Start Conditions" FontSize="13.333" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,0,0,0" />
+        <local:MollierPointControl x:Name="MollierPointControl_Start" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,23,0,0" Width="199" Height="220" />
+        <TextBlock x:Name="label1" Text="Calculation Type" FontSize="13.333" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="257,0,0,0" />
+        <ComboBox x:Name="processCalculateType_ComboBox" IsEditable="False" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="261,25,0,0" Width="266" Height="24"
+                  SelectionChanged="processCalculateType_ComboBox_SelectedIndexChanged" />
+        <StackPanel x:Name="flowLayoutPanel_Main" Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="261,55,0,0" Width="360" Height="177" />
+    </Grid>
+</UserControl>

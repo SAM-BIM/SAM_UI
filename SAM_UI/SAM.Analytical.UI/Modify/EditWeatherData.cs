@@ -1,4 +1,7 @@
-﻿using SAM.Weather;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Weather;
 using System.Windows.Forms;
 
 namespace SAM.Analytical.UI
@@ -33,16 +36,20 @@ namespace SAM.Analytical.UI
                 return;
             }
 
-            using (Weather.Windows.Forms.WeatherDataForm weatherDataForm = new Weather.Windows.Forms.WeatherDataForm(weatherData, Core.Query.Enums(typeof(WeatherData))))
+            SAM.Weather.UI.WPF.WeatherDataWindow weatherDataWindow = new SAM.Weather.UI.WPF.WeatherDataWindow(weatherData, Core.Query.Enums(typeof(WeatherData)));
+
+            // Bridge the WinForms IWin32Window owner to the WPF window's native owner handle.
+            if (owner != null)
             {
-                if(weatherDataForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-                
-                weatherData = weatherDataForm.WeatherData;
+                new System.Windows.Interop.WindowInteropHelper(weatherDataWindow).Owner = owner.Handle;
             }
 
+            if (weatherDataWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            weatherData = weatherDataWindow.WeatherData;
             if(weatherData == null)
             {
                 return;

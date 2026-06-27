@@ -34,9 +34,9 @@ namespace SAM.Core.UI.WPF
         {
             e.Handled = true;
 
-            using (Windows.Forms.TextBoxForm<string> textBoxForm = new Windows.Forms.TextBoxForm<string>("Filter", "Filter Name"))
+            TextBoxWindow textBoxForm = new TextBoxWindow("Filter", "Filter Name");
             {
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                if (textBoxForm.ShowDialog() != true)
                 {
                     return;
                 }

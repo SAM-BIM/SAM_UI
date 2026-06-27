@@ -1,0 +1,26 @@
+<UserControl x:Class="SAM.Core.Mollier.UI.Controls.MollierPointControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:SAM.Core.Mollier.UI.Controls"
+             Width="155" Height="200"
+             d:DesignHeight="200" d:DesignWidth="155"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid>
+        <TextBlock x:Name="Label_Pressure" Text="Pressure" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="3,13,0,0" />
+        <local:NumberBoxControl x:Name="NumberBoxControl_Pressure" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="3,33,0,0" Width="104" Height="22" String_NaN="" String_PositiveInfinity="" String_NegativeInfinity="" Tolerance="0.001" />
+        <TextBlock x:Name="Label_PressureUnit" Text="Pa" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="113,36,0,0" />
+        <Button x:Name="Button_SelectMollierPoint" Content="..." HorizontalAlignment="Left" VerticalAlignment="Top" Margin="120,3,0,0" Width="25" Height="23" Visibility="Collapsed" Click="Button_SelectMollierPoint_Click" />
+
+        <ComboBox x:Name="ComboBox_FirstParameter" IsEditable="False" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,69,0,0" Width="152" Height="24"
+                  SelectionChanged="ComboBox_FirstParameter_SelectedIndexChanged" DropDownOpened="ComboBox_FirstParameter_Click" />
+        <local:NumberBoxControl x:Name="NumberBoxControl_FirstParameter" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,99,0,0" Width="104" Height="22" String_NaN="" String_PositiveInfinity="" String_NegativeInfinity="" Tolerance="0.001" />
+        <TextBlock x:Name="Label_FirstParameterUnit" Text="kg/kg" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="110,102,0,0" />
+
+        <ComboBox x:Name="ComboBox_SecondParameter" IsEditable="False" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,137,0,0" Width="152" Height="24"
+                  SelectionChanged="ComboBox_SecondParameter_SelectedIndexChanged" DropDownOpened="ComboBox_SecondParameter_Click" />
+        <local:NumberBoxControl x:Name="NumberBoxControl_SecondParameter" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,167,0,0" Width="104" Height="22" String_NaN="" String_PositiveInfinity="" String_NegativeInfinity="" Tolerance="0.001" />
+        <TextBlock x:Name="Label_SecondParameterUnit" Text="kg/kg" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="110,170,0,0" />
+    </Grid>
+</UserControl>

@@ -1,5 +1,7 @@
-﻿using System;
-using System.Windows.Forms;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using System;
 
 namespace SAM.Weather.UI
 {
@@ -11,9 +13,8 @@ namespace SAM.Weather.UI
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Windows.Forms.WeatherDataForm());
+            System.Windows.Application application = new System.Windows.Application();
+            application.Run(new SAM.Weather.UI.WPF.WeatherDataWindow());
         }
     }
 }

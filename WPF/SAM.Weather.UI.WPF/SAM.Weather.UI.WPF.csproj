@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WPF replacement for the WinForms SAM.Weather.Windows WeatherDataForm/WeatherDataControl
+    (part of the SAM_Windows retirement). Chart layer is OxyPlot.Wpf; the legacy
+    System.Windows.Forms.DataVisualization chart and the WM_SETREDRAW P/Invoke are dropped.
+    No UseWindowsForms - the parameter grid is the WPF ParametersControl from SAM.Core.UI.WPF.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>SAM.Weather.UI.WPF</RootNamespace>
+    <AssemblyName>SAM.Weather.UI.WPF</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <OutputPath>..\..\build\</OutputPath>
+    <Configurations>Debug;Release;net48-windows</Configurations>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="SAM.Core">
+      <HintPath>..\..\..\SAM\build\SAM.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Weather">
+      <HintPath>..\..\..\SAM\build\SAM.Weather.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
+    <!-- Query.Color(WeatherDataType) returns System.Drawing.Color; pinned to match the build dir. -->
+    <PackageReference Include="System.Drawing.Common" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SAM.Core.UI.WPF\SAM.Core.UI.WPF.csproj" />
+    <ProjectReference Include="..\..\SAM_UI\SAM.Core.UI\SAM.Core.UI.csproj" />
+  </ItemGroup>
+
+</Project>

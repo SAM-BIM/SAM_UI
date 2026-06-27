@@ -44,15 +44,13 @@ namespace SAM.Analytical.UI.WPF
             }
 
             IViewSettings? viewSettings_Source = null;
-            using (Core.Windows.Forms.ComboBoxForm<IViewSettings> textBoxForm = new ("Copy View", viewSettings_Compatible, x => x.Name))
+            SAM.Core.UI.WPF.ComboBoxWindow<IViewSettings> comboBoxWindow = new SAM.Core.UI.WPF.ComboBoxWindow<IViewSettings>("Copy View", viewSettings_Compatible, x => x.Name);
+            if (comboBoxWindow.ShowDialog() != true)
             {
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                viewSettings_Source = textBoxForm.SelectedItem;
+                return;
             }
+
+            viewSettings_Source = comboBoxWindow.SelectedItem;
 
             if(viewSettings_Source is null)
             {
@@ -81,7 +79,10 @@ namespace SAM.Analytical.UI.WPF
 
             analyticalModel.SetValue(AnalyticalModelParameter.UIGeometrySettings, uIGeometrySettings);
 
-            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(viewSettings_Destination, false, true));
+            // "Load view" copies the whole source view settings (appearances, types, legend, camera),
+            // so the geometry must be regenerated as well as the camera applied - hence updateGeometry:
+            // true. ("Load camera" / CopyViewSettingsCamera copies only the camera, updateGeometry: false.)
+            uIAnalyticalModel.SetJSAMObject(analyticalModel, new ViewSettingsModification(viewSettings_Destination, true, true));
         }
     }
 }

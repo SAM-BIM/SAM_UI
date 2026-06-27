@@ -171,10 +171,10 @@ namespace SAM.Core.UI.WPF
             }
 
             string name = null;
-            using (Windows.Forms.TextBoxForm<string> textBoxForm = new Windows.Forms.TextBoxForm<string>("Filter", "Filter Name"))
+            TextBoxWindow textBoxForm = new TextBoxWindow("Filter", "Filter Name");
             {
                 textBoxForm.Value = uIFilter.Name;
-                if (textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                if (textBoxForm.ShowDialog() != true)
                 {
                     return;
                 }
@@ -241,9 +241,9 @@ namespace SAM.Core.UI.WPF
             if(!filterAddingEventArgs.Handled)
             {
                 string name = null;
-                using (Windows.Forms.TextBoxForm<string> textBoxForm = new Windows.Forms.TextBoxForm<string>("Filter", "Filter Name"))
+                TextBoxWindow textBoxForm = new TextBoxWindow("Filter", "Filter Name");
                 {
-                    if(textBoxForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                    if(textBoxForm.ShowDialog() != true)
                     {
                         return;
                     }

@@ -1,4 +1,7 @@
-﻿using SAM.Core.UI;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core.UI;
 using SAM.Core.UI.WPF;
 using System.Windows.Forms;
 
@@ -40,7 +43,7 @@ namespace SAM.Analytical.UI.WPF
                 string extension = System.IO.Path.GetExtension(path);
                 if (extension.ToLower().EndsWith("tbd"))
                 {
-                    analyticalModel = Tas.Convert.ToSAM(path, false);
+                    analyticalModel = Tas.Convert.ToSAM(path, false, false);
                 }
                 else if (extension.ToLower().EndsWith("xml"))
                 {

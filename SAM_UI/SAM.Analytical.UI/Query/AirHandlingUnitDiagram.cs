@@ -1,7 +1,10 @@
-﻿using SAM.Analytical.Mollier;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Analytical.Mollier;
 using SAM.Core.Mollier;
 using SAM.Core.Mollier.UI;
-using SAM.Core.Windows.Forms;
+using SAM.Core.UI.WPF;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
@@ -34,17 +37,15 @@ namespace SAM.Analytical.UI
             }
 
             airHandlingUnits.Sort((x, y) => x.Name.CompareTo(y.Name));
-            using (ComboBoxForm<AirHandlingUnit> comboBoxForm = new ComboBoxForm<AirHandlingUnit>("Air Handling Units", airHandlingUnits, (AirHandlingUnit x) => x?.Name))
+            ComboBoxWindow<AirHandlingUnit> comboBoxWindow = new ComboBoxWindow<AirHandlingUnit>("Air Handling Units", airHandlingUnits, (AirHandlingUnit x) => x?.Name);
+            comboBoxWindow.SelectedItem = airHandlingUnits.FirstOrDefault();
+
+            if (comboBoxWindow.ShowDialog(owner) != true)
             {
-                comboBoxForm.SelectedItem = airHandlingUnits.FirstOrDefault();
-
-                if (comboBoxForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                airHandlingUnit = comboBoxForm.SelectedItem;
+                return;
             }
+
+            airHandlingUnit = comboBoxWindow.SelectedItem;
 
             if(airHandlingUnit == null)
             {
@@ -71,19 +72,14 @@ namespace SAM.Analytical.UI
 
             double pressure = Core.Mollier.UI.Query.DefaultPressure(null, mollierProcesses);
 
-            using (MollierForm mollierForm = new MollierForm() { ReadOnly = true, WindowState = FormWindowState.Normal })
-            {
-                mollierForm.Name = string.IsNullOrWhiteSpace(airHandlingUnit.Name) ? mollierForm.Name : airHandlingUnit.Name;
-                mollierForm.MollierControlSettings = Core.Mollier.UI.Query.DefaultMollierControlSettings();
-                mollierForm.Pressure = pressure;
-                //mollierForm.AddProcesses(mollierProcesses, false);
-                mollierForm.AddMollierObjects(mollierProcesses, false);
-
-                if (mollierForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-            }
+            // MollierForm is now a WPF Window: not IDisposable (no using), and Name with arbitrary text
+            // would throw, so the AHU name goes to Title. ShowDialog() takes no owner on a WPF Window.
+            MollierForm mollierForm = new MollierForm() { ReadOnly = true, WindowState = System.Windows.WindowState.Normal };
+            mollierForm.Title = string.IsNullOrWhiteSpace(airHandlingUnit.Name) ? mollierForm.Title : airHandlingUnit.Name;
+            mollierForm.MollierControlSettings = Core.Mollier.UI.Query.DefaultMollierControlSettings();
+            mollierForm.Pressure = pressure;
+            mollierForm.AddMollierObjects(mollierProcesses, false);
+            mollierForm.ShowDialog();
 
             return;
         }

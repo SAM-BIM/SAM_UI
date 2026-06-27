@@ -52,6 +52,11 @@ namespace SAM.Core.UI.WPF
             MultipleSelectionTreeViewControl_Main.SetObjects(objects);
         }
 
+        public void SelectAll()
+        {
+            MultipleSelectionTreeViewControl_Main.SelectAll();
+        }
+
         private void Button_Cancel_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;

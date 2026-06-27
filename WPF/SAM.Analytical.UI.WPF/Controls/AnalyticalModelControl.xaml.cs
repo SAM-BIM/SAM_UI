@@ -9,6 +9,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -24,7 +25,11 @@ namespace SAM.Analytical.UI.WPF
         private TreeViewHighlightManager treeViewHighlightManager_Model;
         private TreeViewHighlightManager treeViewHighlightManager_Views;
         private UIAnalyticalModel uIAnalyticalModel;
-        private Core.Windows.WindowHandle windowHandle;
+        private SAM.Core.UI.WPF.WindowHandle windowHandle;
+
+        // Content signature of the model tree last built by LoadModel; used to skip a rebuild that would
+        // produce an identical tree (see LoadAnalyticalModel / ModelTreeSignature).
+        private string modelTreeSignature;
         public AnalyticalModelControl()
         {
             InitializeComponent();
@@ -193,7 +198,7 @@ namespace SAM.Analytical.UI.WPF
         {
             if (jSAMObject is Space)
             {
-                UI.Modify.EditSpace(uIAnalyticalModel, jSAMObject as dynamic, windowHandle);
+                Modify.EditSpace(uIAnalyticalModel, jSAMObject as dynamic, windowHandle);
             }
             else if (jSAMObject is Panel)
             {
@@ -217,7 +222,7 @@ namespace SAM.Analytical.UI.WPF
             }
             else if (jSAMObject is InternalCondition)
             {
-                UI.Modify.EditInternalCondition(uIAnalyticalModel, jSAMObject as dynamic);
+                Modify.EditInternalCondition(uIAnalyticalModel, jSAMObject as dynamic);
             }
         }
 
@@ -248,8 +253,189 @@ namespace SAM.Analytical.UI.WPF
 
         private void LoadAnalyticalModel(AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs)
         {
-            LoadModel(analyticalModel);
-            LoadViews(analyticalModel);
+            using (PerformanceLog.Measure("AnalyticalModelControl.LoadAnalyticalModel"))
+            {
+                // The model tree (spaces/panels/apertures/ICs/materials/profiles/systems/zones) is rebuilt
+                // from scratch here and is the dominant reload cost. Skip the rebuild when it would produce
+                // an identical tree:
+                //  - a pure ViewSettingsModification (hide/colour/legend/camera) never touches model content;
+                //  - otherwise compare a content signature, so attribute edits that change no tree text
+                //    (internal-condition assignment, colour, ...) also skip, while rename/add/delete rebuild.
+                // First load, Open and Close always rebuild. The views tree is cheap and may change on a
+                // ViewSettingsModification (e.g. view rename), so it always loads.
+                List<IModification> modifications = modifiedEventArgs?.Modifications;
+
+                bool rebuildModel;
+                string signature = null;
+                if (treeView_Model == null || treeView_Model.Items.Count == 0
+                    || modifiedEventArgs is OpenedEventArgs || modifiedEventArgs is ClosedEventArgs
+                    || modifications == null || modifications.Count == 0)
+                {
+                    rebuildModel = true;
+                }
+                else if (modifications.All(x => x is ViewSettingsModification))
+                {
+                    rebuildModel = false;
+                }
+                else
+                {
+                    signature = ModelTreeSignature(analyticalModel);
+                    rebuildModel = !string.Equals(signature, modelTreeSignature, StringComparison.Ordinal);
+                }
+
+                if (rebuildModel)
+                {
+                    LoadModel(analyticalModel);
+                    modelTreeSignature = signature ?? ModelTreeSignature(analyticalModel);
+                }
+
+                LoadViews(analyticalModel);
+            }
+        }
+
+        // Content signature of the model tree produced by LoadModel. MUST mirror LoadModel's traversal
+        // order and header text so an identical signature guarantees an identical tree. Keep in sync with
+        // LoadModel: if a section/header rendered there changes, reflect it here or stale trees can result.
+        private static string ModelTreeSignature(AnalyticalModel analyticalModel)
+        {
+            if (analyticalModel == null)
+            {
+                return null;
+            }
+
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.Append("M|").Append(analyticalModel.Name).Append('\n');
+
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
+            if (adjacencyCluster != null)
+            {
+                List<Space> spaces = adjacencyCluster.GetSpaces();
+                if (spaces != null)
+                {
+                    foreach (Space space in spaces)
+                    {
+                        stringBuilder.Append("S|").Append(space.Guid).Append('|').Append(space.Name).Append('\n');
+                        List<Panel> panels_Space = adjacencyCluster.GetPanels(space);
+                        if (panels_Space != null)
+                        {
+                            foreach (Panel panel in panels_Space)
+                            {
+                                stringBuilder.Append(" P|").Append(panel.Guid).Append('|').Append(panel.Name).Append('\n');
+                                List<Aperture> apertures = panel.Apertures;
+                                if (apertures != null)
+                                {
+                                    foreach (Aperture aperture in apertures)
+                                    {
+                                        stringBuilder.Append("  A|").Append(aperture.Guid).Append('|').Append(aperture.Name).Append('\n');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                List<Panel> panels = adjacencyCluster.GetPanels();
+                if (panels != null)
+                {
+                    foreach (Panel panel in panels)
+                    {
+                        List<Space> spaces_Panel = adjacencyCluster.GetSpaces(panel);
+                        if (spaces_Panel == null || spaces_Panel.Count == 0)
+                        {
+                            stringBuilder.Append("SH|").Append(panel.Guid).Append('|').Append(panel.Name).Append('\n');
+                        }
+                    }
+                }
+
+                IEnumerable<InternalCondition> internalConditions = adjacencyCluster.GetInternalConditions(false, true);
+                if (internalConditions != null)
+                {
+                    foreach (InternalCondition internalCondition in internalConditions)
+                    {
+                        stringBuilder.Append("IC|").Append(internalCondition.Name).Append('\n');
+                    }
+                }
+
+                List<MechanicalSystemType> mechanicalSystemTypes = adjacencyCluster.GetMechanicalSystemTypes<MechanicalSystemType>();
+                if (mechanicalSystemTypes != null)
+                {
+                    foreach (MechanicalSystemType mechanicalSystemType in mechanicalSystemTypes)
+                    {
+                        stringBuilder.Append("MT|").Append(mechanicalSystemType.Guid).Append('|').Append(mechanicalSystemType.Name).Append('\n');
+                        List<MechanicalSystem> mechanicalSystems = adjacencyCluster.GetMechanicalSystems(mechanicalSystemType);
+                        if (mechanicalSystems != null)
+                        {
+                            foreach (MechanicalSystem mechanicalSystem in mechanicalSystems)
+                            {
+                                stringBuilder.Append("  MS|").Append(mechanicalSystem.Guid).Append('|').Append(mechanicalSystem.FullName).Append('\n');
+                            }
+                        }
+                    }
+                }
+            }
+
+            List<Profile> profiles = analyticalModel.ProfileLibrary?.GetProfiles();
+            if (profiles != null)
+            {
+                foreach (Profile profile in profiles)
+                {
+                    stringBuilder.Append("PR|").Append(profile.Name).Append('\n');
+                }
+            }
+
+            List<IMaterial> materials = analyticalModel.MaterialLibrary?.GetMaterials();
+            if (materials != null)
+            {
+                foreach (IMaterial material in materials)
+                {
+                    stringBuilder.Append("MAT|").Append(material.Name).Append('\n');
+                }
+            }
+
+            List<Zone> zones = adjacencyCluster?.GetZones();
+            if (zones != null)
+            {
+                SortedDictionary<string, List<Zone>> dictionary = new SortedDictionary<string, List<Zone>>();
+                foreach (Zone zone in zones)
+                {
+                    if (zone == null)
+                    {
+                        continue;
+                    }
+
+                    if (!zone.TryGetValue(ZoneParameter.ZoneCategory, out string zoneCategory) || string.IsNullOrWhiteSpace(zoneCategory))
+                    {
+                        zoneCategory = "???";
+                    }
+
+                    if (!dictionary.TryGetValue(zoneCategory, out List<Zone> zones_Temp))
+                    {
+                        zones_Temp = new List<Zone>();
+                        dictionary[zoneCategory] = zones_Temp;
+                    }
+
+                    zones_Temp.Add(zone);
+                }
+
+                foreach (KeyValuePair<string, List<Zone>> keyValuePair in dictionary)
+                {
+                    stringBuilder.Append("ZC|").Append(keyValuePair.Key).Append('\n');
+                    foreach (Zone zone in keyValuePair.Value)
+                    {
+                        stringBuilder.Append(" Z|").Append(zone.Guid).Append('|').Append(zone.Name).Append('\n');
+                        List<Space> spaces_Zone = adjacencyCluster.GetRelatedObjects<Space>(zone);
+                        if (spaces_Zone != null && spaces_Zone.Count != 0)
+                        {
+                            foreach (Space space in spaces_Zone)
+                            {
+                                stringBuilder.Append("  ZS|").Append(space.Guid).Append('|').Append(space.Name).Append('\n');
+                            }
+                        }
+                    }
+                }
+            }
+
+            return stringBuilder.ToString();
         }
 
         private void LoadModel(AnalyticalModel analyticalModel)
@@ -607,7 +793,7 @@ namespace SAM.Analytical.UI.WPF
 
             foreach (InternalCondition internalCondition in jSAMObjects.FindAll(x => x is InternalCondition))
             {
-                UI.Modify.DuplicateInternalCondition(uIAnalyticalModel, internalCondition);
+                Modify.DuplicateInternalCondition(uIAnalyticalModel, internalCondition);
             }
         }
 
@@ -1423,7 +1609,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (analyticalObject is InternalCondition)
             {
-                UI.Modify.EditInternalCondition(uIAnalyticalModel, (InternalCondition)analyticalObject);
+                Modify.EditInternalCondition(uIAnalyticalModel, (InternalCondition)analyticalObject);
             }
             else if (analyticalObject is Profile)
             {
@@ -1469,7 +1655,7 @@ namespace SAM.Analytical.UI.WPF
             System.Windows.Window window = Geometry.UI.WPF.Query.Window(this);
             if(window != null)
             {
-                windowHandle = new Core.Windows.WindowHandle(window);
+                windowHandle = new SAM.Core.UI.WPF.WindowHandle(window);
             }
         }
     }

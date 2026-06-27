@@ -1,4 +1,5 @@
-﻿using SAM.Core.Windows.Forms;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 using System;
 using System.Collections.Generic;
 
@@ -71,19 +72,22 @@ namespace SAM.Analytical.UI.WPF
             }
 
             List<Core.Result> results_Selected = new List<Core.Result>();
-            using (TreeViewForm<Tuple<string, string, List<Core.Result>>> treeViewForm = new TreeViewForm<Tuple<string, string, List<Core.Result>>>("Select Result Types", tuples, x => x.Item2, x => x.Item1, @checked: x => true))
-            {
-                if(treeViewForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
+            SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow treeViewWindow = new SAM.Core.UI.WPF.MultipleSelectionTreeViewWindow { Title = "Select Result Types" };
+            treeViewWindow.GettingText += (sender, e) => { if (e.Object is Tuple<string, string, List<Core.Result>> tuple) { e.Text = tuple.Item2; } };
+            treeViewWindow.GettingCategory += (sender, e) => { if (e.Object is Tuple<string, string, List<Core.Result>> tuple) { e.Category = new Core.Category(tuple.Item1); } };
+            treeViewWindow.SetObjects(tuples);
+            treeViewWindow.SelectAll();
 
-                foreach(Tuple<string, string, List<Core.Result>> tuple in treeViewForm.SelectedItems)
+            if (treeViewWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            foreach (Tuple<string, string, List<Core.Result>> tuple in treeViewWindow.GetObjects<Tuple<string, string, List<Core.Result>>>())
+            {
+                if (tuple?.Item3 != null)
                 {
-                    if(tuple?.Item3 != null)
-                    {
-                        results_Selected.AddRange(tuple.Item3);
-                    }
+                    results_Selected.AddRange(tuple.Item3);
                 }
             }
 

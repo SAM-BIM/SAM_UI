@@ -1,4 +1,7 @@
-﻿using SAM.Core;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -26,7 +29,10 @@ namespace SAM.Analytical.UI.WPF
             space_Temp.InternalCondition = internalCondition;
             adjacencyCluster.AddObject(space_Temp);
 
-            uIAnalyticalModel.JSAMObject = new AnalyticalModel(analyticalModel, adjacencyCluster, analyticalModel.MaterialLibrary, profileLibrary);
+            // Attribute-only edit: scope the modification to the space (the JSAMObject setter would raise a
+            // FullModification and regenerate every view) and mark it as attribute-only so views can refresh
+            // colors/legend in place (#11).
+            uIAnalyticalModel.SetJSAMObject(new AnalyticalModel(analyticalModel, adjacencyCluster, analyticalModel.MaterialLibrary, profileLibrary), new AttributeModification(new SAMObject[] { space_Temp }));
         }
 
         public static void AssignSpaceInternalCondition(this UIAnalyticalModel uIAnalyticalModel, IEnumerable<Space> spaces)
@@ -67,21 +73,22 @@ namespace SAM.Analytical.UI.WPF
             }
 
             InternalCondition internalCondition = null;
-            using (Core.Windows.Forms.SearchForm<InternalCondition> searchForm = new Core.Windows.Forms.SearchForm<InternalCondition>("Select Internal Condition", internalConditions, (InternalCondition x) => x.Name, false))
+            SAM.Core.UI.WPF.SearchWindow searchWindow = new SAM.Core.UI.WPF.SearchWindow(internalConditions, x => (x as InternalCondition)?.Name)
             {
-                searchForm.SelectionMode = System.Windows.Forms.SelectionMode.One;
-                if (internalConditions_Temp != null && internalConditions_Temp.Count != 0 && internalConditions_Temp.TrueForAll(x => x.Name == internalConditions_Temp[0].Name))
-                {
-                    searchForm.SearchText = internalConditions_Temp[0].Name;
-                }
-
-                if(searchForm.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-                {
-                    return;
-                }
-
-                internalCondition = searchForm.SelectedItems?.FirstOrDefault();
+                SelectionMode = System.Windows.Controls.SelectionMode.Single,
+                Title = "Select Internal Condition"
+            };
+            if (internalConditions_Temp != null && internalConditions_Temp.Count != 0 && internalConditions_Temp.TrueForAll(x => x.Name == internalConditions_Temp[0].Name))
+            {
+                searchWindow.SearchText = internalConditions_Temp[0].Name;
             }
+
+            if (searchWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            internalCondition = searchWindow.GetSelectedItems<InternalCondition>()?.FirstOrDefault();
 
             if(internalCondition == null)
             {
@@ -96,7 +103,7 @@ namespace SAM.Analytical.UI.WPF
                 sAMObjects.Add(space_Temp);
             }
 
-            uIAnalyticalModel.SetJSAMObject(new AnalyticalModel(analyticalModel, adjacencyCluster, analyticalModel.MaterialLibrary, profileLibrary), new AnalyticalModelModification(sAMObjects));
+            uIAnalyticalModel.SetJSAMObject(new AnalyticalModel(analyticalModel, adjacencyCluster, analyticalModel.MaterialLibrary, profileLibrary), new AttributeModification(sAMObjects));
         }
     }
 }

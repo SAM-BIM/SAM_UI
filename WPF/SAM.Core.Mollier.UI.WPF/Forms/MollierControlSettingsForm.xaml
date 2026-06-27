@@ -1,0 +1,105 @@
+<Window x:Class="SAM.Core.Mollier.UI.MollierControlSettingsForm"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:SAM.Core.Mollier.UI.Controls"
+        Title="Mollier Settings" Width="739" Height="559" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Grid>
+        <TabControl x:Name="TabControl_Main" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,12,0,0" Width="697" Height="462">
+            <!-- View -->
+            <TabItem Header="View">
+                <Canvas>
+                    <ScrollViewer Canvas.Left="3" Canvas.Top="3" Width="670" Height="360" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="FlowLayoutPanel_BuiltInVisibilitySettings" Orientation="Vertical" />
+                    </ScrollViewer>
+                </Canvas>
+            </TabItem>
+            <!-- Ranges -->
+            <TabItem Header="Ranges">
+                <Canvas>
+                    <TextBlock Text="Temperature Axis" FontWeight="Bold" Canvas.Left="240" Canvas.Top="21" />
+                    <TextBlock Text="Minimum Value" Canvas.Left="145" Canvas.Top="47" />
+                    <TextBlock Text="Maximum Value" Canvas.Left="256" Canvas.Top="47" />
+                    <TextBlock Text="Interval" Canvas.Left="393" Canvas.Top="47" />
+                    <TextBox x:Name="TemperatureMinimumValueTextbox" Text="-20" TextAlignment="Right" Canvas.Left="152" Canvas.Top="68" Width="75" Height="22" />
+                    <TextBox x:Name="TemperatureMaximumValueTextbox" Text="50" TextAlignment="Right" Canvas.Left="267" Canvas.Top="68" Width="75" Height="22" />
+                    <TextBox x:Name="TemperatureIntervalTextbox" Text="5" TextAlignment="Right" Canvas.Left="375" Canvas.Top="68" Width="82" Height="22" />
+                    <TextBlock Text="°C" Canvas.Left="230" Canvas.Top="71" />
+                    <TextBlock Text="°C" Canvas.Left="344" Canvas.Top="71" />
+                    <TextBlock Text="°C" Canvas.Left="459" Canvas.Top="71" />
+                    <TextBlock Text="HumidityRatio Axis" FontWeight="Bold" Canvas.Left="245" Canvas.Top="128" />
+                    <TextBlock Text="Minimum Value" Canvas.Left="125" Canvas.Top="159" />
+                    <TextBlock Text="Maximum Value" Canvas.Left="260" Canvas.Top="159" />
+                    <TextBlock Text="Interval" Canvas.Left="415" Canvas.Top="159" />
+                    <TextBox x:Name="HumidityRatioMinimumValueTextbox" Text="0" TextAlignment="Right" Canvas.Left="132" Canvas.Top="180" Width="75" Height="22" />
+                    <TextBox x:Name="HumidityRatioMaximumValueTextbox" Text="35" TextAlignment="Right" Canvas.Left="267" Canvas.Top="180" Width="78" Height="22" />
+                    <TextBox x:Name="HumidityRatioIntervalTextbox" Text="5" TextAlignment="Right" Canvas.Left="399" Canvas.Top="180" Width="82" Height="22" />
+                    <TextBlock Text="g/kg" Canvas.Left="209" Canvas.Top="183" />
+                    <TextBlock Text="g/kg" Canvas.Left="348" Canvas.Top="183" />
+                    <TextBlock Text="g/kg" Canvas.Left="484" Canvas.Top="183" />
+                    <TextBlock Text="Other Intervals" FontWeight="Bold" Canvas.Left="256" Canvas.Top="233" />
+                    <TextBlock Text="Density&#10;Interval" Canvas.Left="84" Canvas.Top="260" />
+                    <TextBlock Text="Enthalpy&#10; Interval" Canvas.Left="215" Canvas.Top="260" />
+                    <TextBlock Text="Specific Volume &#10;        Interval" Canvas.Left="340" Canvas.Top="260" />
+                    <TextBlock Text="Wet Bulb Temperature&#10;              Interval " Canvas.Left="459" Canvas.Top="260" />
+                    <TextBox x:Name="DensityIntervalTextBox" Text="1" TextAlignment="Right" Canvas.Left="66" Canvas.Top="295" Width="83" Height="22" />
+                    <TextBox x:Name="EnthalpyIntervalTextBox" Text="1" TextAlignment="Right" Canvas.Left="201" Canvas.Top="295" Width="82" Height="22" />
+                    <TextBox x:Name="SpecificVolumeIntervalTextBox" Text="1" TextAlignment="Right" Canvas.Left="345" Canvas.Top="295" Width="83" Height="22" />
+                    <TextBox x:Name="WetBulbTemperatureIntervalTextBox" Text="1" TextAlignment="Right" Canvas.Left="487" Canvas.Top="295" Width="83" Height="22" />
+                    <TextBlock Text="kg/m³" Canvas.Left="152" Canvas.Top="298" />
+                    <TextBlock Text="kJ/kg" Canvas.Left="286" Canvas.Top="298" />
+                    <TextBlock Text="m³/kg" Canvas.Left="431" Canvas.Top="298" />
+                    <TextBlock Text="°C" Canvas.Left="573" Canvas.Top="298" />
+                    <TextBlock Text="Partial Vapour Pressure&#10;             Interval" Canvas.Left="245" Canvas.Top="358" />
+                    <TextBox x:Name="PartialVapourPressure_IntervalTextBox" Text="1" TextAlignment="Right" Canvas.Left="258" Canvas.Top="393" Width="99" Height="22" />
+                    <TextBlock Text="kPa" Canvas.Left="360" Canvas.Top="396" />
+                </Canvas>
+            </TabItem>
+            <!-- Tools -->
+            <TabItem Header="Tools">
+                <Canvas>
+                    <CheckBox x:Name="CheckBox_GradientPoint" Content="Gradient Point" Canvas.Left="38" Canvas.Top="36"
+                              ToolTip="Paints the points in two colors depending on their intensity" />
+                    <Button x:Name="Button_LowIntensityColor" Canvas.Left="157" Canvas.Top="33" Width="163" Height="23"
+                            ToolTip="The color of the less intense points" Click="Button_LowIntensityColor_Click" />
+                    <Button x:Name="Button_HighIntensityColor" Canvas.Left="326" Canvas.Top="33" Width="146" Height="23"
+                            ToolTip="The color of the more intense points" Click="Button_HighIntensityColor_Click" />
+                    <CheckBox x:Name="CheckBox_DisableUnits" Content="Disable Units" Canvas.Left="38" Canvas.Top="73"
+                              ToolTip="Turns off the visibility of all units" />
+                    <CheckBox x:Name="CheckBox_DisableLabels" Content="Disable Labels" Canvas.Left="38" Canvas.Top="109"
+                              ToolTip="Turns off the visibility of all line names" />
+                    <CheckBox x:Name="VisualizeSolver_Checkbox" Content="Visualize Solver" Canvas.Left="38" Canvas.Top="145" />
+                    <CheckBox x:Name="CheckBox_EnableStartProcessPoint" Content="Show process start point" Canvas.Left="38" Canvas.Top="183" />
+                    <CheckBox x:Name="checkBox_EnableProcessStartPointLabel" Content="Show label start point" Canvas.Left="378" Canvas.Top="183" />
+                    <CheckBox x:Name="CheckBox_EnableEndProcessPoint" Content="Show process end point" Canvas.Left="38" Canvas.Top="220" />
+                    <CheckBox x:Name="checkBox_EnableProcessEndPointLabel" Content="Show label end point" Canvas.Left="378" Canvas.Top="220" />
+                    <CheckBox x:Name="CheckBox_ProccessLineThickness" Content="Turn off process thickness line" Canvas.Left="38" Canvas.Top="257" />
+                    <CheckBox x:Name="CheckBox_EnableProcessLabel" Content="Show label process" Canvas.Left="378" Canvas.Top="257" />
+                    <CheckBox x:Name="CheckBox_DisablePoint" Content="Show process all points first disk" Canvas.Left="38" Canvas.Top="293" />
+                    <TextBlock Text="disk color" Canvas.Left="375" Canvas.Top="294" />
+                    <Button x:Name="Button_PointColor" Canvas.Left="449" Canvas.Top="291" Width="75" Height="23" Click="Button_PointColor_Click" />
+                    <TextBlock Text="disk size 8" Canvas.Left="543" Canvas.Top="297" />
+                    <TextBox x:Name="TextBox_PointSize" Canvas.Left="625" Canvas.Top="292" Width="51" Height="22" PreviewTextInput="IntegerOnly_PreviewTextInput" />
+                    <CheckBox x:Name="CheckBox_DisablePointBorder" Content="Show process all points second circle" Canvas.Left="38" Canvas.Top="327" />
+                    <TextBlock Text="circle color" Canvas.Left="375" Canvas.Top="328" />
+                    <Button x:Name="Button_PointBorderColor" Canvas.Left="449" Canvas.Top="325" Width="75" Height="23" Click="Button_PointBorderColor_Click" />
+                    <TextBlock Text="circle size 2" Canvas.Left="543" Canvas.Top="331" />
+                    <TextBox x:Name="TextBox_PointBorderSize" Canvas.Left="625" Canvas.Top="325" Width="51" Height="22" PreviewTextInput="IntegerOnly_PreviewTextInput" />
+                    <TextBlock Text="Mollier windows size" Canvas.Left="35" Canvas.Top="371" />
+                    <TextBox x:Name="TextBox_MollierWindowWidth" Canvas.Left="210" Canvas.Top="368" Width="50" Height="22" PreviewTextInput="IntegerOnly_PreviewTextInput" />
+                    <TextBlock Text="x" Canvas.Left="266" Canvas.Top="371" />
+                    <TextBox x:Name="TextBox_MollierWindowHeight" Canvas.Left="285" Canvas.Top="368" Width="50" Height="22" PreviewTextInput="IntegerOnly_PreviewTextInput" />
+                    <CheckBox x:Name="CheckBox_EnableCoolingAuxiliaryProcesses" Content="Show realistic cooling process" Canvas.Left="378" Canvas.Top="370" />
+                    <TextBlock Text="Psychrometric window size:" Canvas.Left="35" Canvas.Top="404" />
+                    <TextBlock Text="x" Canvas.Left="184" Canvas.Top="404" />
+                    <TextBox x:Name="TextBox_PsychrometricWindowWidth" Canvas.Left="210" Canvas.Top="401" Width="50" Height="22" PreviewTextInput="IntegerOnly_PreviewTextInput" />
+                    <TextBlock Text="x" Canvas.Left="266" Canvas.Top="401" />
+                    <TextBox x:Name="TextBox_PsychrometricWindowHeight" Canvas.Left="285" Canvas.Top="401" Width="50" Height="22" PreviewTextInput="IntegerOnly_PreviewTextInput" />
+                </Canvas>
+            </TabItem>
+        </TabControl>
+        <Button x:Name="Button_Apply" Content="Apply" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="468,480,0,0" Width="75" Height="28" Click="Button_Apply_Click" />
+        <Button x:Name="Button_OK" Content="OK" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="549,480,0,0" Width="75" Height="28" Click="Button_OK_Click" />
+        <Button x:Name="Button_Cancel" Content="Cancel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="630,480,0,0" Width="75" Height="28" Click="Button_Cancel_Click" />
+    </Grid>
+</Window>

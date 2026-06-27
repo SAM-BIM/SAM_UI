@@ -1,5 +1,8 @@
-﻿using SAM.Analytical.Windows.Forms;
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
 using SAM.Core;
+using SAM.Core.UI.WPF;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
@@ -32,16 +35,14 @@ namespace SAM.Analytical.UI
                 constructions.ForEach(x => constructionLibrary.Add(x));
             }
 
-            using (PanelForm panelForm = new PanelForm(panel, materialLibrary, constructionLibrary, Core.Query.Enums(typeof(Panel))))
+            PanelWindow panelWindow = new PanelWindow(panel, materialLibrary, constructionLibrary, Core.Query.Enums(typeof(Panel)));
+            if (panelWindow.ShowDialog(owner) != true)
             {
-                if (panelForm.ShowDialog(owner) != DialogResult.OK)
-                {
-                    return;
-                }
-
-                panel = panelForm.Panel;
-                constructionLibrary = panelForm.ConstructionLibrary;
+                return;
             }
+
+            panel = panelWindow.Panel;
+            constructionLibrary = panelWindow.ConstructionLibrary;
 
             adjacencyCluster.AddObject(panel);
 
