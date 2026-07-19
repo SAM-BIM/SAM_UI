@@ -98,9 +98,9 @@ jobs:
           # Keep current repo LAST. Do not duplicate SAM_UI earlier in the list.
           $buildOrder = @(
             'SAM'
+            'SAM_Mollier'
             'SAM_Systems'
             'SAM_Windows'
-            'SAM_Mollier'
             'SAM_gbXML'
             'SAM_SolarCalculator'
             'SAM_Tas'
@@ -170,9 +170,9 @@ jobs:
           # Keep current repo LAST. SAM_Solver must be built before SAM_UI.
           $buildOrder = @(
             'SAM'
+            'SAM_Mollier'
             'SAM_Systems'
             'SAM_Windows'
-            'SAM_Mollier'
             'SAM_gbXML'
             'SAM_SolarCalculator'
             'SAM_Tas'
