@@ -42,7 +42,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     result = Tas.Convert.ToTBD(analyticalModel, path);
                 }
-                else if (extension.ToLower().EndsWith("gbxml"))
+                else if (extension.ToLower().EndsWith("gbxml") || extension.ToLower().EndsWith("xml"))
                 {
                     gbXMLSerializer.gbXML gbXML = Analytical.gbXML.Convert.TogbXML(analyticalModel);
                     if (gbXML != null)

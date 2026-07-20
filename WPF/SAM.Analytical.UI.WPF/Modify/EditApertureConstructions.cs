@@ -227,10 +227,7 @@ namespace SAM.Analytical.UI.WPF
                 treeViewWindow.GettingCategory += TreeViewWindow_GettingConstructionCategory;
                 treeViewWindow.GettingText += TreeViewWindow_GettingConstructionText;
                 treeViewWindow.SetObjects(constructionManager?.Constructions);
-                if (owner != null)
-                {
-                    treeViewWindow.Owner = owner;
-                }
+                SAM.Core.UI.WPF.Modify.SetOwner(treeViewWindow, owner);
 
                 if (treeViewWindow.ShowDialog() != true)
                 {
