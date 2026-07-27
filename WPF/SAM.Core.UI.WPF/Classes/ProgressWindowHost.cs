@@ -54,6 +54,26 @@ namespace SAM.Core.UI.WPF
         /// </summary>
         private volatile bool disposed;
 
+        private volatile bool shutdownCompleted;
+
+        /// <summary>
+        /// True once <see cref="Dispose"/> has both joined the dialog thread and established that no
+        /// <see cref="CancelRequested"/> handler will run again. Only then is the caller's post-dispose
+        /// cancellation check final: while either is outstanding the dialog thread is still live and a click
+        /// it has queued can still be sitting unobserved, so a run that looks successful may not be one.
+        /// <para>
+        /// False before <see cref="Dispose"/> has run. Callers should read it after disposing and treat false
+        /// as "the outcome of this run cannot be confirmed" rather than as success.
+        /// </para>
+        /// </summary>
+        public bool ShutdownCompleted
+        {
+            get
+            {
+                return shutdownCompleted;
+            }
+        }
+
         /// <summary>
         /// Whatever killed the dialog thread, if anything. Rethrown by the constructor when it happened during
         /// startup; if it happened later, inside the dispatcher loop, the constructor has already returned and
@@ -116,6 +136,8 @@ namespace SAM.Core.UI.WPF
             {
                 bool raiseNow;
 
+                // The catch-up invoke happens under the lock, like every other invoke on this class - see
+                // RaiseCancelRequested for why that is what makes Dispose's quiescence guarantee real.
                 lock (cancelRequested_Lock)
                 {
                     if (cancelRequested_Detached)
@@ -125,13 +147,11 @@ namespace SAM.Core.UI.WPF
 
                     cancelRequested += value;
                     raiseNow = cancelRequested_Latched;
-                }
 
-                // Outside the lock: a handler cancelling a CancellationTokenSource runs its callbacks inline,
-                // and those are caller code that must never run under a lock of ours.
-                if (raiseNow)
-                {
-                    value?.Invoke(this, EventArgs.Empty);
+                    if (raiseNow)
+                    {
+                        value?.Invoke(this, EventArgs.Empty);
+                    }
                 }
             }
 
@@ -150,8 +170,17 @@ namespace SAM.Core.UI.WPF
         /// </summary>
         private void RaiseCancelRequested()
         {
-            System.EventHandler cancelRequested_Temp;
-
+            // Handlers are invoked INSIDE the lock, deliberately, and this is the whole teardown handshake:
+            // Dispose acquires the same lock to detach, so it cannot return while a handler is still running,
+            // and no handler can start once it has. Capturing the delegate under the lock and invoking outside
+            // it - the obvious shape - does NOT achieve that: clearing the field cannot revoke a delegate a
+            // stalled thread has already copied into a local, so Dispose could return, the caller could
+            // dispose the CancellationTokenSource its handler closes over, and the handler could then run
+            // against it.
+            //
+            // Safe to hold across caller code because nothing Dispose does while waiting on this lock depends
+            // on this thread: Shutdown() and the Join both complete before the detach is attempted, and the
+            // detach itself is a bounded TryEnter so a handler that never returns cannot hang the host.
             lock (cancelRequested_Lock)
             {
                 if (cancelRequested_Latched || cancelRequested_Detached)
@@ -160,21 +189,13 @@ namespace SAM.Core.UI.WPF
                 }
 
                 cancelRequested_Latched = true;
-                cancelRequested_Temp = cancelRequested;
-            }
 
-            try
-            {
-                cancelRequested_Temp?.Invoke(this, EventArgs.Empty);
-            }
-            catch (ObjectDisposedException)
-            {
-                // Covers the sliver the detach flag cannot: a raise that captured the handler list just before
-                // Dispose detached it, landing after the caller disposed the CancellationTokenSource the
-                // handler closes over. Swallowed rather than allowed to propagate because this runs on the
-                // dialog thread, where an escaping exception kills the thread and is recorded as a dialog
-                // failure - a misleading report of something the caller no longer cares about, since it has
-                // already finished and torn down.
+                // No catch around this. An earlier revision swallowed ObjectDisposedException here to cover
+                // the post-dispose race the handshake now closes properly, but that suppression spanned the
+                // whole multicast: it would silently eat a genuine failure from any subscriber, skip every
+                // subscriber after the one that threw, and hide it from both the dialog thread's outer catch
+                // and the Exception property. Real handler failures belong there, visible.
+                cancelRequested?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -459,24 +480,35 @@ namespace SAM.Core.UI.WPF
                 RaiseCancelRequested();
             }
 
-            // Only a completed join establishes that. When it times out the dialog thread is still running,
-            // so a click can still be queued behind the read above and would land after the caller's final
-            // token check - and after it disposes the CancellationTokenSource its handler closes over.
-            // Detaching here is what stops that becoming an ObjectDisposedException thrown on the dialog
-            // thread. The cancellation is lost in that case, which is the honest outcome: a dialog thread
-            // that will not shut down cannot be asked what the user did, and silently reporting "cancelled"
-            // for a run that actually completed would throw away real results.
-            lock (cancelRequested_Lock)
+            // The teardown handshake. Taking this lock waits out any handler currently running on the dialog
+            // thread, and setting the flag under it stops another starting - so once this block completes,
+            // no handler will ever run again and the caller can dispose the CancellationTokenSource its
+            // handler closes over without the dialog thread throwing ObjectDisposedException against it.
+            //
+            // TryEnter rather than lock: a handler that never returns must not hang the host. Failing to take
+            // it is the one case where quiescence cannot be established, and it is reported rather than
+            // pretended away.
+            bool quiesced = System.Threading.Monitor.TryEnter(cancelRequested_Lock, 2000);
+            if (quiesced)
             {
-                cancelRequested = null;
-                cancelRequested_Detached = true;
+                try
+                {
+                    cancelRequested = null;
+                    cancelRequested_Detached = true;
+                }
+                finally
+                {
+                    System.Threading.Monitor.Exit(cancelRequested_Lock);
+                }
             }
 
-            if (!joined && exception_Startup == null)
+            shutdownCompleted = joined && quiesced;
+
+            if (!shutdownCompleted && exception_Startup == null)
             {
-                // Surfaced rather than swallowed: this is a broken dialog, and Exception is where a caller
-                // already looks to find that out. Never thrown - the job it was reporting on is unaffected.
-                exception_Startup = new TimeoutException("The progress dialog thread did not shut down within 5 seconds; a cancellation made in that window may have been lost.");
+                exception_Startup = joined
+                    ? new TimeoutException("A ProgressWindowHost.CancelRequested handler did not return within 2 seconds, so the dialog could not be quiesced.")
+                    : new TimeoutException("The progress dialog thread did not shut down within 5 seconds; a cancellation made in that window may have been lost.");
             }
 
             progressWindow = null;

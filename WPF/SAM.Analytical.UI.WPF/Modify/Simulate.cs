@@ -222,8 +222,10 @@ namespace SAM.Analytical.UI.WPF
                     }
 
                     // The host is down, so no further click can arrive and any in-flight one has already run:
-                    // this observation is final.
-                    if (!cancelled && cancellationTokenSource.IsCancellationRequested)
+                    // this observation is final - but only once the host confirms it actually shut down. If
+                    // it could not, its thread is still live and may be sitting on a click nothing observed,
+                    // so preparation cannot be reported as having completed uninterrupted.
+                    if (!cancelled && (cancellationTokenSource.IsCancellationRequested || !progressWindowHost.ShutdownCompleted))
                     {
                         cancelled = true;
                     }
@@ -627,8 +629,10 @@ namespace SAM.Analytical.UI.WPF
                 }
 
                 // The host is down, so no further click can arrive and any in-flight one has already run:
-                // this observation is final.
-                if (!cancelled && cancellationTokenSource.IsCancellationRequested)
+                // this observation is final - but only once the host confirms it actually shut down. If it
+                // could not, its thread is still live and may be sitting on a click nothing observed, so
+                // preparation cannot be reported as having completed uninterrupted.
+                if (!cancelled && (cancellationTokenSource.IsCancellationRequested || !progressWindowHost.ShutdownCompleted))
                 {
                     cancelled = true;
                 }

@@ -98,7 +98,13 @@ namespace SAM.Analytical.UI.WPF
                 // Past this point no cancel can be raised, so this observation is final. It catches a click
                 // that landed after WorkflowCalculator's own last check - without it the caller would go on to
                 // treat a cancelled run as a successful one.
-                if (!cancelled && cancellationTokenSource.IsCancellationRequested)
+                //
+                // "Final" holds only once the host confirms it shut down cleanly. If it could not, the dialog
+                // thread is still live and a click it has queued may never have been observed, so success
+                // cannot be claimed - the safe direction is to report the run as cancelled. The expensive
+                // artifacts (.tbd/.tsd) are on disk either way; what is given up is the in-memory handoff,
+                // which a rerun reproduces.
+                if (!cancelled && (cancellationTokenSource.IsCancellationRequested || !progressWindowHost.ShutdownCompleted))
                 {
                     cancelled = true;
                     result = null;
@@ -269,7 +275,9 @@ namespace SAM.Analytical.UI.WPF
                     progressWindowHost.Dispose();
                 }
 
-                if (!cancelled && cancellationTokenSource.IsCancellationRequested)
+                // As in the single-model overload: a host that could not confirm a clean shutdown may be
+                // sitting on an unobserved click, so the batch cannot be reported as complete.
+                if (!cancelled && (cancellationTokenSource.IsCancellationRequested || !progressWindowHost.ShutdownCompleted))
                 {
                     cancelled = true;
                 }
