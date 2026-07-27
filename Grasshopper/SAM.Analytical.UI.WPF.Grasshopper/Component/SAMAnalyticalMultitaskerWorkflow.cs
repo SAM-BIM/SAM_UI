@@ -349,9 +349,17 @@ namespace SAM.Analytical.UI.WPF.Grasshopper
                 }
             }
 
-            Dictionary<string, AnalyticalModel> dictionary = Modify.RunWorkflow(analyticalModels, workflowSettings, directory, parallel, maxDegreeOfParallelism);
+            // The cancellable overload, not the compatibility one: that discards the cancelled flag, and a
+            // cancelled batch would then be indistinguishable from a complete one here - the count warning
+            // below is not enough, since a partial batch that happens to be short for an unrelated reason
+            // reads the same. Successful must not be true for a run the user stopped.
+            Dictionary<string, AnalyticalModel> dictionary = Modify.RunWorkflow(analyticalModels, workflowSettings, directory, System.Threading.CancellationToken.None, out bool cancelled, parallel, maxDegreeOfParallelism);
 
-            if (analyticalModels.Count != dictionary.Count)
+            if (cancelled)
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Workflow cancelled. The models listed below are the ones that finished; partially written .tbd/.tsd files may remain in the output directory.");
+            }
+            else if (analyticalModels.Count != (dictionary == null ? 0 : dictionary.Count))
             {
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Some of the models could not be calculated.");
             }
@@ -370,7 +378,7 @@ namespace SAM.Analytical.UI.WPF.Grasshopper
 
             if (index_successful != -1)
             {
-                dataAccess.SetData(index_successful, true);
+                dataAccess.SetData(index_successful, !cancelled);
             }
         }
 
