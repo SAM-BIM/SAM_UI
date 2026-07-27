@@ -251,6 +251,14 @@ namespace SAM.Core.UI.WPF
                     // Unlike Application.Run, a bare dispatcher loop does not end when the last window closes
                     // - it has to be told. Without this the thread would sit in Dispatcher.Run forever and
                     // every Dispose would pay the full join timeout.
+                    //
+                    // Closing the window is deliberately NOT cancellation, and this has been asked about more
+                    // than once: the title-bar X dismisses the dialog and the run carries on to finish
+                    // normally. That run then genuinely succeeds, so reporting it as successful is right, not
+                    // a missed cancel - what the user gives up is visibility, not the result. Only the Cancel
+                    // button means "stop". SAM.Core.Windows.Forms.ProgressFormHost behaves identically, and
+                    // Michal confirmed on 2026-07-27, after seeing it in the app, that it should stay this
+                    // way. Do not "fix" this into a cancel or into a refused close without asking him first.
                     progressWindow_Temp.Closed += (s, e) => Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
 
                     // Set before the loop starts so the caller never sees a null window once it is released.
