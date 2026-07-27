@@ -165,8 +165,10 @@ namespace SAM.Core.UI.WPF
         }
 
         /// <summary>
-        /// Records the cancellation and notifies whoever is listening, at most once. Idempotent so the
-        /// safety-net call in <see cref="Dispose"/> cannot double-raise a cancel the dialog already forwarded.
+        /// Records the cancellation and notifies whoever is listening, at most once. Called only from the
+        /// dialog thread. <see cref="Dispose"/>'s safety net deliberately does NOT route through here: it
+        /// raises inline, under the single bounded acquisition it already makes, because a second unbounded
+        /// acquisition from the caller thread cannot be made safe — see there.
         /// </summary>
         private void RaiseCancelRequested()
         {
@@ -179,8 +181,9 @@ namespace SAM.Core.UI.WPF
             // against it.
             //
             // Safe to hold across caller code because nothing Dispose does while waiting on this lock depends
-            // on this thread: Shutdown() and the Join both complete before the detach is attempted, and the
-            // detach itself is a bounded TryEnter so a handler that never returns cannot hang the host.
+            // on this thread: Shutdown() and the Join both complete before it is attempted, and the single
+            // acquisition it then makes is a bounded TryEnter — so a handler that never returns costs Dispose
+            // two seconds and a reported failure to quiesce, not a deadlock.
             lock (cancelRequested_Lock)
             {
                 if (cancelRequested_Latched || cancelRequested_Detached)
@@ -468,31 +471,56 @@ namespace SAM.Core.UI.WPF
             // Bounded for the same reason as the startup wait: a stuck dialog thread must not hang the host.
             bool joined = thread == null || thread.Join(5000);
 
-            // Last line of defence, and the reason the caller's "dispose, then observe the token" ordering is
-            // airtight rather than just narrower. Once the thread is joined the dialog is finished with:
-            // whatever the user did has either been forwarded already or is recorded in the window's own
-            // volatile flag, which outlives it. Raising from here converts that flag into the cancel the
-            // caller is about to look for. RaiseCancelRequested is idempotent, so a click that was forwarded
-            // normally does not fire twice.
-            ProgressWindow progressWindow_Temp = progressWindow;
-            if (progressWindow_Temp != null && progressWindow_Temp.CancellationRequested)
-            {
-                RaiseCancelRequested();
-            }
-
-            // The teardown handshake. Taking this lock waits out any handler currently running on the dialog
-            // thread, and setting the flag under it stops another starting - so once this block completes,
-            // no handler will ever run again and the caller can dispose the CancellationTokenSource its
-            // handler closes over without the dialog thread throwing ObjectDisposedException against it.
+            // The teardown handshake AND the safety-net raise, under one bounded acquisition.
+            //
+            // Taking this lock waits out any handler currently running on the dialog thread, and setting the
+            // detached flag under it stops another starting - so once this block completes, no handler will
+            // ever run again and the caller can dispose the CancellationTokenSource its handler closes over
+            // without the dialog thread throwing ObjectDisposedException against it.
             //
             // TryEnter rather than lock: a handler that never returns must not hang the host. Failing to take
             // it is the one case where quiescence cannot be established, and it is reported rather than
             // pretended away.
+            //
+            // The safety net has to live INSIDE this same acquisition rather than before it. A handler still
+            // running on a dialog thread the join failed to reach is holding this lock, and a separate
+            // RaiseCancelRequested call from here would wait on it unbounded - never reaching the TryEnter
+            // that exists precisely to bound that wait, and deadlocking Dispose instead of timing out. One
+            // acquisition answers both questions at once: take it and no handler is running, so raising is
+            // safe; fail to take it and neither step is safe to attempt.
             bool quiesced = System.Threading.Monitor.TryEnter(cancelRequested_Lock, 2000);
             if (quiesced)
             {
                 try
                 {
+                    // Last line of defence, and the reason the caller's "dispose, then observe the token"
+                    // ordering is airtight rather than just narrower. Once the thread is joined the dialog is
+                    // finished with: whatever the user did has either been forwarded already or is recorded in
+                    // the window's own volatile flag, which outlives it. Raising here converts that flag into
+                    // the cancel the caller is about to look for. The latch check keeps a click that was
+                    // forwarded normally from firing twice.
+                    ProgressWindow progressWindow_Temp = progressWindow;
+                    if (progressWindow_Temp != null && progressWindow_Temp.CancellationRequested && !cancelRequested_Latched)
+                    {
+                        cancelRequested_Latched = true;
+
+                        // Caught here, unlike the raise on the dialog thread, for a reason specific to this
+                        // call site: callers invoke Dispose from a finally, so an exception thrown out of it
+                        // would replace whatever the job was already failing with. Recorded and surfaced
+                        // through Exception instead - visible, but not masking the primary fault.
+                        try
+                        {
+                            cancelRequested?.Invoke(this, EventArgs.Empty);
+                        }
+                        catch (Exception exception)
+                        {
+                            if (exception_Startup == null)
+                            {
+                                exception_Startup = exception;
+                            }
+                        }
+                    }
+
                     cancelRequested = null;
                     cancelRequested_Detached = true;
                 }
