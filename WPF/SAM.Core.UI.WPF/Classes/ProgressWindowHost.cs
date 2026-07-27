@@ -72,10 +72,84 @@ namespace SAM.Core.UI.WPF
         private readonly ManualResetEventSlim manualResetEventSlim = new ManualResetEventSlim(false);
 
         /// <summary>
+        /// Guards <see cref="cancelRequested"/> and <see cref="cancelRequested_Latched"/> together, so a
+        /// subscription and a cancel arriving at the same moment cannot interleave into "latched, but the
+        /// handler that was being added never heard about it".
+        /// </summary>
+        private readonly object cancelRequested_Lock = new object();
+
+        /// <summary>
+        /// True once the user has asked to cancel, whether or not anyone was listening at the time.
+        /// </summary>
+        private bool cancelRequested_Latched;
+
+        private System.EventHandler cancelRequested;
+
+        /// <summary>
         /// Raised on the dialog's thread when the user clicks Cancel, so a handler must be safe to call from a
         /// thread other than the one running the job. Cancelling a <c>CancellationTokenSource</c> is.
+        /// <para>
+        /// Latching rather than a plain field-like event, because the window is clickable before the caller
+        /// can subscribe: the constructor returns as soon as the dialog is up, and only then does the caller
+        /// get to attach its handler. A click landing in that gap would invoke a null handler list and be
+        /// thrown away — the dialog would record the cancellation and nothing would act on it. Subscribing
+        /// after the fact therefore fires immediately if a cancel has already been recorded.
+        /// </para>
+        /// <para>
+        /// Handlers must be safe to run on the subscribing thread as well as the dialog's, since that
+        /// catch-up call happens inline on whichever thread subscribes.
+        /// </para>
         /// </summary>
-        public event System.EventHandler CancelRequested;
+        public event System.EventHandler CancelRequested
+        {
+            add
+            {
+                bool raiseNow;
+
+                lock (cancelRequested_Lock)
+                {
+                    cancelRequested += value;
+                    raiseNow = cancelRequested_Latched;
+                }
+
+                // Outside the lock: a handler cancelling a CancellationTokenSource runs its callbacks inline,
+                // and those are caller code that must never run under a lock of ours.
+                if (raiseNow)
+                {
+                    value?.Invoke(this, EventArgs.Empty);
+                }
+            }
+
+            remove
+            {
+                lock (cancelRequested_Lock)
+                {
+                    cancelRequested -= value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Records the cancellation and notifies whoever is listening, at most once. Idempotent so the
+        /// safety-net call in <see cref="Dispose"/> cannot double-raise a cancel the dialog already forwarded.
+        /// </summary>
+        private void RaiseCancelRequested()
+        {
+            System.EventHandler cancelRequested_Temp;
+
+            lock (cancelRequested_Lock)
+            {
+                if (cancelRequested_Latched)
+                {
+                    return;
+                }
+
+                cancelRequested_Latched = true;
+                cancelRequested_Temp = cancelRequested;
+            }
+
+            cancelRequested_Temp?.Invoke(this, EventArgs.Empty);
+        }
 
         /// <param name="name">Window title.</param>
         /// <param name="max">Number of steps the progress bar counts to.</param>
@@ -108,7 +182,7 @@ namespace SAM.Core.UI.WPF
                     };
 
                     progressWindow_Temp.Note = note;
-                    progressWindow_Temp.CancelRequested += (s, e) => CancelRequested?.Invoke(this, EventArgs.Empty);
+                    progressWindow_Temp.CancelRequested += (s, e) => RaiseCancelRequested();
 
                     progressWindow_Temp.Loaded += (s, e) =>
                     {
@@ -207,6 +281,15 @@ namespace SAM.Core.UI.WPF
         /// — rather than relying only on the Closed handler — is what covers the case where the loop was never
         /// entered, or the window never built: a dispatcher told to shut down before <c>Dispatcher.Run</c> is
         /// reached makes that call return instead of blocking for the join timeout.
+        /// <para>
+        /// Both are posted BELOW <see cref="DispatcherPriority.Input"/>, and a synchronising call at Input
+        /// priority runs first. This is the whole point rather than a detail: a Cancel click the user has
+        /// already made can still be sitting unprocessed when the job finishes, and the dispatcher runs its
+        /// queue strictly by priority. Closing at Send (10) or shutting down at Normal (9) — both above Input
+        /// (5) — tears the loop down over the top of that click and throws it away, so the run reports success
+        /// after the user asked it to stop. That is precisely the "the click never happened" failure this
+        /// class exists to prevent, reintroduced one layer down.
+        /// </para>
         /// </summary>
         private void Shutdown()
         {
@@ -219,12 +302,26 @@ namespace SAM.Core.UI.WPF
             try
             {
                 ProgressWindow progressWindow_Temp = progressWindow;
+
                 if (progressWindow_Temp != null)
                 {
-                    dispatcher_Temp.BeginInvoke(DispatcherPriority.Send, new Action(progressWindow_Temp.Close));
+                    // Let everything at Input priority and above finish before anything below it is queued.
+                    // Bounded, because a dialog thread that has wedged must not take the host down with it -
+                    // and skipped entirely when no window was ever shown, so a failed construction does not
+                    // pay this wait.
+                    try
+                    {
+                        dispatcher_Temp.Invoke(() => { }, DispatcherPriority.Input, CancellationToken.None, TimeSpan.FromSeconds(1));
+                    }
+                    catch (TimeoutException)
+                    {
+                        // the dialog thread is not draining its queue; fall through and tear it down anyway
+                    }
+
+                    dispatcher_Temp.BeginInvoke(DispatcherPriority.Background, new Action(progressWindow_Temp.Close));
                 }
 
-                dispatcher_Temp.BeginInvokeShutdown(DispatcherPriority.Normal);
+                dispatcher_Temp.BeginInvokeShutdown(DispatcherPriority.Background);
             }
             catch (System.ComponentModel.InvalidAsynchronousStateException)
             {
@@ -237,6 +334,10 @@ namespace SAM.Core.UI.WPF
             catch (TaskCanceledException)
             {
                 // the dispatcher shut down between the null check and the post
+            }
+            catch (InvalidOperationException)
+            {
+                // shutdown had already started; nothing left to ask of this dispatcher
             }
         }
 
@@ -313,6 +414,18 @@ namespace SAM.Core.UI.WPF
 
             // Bounded for the same reason as the startup wait: a stuck dialog thread must not hang the host.
             thread?.Join(5000);
+
+            // Last line of defence, and the reason the caller's "dispose, then observe the token" ordering is
+            // actually airtight rather than just narrower. The thread is joined, so the dialog is finished
+            // with: whatever the user did has either been forwarded already or is recorded in the window's
+            // own volatile flag, which outlives it. Raising from here converts that flag into the cancel the
+            // caller is about to look for. RaiseCancelRequested is idempotent, so a click that was forwarded
+            // normally does not fire twice.
+            ProgressWindow progressWindow_Temp = progressWindow;
+            if (progressWindow_Temp != null && progressWindow_Temp.CancellationRequested)
+            {
+                RaiseCancelRequested();
+            }
 
             progressWindow = null;
 
