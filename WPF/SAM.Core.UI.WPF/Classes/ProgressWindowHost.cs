@@ -86,6 +86,16 @@ namespace SAM.Core.UI.WPF
         private System.EventHandler cancelRequested;
 
         /// <summary>
+        /// Set at the very end of <see cref="Dispose"/>, after which no handler is ever invoked again. This
+        /// matters when the dialog thread could NOT be joined: the caller is about to make its final token
+        /// observation and then dispose the <c>CancellationTokenSource</c> its handler closes over, and
+        /// <c>Cancel()</c> on a disposed source throws — on the dialog thread, killing it. Detaching means a
+        /// click still in flight on a thread we failed to join is dropped rather than turned into an exception
+        /// against state the caller has already torn down.
+        /// </summary>
+        private bool cancelRequested_Detached;
+
+        /// <summary>
         /// Raised on the dialog's thread when the user clicks Cancel, so a handler must be safe to call from a
         /// thread other than the one running the job. Cancelling a <c>CancellationTokenSource</c> is.
         /// <para>
@@ -108,6 +118,11 @@ namespace SAM.Core.UI.WPF
 
                 lock (cancelRequested_Lock)
                 {
+                    if (cancelRequested_Detached)
+                    {
+                        return;
+                    }
+
                     cancelRequested += value;
                     raiseNow = cancelRequested_Latched;
                 }
@@ -139,7 +154,7 @@ namespace SAM.Core.UI.WPF
 
             lock (cancelRequested_Lock)
             {
-                if (cancelRequested_Latched)
+                if (cancelRequested_Latched || cancelRequested_Detached)
                 {
                     return;
                 }
@@ -148,7 +163,19 @@ namespace SAM.Core.UI.WPF
                 cancelRequested_Temp = cancelRequested;
             }
 
-            cancelRequested_Temp?.Invoke(this, EventArgs.Empty);
+            try
+            {
+                cancelRequested_Temp?.Invoke(this, EventArgs.Empty);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Covers the sliver the detach flag cannot: a raise that captured the handler list just before
+                // Dispose detached it, landing after the caller disposed the CancellationTokenSource the
+                // handler closes over. Swallowed rather than allowed to propagate because this runs on the
+                // dialog thread, where an escaping exception kills the thread and is recorded as a dialog
+                // failure - a misleading report of something the caller no longer cares about, since it has
+                // already finished and torn down.
+            }
         }
 
         /// <param name="name">Window title.</param>
@@ -342,9 +369,14 @@ namespace SAM.Core.UI.WPF
         }
 
         /// <summary>
-        /// Non-null when the dialog thread died of an exception raised inside its dispatcher loop, after the
-        /// constructor had already returned. The dialog is gone; the job it was reporting on is unaffected and
-        /// keeps running, which is why this is reported rather than thrown.
+        /// Non-null when something went wrong with the dialog itself: either its thread died of an exception
+        /// raised inside the dispatcher loop after the constructor had already returned, or
+        /// <see cref="Dispose"/> could not join that thread within its timeout. The job the dialog was
+        /// reporting on is unaffected either way, which is why this is reported rather than thrown.
+        /// <para>
+        /// A failed join is worth checking for, not just logging: it is the one case where a Cancel click can
+        /// still be lost, because a thread that will not shut down cannot be asked what the user did.
+        /// </para>
         /// </summary>
         public Exception Exception
         {
@@ -413,18 +445,38 @@ namespace SAM.Core.UI.WPF
             Shutdown();
 
             // Bounded for the same reason as the startup wait: a stuck dialog thread must not hang the host.
-            thread?.Join(5000);
+            bool joined = thread == null || thread.Join(5000);
 
             // Last line of defence, and the reason the caller's "dispose, then observe the token" ordering is
-            // actually airtight rather than just narrower. The thread is joined, so the dialog is finished
-            // with: whatever the user did has either been forwarded already or is recorded in the window's
-            // own volatile flag, which outlives it. Raising from here converts that flag into the cancel the
+            // airtight rather than just narrower. Once the thread is joined the dialog is finished with:
+            // whatever the user did has either been forwarded already or is recorded in the window's own
+            // volatile flag, which outlives it. Raising from here converts that flag into the cancel the
             // caller is about to look for. RaiseCancelRequested is idempotent, so a click that was forwarded
             // normally does not fire twice.
             ProgressWindow progressWindow_Temp = progressWindow;
             if (progressWindow_Temp != null && progressWindow_Temp.CancellationRequested)
             {
                 RaiseCancelRequested();
+            }
+
+            // Only a completed join establishes that. When it times out the dialog thread is still running,
+            // so a click can still be queued behind the read above and would land after the caller's final
+            // token check - and after it disposes the CancellationTokenSource its handler closes over.
+            // Detaching here is what stops that becoming an ObjectDisposedException thrown on the dialog
+            // thread. The cancellation is lost in that case, which is the honest outcome: a dialog thread
+            // that will not shut down cannot be asked what the user did, and silently reporting "cancelled"
+            // for a run that actually completed would throw away real results.
+            lock (cancelRequested_Lock)
+            {
+                cancelRequested = null;
+                cancelRequested_Detached = true;
+            }
+
+            if (!joined && exception_Startup == null)
+            {
+                // Surfaced rather than swallowed: this is a broken dialog, and Exception is where a caller
+                // already looks to find that out. Never thrown - the job it was reporting on is unaffected.
+                exception_Startup = new TimeoutException("The progress dialog thread did not shut down within 5 seconds; a cancellation made in that window may have been lost.");
             }
 
             progressWindow = null;
