@@ -83,6 +83,14 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
+            // From here on the model is mutated in place - the name immediately below, materials at "Update
+            // Materials". Those writes would land on the instance the user still has open, so a cancelled run
+            // would leave it renamed and re-materialled with no modification notification ever issued: changed
+            // behind the UI's back. Work on a copy instead. On success the copy is what SetJSAMObject adopts,
+            // which is already how this ends - UpdateConstructionLayersByPanelType and the workflow both return
+            // fresh instances. The copy constructor carries the Guid over, so identity does not change.
+            analyticalModel = new AnalyticalModel(analyticalModel);
+
             analyticalModel.Name = projectName;
 
             DateTime dateTime = DateTime.Now;
@@ -423,7 +431,8 @@ namespace SAM.Analytical.UI.WPF
             MessageBox.Show(message);
 
             // A cancelled run leaves analyticalModel null, and pushing that back would replace the model the
-            // user still has open with nothing. Leave what is loaded exactly as it was.
+            // user still has open with nothing. Not adopting it really does leave the loaded model untouched,
+            // because everything above this point worked on the copy taken before the first mutation.
             if (!cancelled && analyticalModel != null)
             {
                 uIAnalyticalModel.SetJSAMObject(analyticalModel, new FullModification());
@@ -510,6 +519,11 @@ namespace SAM.Analytical.UI.WPF
             }
 
             string path_TBD = System.IO.Path.Combine(outputDirectory, projectName + ".tbd");
+
+            // Same reason as the overload above: "Update Materials" writes into the model, and this method
+            // signals cancellation by returning null. Mutating the caller's instance and then handing back
+            // null would change it while telling the caller nothing came of the run. The copy keeps the Guid.
+            analyticalModel = new AnalyticalModel(analyticalModel);
 
             bool shadingUpdated = false;
 
