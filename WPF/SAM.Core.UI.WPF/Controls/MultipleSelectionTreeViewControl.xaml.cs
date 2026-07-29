@@ -139,7 +139,7 @@ namespace SAM.Core.UI.WPF
 
         public List<T> GetObjects<T>(bool selected = true)
         {
-            return GetObjects<T>(TreeView_Main.Items);
+            return GetObjects<T>(TreeView_Main.Items, selected);
         }
 
         private List<T> GetObjects<T>(ItemCollection itemCollection, bool selected = true)
