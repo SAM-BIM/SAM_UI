@@ -58,7 +58,7 @@ namespace SAM.Analytical.UI
                 }
             }
 
-            using (SAM.Core.UI.WPF.ProgressWindow progressForm = new SAM.Core.UI.WPF.ProgressWindow("Print RDS", 4))
+            using (SAM.Core.Windows.WPF.ProgressWindow progressForm = new SAM.Core.Windows.WPF.ProgressWindow("Print RDS", 4))
             {
                 progressForm.Update("Collecting Data");
 
