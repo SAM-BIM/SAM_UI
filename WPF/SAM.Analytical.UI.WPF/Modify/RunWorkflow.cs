@@ -3,6 +3,7 @@
 
 using SAM.Analytical.Tas;
 using SAM.Core.UI.WPF;
+using SAM.Core.Windows.WPF;
 using System;
 using System.Collections.Generic;
 using System.IO;

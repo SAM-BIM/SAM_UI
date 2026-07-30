@@ -6,6 +6,7 @@ using SAM.Core;
 using SAM.Core.Tas;
 using SAM.Core.UI;
 using SAM.Core.UI.WPF;
+using SAM.Core.Windows.WPF;
 using SAM.Weather;
 using System;
 using System.Collections.Generic;
