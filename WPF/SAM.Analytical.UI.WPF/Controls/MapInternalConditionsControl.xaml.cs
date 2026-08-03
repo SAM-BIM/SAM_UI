@@ -20,6 +20,28 @@ namespace SAM.Analytical.UI.WPF
         private Func<Space, InternalCondition> mapFunc = null;
         private Func<Space, string> groupFunc = null;
 
+        private readonly HashSet<Guid> dirtySpaceGuids = new HashSet<Guid>();
+        private bool suppressDirtyTracking = false;
+        private bool internalConditionLibrarySelectionChangedSubscribed = false;
+        private bool textMapSelectionChangedSubscribed = false;
+
+        /// <summary>
+        /// When true, SetSpaces preselects each row from MapFunc if it has no restored value.
+        /// Default is false so the shared "Map IC" dialog keeps its existing blank-until-Assign
+        /// behaviour; only the TM59 dialog opts in.
+        /// </summary>
+        public bool AutoMapOnLoad { get; set; } = false;
+
+        /// <summary>
+        /// Optional: explains why MapFunc returned null (or made a noteworthy automatic choice) for a
+        /// row, e.g. "4 bedrooms - TM59 defines no matching size, assign manually". Shown as the row's
+        /// ComboBox tooltip when AutoMapOnLoad preselects it. Never required - a null return is fine.
+        /// </summary>
+        public Func<Space, string> MapDiagnosticFunc { get; set; } = null;
+
+        /// <summary>Raised when the selected TextMap or InternalConditionLibrary changes (via file browse).</summary>
+        public event EventHandler MapSourceChanged;
+
         public MapInternalConditionsControl()
         {
             InitializeComponent();
@@ -46,6 +68,17 @@ namespace SAM.Analytical.UI.WPF
 
             selectSAMObjectComboBoxControl_TextMap.SelectedText = internalText;
             selectSAMObjectComboBoxControl_TextMap.ValidateFunc = new Func<IJSAMObject, bool>(x => x is TextMap);
+
+            if (!textMapSelectionChangedSubscribed)
+            {
+                selectSAMObjectComboBoxControl_TextMap.SelectionChanged += SelectSAMObjectComboBoxControl_TextMap_SelectionChanged;
+                textMapSelectionChangedSubscribed = true;
+            }
+        }
+
+        private void SelectSAMObjectComboBoxControl_TextMap_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            MapSourceChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public Func<Space, InternalCondition> MapFunc
@@ -79,7 +112,9 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
-                return selectSAMObjectComboBoxControl_TextMap.GetJSAMObject<TextMap>(internalText);
+                // Returns the currently SELECTED item (not always the <Internal> default) so a
+                // user-loaded override is honoured by callers such as MapTM59InternalConditionsControl.SetMapFunc.
+                return selectSAMObjectComboBoxControl_TextMap.GetJSAMObject<TextMap>();
             }
 
             set
@@ -92,7 +127,8 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
-                return selectSAMObjectComboBoxControl_InternalConditionLibrary.GetJSAMObject<InternalConditionLibrary>(internalText);
+                // Returns the currently SELECTED item (not always the <Internal> default) - see TextMap getter.
+                return selectSAMObjectComboBoxControl_InternalConditionLibrary.GetJSAMObject<InternalConditionLibrary>();
             }
 
             set
@@ -441,7 +477,32 @@ namespace SAM.Analytical.UI.WPF
                         comboBox.Items.Add(internalConditionName_Temp);
                     }
 
-                    comboBox.Text = internalConditionName;
+                    suppressDirtyTracking = true;
+                    try
+                    {
+                        comboBox.Text = internalConditionName;
+
+                        if (AutoMapOnLoad && mapFunc != null && string.IsNullOrEmpty(internalConditionName))
+                        {
+                            InternalCondition proposed = mapFunc.Invoke(space);
+                            if (proposed?.Name != null && hashSet.Contains(proposed.Name))
+                            {
+                                comboBox.Text = proposed.Name;
+                            }
+
+                            string diagnostic = MapDiagnosticFunc?.Invoke(space);
+                            if (!string.IsNullOrWhiteSpace(diagnostic))
+                            {
+                                comboBox.ToolTip = diagnostic;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        suppressDirtyTracking = false;
+                    }
+
+                    comboBox.SelectionChanged += ComboBox_SelectionChanged;
 
                     grid.Children.Add(checkBox);
                     grid.Children.Add(comboBox);
@@ -457,9 +518,33 @@ namespace SAM.Analytical.UI.WPF
 
         }
 
+        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (suppressDirtyTracking)
+            {
+                return;
+            }
+
+            ComboBox comboBox = sender as ComboBox;
+            int rowIndex = comboBox == null ? -1 : Grid.GetRow(comboBox);
+            if (rowIndex == -1 || rowIndex >= grid.RowDefinitions.Count)
+            {
+                return;
+            }
+
+            if (grid.RowDefinitions[rowIndex].Tag is Space space)
+            {
+                dirtySpaceGuids.Add(space.Guid);
+            }
+        }
+
         private void SetInternalConditionLibrary(InternalConditionLibrary internalConditionLibrary)
         {
-            selectSAMObjectComboBoxControl_InternalConditionLibrary.SelectionChanged += SelectSAMObjectComboBoxControl_InternalConditionLibrary_SelectionChanged; ;
+            if (!internalConditionLibrarySelectionChangedSubscribed)
+            {
+                selectSAMObjectComboBoxControl_InternalConditionLibrary.SelectionChanged += SelectSAMObjectComboBoxControl_InternalConditionLibrary_SelectionChanged;
+                internalConditionLibrarySelectionChangedSubscribed = true;
+            }
 
             selectSAMObjectComboBoxControl_InternalConditionLibrary.Add(internalText, internalConditionLibrary);
             selectSAMObjectComboBoxControl_InternalConditionLibrary.SelectedText = internalText;
@@ -469,6 +554,7 @@ namespace SAM.Analytical.UI.WPF
         {
             List<Space> spaces = GetSpaces();
             SetSpaces(spaces);
+            MapSourceChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void SetTextMap(TextMap textMap)
@@ -519,6 +605,14 @@ namespace SAM.Analytical.UI.WPF
             {
                 Space space = keyValuePair.Key;
 
+                // A row the user has already edited by hand keeps its current value - Assign only
+                // fills in rows nobody has touched. OK still applies whatever is currently shown,
+                // dirty or not (GetSpaces reads ComboBox.Text directly, unaffected by this flag).
+                if (dirtySpaceGuids.Contains(space.Guid))
+                {
+                    continue;
+                }
+
                 InternalCondition internalCondition = func.Invoke(space);
                 if (internalCondition?.Name != null)
                 {
@@ -536,7 +630,15 @@ namespace SAM.Analytical.UI.WPF
 
                     if (index != -1)
                     {
-                        comboBox.SelectedItem = comboBox.Items[index];
+                        suppressDirtyTracking = true;
+                        try
+                        {
+                            comboBox.SelectedItem = comboBox.Items[index];
+                        }
+                        finally
+                        {
+                            suppressDirtyTracking = false;
+                        }
                     }
 
                 }
