@@ -11,11 +11,19 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public partial class MapTM59InternalConditionsControl : UserControl
     {
+        // Preferred Zone Type categories to auto-select when more than one is available and the
+        // user has not chosen one yet - "Flats" is what Modify.MapInternalConditionsByTM59 assumes.
+        private static readonly string[] PreferredZoneCategories = { "Flats", "Flat", "Apartments", "Dwellings", "Units" };
+
         private AdjacencyCluster adjacencyCluster;
+        private bool resourceFailureReported = false;
 
         public MapTM59InternalConditionsControl()
         {
             InitializeComponent();
+
+            mapInternalConditionsControl.AutoMapOnLoad = true;
+            mapInternalConditionsControl.MapSourceChanged += MapInternalConditionsControl_MapSourceChanged;
 
             Load();
         }
@@ -23,6 +31,9 @@ namespace SAM.Analytical.UI.WPF
         public MapTM59InternalConditionsControl(IEnumerable<Space> spaces, AdjacencyCluster adjacencyCluster, TextMap textMap = null, InternalConditionLibrary internalConditionLibrary = null)
         {
             InitializeComponent();
+
+            mapInternalConditionsControl.AutoMapOnLoad = true;
+            mapInternalConditionsControl.MapSourceChanged += MapInternalConditionsControl_MapSourceChanged;
 
             this.adjacencyCluster = adjacencyCluster;
 
@@ -32,6 +43,11 @@ namespace SAM.Analytical.UI.WPF
             mapInternalConditionsControl.Spaces = spaces?.ToList();
 
             Load();
+        }
+
+        private void MapInternalConditionsControl_MapSourceChanged(object sender, EventArgs e)
+        {
+            SetMapFunc();
         }
 
         private void Load()
@@ -69,8 +85,43 @@ namespace SAM.Analytical.UI.WPF
             if(!string.IsNullOrWhiteSpace(value))
             {
                 comboBox_ZoneType.Text = value;
+                return;
             }
 
+            // No prior selection to restore - pick a sensible default so preselection (AutoMapOnLoad)
+            // has a Zone Type to work with as soon as the dialog opens, instead of requiring the user
+            // to pick one first.
+            string defaultCategory = SelectDefaultZoneCategory(categories);
+            if (defaultCategory != null)
+            {
+                comboBox_ZoneType.SelectedItem = defaultCategory;
+            }
+        }
+
+        private static string SelectDefaultZoneCategory(HashSet<string> categories)
+        {
+            if (categories == null || categories.Count == 0)
+            {
+                return null;
+            }
+
+            if (categories.Count == 1)
+            {
+                return categories.First();
+            }
+
+            foreach (string preferred in PreferredZoneCategories)
+            {
+                string match = categories.FirstOrDefault(x => string.Equals(x, preferred, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            // More than one category and none of them look like a residential-unit category -
+            // leave unselected rather than guessing; the user must pick one.
+            return null;
         }
 
         public TextMap TextMap
@@ -135,9 +186,12 @@ namespace SAM.Analytical.UI.WPF
 
         private void comboBox_ZoneType_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            List<Space> spaces = Spaces;
+            // SetMapFunc must run BEFORE GroupFunc is assigned: the GroupFunc setter immediately
+            // triggers a row rebuild (SetSpaces), which would otherwise preselect using the previous
+            // MapFunc's stale Zone Type closure.
+            SetMapFunc();
 
-            mapInternalConditionsControl.GroupFunc = new Func<Space, string>(x => 
+            mapInternalConditionsControl.GroupFunc = new Func<Space, string>(x =>
             {
                 Zone zone = adjacencyCluster?.GetZones(x, comboBox_ZoneType.SelectedItem as string)?.FirstOrDefault();
                 if(zone == null)
@@ -147,8 +201,6 @@ namespace SAM.Analytical.UI.WPF
 
                 return zone.Name;
             });
-
-            SetMapFunc();
         }
 
         public void SetMapFunc()
@@ -157,12 +209,53 @@ namespace SAM.Analytical.UI.WPF
             InternalConditionLibrary internalConditionLibrary = InternalConditionLibrary;
             string zoneType = comboBox_ZoneType.SelectedItem as string;
 
+            // TM59Manager's TextMap ctor falls back to the TM59 default resource when textMap is null,
+            // so a missing selection here does not silently produce an inert (always-blank) manager.
             TM59Manager tM59Manager = new TM59Manager(textMap);
 
-            mapInternalConditionsControl.MapFunc = new Func<Space, InternalCondition>(x => 
+            if (!ResourcesAreUsable(tM59Manager, internalConditionLibrary))
             {
-                return tM59Manager.GetInternalCondition(adjacencyCluster, internalConditionLibrary, x, zoneType);
+                ReportResourceFailure();
+
+                mapInternalConditionsControl.MapFunc = new Func<Space, InternalCondition>(x => null);
+                return;
+            }
+
+            mapInternalConditionsControl.MapFunc = new Func<Space, InternalCondition>(x =>
+            {
+                return tM59Manager.GetInternalConditionResult(adjacencyCluster, internalConditionLibrary, x, zoneType)?.InternalCondition;
             });
+
+            mapInternalConditionsControl.MapDiagnosticFunc = new Func<Space, string>(x =>
+            {
+                return tM59Manager.GetInternalConditionResult(adjacencyCluster, internalConditionLibrary, x, zoneType)?.Diagnostic;
+            });
+        }
+
+        private static bool ResourcesAreUsable(TM59Manager tM59Manager, InternalConditionLibrary internalConditionLibrary)
+        {
+            if (tM59Manager == null || internalConditionLibrary == null)
+            {
+                return false;
+            }
+
+            List<InternalCondition> internalConditions = internalConditionLibrary.GetInternalConditions();
+            return internalConditions != null && internalConditions.Count != 0;
+        }
+
+        private void ReportResourceFailure()
+        {
+            if (resourceFailureReported)
+            {
+                return;
+            }
+
+            resourceFailureReported = true;
+            System.Windows.MessageBox.Show(
+                "The TM59 InternalCondition TextMap or InternalConditionLibrary could not be loaded, " +
+                "so spaces cannot be mapped automatically. Select a valid Text Map and InternalCondition " +
+                "Library above, or assign conditions manually.",
+                "TM59 - Map Internal Conditions");
         }
 
         public List<Space> GetSpaces(bool selected = false)

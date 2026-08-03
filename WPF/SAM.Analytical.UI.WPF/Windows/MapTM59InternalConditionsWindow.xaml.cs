@@ -22,6 +22,18 @@ namespace SAM.Analytical.UI.WPF
             mapTM59InternalConditionsControl.TextMap = textMap;
             mapTM59InternalConditionsControl.InternalConditionLibrary = internalConditionLibrary;
             mapTM59InternalConditionsControl.Spaces = spaces == null ? null : new List<Space>(spaces);
+
+            UpdateStatus();
+        }
+
+        private void UpdateStatus()
+        {
+            List<Space> spaces = mapTM59InternalConditionsControl.GetSpaces();
+            int unassigned = spaces?.FindAll(x => x.InternalCondition == null).Count ?? 0;
+
+            textBlock_Status.Text = unassigned == 0
+                ? string.Empty
+                : $"{unassigned} space(s) need manual review - hover the blank rows for why.";
         }
 
         public List<Space> Spaces
