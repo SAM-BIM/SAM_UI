@@ -459,6 +459,7 @@ namespace SAM.Analytical.UI.WPF
 
             if(spaces == null || spaces.Count() == 0)
             {
+                MappingChanged?.Invoke(this, EventArgs.Empty);
                 return;
             }
 
@@ -632,6 +633,12 @@ namespace SAM.Analytical.UI.WPF
 
             }
 
+            // Each row's ComboBox.SelectionChanged handler (see below) is only attached AFTER that
+            // row's own text/auto-preselect assignment above, so it never fires for the rebuild itself
+            // - only for later interactive edits. A caller tracking "N space(s) need manual review"
+            // needs to see the rebuilt state (e.g. after RemapAutomatic on a Zone Type/TextMap/Library
+            // change) regardless, so this fires once, unconditionally, after every rebuild completes.
+            MappingChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
