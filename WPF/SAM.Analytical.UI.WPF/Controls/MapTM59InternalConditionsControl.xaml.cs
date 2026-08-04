@@ -56,9 +56,13 @@ namespace SAM.Analytical.UI.WPF
             mapInternalConditionsControl.TextMap = textMap;
             mapInternalConditionsControl.InternalConditionLibrary = internalConditionLibrary;
 
-            mapInternalConditionsControl.Spaces = spaces?.ToList();
-
+            // FinishInitialization must run BEFORE Spaces is assigned - see the matching ordering (and
+            // the reason for it) in MapTM59InternalConditionsWindow's constructor. Without this, rows
+            // would be built against the null-returning "not ready yet" placeholder MapFunc and never
+            // get TM59-preselected.
             FinishInitialization();
+
+            mapInternalConditionsControl.Spaces = spaces?.ToList();
         }
 
         /// <summary>

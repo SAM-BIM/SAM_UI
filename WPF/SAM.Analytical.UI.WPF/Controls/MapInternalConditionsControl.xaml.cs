@@ -269,6 +269,14 @@ namespace SAM.Analytical.UI.WPF
                     space.InternalCondition = internalCondition;
                     space.UpdateAreaPerPerson();
                 }
+                else
+                {
+                    // A row left blank (no resolved condition, e.g. AutoMapOnLoad found no defensible
+                    // automatic mapping) must not silently keep whatever InternalCondition the
+                    // underlying Space previously had - the returned Space has to reflect exactly what
+                    // is shown, not stale state from before a remap invalidated it.
+                    space.InternalCondition = null;
+                }
 
                 result.Add(space);
             }
@@ -398,9 +406,46 @@ namespace SAM.Analytical.UI.WPF
             //return result;
         }
 
+        /// <summary>
+        /// Captures each row's current CheckBox.IsChecked state, keyed by Space.Guid, so a rebuild
+        /// (SetSpaces, via RemapAutomatic) can restore it - without this, every rebuilt row defaults
+        /// back to checked, silently re-including any space the user had excluded beforehand.
+        /// </summary>
+        private Dictionary<Guid, bool> GetCheckedStateByGuid()
+        {
+            Dictionary<Guid, bool> result = new Dictionary<Guid, bool>();
+
+            if (grid == null || grid.Children == null)
+            {
+                return result;
+            }
+
+            foreach (UIElement uIElement in grid.Children)
+            {
+                int rowIndex = Grid.GetRow(uIElement);
+                if (rowIndex == -1)
+                {
+                    continue;
+                }
+
+                if (!(grid.RowDefinitions[rowIndex].Tag is Space space))
+                {
+                    continue;
+                }
+
+                if (uIElement is CheckBox checkBox)
+                {
+                    result[space.Guid] = checkBox.IsChecked == true;
+                }
+            }
+
+            return result;
+        }
+
         private void SetSpaces(IEnumerable<Space> spaces)
         {
             List<Tuple<Space, string>> tuples = GetTuples();
+            Dictionary<Guid, bool> checkedStateByGuid = GetCheckedStateByGuid();
 
             grid.Children.Clear();
             grid.RowDefinitions.Clear();
@@ -514,7 +559,10 @@ namespace SAM.Analytical.UI.WPF
                         }
                     }
 
-                    CheckBox checkBox = new CheckBox() { MinWidth = 100, Content = space.Name, IsChecked = true, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 5, 0, 5) };
+                    // Preserve a prior exclusion (Select None / individually unchecked) across a rebuild;
+                    // a space not seen before (not in checkedStateByGuid) defaults to checked, as before.
+                    bool isChecked = !checkedStateByGuid.TryGetValue(space.Guid, out bool wasChecked) || wasChecked;
+                    CheckBox checkBox = new CheckBox() { MinWidth = 100, Content = space.Name, IsChecked = isChecked, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 5, 0, 5) };
 
                     ComboBox comboBox = new ComboBox() { MinWidth = 220, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center };
                     foreach (string internalConditionName_Temp in hashSet)
