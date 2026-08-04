@@ -85,15 +85,15 @@ namespace SAM.Analytical.UI.WPF
                 // fuzzy name-based TM59Manager.Occupancy, which reads bedroom-count digits out of the
                 // condition name and so returns e.g. 1 for every "1 Bed Apt. *" condition regardless
                 // of how many people actually occupy the flat.
+                //
+                // Always set it explicitly (including 0 for non-habitable) - a space remapped from a
+                // bedroom to a corridor/bathroom/stairs/cupboard must not retain its old positive
+                // Occupancy. UpdateAreaPerPerson then re-derives AreaPerPerson from that Occupancy;
+                // for Occupancy == 0 it writes AreaPerPerson == 0 rather than dividing by zero, and it
+                // never creates or modifies SpaceParameter.Area itself.
                 int occupancy = TM59Manager.TM59Occupancy(space.InternalCondition);
-                if(occupancy > 0)
-                {
-                    space.SetValue(SpaceParameter.Occupancy, occupancy);
-
-                    // Re-run after the TM59 occupancy is set (GetSpaces() already ran this once against
-                    // whatever occupancy the space had beforehand, so InternalCondition.AreaPerPerson was stale).
-                    space.UpdateAreaPerPerson();
-                }
+                space.SetValue(SpaceParameter.Occupancy, occupancy);
+                space.UpdateAreaPerPerson();
 
                 adjacencyCluster.AddObject(space);
                 sAMObjects.Add(space);
