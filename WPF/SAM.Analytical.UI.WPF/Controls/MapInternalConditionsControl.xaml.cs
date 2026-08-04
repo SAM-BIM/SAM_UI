@@ -554,15 +554,28 @@ namespace SAM.Analytical.UI.WPF
                     // as it is still a valid condition in the (possibly new) library. The general
                     // "Map IC" dialog (AutoMapOnLoad == false) has no such distinction and keeps its
                     // existing behaviour of restoring every prior value unconditionally.
-                    bool restoreFromTuples = !AutoMapOnLoad || dirtySpaceGuids.Contains(space.Guid);
+                    bool isDirty = dirtySpaceGuids.Contains(space.Guid);
+                    bool restoreFromTuples = !AutoMapOnLoad || isDirty;
 
                     string internalConditionName = string.Empty;
                     if (tuples != null && restoreFromTuples)
                     {
                         int index = tuples.FindIndex(x => x.Item1.Guid == space.Guid);
-                        if (index != -1 && hashSet.Contains(tuples[index].Item2))
+                        if (index != -1)
                         {
-                            internalConditionName = tuples[index].Item2;
+                            string previousValue = tuples[index].Item2;
+
+                            // GetTuples() normalizes a deliberately-cleared row's blank ComboBox.Text to
+                            // null - that is always restorable as blank (never invalid), unlike a real
+                            // condition name, which is only restored if still valid in the (possibly
+                            // changed) library. Without this, a manually-cleared dirty row was
+                            // indistinguishable below from a never-touched blank one, and the
+                            // auto-preselect block a few lines down would silently overwrite the user's
+                            // deliberate clear with a fresh automatic guess.
+                            if (previousValue == null || hashSet.Contains(previousValue))
+                            {
+                                internalConditionName = previousValue ?? string.Empty;
+                            }
                         }
                     }
 
@@ -582,7 +595,10 @@ namespace SAM.Analytical.UI.WPF
                     {
                         comboBox.Text = internalConditionName;
 
-                        if (AutoMapOnLoad && mapFunc != null && string.IsNullOrEmpty(internalConditionName))
+                        // !isDirty here (not just the blank check) is what actually protects a
+                        // deliberately-cleared dirty row - it stays blank exactly because it is dirty,
+                        // not because its blank happens to also look like an untouched row's blank.
+                        if (AutoMapOnLoad && mapFunc != null && !isDirty && string.IsNullOrEmpty(internalConditionName))
                         {
                             InternalCondition proposed = mapFunc.Invoke(space);
                             if (proposed?.Name != null && hashSet.Contains(proposed.Name))
