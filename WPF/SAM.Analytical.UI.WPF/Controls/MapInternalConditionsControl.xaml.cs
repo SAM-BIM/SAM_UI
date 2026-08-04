@@ -54,6 +54,13 @@ namespace SAM.Analytical.UI.WPF
         public event EventHandler MapSourceChanged;
 
         /// <summary>
+        /// Raised whenever a row's mapped condition changes - a manual edit, Assign filling in blanks,
+        /// or a remap that clears/resolves rows. Callers that show a live "N space(s) need manual
+        /// review" style status should refresh it from this, not only once at construction.
+        /// </summary>
+        public event EventHandler MappingChanged;
+
+        /// <summary>
         /// Clears every row's dirty (manually-edited) flag without changing what is currently
         /// displayed. Ordinary Zone Type/TextMap/InternalConditionLibrary changes deliberately do NOT
         /// call this - a manual edit is meant to survive a source change. Call it explicitly only when
@@ -613,11 +620,6 @@ namespace SAM.Analytical.UI.WPF
 
         private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (suppressDirtyTracking)
-            {
-                return;
-            }
-
             ComboBox comboBox = sender as ComboBox;
             int rowIndex = comboBox == null ? -1 : Grid.GetRow(comboBox);
             if (rowIndex == -1 || rowIndex >= grid.RowDefinitions.Count)
@@ -625,10 +627,17 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            if (grid.RowDefinitions[rowIndex].Tag is Space space)
+            // Dirty tracking only reflects a genuine user edit, so it stays gated behind
+            // suppressDirtyTracking (set around SetSpaces'/Assign's own programmatic writes). Notifying
+            // that the mapping changed is not - a caller's "unresolved space" status needs to refresh
+            // regardless of whether the change was manual (a user edit) or automatic (Assign, or a
+            // remap that created or resolved blanks), so this fires unconditionally.
+            if (!suppressDirtyTracking && grid.RowDefinitions[rowIndex].Tag is Space space)
             {
                 dirtySpaceGuids.Add(space.Guid);
             }
+
+            MappingChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void SetInternalConditionLibrary(InternalConditionLibrary internalConditionLibrary)

@@ -165,8 +165,14 @@ namespace SAM.Analytical.UI.WPF
 
             set
             {
+                // MapSourceChanged only fires for a user's file-browse ComboBox selection, not this
+                // property assignment - RemapAutomatic must be called explicitly here too, or a host
+                // assigning TextMap programmatically (after Spaces has already populated the control)
+                // would leave automatic rows showing/returning mappings from the previous TextMap.
+                // A no-op before Spaces is assigned, since there are no rows yet to rebuild.
                 mapInternalConditionsControl.TextMap = value;
                 SetMapFunc();
+                mapInternalConditionsControl.RemapAutomatic();
             }
         }
 
@@ -179,9 +185,18 @@ namespace SAM.Analytical.UI.WPF
 
             set
             {
+                // Same reasoning as the TextMap setter above.
                 mapInternalConditionsControl.InternalConditionLibrary = value;
                 SetMapFunc();
+                mapInternalConditionsControl.RemapAutomatic();
             }
+        }
+
+        /// <summary>Forwards the inner control's MappingChanged - see its doc comment for when this fires.</summary>
+        public event EventHandler MappingChanged
+        {
+            add { mapInternalConditionsControl.MappingChanged += value; }
+            remove { mapInternalConditionsControl.MappingChanged -= value; }
         }
 
         public List<Space> Spaces

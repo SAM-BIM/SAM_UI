@@ -1,4 +1,5 @@
 ﻿using SAM.Core;
+using System;
 using System.Collections.Generic;
 
 namespace SAM.Analytical.UI.WPF
@@ -17,6 +18,11 @@ namespace SAM.Analytical.UI.WPF
         {
             InitializeComponent();
 
+            // Subscribed before any of the assignments below, so status is kept live from that point
+            // on - a manual edit, Assign, or a later remap (Zone Type/TextMap/Library change) all fire
+            // MappingChanged, not just the initial row build.
+            mapTM59InternalConditionsControl.MappingChanged += MapTM59InternalConditionsControl_MappingChanged;
+
             mapTM59InternalConditionsControl.AdjacencyCluster = adjacencyCluster;
             mapTM59InternalConditionsControl.TextMap = textMap;
             mapTM59InternalConditionsControl.InternalConditionLibrary = internalConditionLibrary;
@@ -28,6 +34,11 @@ namespace SAM.Analytical.UI.WPF
 
             mapTM59InternalConditionsControl.Spaces = spaces == null ? null : new List<Space>(spaces);
 
+            UpdateStatus();
+        }
+
+        private void MapTM59InternalConditionsControl_MappingChanged(object sender, EventArgs e)
+        {
             UpdateStatus();
         }
 
