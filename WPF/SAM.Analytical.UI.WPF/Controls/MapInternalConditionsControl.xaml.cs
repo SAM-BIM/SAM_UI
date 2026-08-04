@@ -20,6 +20,57 @@ namespace SAM.Analytical.UI.WPF
         private Func<Space, InternalCondition> mapFunc = null;
         private Func<Space, string> groupFunc = null;
 
+        private readonly HashSet<Guid> dirtySpaceGuids = new HashSet<Guid>();
+        private bool suppressDirtyTracking = false;
+        private bool internalConditionLibrarySelectionChangedSubscribed = false;
+        private bool textMapSelectionChangedSubscribed = false;
+
+        /// <summary>
+        /// When true, SetSpaces preselects each row from MapFunc if it has no restored value.
+        /// Default is false so the shared "Map IC" dialog keeps its existing blank-until-Assign
+        /// behaviour; only the TM59 dialog opts in.
+        /// </summary>
+        public bool AutoMapOnLoad { get; set; } = false;
+
+        /// <summary>
+        /// Disables the Assign button - set by a caller (e.g. the TM59 dialog) when a required
+        /// resource genuinely failed to load, so the user cannot trigger a mapping that can only
+        /// ever produce blanks. Does not affect OK/Cancel/Select All/Select None.
+        /// </summary>
+        public bool AssignEnabled
+        {
+            get => button_Assign.IsEnabled;
+            set => button_Assign.IsEnabled = value;
+        }
+
+        /// <summary>
+        /// Optional: explains why MapFunc returned null (or made a noteworthy automatic choice) for a
+        /// row, e.g. "4 bedrooms - TM59 defines no matching size, assign manually". Shown as the row's
+        /// ComboBox tooltip when AutoMapOnLoad preselects it. Never required - a null return is fine.
+        /// </summary>
+        public Func<Space, string> MapDiagnosticFunc { get; set; } = null;
+
+        /// <summary>Raised when the selected TextMap or InternalConditionLibrary changes (via file browse).</summary>
+        public event EventHandler MapSourceChanged;
+
+        /// <summary>
+        /// Raised whenever a row's mapped condition changes - a manual edit, Assign filling in blanks,
+        /// or a remap that clears/resolves rows. Callers that show a live "N space(s) need manual
+        /// review" style status should refresh it from this, not only once at construction.
+        /// </summary>
+        public event EventHandler MappingChanged;
+
+        /// <summary>
+        /// Clears every row's dirty (manually-edited) flag without changing what is currently
+        /// displayed. Ordinary Zone Type/TextMap/InternalConditionLibrary changes deliberately do NOT
+        /// call this - a manual edit is meant to survive a source change. Call it explicitly only when
+        /// a source change should discard prior manual edits too (e.g. starting the mapping over).
+        /// </summary>
+        public void ClearDirtyState()
+        {
+            dirtySpaceGuids.Clear();
+        }
+
         public MapInternalConditionsControl()
         {
             InitializeComponent();
@@ -46,6 +97,32 @@ namespace SAM.Analytical.UI.WPF
 
             selectSAMObjectComboBoxControl_TextMap.SelectedText = internalText;
             selectSAMObjectComboBoxControl_TextMap.ValidateFunc = new Func<IJSAMObject, bool>(x => x is TextMap);
+
+            if (!textMapSelectionChangedSubscribed)
+            {
+                selectSAMObjectComboBoxControl_TextMap.SelectionChanged += SelectSAMObjectComboBoxControl_TextMap_SelectionChanged;
+                textMapSelectionChangedSubscribed = true;
+            }
+        }
+
+        private void SelectSAMObjectComboBoxControl_TextMap_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Raise BEFORE rebuilding rows: a TM59 listener's SetMapFunc must rebuild its resolver
+            // against the newly-selected TextMap first, or RemapAutomatic below would re-preselect
+            // every automatic row using the now-stale MapFunc closure.
+            MapSourceChanged?.Invoke(this, EventArgs.Empty);
+            RemapAutomatic();
+        }
+
+        /// <summary>
+        /// Rebuilds every row from the current MapFunc, clearing (and so recalculating) automatic
+        /// values while preserving manual (dirty) ones that are still valid - see SetSpaces. Call
+        /// after a genuine source change (Zone Type, TextMap, InternalConditionLibrary) once MapFunc
+        /// itself has already been updated to reflect that change.
+        /// </summary>
+        public void RemapAutomatic()
+        {
+            SetSpaces(GetSpaces());
         }
 
         public Func<Space, InternalCondition> MapFunc
@@ -79,7 +156,9 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
-                return selectSAMObjectComboBoxControl_TextMap.GetJSAMObject<TextMap>(internalText);
+                // Returns the currently SELECTED item (not always the <Internal> default) so a
+                // user-loaded override is honoured by callers such as MapTM59InternalConditionsControl.SetMapFunc.
+                return selectSAMObjectComboBoxControl_TextMap.GetJSAMObject<TextMap>();
             }
 
             set
@@ -92,7 +171,8 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
-                return selectSAMObjectComboBoxControl_InternalConditionLibrary.GetJSAMObject<InternalConditionLibrary>(internalText);
+                // Returns the currently SELECTED item (not always the <Internal> default) - see TextMap getter.
+                return selectSAMObjectComboBoxControl_InternalConditionLibrary.GetJSAMObject<InternalConditionLibrary>();
             }
 
             set
@@ -195,6 +275,14 @@ namespace SAM.Analytical.UI.WPF
                 {
                     space.InternalCondition = internalCondition;
                     space.UpdateAreaPerPerson();
+                }
+                else
+                {
+                    // A row left blank (no resolved condition, e.g. AutoMapOnLoad found no defensible
+                    // automatic mapping) must not silently keep whatever InternalCondition the
+                    // underlying Space previously had - the returned Space has to reflect exactly what
+                    // is shown, not stale state from before a remap invalidated it.
+                    space.InternalCondition = null;
                 }
 
                 result.Add(space);
@@ -325,15 +413,53 @@ namespace SAM.Analytical.UI.WPF
             //return result;
         }
 
+        /// <summary>
+        /// Captures each row's current CheckBox.IsChecked state, keyed by Space.Guid, so a rebuild
+        /// (SetSpaces, via RemapAutomatic) can restore it - without this, every rebuilt row defaults
+        /// back to checked, silently re-including any space the user had excluded beforehand.
+        /// </summary>
+        private Dictionary<Guid, bool> GetCheckedStateByGuid()
+        {
+            Dictionary<Guid, bool> result = new Dictionary<Guid, bool>();
+
+            if (grid == null || grid.Children == null)
+            {
+                return result;
+            }
+
+            foreach (UIElement uIElement in grid.Children)
+            {
+                int rowIndex = Grid.GetRow(uIElement);
+                if (rowIndex == -1)
+                {
+                    continue;
+                }
+
+                if (!(grid.RowDefinitions[rowIndex].Tag is Space space))
+                {
+                    continue;
+                }
+
+                if (uIElement is CheckBox checkBox)
+                {
+                    result[space.Guid] = checkBox.IsChecked == true;
+                }
+            }
+
+            return result;
+        }
+
         private void SetSpaces(IEnumerable<Space> spaces)
         {
             List<Tuple<Space, string>> tuples = GetTuples();
+            Dictionary<Guid, bool> checkedStateByGuid = GetCheckedStateByGuid();
 
             grid.Children.Clear();
             grid.RowDefinitions.Clear();
 
             if(spaces == null || spaces.Count() == 0)
             {
+                MappingChanged?.Invoke(this, EventArgs.Empty);
                 return;
             }
 
@@ -423,17 +549,41 @@ namespace SAM.Analytical.UI.WPF
                     rowDefinition.Height = new GridLength(30);
                     grid.RowDefinitions.Add(rowDefinition);
 
+                    // In AutoMapOnLoad (TM59) mode, a genuine source change (Zone Type, TextMap or
+                    // InternalConditionLibrary) must invalidate stale AUTOMATIC values so they get
+                    // recalculated below, while a deliberate MANUAL edit (dirty) is restored as long
+                    // as it is still a valid condition in the (possibly new) library. The general
+                    // "Map IC" dialog (AutoMapOnLoad == false) has no such distinction and keeps its
+                    // existing behaviour of restoring every prior value unconditionally.
+                    bool isDirty = dirtySpaceGuids.Contains(space.Guid);
+                    bool restoreFromTuples = !AutoMapOnLoad || isDirty;
+
                     string internalConditionName = string.Empty;
-                    if (tuples != null)
+                    if (tuples != null && restoreFromTuples)
                     {
                         int index = tuples.FindIndex(x => x.Item1.Guid == space.Guid);
-                        if (index != -1 && hashSet.Contains(tuples[index].Item2))
+                        if (index != -1)
                         {
-                            internalConditionName = tuples[index].Item2;
+                            string previousValue = tuples[index].Item2;
+
+                            // GetTuples() normalizes a deliberately-cleared row's blank ComboBox.Text to
+                            // null - that is always restorable as blank (never invalid), unlike a real
+                            // condition name, which is only restored if still valid in the (possibly
+                            // changed) library. Without this, a manually-cleared dirty row was
+                            // indistinguishable below from a never-touched blank one, and the
+                            // auto-preselect block a few lines down would silently overwrite the user's
+                            // deliberate clear with a fresh automatic guess.
+                            if (previousValue == null || hashSet.Contains(previousValue))
+                            {
+                                internalConditionName = previousValue ?? string.Empty;
+                            }
                         }
                     }
 
-                    CheckBox checkBox = new CheckBox() { MinWidth = 100, Content = space.Name, IsChecked = true, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 5, 0, 5) };
+                    // Preserve a prior exclusion (Select None / individually unchecked) across a rebuild;
+                    // a space not seen before (not in checkedStateByGuid) defaults to checked, as before.
+                    bool isChecked = !checkedStateByGuid.TryGetValue(space.Guid, out bool wasChecked) || wasChecked;
+                    CheckBox checkBox = new CheckBox() { MinWidth = 100, Content = space.Name, IsChecked = isChecked, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 5, 0, 5) };
 
                     ComboBox comboBox = new ComboBox() { MinWidth = 220, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center };
                     foreach (string internalConditionName_Temp in hashSet)
@@ -441,7 +591,35 @@ namespace SAM.Analytical.UI.WPF
                         comboBox.Items.Add(internalConditionName_Temp);
                     }
 
-                    comboBox.Text = internalConditionName;
+                    suppressDirtyTracking = true;
+                    try
+                    {
+                        comboBox.Text = internalConditionName;
+
+                        // !isDirty here (not just the blank check) is what actually protects a
+                        // deliberately-cleared dirty row - it stays blank exactly because it is dirty,
+                        // not because its blank happens to also look like an untouched row's blank.
+                        if (AutoMapOnLoad && mapFunc != null && !isDirty && string.IsNullOrEmpty(internalConditionName))
+                        {
+                            InternalCondition proposed = mapFunc.Invoke(space);
+                            if (proposed?.Name != null && hashSet.Contains(proposed.Name))
+                            {
+                                comboBox.Text = proposed.Name;
+                            }
+
+                            string diagnostic = MapDiagnosticFunc?.Invoke(space);
+                            if (!string.IsNullOrWhiteSpace(diagnostic))
+                            {
+                                comboBox.ToolTip = diagnostic;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        suppressDirtyTracking = false;
+                    }
+
+                    comboBox.SelectionChanged += ComboBox_SelectionChanged;
 
                     grid.Children.Add(checkBox);
                     grid.Children.Add(comboBox);
@@ -455,11 +633,43 @@ namespace SAM.Analytical.UI.WPF
 
             }
 
+            // Each row's ComboBox.SelectionChanged handler (see below) is only attached AFTER that
+            // row's own text/auto-preselect assignment above, so it never fires for the rebuild itself
+            // - only for later interactive edits. A caller tracking "N space(s) need manual review"
+            // needs to see the rebuilt state (e.g. after RemapAutomatic on a Zone Type/TextMap/Library
+            // change) regardless, so this fires once, unconditionally, after every rebuild completes.
+            MappingChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ComboBox comboBox = sender as ComboBox;
+            int rowIndex = comboBox == null ? -1 : Grid.GetRow(comboBox);
+            if (rowIndex == -1 || rowIndex >= grid.RowDefinitions.Count)
+            {
+                return;
+            }
+
+            // Dirty tracking only reflects a genuine user edit, so it stays gated behind
+            // suppressDirtyTracking (set around SetSpaces'/Assign's own programmatic writes). Notifying
+            // that the mapping changed is not - a caller's "unresolved space" status needs to refresh
+            // regardless of whether the change was manual (a user edit) or automatic (Assign, or a
+            // remap that created or resolved blanks), so this fires unconditionally.
+            if (!suppressDirtyTracking && grid.RowDefinitions[rowIndex].Tag is Space space)
+            {
+                dirtySpaceGuids.Add(space.Guid);
+            }
+
+            MappingChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void SetInternalConditionLibrary(InternalConditionLibrary internalConditionLibrary)
         {
-            selectSAMObjectComboBoxControl_InternalConditionLibrary.SelectionChanged += SelectSAMObjectComboBoxControl_InternalConditionLibrary_SelectionChanged; ;
+            if (!internalConditionLibrarySelectionChangedSubscribed)
+            {
+                selectSAMObjectComboBoxControl_InternalConditionLibrary.SelectionChanged += SelectSAMObjectComboBoxControl_InternalConditionLibrary_SelectionChanged;
+                internalConditionLibrarySelectionChangedSubscribed = true;
+            }
 
             selectSAMObjectComboBoxControl_InternalConditionLibrary.Add(internalText, internalConditionLibrary);
             selectSAMObjectComboBoxControl_InternalConditionLibrary.SelectedText = internalText;
@@ -467,8 +677,9 @@ namespace SAM.Analytical.UI.WPF
 
         private void SelectSAMObjectComboBoxControl_InternalConditionLibrary_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            List<Space> spaces = GetSpaces();
-            SetSpaces(spaces);
+            // Raise BEFORE rebuilding rows - see SelectSAMObjectComboBoxControl_TextMap_SelectionChanged.
+            MapSourceChanged?.Invoke(this, EventArgs.Empty);
+            RemapAutomatic();
         }
 
         private void SetTextMap(TextMap textMap)
@@ -519,6 +730,16 @@ namespace SAM.Analytical.UI.WPF
             {
                 Space space = keyValuePair.Key;
 
+                // Dirty-row skipping is TM59 (AutoMapOnLoad) behaviour only: a row the user has edited
+                // by hand keeps its current value, so Assign only fills in rows nobody has touched.
+                // The general "Map IC" dialog (AutoMapOnLoad == false) keeps its original Assign
+                // behaviour of overwriting every row regardless of prior edits. Either way, OK applies
+                // whatever is currently shown (GetSpaces reads ComboBox.Text directly, unaffected).
+                if (AutoMapOnLoad && dirtySpaceGuids.Contains(space.Guid))
+                {
+                    continue;
+                }
+
                 InternalCondition internalCondition = func.Invoke(space);
                 if (internalCondition?.Name != null)
                 {
@@ -536,7 +757,15 @@ namespace SAM.Analytical.UI.WPF
 
                     if (index != -1)
                     {
-                        comboBox.SelectedItem = comboBox.Items[index];
+                        suppressDirtyTracking = true;
+                        try
+                        {
+                            comboBox.SelectedItem = comboBox.Items[index];
+                        }
+                        finally
+                        {
+                            suppressDirtyTracking = false;
+                        }
                     }
 
                 }
