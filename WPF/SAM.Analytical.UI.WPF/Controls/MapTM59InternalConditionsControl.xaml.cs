@@ -16,7 +16,22 @@ namespace SAM.Analytical.UI.WPF
         private static readonly string[] PreferredZoneCategories = { "Flats", "Flat", "Apartments", "Dwellings", "Units" };
 
         private AdjacencyCluster adjacencyCluster;
-        private bool resourceFailureReported = false;
+
+        // True while the control is being wired up by its owner and required inputs (in particular
+        // InternalConditionLibrary) may still be legitimately null - SetMapFunc must not treat that
+        // transient state as a resource failure. WPF constructs this control via the parameterless
+        // ctor when it appears in XAML (MapTM59InternalConditionsWindow.xaml), then the window's own
+        // ctor assigns AdjacencyCluster, TextMap, InternalConditionLibrary and Spaces as four separate
+        // property-setter calls, each of which calls Load()/SetMapFunc() again - only the LAST of
+        // those calls (once FinishInitialization runs) reflects the fully-assigned state, so every
+        // call before that must be a safe no-op rather than a false failure report.
+        private bool initializing = true;
+
+        // Tracks whether the *previous* real check failed, so a genuinely new failure (one that
+        // follows a period of success) is always reported - this is not a permanent one-shot latch;
+        // it only suppresses repeat notifications for the same ongoing failure (e.g. every Zone Type
+        // change while the library is still invalid).
+        private bool lastCheckFailed = false;
 
         public MapTM59InternalConditionsControl()
         {
@@ -25,7 +40,8 @@ namespace SAM.Analytical.UI.WPF
             mapInternalConditionsControl.AutoMapOnLoad = true;
             mapInternalConditionsControl.MapSourceChanged += MapInternalConditionsControl_MapSourceChanged;
 
-            Load();
+            LoadZones();
+            SetMapFunc();
         }
 
         public MapTM59InternalConditionsControl(IEnumerable<Space> spaces, AdjacencyCluster adjacencyCluster, TextMap textMap = null, InternalConditionLibrary internalConditionLibrary = null)
@@ -42,7 +58,19 @@ namespace SAM.Analytical.UI.WPF
 
             mapInternalConditionsControl.Spaces = spaces?.ToList();
 
-            Load();
+            FinishInitialization();
+        }
+
+        /// <summary>
+        /// Called by the owning window once every required input has been assigned. Before this runs,
+        /// SetMapFunc treats a missing resource as "not ready yet" rather than "failed" - see the
+        /// `initializing` field. Safe to call more than once; only the first call matters.
+        /// </summary>
+        public void FinishInitialization()
+        {
+            initializing = false;
+            LoadZones();
+            SetMapFunc();
         }
 
         private void MapInternalConditionsControl_MapSourceChanged(object sender, EventArgs e)
@@ -205,6 +233,17 @@ namespace SAM.Analytical.UI.WPF
 
         public void SetMapFunc()
         {
+            if (initializing)
+            {
+                // Owner is still wiring the control up (see the `initializing` field) - a missing
+                // library/text map here is expected, not a failure. Keep spaces mappable-looking
+                // (Assign stays enabled) without guessing at a result; FinishInitialization will
+                // run the real check once every input is actually in place.
+                mapInternalConditionsControl.MapFunc = new Func<Space, InternalCondition>(x => null);
+                mapInternalConditionsControl.MapDiagnosticFunc = null;
+                return;
+            }
+
             TextMap textMap = TextMap;
             InternalConditionLibrary internalConditionLibrary = InternalConditionLibrary;
             string zoneType = comboBox_ZoneType.SelectedItem as string;
@@ -213,13 +252,19 @@ namespace SAM.Analytical.UI.WPF
             // so a missing selection here does not silently produce an inert (always-blank) manager.
             TM59Manager tM59Manager = new TM59Manager(textMap);
 
-            if (!ResourcesAreUsable(tM59Manager, internalConditionLibrary))
+            bool usable = ResourcesAreUsable(tM59Manager, internalConditionLibrary);
+            mapInternalConditionsControl.AssignEnabled = usable;
+
+            if (!usable)
             {
                 ReportResourceFailure();
 
                 mapInternalConditionsControl.MapFunc = new Func<Space, InternalCondition>(x => null);
+                mapInternalConditionsControl.MapDiagnosticFunc = null;
                 return;
             }
+
+            lastCheckFailed = false;
 
             mapInternalConditionsControl.MapFunc = new Func<Space, InternalCondition>(x =>
             {
@@ -243,14 +288,20 @@ namespace SAM.Analytical.UI.WPF
             return internalConditions != null && internalConditions.Count != 0;
         }
 
+        /// <summary>
+        /// Reports a genuine resource failure once per failure episode - not a permanent one-shot
+        /// latch: if the control later recovers (a valid library/text map gets selected) and then
+        /// fails again, that new failure is reported too. Only repeat notifications for the SAME
+        /// ongoing failure (e.g. every Zone Type change while still invalid) are suppressed.
+        /// </summary>
         private void ReportResourceFailure()
         {
-            if (resourceFailureReported)
+            if (lastCheckFailed)
             {
                 return;
             }
 
-            resourceFailureReported = true;
+            lastCheckFailed = true;
             System.Windows.MessageBox.Show(
                 "The TM59 InternalCondition TextMap or InternalConditionLibrary could not be loaded, " +
                 "so spaces cannot be mapped automatically. Select a valid Text Map and InternalCondition " +

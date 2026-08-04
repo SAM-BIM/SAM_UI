@@ -18,9 +18,14 @@ namespace SAM.Analytical.UI.WPF
             InitializeComponent();
 
             mapTM59InternalConditionsControl.AdjacencyCluster = adjacencyCluster;
-
             mapTM59InternalConditionsControl.TextMap = textMap;
             mapTM59InternalConditionsControl.InternalConditionLibrary = internalConditionLibrary;
+
+            // FinishInitialization must run BEFORE Spaces is assigned: it is what turns SetMapFunc's
+            // "not ready yet" placeholder into the real, resource-checked mapping function, and Spaces
+            // is what triggers the row build + AutoMapOnLoad preselection that needs that real function.
+            mapTM59InternalConditionsControl.FinishInitialization();
+
             mapTM59InternalConditionsControl.Spaces = spaces == null ? null : new List<Space>(spaces);
 
             UpdateStatus();
