@@ -805,6 +805,9 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_MapInternalConditionsByTM59.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_MapInternalConditionsByTM59.Click += RibbonButton_MapInternalConditionsByTM59_Click;
 
+            RibbonButton_AddVentilationPartF.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_AddVentilationPartF.Click += RibbonButton_AddVentilationPartF_Click;
+
             RibbonButton_EditInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditInternalConditions.Click += RibbonButton_EditInternalConditions_Click;
 
@@ -875,6 +878,11 @@ namespace SAM.Analytical.UI.WPF.Windows
             uIAnalyticalModel.Opened += UIAnalyticalModel_Opened;
 
             SetEnabled();
+        }
+
+        private void RibbonButton_AddVentilationPartF_Click(object sender, RoutedEventArgs e)
+        {
+            Modify.AddVentilationByPartF(uIAnalyticalModel);
         }
 
         private void Isolate(MenuItem menuItem)
