@@ -45,6 +45,22 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>
+        /// Gets or sets the setback operating factor: setback flow rate = continuous design flow rate x
+        /// factor. Validated by the control and again by the calculator.
+        /// </summary>
+        public double SetbackFlowRateFactor
+        {
+            get
+            {
+                return partFVectilationControl.SetbackFlowRateFactor;
+            }
+            set
+            {
+                partFVectilationControl.SetbackFlowRateFactor = value;
+            }
+        }
+
         private void button_OK_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = true;

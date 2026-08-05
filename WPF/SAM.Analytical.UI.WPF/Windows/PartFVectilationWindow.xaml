@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Part F Ventilation" Height="180" Width="350" ResizeMode="NoResize">
+        Title="Part F Ventilation" Height="270" Width="420" ResizeMode="NoResize">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
