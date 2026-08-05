@@ -10,12 +10,20 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public partial class ZoneControl : UserControl
     {
+        //Not set preserves legacy category-only behaviour (ZoneParameter.IsDwelling absent); Yes/No
+        //write an explicit true/false. TryGetValue, not GetValue, distinguishes "explicitly false"
+        //from "no value at all" when this is read back.
+        private const string Dwelling_NotSet = "";
+        private const string Dwelling_Yes = "Yes";
+        private const string Dwelling_No = "No";
+
         private AdjacencyCluster adjacencyCluster;
         private Zone zone;
 
         public ZoneControl()
         {
             InitializeComponent();
+            LoadDwellingOptions();
         }
 
         public ZoneControl(Zone zone)
@@ -23,6 +31,16 @@ namespace SAM.Analytical.UI.WPF
             this.zone = zone;
 
             InitializeComponent();
+            LoadDwellingOptions();
+        }
+
+        private void LoadDwellingOptions()
+        {
+            comboBox_Dwelling.Items.Clear();
+            comboBox_Dwelling.Items.Add(Dwelling_NotSet);
+            comboBox_Dwelling.Items.Add(Dwelling_Yes);
+            comboBox_Dwelling.Items.Add(Dwelling_No);
+            comboBox_Dwelling.SelectedItem = Dwelling_NotSet;
         }
 
         public AdjacencyCluster AdjacencyCluster
@@ -76,6 +94,16 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
+            //TryGetValue, not GetValue: a zone that has never had the parameter set must read back
+            //as Not Set, not as No.
+            if (zone.TryGetValue(ZoneParameter.IsDwelling, out bool isDwelling))
+            {
+                comboBox_Dwelling.SelectedItem = isDwelling ? Dwelling_Yes : Dwelling_No;
+            }
+            else
+            {
+                comboBox_Dwelling.SelectedItem = Dwelling_NotSet;
+            }
         }
 
         private void LoadZoneCategories()
@@ -145,6 +173,20 @@ namespace SAM.Analytical.UI.WPF
             {
                 Color color = solidColorBrush.Color;
                 result.SetValue(ZoneParameter.Color, new Core.SAMColor(Core.UI.Convert.ToDrawing(color)));
+            }
+
+            string dwelling = comboBox_Dwelling?.SelectedItem as string;
+            if (dwelling == Dwelling_Yes)
+            {
+                result.SetValue(ZoneParameter.IsDwelling, true);
+            }
+            else if (dwelling == Dwelling_No)
+            {
+                result.SetValue(ZoneParameter.IsDwelling, false);
+            }
+            else
+            {
+                result.RemoveValue(ZoneParameter.IsDwelling);
             }
 
             return result;
