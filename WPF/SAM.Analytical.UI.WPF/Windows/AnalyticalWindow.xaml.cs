@@ -28,11 +28,11 @@ namespace SAM.Analytical.UI.WPF.Windows
     {
         private static string titlePrefix = "SAM Analytical";
 
-        private DoubleRangeWindow doubleRangeWindow = null;
-        private ProgressBarWindowManager progressBarWindowManager = new ProgressBarWindowManager();
+        private DoubleRangeWindow? doubleRangeWindow = null;
+        private ProgressBarWindowManager progressBarWindowManager = new ();
 
-        private UIAnalyticalModel uIAnalyticalModel = null;
-        private SAM.Core.UI.WPF.WindowHandle windowHandle = null;
+        private UIAnalyticalModel? uIAnalyticalModel = null;
+        private WindowHandle? windowHandle = null;
         public AnalyticalWindow()
         {
             InitializeWindow();
@@ -89,12 +89,12 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
-            AdjacencyCluster adjacencyCluster = uIAnalyticalModel?.JSAMObject?.AdjacencyCluster;
+            AdjacencyCluster? adjacencyCluster = uIAnalyticalModel?.JSAMObject?.AdjacencyCluster;
             if (adjacencyCluster != null)
             {
                 for (int i = sAMObjects.Count - 1; i >= 0; i--)
                 {
-                    Zone zone = sAMObjects[i] as Zone;
+                    Zone? zone = sAMObjects[i] as Zone;
                     if (zone == null)
                     {
                         continue;
@@ -2165,8 +2165,45 @@ namespace SAM.Analytical.UI.WPF.Windows
             System.Diagnostics.Process.Start(path);
         }
 
+        private bool TryOpen(string? extension)
+        {
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                return false;
+            }
+
+            string? outputDirectory = System.IO.Path.GetDirectoryName(uIAnalyticalModel?.Path);
+            string? projectName = uIAnalyticalModel?.JSAMObject?.Name;
+
+            if (string.IsNullOrWhiteSpace(outputDirectory) || string.IsNullOrWhiteSpace(projectName) || !System.IO.Directory.Exists(outputDirectory))
+            {
+                return false;
+            }
+
+            string path = System.IO.Path.Combine(outputDirectory, projectName + extension);
+            if (System.IO.File.Exists(path))
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
         private void RibbonButton_OpenT3D_Click(object sender, RoutedEventArgs e)
         {
+            if (TryOpen(".t3d"))
+            {
+                return;
+            }
+
             string path = Core.Tas.Query.TAS3DPath();
             if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
             {
@@ -2178,6 +2215,11 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_OpenTBD_Click(object sender, RoutedEventArgs e)
         {
+            if (TryOpen(".tbd"))
+            {
+                return;
+            }
+
             string path = Core.Tas.Query.TBDPath();
 
             if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
@@ -2190,6 +2232,11 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_OpenTPD_Click(object sender, RoutedEventArgs e)
         {
+            if (TryOpen(".tpd"))
+            {
+                return;
+            }
+
             string path = Core.Tas.Query.TPDPath();
 
             if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
@@ -2202,6 +2249,11 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_OpenTSD_Click(object sender, RoutedEventArgs e)
         {
+            if (TryOpen(".tsd"))
+            {
+                return;
+            }
+
             string path = Core.Tas.Query.TSDPath();
 
             if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
@@ -2865,7 +2917,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
         }
 
-        private void SetUIGeometrySettings(TabControl tabControl, AnalyticalModel analyticalModel)
+        private void SetUIGeometrySettings(TabControl tabControl, AnalyticalModel? analyticalModel)
         {
             UIGeometrySettings uIGeometrySettings = UpdateUIGeometrySettings(tabControl, analyticalModel, new ModifiedEventArgs());
 
@@ -3487,14 +3539,14 @@ namespace SAM.Analytical.UI.WPF.Windows
             return result;
         }
 
-        private UIGeometrySettings UpdateUIGeometrySettings(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs)
+        private UIGeometrySettings? UpdateUIGeometrySettings(TabControl tabControl, AnalyticalModel? analyticalModel, ModifiedEventArgs modifiedEventArgs)
         {
             if (analyticalModel == null || tabControl == null)
             {
                 return null;
             }
 
-            if (!analyticalModel.TryGetValue(AnalyticalModelParameter.UIGeometrySettings, out UIGeometrySettings result) || result == null)
+            if (!analyticalModel.TryGetValue(AnalyticalModelParameter.UIGeometrySettings, out UIGeometrySettings? result) || result == null)
             {
                 result = new UIGeometrySettings();
             }
@@ -3503,15 +3555,15 @@ namespace SAM.Analytical.UI.WPF.Windows
             Guid guid = Guid.Empty;
             for (int i = 0; i < tabControl.Items.Count; i++)
             {
-                TabItem tabItem = tabControl.Items[i] as TabItem;
+                TabItem? tabItem = tabControl.Items[i] as TabItem;
 
-                ViewportControl viewportControl = tabItem?.Content as ViewportControl;
+                ViewportControl? viewportControl = tabItem?.Content as ViewportControl;
                 if (viewportControl == null)
                 {
                     continue;
                 }
 
-                GeometryObjectModel geometryObjectModel = viewportControl.UIGeometryObjectModel?.JSAMObject;
+                GeometryObjectModel? geometryObjectModel = viewportControl.UIGeometryObjectModel?.JSAMObject;
                 if (geometryObjectModel == null)
                 {
                     return null;
