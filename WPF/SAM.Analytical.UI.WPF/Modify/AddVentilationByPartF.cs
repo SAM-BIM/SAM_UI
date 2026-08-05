@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Core.UI;
@@ -8,7 +8,7 @@ namespace SAM.Analytical.UI.WPF
 {
     public static partial class Modify
     {
-        public static void AddVentilationByPartF(this UIAnalyticalModel? uIAnalyticalModel, string? zoneCategoryName = null, IEnumerable<Space>? spaces = null)
+        public static void AddVentilationByPartF(this UIAnalyticalModel? uIAnalyticalModel)
         {
             AnalyticalModel? analyticalModel = uIAnalyticalModel?.JSAMObject;
             if (analyticalModel == null)
@@ -27,6 +27,19 @@ namespace SAM.Analytical.UI.WPF
             {
                 return;
             }
+
+            PartFVectilationWindow partFVectilationWindow = new()
+            {
+                ZoneCategories = [.. adjacencyCluster.GetZoneCategories() ?? []]
+            };
+
+            bool? showdialog = partFVectilationWindow.ShowDialog();
+            if (showdialog == null || !showdialog.HasValue || !showdialog.Value)
+            {
+                return;
+            }
+
+            string? zoneCategoryName = partFVectilationWindow.SelectedZoneCategory;
 
             partFCalculator.AdjacencyCluster = adjacencyCluster;
 
