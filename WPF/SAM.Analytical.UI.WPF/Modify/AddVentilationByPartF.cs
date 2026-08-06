@@ -2,15 +2,17 @@
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Core.UI;
-using System.Collections.Generic;
 using System.Linq;
-using System.Windows;
+using System.Text;
+using System.Windows.Forms;
 
 namespace SAM.Analytical.UI.WPF
 {
     public static partial class Modify
     {
-        public static void AddVentilationByPartF(this UIAnalyticalModel? uIAnalyticalModel)
+        private const string PartFReportTitle = "Part F Ventilation";
+
+        public static void AddVentilationByPartF(this UIAnalyticalModel? uIAnalyticalModel, IWin32Window? owner = null)
         {
             AnalyticalModel? analyticalModel = uIAnalyticalModel?.JSAMObject;
             if (analyticalModel == null)
@@ -63,25 +65,27 @@ namespace SAM.Analytical.UI.WPF
 
             uIAnalyticalModel?.SetJSAMObject(analyticalModel, new FullModification());
 
-            Report(partFCalculator);
+            Report(partFCalculator, owner);
         }
 
         /// <summary>
-        /// Surfaces the calculation's warnings and remarks. Without this the dwelling filter, the
-        /// unclassified spaces and the local kitchen extract limitation were all computed and then discarded,
-        /// leaving the user with rates and no indication that anything needed checking.
+        /// Builds the calculation's report text: dwelling summaries, excluded zones, unclassified and
+        /// unzoned spaces, warnings, notes and the local kitchen extract limitation. Pure text
+        /// generation with no UI dependency, so it can be unit tested directly - a model with
+        /// thousands of spaces can produce thousands of report lines, and this must not be the layer
+        /// that struggles with that.
         /// </summary>
-        private static void Report(PartFCalculator partFCalculator)
+        public static string BuildReportText(PartFCalculator partFCalculator)
         {
-            List<string> lines = [];
+            StringBuilder stringBuilder = new();
 
             if (partFCalculator.DwellingResults is not null && partFCalculator.DwellingResults.Count != 0)
             {
-                lines.Add(string.Format("{0} dwelling(s) sized.", partFCalculator.DwellingResults.Count));
+                stringBuilder.AppendLine(string.Format("{0} dwelling(s) sized.", partFCalculator.DwellingResults.Count));
 
                 foreach (PartFDwellingResult dwellingResult in partFCalculator.DwellingResults)
                 {
-                    lines.Add(string.Format(
+                    stringBuilder.AppendLine(string.Format(
                         "{0}{1} habitable room(s), {2} bedroom(s), {3:0.##} m2, continuous design {4:0.##} l/s, setback {5:0.##} l/s ({6:0.##}% of continuous design).{7}",
                         string.IsNullOrWhiteSpace(dwellingResult.Name) ? string.Empty : dwellingResult.Name + ": ",
                         dwellingResult.HabitableRoomCount,
@@ -95,51 +99,73 @@ namespace SAM.Analytical.UI.WPF
             }
             else
             {
-                lines.Add("No dwelling was sized.");
+                stringBuilder.AppendLine("No dwelling was sized.");
             }
 
             if (partFCalculator.ExcludedZoneNames is not null && partFCalculator.ExcludedZoneNames.Count != 0)
             {
-                lines.Add(string.Empty);
-                lines.Add("Zones not sized as dwellings: " + string.Join(", ", partFCalculator.ExcludedZoneNames));
+                stringBuilder.AppendLine();
+                stringBuilder.AppendLine("Zones not sized as dwellings: " + string.Join(", ", partFCalculator.ExcludedZoneNames));
             }
 
             if (partFCalculator.UnclassifiedSpaceNames is not null && partFCalculator.UnclassifiedSpaceNames.Count != 0)
             {
-                lines.Add(string.Empty);
-                lines.Add("Unclassified space(s): " + string.Join(", ", partFCalculator.UnclassifiedSpaceNames));
+                stringBuilder.AppendLine();
+                stringBuilder.AppendLine("Unclassified space(s): " + string.Join(", ", partFCalculator.UnclassifiedSpaceNames));
             }
 
             if (partFCalculator.Warnings is not null && partFCalculator.Warnings.Count != 0)
             {
-                lines.Add(string.Empty);
-                lines.Add("WARNINGS");
-                lines.AddRange(partFCalculator.Warnings);
+                stringBuilder.AppendLine();
+                stringBuilder.AppendLine("WARNINGS");
+                foreach (string warning in partFCalculator.Warnings)
+                {
+                    stringBuilder.AppendLine(warning);
+                }
             }
 
             if (partFCalculator.Remarks is not null && partFCalculator.Remarks.Count != 0)
             {
-                lines.Add(string.Empty);
-                lines.Add("NOTES");
-                lines.AddRange(partFCalculator.Remarks);
+                stringBuilder.AppendLine();
+                stringBuilder.AppendLine("NOTES");
+                foreach (string remark in partFCalculator.Remarks)
+                {
+                    stringBuilder.AppendLine(remark);
+                }
             }
 
             //Called out separately from the warning list so the local kitchen extract limitation is not
             //lost among the other messages: it is a standing limitation of the model, not a modelling slip.
             if (partFCalculator.Warnings is not null && partFCalculator.Warnings.Any(x => x.Contains("ENGINEERING CHECK REQUIRED")))
             {
-                lines.Add(string.Empty);
-                lines.Add("LOCAL KITCHEN EXTRACT: one or more dwellings contain a cooking space with no explicit local kitchen or cooker extract represented. Wet-room extract may balance the dwelling airflow but does not demonstrate compliance with the local kitchen-extract requirement. Model and verify it separately.");
+                stringBuilder.AppendLine();
+                stringBuilder.AppendLine("LOCAL KITCHEN EXTRACT: one or more dwellings contain a cooking space with no explicit local kitchen or cooker extract represented. Wet-room extract may balance the dwelling airflow but does not demonstrate compliance with the local kitchen-extract requirement. Model and verify it separately.");
             }
 
-            lines.Add(string.Empty);
-            lines.Add("Using this tool does not by itself demonstrate compliance with Building Regulations Part F. Results must be checked by a suitably qualified engineer against the full Approved Document.");
+            stringBuilder.AppendLine();
+            stringBuilder.AppendLine("Using this tool does not by itself demonstrate compliance with Building Regulations Part F. Results must be checked by a suitably qualified engineer against the full Approved Document.");
 
-            MessageBoxImage messageBoxImage = partFCalculator.Warnings is not null && partFCalculator.Warnings.Count != 0
-                ? MessageBoxImage.Warning
-                : MessageBoxImage.Information;
+            return stringBuilder.ToString();
+        }
 
-            MessageBox.Show(string.Join("\n", lines), "Part F Ventilation", MessageBoxButton.OK, messageBoxImage);
+        /// <summary>
+        /// Surfaces the calculation's warnings and remarks. Without this the dwelling filter, the
+        /// unclassified spaces and the local kitchen extract limitation were all computed and then discarded,
+        /// leaving the user with rates and no indication that anything needed checking.
+        /// </summary>
+        private static void Report(PartFCalculator partFCalculator, IWin32Window? owner)
+        {
+            string text = BuildReportText(partFCalculator);
+
+            SAM.Core.UI.WPF.ReportWindow reportWindow = new(PartFReportTitle, text);
+
+            //Bridge the WinForms IWin32Window owner to the WPF window's native owner handle.
+            if (owner != null)
+            {
+                new System.Windows.Interop.WindowInteropHelper(reportWindow).Owner = owner.Handle;
+            }
+
+            reportWindow.ShowDialog();
         }
     }
 }

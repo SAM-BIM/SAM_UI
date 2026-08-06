@@ -1930,7 +1930,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_AddVentilationPartF_Click(object sender, RoutedEventArgs e)
         {
-            Modify.AddVentilationByPartF(uIAnalyticalModel);
+            Modify.AddVentilationByPartF(uIAnalyticalModel, windowHandle);
         }
         
         private void RibbonButton_AirHandlingUnitDiagram_Click(object sender, RoutedEventArgs e)
