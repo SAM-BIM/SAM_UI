@@ -32,19 +32,19 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            PartFVectilationWindow partFVectilationWindow = new()
+            PartFVentilationWindow partFVentilationWindow = new()
             {
                 ZoneCategories = [.. adjacencyCluster.GetZoneCategories() ?? []],
                 SetbackFlowRateFactor = Analytical.Query.DefaultPartFData()?.SetbackFlowRateFactor ?? PartFData.DefaultSetbackFlowRateFactor,
             };
 
-            bool? showdialog = partFVectilationWindow.ShowDialog();
+            bool? showdialog = partFVentilationWindow.ShowDialog();
             if (showdialog == null || !showdialog.HasValue || !showdialog.Value)
             {
                 return;
             }
 
-            string? zoneCategoryName = partFVectilationWindow.SelectedZoneCategory;
+            string? zoneCategoryName = partFVentilationWindow.SelectedZoneCategory;
 
             partFCalculator.AdjacencyCluster = adjacencyCluster;
 
@@ -52,7 +52,7 @@ namespace SAM.Analytical.UI.WPF
             //ActiveSetting for the whole session, so writing the factor there would silently change every
             //later calculation. The property validates the factor and substitutes the documented default
             //for a negative value, a value above 1, NaN or infinity.
-            partFCalculator.SetbackFlowRateFactor = partFVectilationWindow.SetbackFlowRateFactor;
+            partFCalculator.SetbackFlowRateFactor = partFVentilationWindow.SetbackFlowRateFactor;
 
             //One call, whether or not a zone category was chosen. PartFCalculator.Calculate(string)
             //handles both single house mode (empty category) and zoned mode, and only it applies the

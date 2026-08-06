@@ -8,14 +8,14 @@ using System.Windows.Controls;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// Interaction logic for PartFVectilationControl.xaml
+    /// Interaction logic for PartFVentilationControl.xaml
     /// </summary>
-    public partial class PartFVectilationControl : UserControl
+    public partial class PartFVentilationControl : UserControl
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="PartFVectilationControl"/> class.
+        /// Initializes a new instance of the <see cref="PartFVentilationControl"/> class.
         /// </summary>
-        public PartFVectilationControl()
+        public PartFVentilationControl()
         {
             InitializeComponent();
 

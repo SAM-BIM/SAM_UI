@@ -7,14 +7,14 @@ using System.Windows;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// Interaction logic for PartFVectilationWindow.xaml
+    /// Interaction logic for PartFVentilationWindow.xaml
     /// </summary>
-    public partial class PartFVectilationWindow : System.Windows.Window
+    public partial class PartFVentilationWindow : System.Windows.Window
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="PartFVectilationWindow"/> class.
+        /// Initializes a new instance of the <see cref="PartFVentilationWindow"/> class.
         /// </summary>
-        public PartFVectilationWindow()
+        public PartFVentilationWindow()
         {
             InitializeComponent();
         }
@@ -26,7 +26,7 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
-                return partFVectilationControl.SelectedZoneCategory;
+                return partFVentilationControl.SelectedZoneCategory;
             }
         }
 
@@ -37,11 +37,11 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
-                return partFVectilationControl.ZoneCategories;
+                return partFVentilationControl.ZoneCategories;
             }
             set
             {
-                partFVectilationControl.ZoneCategories = value;
+                partFVentilationControl.ZoneCategories = value;
             }
         }
 
@@ -53,11 +53,11 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
-                return partFVectilationControl.SetbackFlowRateFactor;
+                return partFVentilationControl.SetbackFlowRateFactor;
             }
             set
             {
-                partFVectilationControl.SetbackFlowRateFactor = value;
+                partFVentilationControl.SetbackFlowRateFactor = value;
             }
         }
 
