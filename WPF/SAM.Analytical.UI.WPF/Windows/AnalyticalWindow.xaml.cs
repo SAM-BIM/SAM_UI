@@ -26,13 +26,25 @@ namespace SAM.Analytical.UI.WPF.Windows
     /// </summary>
     public partial class AnalyticalWindow : System.Windows.Window
     {
+        private const int chordTimeoutMilliseconds = 1000;
         private static string titlePrefix = "SAM Analytical";
 
+        // View guids whose geometry regeneration was deferred because the tab was not active
+        // when a modification arrived. Regenerated lazily on activation (see RegenerateIfDirty).
+        private readonly HashSet<Guid> dirtyViewGuids = new HashSet<Guid>();
+
         private DoubleRangeWindow? doubleRangeWindow = null;
-        private ProgressBarWindowManager progressBarWindowManager = new ();
+        // Two-letter chord state (Rhino-style "ZE"/"ZS"). A prefix key (Z) is remembered for a short
+        // window; the next key completes the chord. Z has no single-key action of its own, so there is
+        // nothing to defer - a lone Z, or Z followed by a non-chord key, simply does nothing for the Z.
+        private Key? pendingChordKey;
+
+        private int pendingChordTick;
+        private ProgressBarWindowManager progressBarWindowManager = new();
 
         private UIAnalyticalModel? uIAnalyticalModel = null;
         private WindowHandle? windowHandle = null;
+        
         public AnalyticalWindow()
         {
             InitializeWindow();
@@ -73,6 +85,23 @@ namespace SAM.Analytical.UI.WPF.Windows
             SetUIGeometrySettings(tabControl, analyticalModel);
 
             uIAnalyticalModel.SaveAs();
+        }
+
+        private static bool IsDescendantOf(DependencyObject node, DependencyObject ancestor)
+        {
+            while (node != null)
+            {
+                if (node == ancestor)
+                {
+                    return true;
+                }
+
+                node = node is System.Windows.Media.Visual || node is System.Windows.Media.Media3D.Visual3D
+                    ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                    : System.Windows.LogicalTreeHelper.GetParent(node);
+            }
+
+            return false;
         }
 
         private void AnalyticalModelControl_SelectionRequested(object sender, SelectionRequestedEventArgs e)
@@ -160,9 +189,45 @@ namespace SAM.Analytical.UI.WPF.Windows
             viewportControl.Zoom(sAMObjects);
         }
 
-        private void AssignMechanicalSystems(IEnumerable<Space> spaces = null)
+        private void AssignMechanicalSystems(IEnumerable<Space>? spaces = null)
         {
             Modify.AssignMechanicalSystems(uIAnalyticalModel, spaces);
+        }
+
+        private void CopyViewSettings(TabItem tabItem)
+        {
+            if (tabItem == null)
+            {
+                return;
+            }
+
+            ViewportControl viewportControl = tabItem.Content as ViewportControl;
+            if (viewportControl == null)
+            {
+                return;
+            }
+
+            //SetActiveGuid();
+            SetUIGeometrySettings(tabControl, uIAnalyticalModel.JSAMObject);
+            Modify.CopyViewSettings(uIAnalyticalModel, viewportControl.Guid);
+        }
+
+        private void CopyViewSettingsCamera(TabItem tabItem)
+        {
+            if (tabItem == null)
+            {
+                return;
+            }
+
+            ViewportControl viewportControl = tabItem.Content as ViewportControl;
+            if (viewportControl == null)
+            {
+                return;
+            }
+
+            //SetActiveGuid();
+            SetUIGeometrySettings(tabControl, uIAnalyticalModel.JSAMObject);
+            Modify.CopyViewSettingsCamera(uIAnalyticalModel, viewportControl.Guid);
         }
 
         private void Delete()
@@ -275,43 +340,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             SetUIGeometrySettings(tabControl, uIAnalyticalModel.JSAMObject);
             Modify.DuplicateViewSettings(uIAnalyticalModel, viewportControl.Guid);
         }
-
-        private void CopyViewSettings(TabItem tabItem)
-        {
-            if (tabItem == null)
-            {
-                return;
-            }
-
-            ViewportControl viewportControl = tabItem.Content as ViewportControl;
-            if (viewportControl == null)
-            {
-                return;
-            }
-
-            //SetActiveGuid();
-            SetUIGeometrySettings(tabControl, uIAnalyticalModel.JSAMObject);
-            Modify.CopyViewSettings(uIAnalyticalModel, viewportControl.Guid);
-        }
-
-        private void CopyViewSettingsCamera(TabItem tabItem)
-        {
-            if (tabItem == null)
-            {
-                return;
-            }
-
-            ViewportControl viewportControl = tabItem.Content as ViewportControl;
-            if (viewportControl == null)
-            {
-                return;
-            }
-
-            //SetActiveGuid();
-            SetUIGeometrySettings(tabControl, uIAnalyticalModel.JSAMObject);
-            Modify.CopyViewSettingsCamera(uIAnalyticalModel, viewportControl.Guid);
-        }
-
+        
         private void EditLegend()
         {
             Guid guid = GetActiveGuid();
@@ -515,69 +544,6 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
 
             return uIGeometrySettings.GetViewSettings(viewportControl.Guid);
-        }
-
-        private void Reverse()
-        {
-            ViewportControl viewportControl = GetActiveViewportControl();
-            if (viewportControl == null)
-            {
-                return;
-            }
-
-            AdjacencyCluster? adjacencyCluster = uIAnalyticalModel.JSAMObject?.AdjacencyCluster;
-
-            List<Tuple<SAMObject, bool>> tuples = [];
-
-            if (adjacencyCluster?.GetPanels() is List<Panel> panels)
-            {
-                foreach (Panel panel in panels)
-                {
-                    tuples.Add(new Tuple<SAMObject, bool>(panel, viewportControl.Contains<Panel>(panel.Guid)));
-
-                    List<Aperture> apertures = panel.Apertures;
-                    if (apertures != null)
-                    {
-                        foreach (Aperture aperture in apertures)
-                        {
-                            tuples.Add(new Tuple<SAMObject, bool>(aperture, viewportControl.Contains<Aperture>(aperture.Guid)));
-                        }
-                    }
-                }
-            }
-
-            if (adjacencyCluster?.GetSpaces() is List<Space> spaces)
-            {
-                foreach (Space space in spaces)
-                {
-                    tuples.Add(new Tuple<SAMObject, bool>(space, viewportControl.Contains<Space>(space.Guid)));
-                }
-            }
-
-            if (tuples is null || tuples.Count == 0)
-            {
-                return;
-            }
-
-            List<SAMObject> sAMObjects_Selected = viewportControl.SelectedSAMObjects<SAMObject>();
-            if(sAMObjects_Selected is null || sAMObjects_Selected.Count == 0)
-            {
-                UI.Modify.Hide(uIAnalyticalModel, viewportControl.Guid, tuples.ConvertAll(x => x.Item1), tuples.ConvertAll(x => !x.Item2));
-            }
-            else
-            {
-                List<SAMObject> sAMObjects = tuples.FindAll(x => x.Item2).ConvertAll(x => x.Item1);
-                foreach(SAMObject sAMObject_Selected in sAMObjects_Selected)
-                {
-                    int index = sAMObjects.FindIndex(x => x.Guid == sAMObject_Selected.Guid);
-                    if(index != -1)
-                    {
-                        sAMObjects.RemoveAt(index);
-                    }
-                }
-
-                viewportControl.Select(sAMObjects);
-            }
         }
 
         private void Hide()
@@ -804,6 +770,9 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             RibbonButton_MapInternalConditionsByTM59.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_MapInternalConditionsByTM59.Click += RibbonButton_MapInternalConditionsByTM59_Click;
+
+            RibbonButton_AddVentilationPartF.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_AddVentilationPartF.Click += RibbonButton_AddVentilationPartF_Click;
 
             RibbonButton_EditInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditInternalConditions.Click += RibbonButton_EditInternalConditions_Click;
@@ -1154,7 +1123,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             Delete();
         }
-        
+
         private void MenuItem_Duplicate_TabItem_Click(object sender, RoutedEventArgs e)
         {
             MenuItem menuItem = sender as MenuItem;
@@ -1269,6 +1238,40 @@ namespace SAM.Analytical.UI.WPF.Windows
         private void MenuItem_Legend_Click(object sender, RoutedEventArgs e)
         {
             EditLegend();
+        }
+
+        private void MenuItem_LoadCamera_Click(object sender, RoutedEventArgs e)
+        {
+            MenuItem menuItem = sender as MenuItem;
+            if (menuItem == null)
+            {
+                return;
+            }
+
+            TabItem tabItem = (menuItem.Parent as ContextMenu)?.Tag as TabItem;
+            if (tabItem == null)
+            {
+                return;
+            }
+
+            CopyViewSettingsCamera(tabItem);
+        }
+
+        private void MenuItem_LoadView_Click(object sender, RoutedEventArgs e)
+        {
+            MenuItem menuItem = sender as MenuItem;
+            if (menuItem == null)
+            {
+                return;
+            }
+
+            TabItem tabItem = (menuItem.Parent as ContextMenu)?.Tag as TabItem;
+            if (tabItem == null)
+            {
+                return;
+            }
+
+            CopyViewSettings(tabItem);
         }
 
         private void MenuItem_ManageMechanicalSystems_Click(object sender, RoutedEventArgs e)
@@ -1420,6 +1423,11 @@ namespace SAM.Analytical.UI.WPF.Windows
         private void MenuItem_RevealHidden_Click(object sender, RoutedEventArgs e)
         {
             RevealHidden();
+        }
+
+        private void MenuItem_Reverse_Click(object sender, RoutedEventArgs e)
+        {
+            Reverse();
         }
 
         private void MenuItem_SelectByApertureConstructionName_Click(object sender, RoutedEventArgs e)
@@ -1642,6 +1650,11 @@ namespace SAM.Analytical.UI.WPF.Windows
             return uIAnalyticalModel.Open();
         }
 
+        private void Redo()
+        {
+            uIAnalyticalModel?.Redo();
+        }
+
         private void RefreshDoubleRangeWindow()
         {
             if (doubleRangeWindow == null)
@@ -1692,9 +1705,49 @@ namespace SAM.Analytical.UI.WPF.Windows
             doubleRangeWindow.Range = range;
         }
 
-        // View guids whose geometry regeneration was deferred because the tab was not active
-        // when a modification arrived. Regenerated lazily on activation (see RegenerateIfDirty).
-        private readonly HashSet<Guid> dirtyViewGuids = new HashSet<Guid>();
+        // Keep the ribbon Undo/Redo buttons enabled only when there is something to undo/redo. Called
+        // after every model change (UIAnalyticalModel_Modified) and after open/new/close.
+        private void RefreshHistoryButtons()
+        {
+            RibbonButton_Undo.IsEnabled = uIAnalyticalModel != null && uIAnalyticalModel.CanUndo;
+            RibbonButton_Redo.IsEnabled = uIAnalyticalModel != null && uIAnalyticalModel.CanRedo;
+        }
+
+        // Regenerate a view tab whose geometry update was deferred while it was inactive.
+        // No-op if the tab is not dirty, so activating an up-to-date tab stays free.
+        private void RegenerateIfDirty(Guid guid)
+        {
+            if (guid == Guid.Empty || !dirtyViewGuids.Contains(guid))
+            {
+                return;
+            }
+
+            AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
+            if (analyticalModel == null)
+            {
+                return;
+            }
+
+            IViewSettings viewSettings = Query.ViewSettings<ViewSettings>(uIAnalyticalModel, guid);
+            if (viewSettings == null)
+            {
+                dirtyViewGuids.Remove(guid);
+                return;
+            }
+
+            uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
+            tabControl.SelectionChanged -= TabControl_SelectionChanged;
+
+            progressBarWindowManager?.Show("Reloading", "Reloading...");
+
+            // FullModification forces the geometry regeneration; UpdateTabItem clears the dirty flag.
+            UpdateTabItem(tabControl, analyticalModel, new ModifiedEventArgs(new FullModification()), viewSettings, true);
+
+            progressBarWindowManager?.Close();
+
+            tabControl.SelectionChanged += TabControl_SelectionChanged;
+            uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
+        }
 
         private void Reload(ModifiedEventArgs modifiedEventArgs)
         {
@@ -1796,6 +1849,69 @@ namespace SAM.Analytical.UI.WPF.Windows
             UI.Modify.RemoveOverrides(uIAnalyticalModel, viewportControl.Guid);
         }
 
+        private void Reverse()
+        {
+            ViewportControl viewportControl = GetActiveViewportControl();
+            if (viewportControl == null)
+            {
+                return;
+            }
+
+            AdjacencyCluster? adjacencyCluster = uIAnalyticalModel.JSAMObject?.AdjacencyCluster;
+
+            List<Tuple<SAMObject, bool>> tuples = [];
+
+            if (adjacencyCluster?.GetPanels() is List<Panel> panels)
+            {
+                foreach (Panel panel in panels)
+                {
+                    tuples.Add(new Tuple<SAMObject, bool>(panel, viewportControl.Contains<Panel>(panel.Guid)));
+
+                    List<Aperture> apertures = panel.Apertures;
+                    if (apertures != null)
+                    {
+                        foreach (Aperture aperture in apertures)
+                        {
+                            tuples.Add(new Tuple<SAMObject, bool>(aperture, viewportControl.Contains<Aperture>(aperture.Guid)));
+                        }
+                    }
+                }
+            }
+
+            if (adjacencyCluster?.GetSpaces() is List<Space> spaces)
+            {
+                foreach (Space space in spaces)
+                {
+                    tuples.Add(new Tuple<SAMObject, bool>(space, viewportControl.Contains<Space>(space.Guid)));
+                }
+            }
+
+            if (tuples is null || tuples.Count == 0)
+            {
+                return;
+            }
+
+            List<SAMObject> sAMObjects_Selected = viewportControl.SelectedSAMObjects<SAMObject>();
+            if(sAMObjects_Selected is null || sAMObjects_Selected.Count == 0)
+            {
+                UI.Modify.Hide(uIAnalyticalModel, viewportControl.Guid, tuples.ConvertAll(x => x.Item1), tuples.ConvertAll(x => !x.Item2));
+            }
+            else
+            {
+                List<SAMObject> sAMObjects = tuples.FindAll(x => x.Item2).ConvertAll(x => x.Item1);
+                foreach(SAMObject sAMObject_Selected in sAMObjects_Selected)
+                {
+                    int index = sAMObjects.FindIndex(x => x.Guid == sAMObject_Selected.Guid);
+                    if(index != -1)
+                    {
+                        sAMObjects.RemoveAt(index);
+                    }
+                }
+
+                viewportControl.Select(sAMObjects);
+            }
+        }
+        
         private void RibbonButton_About_Click(object sender, RoutedEventArgs e)
         {
             List<AboutInfoType> abouInfoTypes = Enum.GetValues(typeof(AboutInfoType)).Cast<AboutInfoType>().ToList();
@@ -1807,27 +1923,16 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
         }
 
-        private void RibbonButton_Undo_Click(object sender, RoutedEventArgs e)
-        {
-            Undo();
-        }
-
-        private void RibbonButton_Redo_Click(object sender, RoutedEventArgs e)
-        {
-            Redo();
-        }
-
-        private void RibbonButton_KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
-        {
-            KeyboardShortcutsWindow keyboardShortcutsWindow = new KeyboardShortcutsWindow() { Owner = this };
-            keyboardShortcutsWindow.ShowDialog();
-        }
-
         private void RibbonButton_AddMissingObjects_Click(object sender, RoutedEventArgs e)
         {
             uIAnalyticalModel?.AddMissingObjects(windowHandle);
         }
 
+        private void RibbonButton_AddVentilationPartF_Click(object sender, RoutedEventArgs e)
+        {
+            Modify.AddVentilationByPartF(uIAnalyticalModel, windowHandle);
+        }
+        
         private void RibbonButton_AirHandlingUnitDiagram_Click(object sender, RoutedEventArgs e)
         {
             uIAnalyticalModel?.AirHandlingUnitDiagram(windowHandle);
@@ -2019,6 +2124,12 @@ namespace SAM.Analytical.UI.WPF.Windows
             uIAnalyticalModel?.ImportWeatherData(windowHandle);
         }
 
+        private void RibbonButton_KeyboardShortcuts_Click(object sender, RoutedEventArgs e)
+        {
+            KeyboardShortcutsWindow keyboardShortcutsWindow = new KeyboardShortcutsWindow() { Owner = this };
+            keyboardShortcutsWindow.ShowDialog();
+        }
+
         private void RibbonButton_MapInternalConditions_Click(object sender, RoutedEventArgs e)
         {
             Modify.MapInternalConditions(uIAnalyticalModel);
@@ -2165,38 +2276,6 @@ namespace SAM.Analytical.UI.WPF.Windows
             System.Diagnostics.Process.Start(path);
         }
 
-        private bool TryOpen(string? extension)
-        {
-            if (string.IsNullOrWhiteSpace(extension))
-            {
-                return false;
-            }
-
-            string? outputDirectory = System.IO.Path.GetDirectoryName(uIAnalyticalModel?.Path);
-            string? projectName = uIAnalyticalModel?.JSAMObject?.Name;
-
-            if (string.IsNullOrWhiteSpace(outputDirectory) || string.IsNullOrWhiteSpace(projectName) || !System.IO.Directory.Exists(outputDirectory))
-            {
-                return false;
-            }
-
-            string path = System.IO.Path.Combine(outputDirectory, projectName + extension);
-            if (System.IO.File.Exists(path))
-            {
-                try
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
-
-            return false;
-        }
-
         private void RibbonButton_OpenT3D_Click(object sender, RoutedEventArgs e)
         {
             if (TryOpen(".t3d"))
@@ -2267,6 +2346,11 @@ namespace SAM.Analytical.UI.WPF.Windows
         private void RibbonButton_PrintRoomDataSheets_Click(object sender, RoutedEventArgs e)
         {
             uIAnalyticalModel?.PrintRoomDataSheets(windowHandle);
+        }
+
+        private void RibbonButton_Redo_Click(object sender, RoutedEventArgs e)
+        {
+            Redo();
         }
 
         private void RibbonButton_RemoveAirMovementObjects_Click(object sender, RoutedEventArgs e)
@@ -2371,6 +2455,11 @@ namespace SAM.Analytical.UI.WPF.Windows
             Modify.ThermalTransmittanceCalculator_SingleConstruction(uIAnalyticalModel);
         }
 
+        private void RibbonButton_Undo_Click(object sender, RoutedEventArgs e)
+        {
+            Undo();
+        }
+        
         private void RibbonButton_UpdateUKBRFile_Click(object sender, RoutedEventArgs e)
         {
             bool result = Modify.UpdateUKBRFile(uIAnalyticalModel);
@@ -2548,7 +2637,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             viewportControl.Select(panels);
         }
-        
+
         private void SelectByFilter()
         {
             AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
@@ -2760,7 +2849,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             viewportControl.Select(panels);
         }
-        
+
         private void SetActiveGuid()
         {
             Guid guid = GetActiveGuid();
@@ -3005,42 +3094,6 @@ namespace SAM.Analytical.UI.WPF.Windows
             RegenerateIfDirty(guid);
         }
 
-        // Regenerate a view tab whose geometry update was deferred while it was inactive.
-        // No-op if the tab is not dirty, so activating an up-to-date tab stays free.
-        private void RegenerateIfDirty(Guid guid)
-        {
-            if (guid == Guid.Empty || !dirtyViewGuids.Contains(guid))
-            {
-                return;
-            }
-
-            AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
-            if (analyticalModel == null)
-            {
-                return;
-            }
-
-            IViewSettings viewSettings = Query.ViewSettings<ViewSettings>(uIAnalyticalModel, guid);
-            if (viewSettings == null)
-            {
-                dirtyViewGuids.Remove(guid);
-                return;
-            }
-
-            uIAnalyticalModel.Modified -= UIAnalyticalModel_Modified;
-            tabControl.SelectionChanged -= TabControl_SelectionChanged;
-
-            progressBarWindowManager?.Show("Reloading", "Reloading...");
-
-            // FullModification forces the geometry regeneration; UpdateTabItem clears the dirty flag.
-            UpdateTabItem(tabControl, analyticalModel, new ModifiedEventArgs(new FullModification()), viewSettings, true);
-
-            progressBarWindowManager?.Close();
-
-            tabControl.SelectionChanged += TabControl_SelectionChanged;
-            uIAnalyticalModel.Modified += UIAnalyticalModel_Modified;
-        }
-
         private void TabItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
         {
             TabItem tabItem = sender as TabItem;
@@ -3107,38 +3160,24 @@ namespace SAM.Analytical.UI.WPF.Windows
             contextMenu.IsOpen = true;
         }
 
-        private void MenuItem_LoadCamera_Click(object sender, RoutedEventArgs e)
+        private void TabItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            MenuItem menuItem = sender as MenuItem;
-            if (menuItem == null)
-            {
-                return;
-            }
-
-            TabItem tabItem = (menuItem.Parent as ContextMenu)?.Tag as TabItem;
+            TabItem? tabItem = sender as TabItem;
             if (tabItem == null)
             {
                 return;
             }
 
-            CopyViewSettingsCamera(tabItem);
-        }
-
-        private void MenuItem_LoadView_Click(object sender, RoutedEventArgs e)
-        {
-            MenuItem menuItem = sender as MenuItem;
-            if (menuItem == null)
+            // Only a double-click on the tab header itself should open View Settings. A double-click on an
+            // object inside the viewport opens that object's properties; that same double-click bubbles up
+            // to the TabItem, so without this guard View Settings would also open the moment the properties
+            // dialog is dismissed.
+            if (tabItem.Content is DependencyObject content && e.OriginalSource is DependencyObject source && IsDescendantOf(source, content))
             {
                 return;
             }
 
-            TabItem tabItem = (menuItem.Parent as ContextMenu)?.Tag as TabItem;
-            if (tabItem == null)
-            {
-                return;
-            }
-
-            CopyViewSettings(tabItem);
+            EditViewSettings(tabItem);
         }
 
         private void Test()
@@ -3146,13 +3185,13 @@ namespace SAM.Analytical.UI.WPF.Windows
             OpenFileDialog openFileDialog = new OpenFileDialog();
             bool? dialogResult = openFileDialog.ShowDialog(this);
 
-            if(dialogResult == null || !dialogResult.Value)
+            if (dialogResult == null || !dialogResult.Value)
             {
                 return;
             }
 
             string path = openFileDialog.FileName;
-            if(string.IsNullOrEmpty(path))
+            if (string.IsNullOrEmpty(path))
             {
                 return;
             }
@@ -3160,7 +3199,95 @@ namespace SAM.Analytical.UI.WPF.Windows
             IJSAMObject? jSAMObject = Core.Convert.ToSAM<IJSAMObject>(path)?.FirstOrDefault();
 
         }
+
+        private bool TryOpen(string? extension)
+        {
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                return false;
+            }
+
+            string? outputDirectory = System.IO.Path.GetDirectoryName(uIAnalyticalModel?.Path);
+            string? projectName = uIAnalyticalModel?.JSAMObject?.Name;
+
+            if (string.IsNullOrWhiteSpace(outputDirectory) || string.IsNullOrWhiteSpace(projectName) || !System.IO.Directory.Exists(outputDirectory))
+            {
+                return false;
+            }
+
+            string path = System.IO.Path.Combine(outputDirectory, projectName + extension);
+            if (System.IO.File.Exists(path))
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
         
+        // In-place refresh of space colors + legend for attribute-only edits (see AttributeModification).
+        // Returns false when the in-place result could differ from a full regeneration; the caller then
+        // falls back to the regular ToSAM_GeometryObjectModel path.
+        private bool TryRefreshSpaceAppearances(ViewportControl viewportControl, AnalyticalModel analyticalModel, IViewSettings viewSettings, string name)
+        {
+            TwoDimensionalViewSettings twoDimensionalViewSettings = viewSettings as TwoDimensionalViewSettings;
+            ThreeDimensionalViewSettings threeDimensionalViewSettings = viewSettings as ThreeDimensionalViewSettings;
+            if (twoDimensionalViewSettings == null && threeDimensionalViewSettings == null)
+            {
+                return false;
+            }
+
+            // The 3D in-place re-skin needs a renderer that can recolor per object (the SharpDX path);
+            // the legacy Helix 3D renderer has no in-place re-skin, so 3D edits there regenerate as before
+            // (issue #32). 2D always supports it.
+            if (!viewportControl.SupportsInPlaceAppearanceRefresh)
+            {
+                return false;
+            }
+
+            GeometryObjectModel geometryObjectModel = viewportControl.UIGeometryObjectModel?.JSAMObject;
+            if (geometryObjectModel == null)
+            {
+                return false;
+            }
+
+            using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.AttributeRefresh", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
+            {
+                List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
+
+                HashSet<Guid> spaceGuids;
+                bool refreshed = twoDimensionalViewSettings != null
+                    ? UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, twoDimensionalViewSettings, out spaceGuids)
+                    : UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, threeDimensionalViewSettings, out spaceGuids);
+
+                if (!refreshed)
+                {
+                    return false;
+                }
+
+                if (!viewportControl.RefreshAppearances(spaceGuids))
+                {
+                    return false;
+                }
+
+                // Re-skinning replaces the Model3Ds selection visuals were painted on - re-apply the
+                // selection, mirroring what the full regeneration path does after a scene rebuild.
+                if (sAMObjects != null && sAMObjects.Count != 0)
+                {
+                    viewportControl.Select(sAMObjects);
+                }
+            }
+
+            return true;
+        }
+
         private void UIAnalyticalModel_Closed(object sender, ClosedEventArgs e)
         {
             Reload(e);
@@ -3192,6 +3319,11 @@ namespace SAM.Analytical.UI.WPF.Windows
             {
                 Title += string.Format(" [{0}]", name);
             }
+        }
+
+        private void Undo()
+        {
+            uIAnalyticalModel?.Undo();
         }
 
         private TabItem UpdateTabItem(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs, IViewSettings viewSettings = null, bool active = true)
@@ -3370,100 +3502,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             return tabItem;
         }
-
-        // In-place refresh of space colors + legend for attribute-only edits (see AttributeModification).
-        // Returns false when the in-place result could differ from a full regeneration; the caller then
-        // falls back to the regular ToSAM_GeometryObjectModel path.
-        private bool TryRefreshSpaceAppearances(ViewportControl viewportControl, AnalyticalModel analyticalModel, IViewSettings viewSettings, string name)
-        {
-            TwoDimensionalViewSettings twoDimensionalViewSettings = viewSettings as TwoDimensionalViewSettings;
-            ThreeDimensionalViewSettings threeDimensionalViewSettings = viewSettings as ThreeDimensionalViewSettings;
-            if (twoDimensionalViewSettings == null && threeDimensionalViewSettings == null)
-            {
-                return false;
-            }
-
-            // The 3D in-place re-skin needs a renderer that can recolor per object (the SharpDX path);
-            // the legacy Helix 3D renderer has no in-place re-skin, so 3D edits there regenerate as before
-            // (issue #32). 2D always supports it.
-            if (!viewportControl.SupportsInPlaceAppearanceRefresh)
-            {
-                return false;
-            }
-
-            GeometryObjectModel geometryObjectModel = viewportControl.UIGeometryObjectModel?.JSAMObject;
-            if (geometryObjectModel == null)
-            {
-                return false;
-            }
-
-            using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.AttributeRefresh", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
-            {
-                List<SAMObject> sAMObjects = viewportControl.SelectedSAMObjects<SAMObject>();
-
-                HashSet<Guid> spaceGuids;
-                bool refreshed = twoDimensionalViewSettings != null
-                    ? UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, twoDimensionalViewSettings, out spaceGuids)
-                    : UI.Modify.TryRefreshSpaceAppearances(geometryObjectModel, analyticalModel, threeDimensionalViewSettings, out spaceGuids);
-
-                if (!refreshed)
-                {
-                    return false;
-                }
-
-                if (!viewportControl.RefreshAppearances(spaceGuids))
-                {
-                    return false;
-                }
-
-                // Re-skinning replaces the Model3Ds selection visuals were painted on - re-apply the
-                // selection, mirroring what the full regeneration path does after a scene rebuild.
-                if (sAMObjects != null && sAMObjects.Count != 0)
-                {
-                    viewportControl.Select(sAMObjects);
-                }
-            }
-
-            return true;
-        }
-
-        private void TabItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            TabItem? tabItem = sender as TabItem;
-            if (tabItem == null)
-            {
-                return;
-            }
-
-            // Only a double-click on the tab header itself should open View Settings. A double-click on an
-            // object inside the viewport opens that object's properties; that same double-click bubbles up
-            // to the TabItem, so without this guard View Settings would also open the moment the properties
-            // dialog is dismissed.
-            if (tabItem.Content is DependencyObject content && e.OriginalSource is DependencyObject source && IsDescendantOf(source, content))
-            {
-                return;
-            }
-
-            EditViewSettings(tabItem);
-        }
-
-        private static bool IsDescendantOf(DependencyObject node, DependencyObject ancestor)
-        {
-            while (node != null)
-            {
-                if (node == ancestor)
-                {
-                    return true;
-                }
-
-                node = node is System.Windows.Media.Visual || node is System.Windows.Media.Media3D.Visual3D
-                    ? System.Windows.Media.VisualTreeHelper.GetParent(node)
-                    : System.Windows.LogicalTreeHelper.GetParent(node);
-            }
-
-            return false;
-        }
-
+        
         private List<TabItem> UpdateTabItems(TabControl tabControl, AnalyticalModel analyticalModel, ModifiedEventArgs modifiedEventArgs)
         {
             if (tabControl == null)
@@ -3879,12 +3918,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                 contextMenu.Items.Add(menuItem);
             }
         }
-
-        private void MenuItem_Reverse_Click(object sender, RoutedEventArgs e)
-        {
-            Reverse();
-        }
-
+        
         private void ViewportControl_Loaded(object sender, RoutedEventArgs e)
         {
             ViewportControl viewportControl = sender as ViewportControl;
@@ -3991,14 +4025,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                 doubleRangeWindow = null;
             }
         }
-
-        // Two-letter chord state (Rhino-style "ZE"/"ZS"). A prefix key (Z) is remembered for a short
-        // window; the next key completes the chord. Z has no single-key action of its own, so there is
-        // nothing to defer - a lone Z, or Z followed by a non-chord key, simply does nothing for the Z.
-        private Key? pendingChordKey;
-        private int pendingChordTick;
-        private const int chordTimeoutMilliseconds = 1000;
-
+        
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             // Undo / redo. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Checked before the Z chord
@@ -4103,25 +4130,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                 ShowProperties();
             }
         }
-
-        private void Undo()
-        {
-            uIAnalyticalModel?.Undo();
-        }
-
-        private void Redo()
-        {
-            uIAnalyticalModel?.Redo();
-        }
-
-        // Keep the ribbon Undo/Redo buttons enabled only when there is something to undo/redo. Called
-        // after every model change (UIAnalyticalModel_Modified) and after open/new/close.
-        private void RefreshHistoryButtons()
-        {
-            RibbonButton_Undo.IsEnabled = uIAnalyticalModel != null && uIAnalyticalModel.CanUndo;
-            RibbonButton_Redo.IsEnabled = uIAnalyticalModel != null && uIAnalyticalModel.CanRedo;
-        }
-
+        
         private void ZoomExtents()
         {
             GetActiveViewportControl()?.ZoomExtents();

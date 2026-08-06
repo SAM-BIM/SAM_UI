@@ -17,6 +17,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition MinWidth="100"></ColumnDefinition>
                     <ColumnDefinition MinWidth="220"></ColumnDefinition>
+                    <ColumnDefinition MinWidth="130"></ColumnDefinition>
                 </Grid.ColumnDefinitions>
             </Grid>
         </ScrollViewer>

@@ -1,4 +1,7 @@
-﻿using SAM.Core;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +19,13 @@ namespace SAM.Analytical.UI.WPF
         private static readonly string[] PreferredZoneCategories = { "Flats", "Flat", "Apartments", "Dwellings", "Units" };
 
         private AdjacencyCluster adjacencyCluster;
+
+        // The shared semantic classification layer, read only, used to show the user what each space is
+        // recognised as before that recognition reaches Approved Document F, Approved Document O or
+        // TM59 - all three read the same classification. Built once and reused because the resolver
+        // caches per Space; null where the shared vocabulary resource is missing, in which case the
+        // column is simply not shown rather than blocking the dialog.
+        private readonly SpaceSemanticsResolver spaceSemanticsResolver = Analytical.Query.DefaultSpaceSemanticsResolver();
 
         // True while the control is being wired up by its owner and required inputs (in particular
         // InternalConditionLibrary) may still be legitimately null - SetMapFunc must not treat that
@@ -267,6 +277,8 @@ namespace SAM.Analytical.UI.WPF
             InternalConditionLibrary internalConditionLibrary = InternalConditionLibrary;
             string zoneType = comboBox_ZoneType.SelectedItem as string;
 
+            SetSharedClassificationFuncs(zoneType);
+
             // TM59Manager's TextMap ctor falls back to the TM59 default resource when textMap is null,
             // so a missing selection here does not silently produce an inert (always-blank) manager.
             TM59Manager tM59Manager = new TM59Manager(textMap);
@@ -293,6 +305,39 @@ namespace SAM.Analytical.UI.WPF
             mapInternalConditionsControl.MapDiagnosticFunc = new Func<Space, string>(x =>
             {
                 return tM59Manager.GetInternalConditionResult(adjacencyCluster, internalConditionLibrary, x, zoneType)?.Diagnostic;
+            });
+        }
+
+        /// <summary>
+        /// Points the inner control at the shared semantic classification and the zone dwelling flag, so
+        /// each row shows what the space is, how that was decided, and whether its zone is a dwelling.
+        /// <para>
+        /// Display only. This performs no regulatory calculation - Approved Document F and Approved
+        /// Document O rules stay in the SAM analytical layer and are not duplicated here.
+        /// </para>
+        /// </summary>
+        private void SetSharedClassificationFuncs(string zoneType)
+        {
+            if (spaceSemanticsResolver == null)
+            {
+                mapInternalConditionsControl.SpaceSemanticsFunc = null;
+                mapInternalConditionsControl.IsDwellingFunc = null;
+                return;
+            }
+
+            mapInternalConditionsControl.SpaceSemanticsFunc = new Func<Space, SpaceSemantics>(x => spaceSemanticsResolver.Resolve(x));
+
+            mapInternalConditionsControl.IsDwellingFunc = new Func<Space, bool?>(x =>
+            {
+                Zone zone = adjacencyCluster?.GetZones(x, zoneType)?.FirstOrDefault();
+                if (zone == null)
+                {
+                    return null;
+                }
+
+                //TryGetValue, not GetValue: a zone that has never had the parameter set must read back as
+                //null, not as false. The two mean different things to a zoned Part F calculation.
+                return zone.TryGetValue(ZoneParameter.IsDwelling, out bool isDwelling) ? isDwelling : (bool?)null;
             });
         }
 

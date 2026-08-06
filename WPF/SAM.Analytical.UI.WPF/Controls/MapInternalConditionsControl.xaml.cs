@@ -1,9 +1,13 @@
-﻿using SAM.Core;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using CheckBox = System.Windows.Controls.CheckBox;
 using ComboBox = System.Windows.Controls.ComboBox;
 using UserControl = System.Windows.Controls.UserControl;
@@ -52,6 +56,25 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>Raised when the selected TextMap or InternalConditionLibrary changes (via file browse).</summary>
         public event EventHandler MapSourceChanged;
+
+        /// <summary>
+        /// Optional: the shared semantic classification of a space - what the space is, independently of
+        /// which standard is assessing it. When set, each row shows the classification and how it was
+        /// reached, so the user can see and correct a bad room recognition before it reaches Approved
+        /// Document F, Approved Document O or CIBSE TM59, all of which read the same classification.
+        /// <para>
+        /// Display only. No regulatory calculation is performed here - that stays in the SAM analytical
+        /// layer.
+        /// </para>
+        /// </summary>
+        public Func<Space, SpaceSemantics> SpaceSemanticsFunc { get; set; } = null;
+
+        /// <summary>
+        /// Optional: whether the zone containing a space is a dwelling, per its Is Dwelling parameter.
+        /// Null where the zone carries no value, which is itself worth showing - an unmarked zone is
+        /// excluded from a zoned Part F calculation when other zones in its category are marked.
+        /// </summary>
+        public Func<Space, bool?> IsDwellingFunc { get; set; } = null;
 
         /// <summary>
         /// Raised whenever a row's mapped condition changes - a manual edit, Assign filling in blanks,
@@ -629,6 +652,22 @@ namespace SAM.Analytical.UI.WPF
 
                     Grid.SetRow(comboBox, rowIndex);
                     Grid.SetColumn(comboBox, 1);
+
+                    // The semantics cell must reflect what this row currently PROPOSES, not what the
+                    // space's InternalCondition still is - auto-map (just above) and a manual combo edit
+                    // both only change comboBox.Text, they never mutate the underlying Space. Reading
+                    // SpaceSemanticsFunc off the untouched space left the column and its conflict tooltip
+                    // describing the space's previous mapping (or none at all) even when the row visibly
+                    // shows a different, proposed one. ComboBox_SelectionChanged keeps this in sync for a
+                    // later manual edit, once the row exists.
+                    TextBlock textBlock = SpaceSemanticsTextBlock(BuildSpaceForSemantics(space, comboBox.Text));
+                    if (textBlock != null)
+                    {
+                        grid.Children.Add(textBlock);
+
+                        Grid.SetRow(textBlock, rowIndex);
+                        Grid.SetColumn(textBlock, 2);
+                    }
                 }
 
             }
@@ -639,6 +678,168 @@ namespace SAM.Analytical.UI.WPF
             // needs to see the rebuilt state (e.g. after RemapAutomatic on a Zone Type/TextMap/Library
             // change) regardless, so this fires once, unconditionally, after every rebuild completes.
             MappingChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Builds the shared-classification cell for one row: what the space is, and - in the tooltip -
+        /// how that was decided, which standards read it, whether the zone is a dwelling, and any
+        /// warning. Returns null when no SpaceSemanticsFunc is set, so the general "Map IC" dialog keeps
+        /// its original two-column layout untouched.
+        /// </summary>
+        private TextBlock SpaceSemanticsTextBlock(Space space)
+        {
+            if (SpaceSemanticsFunc == null)
+            {
+                return null;
+            }
+
+            SpaceSemantics spaceSemantics = SpaceSemanticsFunc.Invoke(space);
+
+            bool unresolved = spaceSemantics == null || spaceSemantics.SpaceUse == SpaceUse.Undefined;
+            bool conflict = spaceSemantics != null && spaceSemantics.HasSourceConflict;
+            bool overridden = spaceSemantics != null && spaceSemantics.Source == SpaceSemanticsSource.UserOverride;
+
+            //The four states the user has to be able to tell apart at a glance: unresolved (must act),
+            //conflict (should check), explicit override (deliberate, not automatic), and ordinary
+            //automatic mapping. Suffixes carry the state as text too, so it is not colour-only.
+            string suffix = string.Empty;
+            if (unresolved)
+            {
+                suffix = string.Empty;
+            }
+            else if (overridden)
+            {
+                suffix = "  (override)";
+            }
+            else if (conflict)
+            {
+                suffix = "  (conflict)";
+            }
+
+            TextBlock result = new TextBlock()
+            {
+                Text = (unresolved ? "Unclassified" : Core.Query.Description(spaceSemantics.SpaceUse)) + suffix,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                //Unresolved and conflicting rows are the ones the user has to act on, so they are the
+                //ones that are coloured. An ordinary automatic mapping stays neutral rather than turning
+                //the column into a traffic light the eye has to filter.
+                Foreground = unresolved ? Brushes.Firebrick : conflict ? Brushes.DarkOrange : overridden ? Brushes.SteelBlue : Brushes.DimGray,
+                FontStyle = unresolved ? FontStyles.Italic : FontStyles.Normal,
+                FontWeight = conflict || overridden ? FontWeights.SemiBold : FontWeights.Normal,
+            };
+
+            List<string> lines = new List<string>
+            {
+                "Space: " + space.Name,
+            };
+
+            if (space.InternalCondition?.Name != null)
+            {
+                lines.Add("Internal condition: " + space.InternalCondition.Name);
+            }
+
+            if (unresolved)
+            {
+                lines.Add(string.Empty);
+                lines.Add("No shared classification could be established. Rename the space, add a synonym to the space use text map, or set a Space Use Override.");
+
+                if (!string.IsNullOrWhiteSpace(spaceSemantics?.Diagnostic))
+                {
+                    lines.Add(string.Empty);
+                    lines.Add(spaceSemantics.Diagnostic);
+                }
+            }
+            else
+            {
+                lines.Add("Classification: " + Core.Query.Description(spaceSemantics.SpaceUse));
+                lines.Add("Matched by: " + Core.Query.Description(spaceSemantics.Source) + (overridden ? " (explicit override, not automatic)" : " (automatic)"));
+
+                if (!string.IsNullOrWhiteSpace(spaceSemantics.MatchedAlias))
+                {
+                    lines.Add("Matched on: " + spaceSemantics.MatchedAlias);
+                }
+
+                //Both source values, always - so neither is hidden by the one that won.
+                lines.Add(string.Empty);
+                lines.Add("From space name        : " + (spaceSemantics.SpaceUse_Name == SpaceUse.Undefined ? "(nothing)" : Core.Query.Description(spaceSemantics.SpaceUse_Name)));
+                lines.Add("From internal condition: " + (spaceSemantics.SpaceUse_InternalCondition == SpaceUse.Undefined ? "(nothing)" : Core.Query.Description(spaceSemantics.SpaceUse_InternalCondition)));
+
+                //A conflict's specific diagnostic (which value came from where, and why the name won)
+                //is already appended below, unconditionally, whenever Diagnostic is set - which the
+                //resolver does for every conflict. A second, generic "these two sources disagree" line
+                //here said the same thing twice; show the one concise diagnostic only.
+
+                lines.Add(string.Empty);
+                lines.Add("May be consumed by: Approved Document F (in use), and available to Approved Document O and CIBSE TM59.");
+                lines.Add("Roles: " + Roles(spaceSemantics));
+
+                if (!string.IsNullOrWhiteSpace(spaceSemantics.Diagnostic))
+                {
+                    lines.Add(string.Empty);
+                    lines.Add(spaceSemantics.Diagnostic);
+                }
+            }
+
+            bool? isDwelling = IsDwellingFunc?.Invoke(space);
+            if (IsDwellingFunc != null)
+            {
+                lines.Add(string.Empty);
+                lines.Add("Zone is a dwelling: " + DescribeDwellingStatus(isDwelling));
+            }
+
+            //A plain string ToolTip sizes itself to its longest line with no wrapping - the conflict
+            //diagnostic and dwelling explanation are full sentences that would otherwise stretch the
+            //tooltip far wider than the screen. Cap the width and let WPF wrap instead.
+            result.ToolTip = new ToolTip
+            {
+                Content = new TextBlock
+                {
+                    Text = string.Join("\n", lines),
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 420,
+                },
+            };
+
+            return result;
+        }
+
+        /// <summary>
+        /// Wording for the "Zone is a dwelling" tooltip line, matching
+        /// PartFCalculator.SelectDwellingZones exactly: with Is Dwelling not set, the outcome depends on
+        /// whether any OTHER zone in the category carries the flag - a mixed category excludes this zone,
+        /// but a category where nothing is marked falls back to legacy category-only mode and includes
+        /// every zone, this one included. Kept as its own method so the wording can be unit tested
+        /// without a WPF thread.
+        /// </summary>
+        public static string DescribeDwellingStatus(bool? isDwelling)
+        {
+            if (!isDwelling.HasValue)
+            {
+                return "not set - if any zone in this category has Is Dwelling set, unmarked zones like this one are excluded from the calculation; if none do, every zone in the category is included (legacy category-only mode)";
+            }
+
+            return isDwelling.Value ? "yes" : "no";
+        }
+
+        /// <summary>The independent semantic roles that a space use carries, as a readable list.</summary>
+        private static string Roles(SpaceSemantics spaceSemantics)
+        {
+            List<string> result = new List<string>();
+
+            if (spaceSemantics.IsHabitable) result.Add("habitable");
+            if (spaceSemantics.IsBedroomEquivalent) result.Add("counts as a bedroom");
+            if (spaceSemantics.IsLivingSpace) result.Add("living");
+            if (spaceSemantics.IsCookingSpace) result.Add("cooking");
+            if (spaceSemantics.IsWetRoom) result.Add("wet room");
+            if (spaceSemantics.IsCirculation) result.Add("circulation");
+            if (spaceSemantics.IsCommunal) result.Add("communal");
+            if (!spaceSemantics.IsDwellingSpace) result.Add("not part of a dwelling");
+            if (spaceSemantics.HasSupplyRole) result.Add("supply terminal");
+            if (spaceSemantics.HasExtractRole) result.Add("extract terminal");
+
+            return result.Count == 0 ? "none" : string.Join(", ", result);
         }
 
         private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -655,12 +856,62 @@ namespace SAM.Analytical.UI.WPF
             // that the mapping changed is not - a caller's "unresolved space" status needs to refresh
             // regardless of whether the change was manual (a user edit) or automatic (Assign, or a
             // remap that created or resolved blanks), so this fires unconditionally.
-            if (!suppressDirtyTracking && grid.RowDefinitions[rowIndex].Tag is Space space)
+            if (grid.RowDefinitions[rowIndex].Tag is Space space)
             {
-                dirtySpaceGuids.Add(space.Guid);
+                if (!suppressDirtyTracking)
+                {
+                    dirtySpaceGuids.Add(space.Guid);
+                }
+
+                // A manual edit (or a proposed value the user accepts by leaving it) changes what this
+                // row is telling Part F/O/TM59 the space is, so the semantics cell and its conflict
+                // tooltip must be recomputed against the newly selected text - not left describing
+                // whatever was on screen when the row was first built.
+                RefreshSpaceSemanticsCell(rowIndex, space, comboBox);
             }
 
             MappingChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// A Space carrying <paramref name="internalConditionText"/> as its InternalCondition, for
+        /// resolving the semantics cell against what a row currently shows rather than what the
+        /// underlying Space object still has - see the callers. Public so the null/blank/named cases
+        /// can be unit tested directly, without a live grid.
+        /// </summary>
+        public static Space BuildSpaceForSemantics(Space space, string internalConditionText)
+        {
+            return new Space(space)
+            {
+                InternalCondition = string.IsNullOrWhiteSpace(internalConditionText) ? null : new InternalCondition(internalConditionText)
+            };
+        }
+
+        /// <summary>Rebuilds the column-2 semantics cell for one row after its ComboBox selection changes.</summary>
+        private void RefreshSpaceSemanticsCell(int rowIndex, Space space, ComboBox comboBox)
+        {
+            UIElement existing = null;
+            foreach (UIElement child in grid.Children)
+            {
+                if (Grid.GetRow(child) == rowIndex && Grid.GetColumn(child) == 2)
+                {
+                    existing = child;
+                    break;
+                }
+            }
+
+            if (existing != null)
+            {
+                grid.Children.Remove(existing);
+            }
+
+            TextBlock textBlock = SpaceSemanticsTextBlock(BuildSpaceForSemantics(space, comboBox.Text));
+            if (textBlock != null)
+            {
+                grid.Children.Add(textBlock);
+                Grid.SetRow(textBlock, rowIndex);
+                Grid.SetColumn(textBlock, 2);
+            }
         }
 
         private void SetInternalConditionLibrary(InternalConditionLibrary internalConditionLibrary)
