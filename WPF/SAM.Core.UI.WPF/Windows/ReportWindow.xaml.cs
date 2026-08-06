@@ -55,13 +55,51 @@ namespace SAM.Core.UI.WPF
                 return;
             }
 
-            //Last resort: put the whole report on the selection and give the TextBox focus, so the
-            //user is one Ctrl+C away rather than stuck. The TextBox's own copy command is a different
-            //code path from the one that just failed, so it may well succeed.
+            //Select the whole report and focus it, so Ctrl+C is one keystroke away - the TextBox's own
+            //copy command is a different code path from the one that just failed.
             TextBox_Main.Focus();
             TextBox_Main.SelectAll();
 
-            MessageBox.Show(this, "Could not copy the report to the clipboard - another application is holding it open. The whole report has been selected for you: press Ctrl+C to copy it.", "Copy All", MessageBoxButton.OK, MessageBoxImage.Warning);
+            //Where the clipboard is blocked for the whole process rather than momentarily busy - a
+            //virtual machine or remote-desktop session with clipboard sharing off, or a process running
+            //at a different integrity level from the clipboard's owner - Ctrl+C will fail too. Saving to
+            //a file does not touch the clipboard at all, so it always gets the report out.
+            MessageBoxResult messageBoxResult = MessageBox.Show(
+                this,
+                "Could not copy the report to the clipboard - another application is holding it open.\n\nThe whole report has been selected, so you can press Ctrl+C to try copying it directly.\n\nSave the report to a file instead?",
+                "Copy All",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (messageBoxResult == MessageBoxResult.Yes)
+            {
+                SaveReport(text);
+            }
+        }
+
+        private void SaveReport(string text)
+        {
+            Microsoft.Win32.SaveFileDialog saveFileDialog = new()
+            {
+                Title = "Save Report",
+                Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                DefaultExt = ".txt",
+                FileName = "Report.txt",
+            };
+
+            if (saveFileDialog.ShowDialog(this) != true)
+            {
+                return;
+            }
+
+            try
+            {
+                System.IO.File.WriteAllText(saveFileDialog.FileName, text);
+            }
+            catch (System.Exception exception) when (exception is System.IO.IOException || exception is System.UnauthorizedAccessException)
+            {
+                MessageBox.Show(this, "Could not save the report: " + exception.Message, "Save Report", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         /// <summary>
@@ -77,24 +115,30 @@ namespace SAM.Core.UI.WPF
         /// flush - that data only lives as long as this process, but pasting it now is what the user
         /// actually asked for, and it is far better than failing.
         /// </para>
+        /// <para>
+        /// Every retry sleeps the UI thread, so the whole sequence is deliberately capped at roughly a
+        /// quarter of a second. A longer, more determined retry was measurably worse: where the
+        /// clipboard is blocked for the process rather than momentarily busy it never succeeds anyway,
+        /// and the only thing the extra attempts bought was a frozen window before the same failure.
+        /// </para>
         /// </summary>
         private static bool TrySetClipboardText(string text)
         {
-            if (TrySetClipboardText_Wpf(text, copy: true, maxAttempts: 8, retryDelayMilliseconds: 125))
+            if (TrySetClipboardText_Wpf(text, copy: true, maxAttempts: 3, retryDelayMilliseconds: 40))
             {
                 return true;
             }
 
             try
             {
-                System.Windows.Forms.Clipboard.SetDataObject(text, true, 10, 100);
+                System.Windows.Forms.Clipboard.SetDataObject(text, true, 2, 40);
                 return true;
             }
             catch (System.Runtime.InteropServices.ExternalException)
             {
             }
 
-            return TrySetClipboardText_Wpf(text, copy: false, maxAttempts: 3, retryDelayMilliseconds: 100);
+            return TrySetClipboardText_Wpf(text, copy: false, maxAttempts: 2, retryDelayMilliseconds: 40);
         }
 
         private static bool TrySetClipboardText_Wpf(string text, bool copy, int maxAttempts, int retryDelayMilliseconds)

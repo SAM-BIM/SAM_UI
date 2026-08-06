@@ -10,20 +10,17 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public partial class ZoneControl : UserControl
     {
-        //Not set preserves legacy category-only behaviour (ZoneParameter.IsDwelling absent); Yes/No
-        //write an explicit true/false. TryGetValue, not GetValue, distinguishes "explicitly false"
-        //from "no value at all" when this is read back.
-        private const string Dwelling_NotSet = "";
-        private const string Dwelling_Yes = "Yes";
-        private const string Dwelling_No = "No";
-
+        //A three-state tick, NOT a plain checkbox: ticked is Yes, cleared is an explicit No, and the
+        //third (indeterminate) state is Not set, which removes ZoneParameter.IsDwelling and so preserves
+        //the legacy category-only behaviour. Not set and No drive different Part F outcomes, so they
+        //must not collapse into one boolean. TryGetValue, not GetValue, tells them apart on the way in.
         private AdjacencyCluster adjacencyCluster;
         private Zone zone;
 
         public ZoneControl()
         {
             InitializeComponent();
-            LoadDwellingOptions();
+            UpdateDwellingText();
         }
 
         public ZoneControl(Zone zone)
@@ -31,16 +28,24 @@ namespace SAM.Analytical.UI.WPF
             this.zone = zone;
 
             InitializeComponent();
-            LoadDwellingOptions();
+            UpdateDwellingText();
         }
 
-        private void LoadDwellingOptions()
+        /// <summary>
+        /// Names the tick's current state next to it. The indeterminate state of a three-state tick is
+        /// not self-explanatory, and confusing Not set with No would silently change which zones Part F
+        /// sizes, so the state is always spelled out rather than left to the box's appearance alone.
+        /// </summary>
+        private void UpdateDwellingText()
         {
-            comboBox_Dwelling.Items.Clear();
-            comboBox_Dwelling.Items.Add(Dwelling_NotSet);
-            comboBox_Dwelling.Items.Add(Dwelling_Yes);
-            comboBox_Dwelling.Items.Add(Dwelling_No);
-            comboBox_Dwelling.SelectedItem = Dwelling_NotSet;
+            bool? isDwelling = checkBox_Dwelling.IsChecked;
+
+            checkBox_Dwelling.Content = isDwelling.HasValue ? (isDwelling.Value ? "Yes" : "No") : "Not set";
+        }
+
+        private void checkBox_Dwelling_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateDwellingText();
         }
 
         public AdjacencyCluster AdjacencyCluster
@@ -95,15 +100,9 @@ namespace SAM.Analytical.UI.WPF
             }
 
             //TryGetValue, not GetValue: a zone that has never had the parameter set must read back
-            //as Not Set, not as No.
-            if (zone.TryGetValue(ZoneParameter.IsDwelling, out bool isDwelling))
-            {
-                comboBox_Dwelling.SelectedItem = isDwelling ? Dwelling_Yes : Dwelling_No;
-            }
-            else
-            {
-                comboBox_Dwelling.SelectedItem = Dwelling_NotSet;
-            }
+            //as Not set, not as No.
+            checkBox_Dwelling.IsChecked = zone.TryGetValue(ZoneParameter.IsDwelling, out bool isDwelling) ? isDwelling : (bool?)null;
+            UpdateDwellingText();
         }
 
         private void LoadZoneCategories()
@@ -175,14 +174,10 @@ namespace SAM.Analytical.UI.WPF
                 result.SetValue(ZoneParameter.Color, new Core.SAMColor(Core.UI.Convert.ToDrawing(color)));
             }
 
-            string dwelling = comboBox_Dwelling?.SelectedItem as string;
-            if (dwelling == Dwelling_Yes)
+            bool? isDwelling_Selected = checkBox_Dwelling?.IsChecked;
+            if (isDwelling_Selected.HasValue)
             {
-                result.SetValue(ZoneParameter.IsDwelling, true);
-            }
-            else if (dwelling == Dwelling_No)
-            {
-                result.SetValue(ZoneParameter.IsDwelling, false);
+                result.SetValue(ZoneParameter.IsDwelling, isDwelling_Selected.Value);
             }
             else
             {
