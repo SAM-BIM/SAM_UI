@@ -653,7 +653,14 @@ namespace SAM.Analytical.UI.WPF
                     Grid.SetRow(comboBox, rowIndex);
                     Grid.SetColumn(comboBox, 1);
 
-                    TextBlock textBlock = SpaceSemanticsTextBlock(space);
+                    // The semantics cell must reflect what this row currently PROPOSES, not what the
+                    // space's InternalCondition still is - auto-map (just above) and a manual combo edit
+                    // both only change comboBox.Text, they never mutate the underlying Space. Reading
+                    // SpaceSemanticsFunc off the untouched space left the column and its conflict tooltip
+                    // describing the space's previous mapping (or none at all) even when the row visibly
+                    // shows a different, proposed one. ComboBox_SelectionChanged keeps this in sync for a
+                    // later manual edit, once the row exists.
+                    TextBlock textBlock = SpaceSemanticsTextBlock(BuildSpaceForSemantics(space, comboBox.Text));
                     if (textBlock != null)
                     {
                         grid.Children.Add(textBlock);
@@ -849,12 +856,62 @@ namespace SAM.Analytical.UI.WPF
             // that the mapping changed is not - a caller's "unresolved space" status needs to refresh
             // regardless of whether the change was manual (a user edit) or automatic (Assign, or a
             // remap that created or resolved blanks), so this fires unconditionally.
-            if (!suppressDirtyTracking && grid.RowDefinitions[rowIndex].Tag is Space space)
+            if (grid.RowDefinitions[rowIndex].Tag is Space space)
             {
-                dirtySpaceGuids.Add(space.Guid);
+                if (!suppressDirtyTracking)
+                {
+                    dirtySpaceGuids.Add(space.Guid);
+                }
+
+                // A manual edit (or a proposed value the user accepts by leaving it) changes what this
+                // row is telling Part F/O/TM59 the space is, so the semantics cell and its conflict
+                // tooltip must be recomputed against the newly selected text - not left describing
+                // whatever was on screen when the row was first built.
+                RefreshSpaceSemanticsCell(rowIndex, space, comboBox);
             }
 
             MappingChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// A Space carrying <paramref name="internalConditionText"/> as its InternalCondition, for
+        /// resolving the semantics cell against what a row currently shows rather than what the
+        /// underlying Space object still has - see the callers. Public so the null/blank/named cases
+        /// can be unit tested directly, without a live grid.
+        /// </summary>
+        public static Space BuildSpaceForSemantics(Space space, string internalConditionText)
+        {
+            return new Space(space)
+            {
+                InternalCondition = string.IsNullOrWhiteSpace(internalConditionText) ? null : new InternalCondition(internalConditionText)
+            };
+        }
+
+        /// <summary>Rebuilds the column-2 semantics cell for one row after its ComboBox selection changes.</summary>
+        private void RefreshSpaceSemanticsCell(int rowIndex, Space space, ComboBox comboBox)
+        {
+            UIElement existing = null;
+            foreach (UIElement child in grid.Children)
+            {
+                if (Grid.GetRow(child) == rowIndex && Grid.GetColumn(child) == 2)
+                {
+                    existing = child;
+                    break;
+                }
+            }
+
+            if (existing != null)
+            {
+                grid.Children.Remove(existing);
+            }
+
+            TextBlock textBlock = SpaceSemanticsTextBlock(BuildSpaceForSemantics(space, comboBox.Text));
+            if (textBlock != null)
+            {
+                grid.Children.Add(textBlock);
+                Grid.SetRow(textBlock, rowIndex);
+                Grid.SetColumn(textBlock, 2);
+            }
         }
 
         private void SetInternalConditionLibrary(InternalConditionLibrary internalConditionLibrary)
