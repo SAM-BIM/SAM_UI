@@ -145,7 +145,82 @@ namespace SAM.Analytical.UI.WPF
             stringBuilder.AppendLine();
             stringBuilder.AppendLine("Using this tool does not by itself demonstrate compliance with Building Regulations Part F. Results must be checked by a suitably qualified engineer against the full Approved Document.");
 
-            return stringBuilder.ToString();
+            return Wrap(stringBuilder.ToString(), reportLineLength);
+        }
+
+        /// <summary>
+        /// Column at which report lines are wrapped. The Approved Document warnings are full paragraphs
+        /// and the unzoned-space list can name thousands of spaces, so without this a line runs several
+        /// screens wide and the reader has to scroll horizontally to read one sentence.
+        /// </summary>
+        private const int reportLineLength = 100;
+
+        /// <summary>
+        /// Hard-wraps each line at <paramref name="maxLineLength"/> on whitespace, so the report reads
+        /// as a paragraph rather than one very long line. Existing line breaks and blank lines are kept,
+        /// so the section structure survives.
+        /// <para>
+        /// A single word longer than the limit is emitted whole on its own line rather than split: the
+        /// long tokens here are space and zone names, and breaking one in half would make the report
+        /// name a space that does not exist.
+        /// </para>
+        /// </summary>
+        private static string Wrap(string text, int maxLineLength)
+        {
+            if (string.IsNullOrEmpty(text) || maxLineLength <= 0)
+            {
+                return text;
+            }
+
+            StringBuilder result = new();
+
+            string[] lines = text.Split('\n');
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+
+                //The text ends with a line break, so the final split segment is empty. Appending it
+                //would add a blank line the report did not have.
+                if (i == lines.Length - 1 && line.Length == 0)
+                {
+                    break;
+                }
+
+                string line_Trimmed = line.TrimEnd('\r');
+
+                if (line_Trimmed.Length <= maxLineLength)
+                {
+                    result.AppendLine(line_Trimmed);
+                    continue;
+                }
+
+                StringBuilder line_Current = new();
+
+                foreach (string word in line_Trimmed.Split(' '))
+                {
+                    //+1 for the space that would be needed before this word.
+                    if (line_Current.Length != 0 && line_Current.Length + 1 + word.Length > maxLineLength)
+                    {
+                        result.AppendLine(line_Current.ToString());
+                        line_Current.Clear();
+                    }
+
+                    if (line_Current.Length != 0)
+                    {
+                        line_Current.Append(' ');
+                    }
+
+                    line_Current.Append(word);
+                }
+
+                if (line_Current.Length != 0)
+                {
+                    result.AppendLine(line_Current.ToString());
+                }
+            }
+
+            return result.ToString();
         }
 
         /// <summary>

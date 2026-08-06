@@ -105,6 +105,47 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
+        /// The Approved Document warnings are full paragraphs, so without hard wrapping a single line
+        /// runs several screens wide and has to be read by scrolling sideways. Every line must fit a
+        /// sensible column width.
+        /// </summary>
+        [Fact]
+        public void BuildReportText_WrapsLongLines()
+        {
+            PartFCalculator partFCalculator = new(null);
+            partFCalculator.Warnings.Add("Flat 1: ENGINEERING CHECK REQUIRED: This dwelling contains a cooking space, but no explicit local kitchen or cooker extract is represented. Extract from a bathroom, ensuite or other wet room may balance the dwelling airflow but does not demonstrate compliance with the local kitchen-extract requirement.");
+
+            string text = Modify.BuildReportText(partFCalculator);
+
+            string[] lines = text.Split('\n');
+            foreach (string line in lines)
+            {
+                Assert.True(line.TrimEnd('\r').Length <= 100, string.Format("Line exceeds the wrap width: '{0}'", line));
+            }
+
+            //Wrapping must not lose or corrupt the content it breaks up.
+            Assert.Contains("ENGINEERING CHECK REQUIRED", text);
+            Assert.Contains("cooker extract", text);
+        }
+
+        /// <summary>
+        /// Wrapping breaks on whitespace only. A space name is a single word, so it must survive whole -
+        /// a report naming "Bedroo" and "m 1" would be worse than no report at all.
+        /// </summary>
+        [Fact]
+        public void BuildReportText_DoesNotSplitLongSpaceNamesInHalf()
+        {
+            string spaceName = "A_Very_Long_Space_Name_That_On_Its_Own_Comfortably_Exceeds_The_Wrap_Column_Width_And_Then_Some_More";
+
+            PartFCalculator partFCalculator = new(null);
+            partFCalculator.UnclassifiedSpaceNames.Add(spaceName);
+
+            string text = Modify.BuildReportText(partFCalculator);
+
+            Assert.Contains(spaceName, text);
+        }
+
+        /// <summary>
         /// A model with roughly 10,000 spaces produces a report with thousands of space names in a
         /// single unzoned-space line, exactly as PartFCalculator.Calculate(string) does today. This must
         /// build without throwing or hanging - the scale that motivated moving off MessageBox in the
