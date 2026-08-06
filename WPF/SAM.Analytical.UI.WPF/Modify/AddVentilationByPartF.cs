@@ -85,12 +85,15 @@ namespace SAM.Analytical.UI.WPF
 
                 foreach (PartFDwellingResult dwellingResult in partFCalculator.DwellingResults)
                 {
+                    int spaceCount = dwellingResult.SpaceNames?.Count ?? 0;
+
                     stringBuilder.AppendLine(string.Format(
-                        "{0}{1} habitable room(s), {2} bedroom(s), {3:0.##} m2, continuous design {4:0.##} l/s, setback {5:0.##} l/s ({6:0.##}% of continuous design).{7}",
+                        "{0}{1} space(s), {2:0.##} m2, {3} habitable room(s), {4} bedroom(s), continuous design {5:0.##} l/s, setback {6:0.##} l/s ({7:0.##}% of continuous design).{8}",
                         string.IsNullOrWhiteSpace(dwellingResult.Name) ? string.Empty : dwellingResult.Name + ": ",
+                        spaceCount,
+                        dwellingResult.InternalFloorArea_M2,
                         dwellingResult.HabitableRoomCount,
                         dwellingResult.BedroomCount,
-                        dwellingResult.InternalFloorArea_M2,
                         dwellingResult.ContinuousDesignSystemRate_Lps,
                         dwellingResult.SetbackSystemRate_Lps,
                         dwellingResult.SetbackFlowRateFactor * 100,

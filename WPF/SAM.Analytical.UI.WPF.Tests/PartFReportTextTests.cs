@@ -23,6 +23,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             partFCalculator.DwellingResults.Add(new PartFDwellingResult("Flat 1")
             {
+                SpaceNames = ["Bedroom 1", "Bathroom 1"],
                 HabitableRoomCount = 2,
                 BedroomCount = 1,
                 InternalFloorArea_M2 = 45.5,
@@ -34,13 +35,34 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             string text = Modify.BuildReportText(partFCalculator);
 
-            Assert.Contains("1 dwelling(s) sized.", text);
-            Assert.Contains("Flat 1:", text);
-            Assert.Contains("2 habitable room(s)", text);
-            Assert.Contains("1 bedroom(s)", text);
-            Assert.Contains("45.5 m2", text);
-            Assert.Contains("continuous design 13 l/s", text);
-            Assert.Contains("setback 3.9 l/s", text);
+            //Hard wrapping (see the 10,000-name and wrap tests below) can legitimately break this line
+            //mid-phrase at the column width - a valid line break, not a content bug. Content-presence
+            //and ordering checks read the unwrapped line so a wrap point can't fail them.
+            string text_Unwrapped = text.Replace("\r", "").Replace("\n", " ");
+
+            Assert.Contains("1 dwelling(s) sized.", text_Unwrapped);
+            Assert.Contains("Flat 1:", text_Unwrapped);
+            Assert.Contains("2 space(s)", text_Unwrapped);
+            Assert.Contains("2 habitable room(s)", text_Unwrapped);
+            Assert.Contains("1 bedroom(s)", text_Unwrapped);
+            Assert.Contains("45.5 m2", text_Unwrapped);
+            Assert.Contains("continuous design 13 l/s", text_Unwrapped);
+            Assert.Contains("setback 3.9 l/s", text_Unwrapped);
+
+            //Locks the summary line's field order: name, space count, area, habitable rooms, bedrooms,
+            //then rates - so a future edit can't silently reorder it again.
+            int nameIndex = text_Unwrapped.IndexOf("Flat 1:");
+            int spaceIndex = text_Unwrapped.IndexOf("2 space(s)");
+            int areaIndex = text_Unwrapped.IndexOf("45.5 m2");
+            int habitableIndex = text_Unwrapped.IndexOf("2 habitable room(s)");
+            int bedroomIndex = text_Unwrapped.IndexOf("1 bedroom(s)");
+            int continuousIndex = text_Unwrapped.IndexOf("continuous design 13 l/s");
+
+            Assert.True(nameIndex < spaceIndex);
+            Assert.True(spaceIndex < areaIndex);
+            Assert.True(areaIndex < habitableIndex);
+            Assert.True(habitableIndex < bedroomIndex);
+            Assert.True(bedroomIndex < continuousIndex);
         }
 
         [Fact]
