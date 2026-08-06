@@ -759,11 +759,10 @@ namespace SAM.Analytical.UI.WPF
                 lines.Add("From space name        : " + (spaceSemantics.SpaceUse_Name == SpaceUse.Undefined ? "(nothing)" : Core.Query.Description(spaceSemantics.SpaceUse_Name)));
                 lines.Add("From internal condition: " + (spaceSemantics.SpaceUse_InternalCondition == SpaceUse.Undefined ? "(nothing)" : Core.Query.Description(spaceSemantics.SpaceUse_InternalCondition)));
 
-                if (conflict)
-                {
-                    lines.Add(string.Empty);
-                    lines.Add("CONFLICT: these two sources disagree. The space name has been used because it is the higher-priority source. Neither value has been overwritten. Set a Space Use Override to force either answer.");
-                }
+                //A conflict's specific diagnostic (which value came from where, and why the name won)
+                //is already appended below, unconditionally, whenever Diagnostic is set - which the
+                //resolver does for every conflict. A second, generic "these two sources disagree" line
+                //here said the same thing twice; show the one concise diagnostic only.
 
                 lines.Add(string.Empty);
                 lines.Add("May be consumed by: Approved Document F (in use), and available to Approved Document O and CIBSE TM59.");
@@ -780,12 +779,41 @@ namespace SAM.Analytical.UI.WPF
             if (IsDwellingFunc != null)
             {
                 lines.Add(string.Empty);
-                lines.Add("Zone is a dwelling: " + (isDwelling.HasValue ? (isDwelling.Value ? "yes" : "no") : "not set - this zone is excluded from a zoned Part F calculation when other zones in its category are marked"));
+                lines.Add("Zone is a dwelling: " + DescribeDwellingStatus(isDwelling));
             }
 
-            result.ToolTip = string.Join("\n", lines);
+            //A plain string ToolTip sizes itself to its longest line with no wrapping - the conflict
+            //diagnostic and dwelling explanation are full sentences that would otherwise stretch the
+            //tooltip far wider than the screen. Cap the width and let WPF wrap instead.
+            result.ToolTip = new ToolTip
+            {
+                Content = new TextBlock
+                {
+                    Text = string.Join("\n", lines),
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 420,
+                },
+            };
 
             return result;
+        }
+
+        /// <summary>
+        /// Wording for the "Zone is a dwelling" tooltip line, matching
+        /// PartFCalculator.SelectDwellingZones exactly: with Is Dwelling not set, the outcome depends on
+        /// whether any OTHER zone in the category carries the flag - a mixed category excludes this zone,
+        /// but a category where nothing is marked falls back to legacy category-only mode and includes
+        /// every zone, this one included. Kept as its own method so the wording can be unit tested
+        /// without a WPF thread.
+        /// </summary>
+        public static string DescribeDwellingStatus(bool? isDwelling)
+        {
+            if (!isDwelling.HasValue)
+            {
+                return "not set - if any zone in this category has Is Dwelling set, unmarked zones like this one are excluded from the calculation; if none do, every zone in the category is included (legacy category-only mode)";
+            }
+
+            return isDwelling.Value ? "yes" : "no";
         }
 
         /// <summary>The independent semantic roles that a space use carries, as a readable list.</summary>

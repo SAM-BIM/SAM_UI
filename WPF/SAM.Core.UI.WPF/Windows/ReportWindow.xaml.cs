@@ -45,10 +45,48 @@ namespace SAM.Core.UI.WPF
         private void Button_CopyAll_Click(object sender, RoutedEventArgs e)
         {
             string text = TextBox_Main.Text;
-            if (!string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text))
             {
-                Clipboard.SetText(text);
+                return;
             }
+
+            if (!TrySetClipboardText(text))
+            {
+                MessageBox.Show(this, "Could not copy the report to the clipboard. Another application may be holding it open - please try again.", "Copy All", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        /// <summary>
+        /// The Windows clipboard is briefly locked by other processes (clipboard managers, remote
+        /// desktop, antivirus scanners) far more often than most apps expect; Clipboard.SetText then
+        /// throws a COMException (CLIPBRD_E_CANT_OPEN). This application has no global
+        /// unhandled-exception handler, so letting that escape from a button click crashes the whole
+        /// app over a transient, retryable condition. A short retry is the standard mitigation.
+        /// </summary>
+        private static bool TrySetClipboardText(string text)
+        {
+            const int maxAttempts = 5;
+            const int retryDelayMilliseconds = 100;
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    Clipboard.SetText(text);
+                    return true;
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    if (attempt == maxAttempts)
+                    {
+                        return false;
+                    }
+
+                    System.Threading.Thread.Sleep(retryDelayMilliseconds);
+                }
+            }
+
+            return false;
         }
 
         private void Button_Close_Click(object sender, RoutedEventArgs e)
