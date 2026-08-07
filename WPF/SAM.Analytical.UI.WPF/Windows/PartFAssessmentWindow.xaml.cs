@@ -382,9 +382,7 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private void Overlay_Changed(object sender, RoutedEventArgs e)
         {
-            Place();
-
-            DrawMarks();
+            ApplyViewSettings();
         }
 
         private void Button_Reset_Click(object sender, RoutedEventArgs e)
@@ -399,9 +397,7 @@ namespace SAM.Analytical.UI.WPF
 
             FloorPlan.ZoomExtents();
 
-            Place();
-
-            DrawMarks();
+            ApplyViewSettings();
         }
 
         /// <summary>Shows everything the assessment holds about one terminal.</summary>

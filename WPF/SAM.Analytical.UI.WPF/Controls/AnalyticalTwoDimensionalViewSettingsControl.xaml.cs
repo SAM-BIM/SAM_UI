@@ -4,6 +4,7 @@ using SAM.Geometry.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace SAM.Analytical.UI.WPF
@@ -14,6 +15,18 @@ namespace SAM.Analytical.UI.WPF
     public partial class AnalyticalTwoDimensionalViewSettingsControl : UserControl
     {
         private TwoDimensionalViewSettings twoDimensionalViewSettings;
+
+        /// <summary>
+        /// The view's Part F airflow presentation, edited in its own dialog and stored back on the view.
+        /// <para>
+        /// Null means this view has never been told about Part F, which is not the same as being told to turn
+        /// it off: a null is left absent from the view rather than written as a disabled setting, so the
+        /// hundreds of views saved before the annotation existed stay exactly as they are.
+        /// </para>
+        /// </summary>
+        private PartFAirflowViewSettings partFAirflowViewSettings;
+
+        private AdjacencyCluster adjacencyCluster_PartF;
 
         public AnalyticalTwoDimensionalViewSettingsControl()
         {
@@ -64,6 +77,9 @@ namespace SAM.Analytical.UI.WPF
         private void SetAnalyticalModel(AnalyticalModel analyticalModel)
         {
             AdjacencyCluster adjacencyCluster = analyticalModel?.AdjacencyCluster;
+
+            //Kept for the Part F airflow dialog, which lists the model's zone categories and dwelling zones.
+            adjacencyCluster_PartF = adjacencyCluster;
 
             spaceAppearanceSettingsControl.AdjacencyCluster = adjacencyCluster;
 
@@ -135,6 +151,47 @@ namespace SAM.Analytical.UI.WPF
             {
                 comboBox_Group.Text = group;
             }
+
+            partFAirflowViewSettings = twoDimensionalViewSettings.TryGetValue(AnalyticalViewSettingsParameter.PartFAirflow, out PartFAirflowViewSettings partFAirflowViewSettings_Temp)
+                ? partFAirflowViewSettings_Temp
+                : null;
+
+            UpdatePartFAirflowButton();
+        }
+
+        /// <summary>
+        /// Opens the Part F airflow dialog for this view. Kept as a dialog rather than another group box on an
+        /// already crowded panel, and separate from the colour scheme on purpose: the two are independent and
+        /// are meant to be used together.
+        /// </summary>
+        private void button_PartFAirflow_Click(object sender, RoutedEventArgs e)
+        {
+            PartFAirflowViewSettingsWindow partFAirflowViewSettingsWindow = new()
+            {
+                AdjacencyCluster = adjacencyCluster_PartF,
+            };
+
+            //Assigned after the model, because the dwelling list has to exist before a saved dwelling can be
+            //selected in it.
+            partFAirflowViewSettingsWindow.PartFAirflowViewSettings = partFAirflowViewSettings;
+
+            //Fully qualified: an unqualified Window here is SAM.Analytical.Window, the architectural element.
+            partFAirflowViewSettingsWindow.Owner = System.Windows.Window.GetWindow(this);
+
+            if (partFAirflowViewSettingsWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            partFAirflowViewSettings = partFAirflowViewSettingsWindow.PartFAirflowViewSettings;
+
+            UpdatePartFAirflowButton();
+        }
+
+        /// <summary>Says on the button whether this view carries the annotation, so it reads at a glance.</summary>
+        private void UpdatePartFAirflowButton()
+        {
+            button_PartFAirflow.Content = partFAirflowViewSettings?.Enabled == true ? "Part F Airflow: on..." : "Part F Airflow...";
         }
 
         private TwoDimensionalViewSettings GetTwoDimensionalViewSettings()
@@ -185,6 +242,13 @@ namespace SAM.Analytical.UI.WPF
             }
 
             result.Plane = Geometry.Spatial.Create.Plane(elevationControl.Elevation);
+
+            //Written only where the view has one. Absent means "never told about Part F", and writing a
+            //disabled setting instead would change every view a person merely opened this dialog on.
+            if (partFAirflowViewSettings is not null)
+            {
+                result.SetValue(AnalyticalViewSettingsParameter.PartFAirflow, partFAirflowViewSettings);
+            }
 
             if (checkBox_UseDefaultName.IsChecked != null && checkBox_UseDefaultName.IsChecked.HasValue)
             {

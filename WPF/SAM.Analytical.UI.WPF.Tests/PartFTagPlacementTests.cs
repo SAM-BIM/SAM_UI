@@ -333,8 +333,9 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         /// <summary>
         /// <b>The camera cannot reach the placement.</b> Asserted structurally, by reading the compiled body
-        /// of <c>PartFAssessmentWindow.Place</c> and everything it calls in the window, and proving that the
-        /// view transform - <c>FloorPlan2DControl.WorldToScreen</c> - is never among them.
+        /// of <c>PartFAirflowRenderer.Place</c> and everything it calls, and proving that the view transform -
+        /// <c>FloorPlan2DControl.WorldToScreen</c> - is never among them. The renderer is the single Part F
+        /// renderer, so this one assertion covers the assessment window and the saved 2D view alike.
         /// <para>
         /// Structural rather than "zoom twice and compare", and deliberately so: a runtime test samples two
         /// zoom levels and this proves the dependency does not exist at any of them. The layout is a function
@@ -346,7 +347,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         [Fact]
         public void Place_NeverReadsTheViewTransform()
         {
-            List<MethodInfo> methodInfos = Reachable(typeof(PartFAssessmentWindow).GetMethod("Place", BindingFlags.Instance | BindingFlags.NonPublic));
+            List<MethodInfo> methodInfos = Reachable(typeof(PartFAirflowRenderer).GetMethod("Place", BindingFlags.Instance | BindingFlags.Public));
 
             //Positive control first, so this cannot pass by the walker finding nothing at all: it must be
             //seeing the placement call, and - the tight part - it must be seeing a property read on the very
@@ -365,29 +366,30 @@ namespace SAM.Analytical.UI.WPF.Tests
         [Fact]
         public void FloorPlan_ViewChanged_RedrawsWithoutPlacing()
         {
-            MethodInfo methodInfo_Place = typeof(PartFAssessmentWindow).GetMethod("Place", BindingFlags.Instance | BindingFlags.NonPublic);
-            MethodInfo methodInfo_DrawMarks = typeof(PartFAssessmentWindow).GetMethod("DrawMarks", BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo methodInfo_Place = typeof(PartFAirflowRenderer).GetMethod("Place", BindingFlags.Instance | BindingFlags.Public);
+            MethodInfo methodInfo_Draw = typeof(PartFAirflowRenderer).GetMethod("Draw", BindingFlags.Instance | BindingFlags.Public);
 
-            List<MethodInfo> methodInfos = Called(typeof(PartFAssessmentWindow).GetMethod("FloorPlan_ViewChanged", BindingFlags.Instance | BindingFlags.NonPublic));
+            List<MethodInfo> methodInfos = Called(typeof(PartFAirflowRenderer).GetMethod("FloorPlan2DControl_ViewChanged", BindingFlags.Instance | BindingFlags.NonPublic));
 
             Assert.DoesNotContain(methodInfo_Place, methodInfos);
-            Assert.Contains(methodInfo_DrawMarks, methodInfos);
+            Assert.Contains(methodInfo_Draw, methodInfos);
         }
 
         /// <summary>
-        /// And the list of things that DO lay the tags out again is exactly the agreed one: loading the plan,
-        /// a change of operating condition, a visibility toggle, a reset, and the annotation scale. Written as
-        /// an assertion because "which events re-solve" is the architecture, and it is the kind of thing that
-        /// grows an extra caller by accident.
+        /// And the list of things that DO lay the tags out again is exactly the agreed one: loading the
+        /// dwellings, a change of operating condition, and a change of view settings - which is how a
+        /// visibility toggle, the annotation scale and a manual position all arrive. Written as an assertion
+        /// because "which events re-solve" is the architecture, and it is the kind of thing that grows an
+        /// extra caller by accident.
         /// </summary>
         [Fact]
         public void Place_IsCalledOnlyByTheAgreedInputChanges()
         {
-            MethodInfo methodInfo_Place = typeof(PartFAssessmentWindow).GetMethod("Place", BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo methodInfo_Place = typeof(PartFAirflowRenderer).GetMethod("Place", BindingFlags.Instance | BindingFlags.Public);
 
             List<string> names = [];
 
-            foreach (MethodInfo methodInfo in typeof(PartFAssessmentWindow).GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            foreach (MethodInfo methodInfo in typeof(PartFAirflowRenderer).GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
             {
                 if (methodInfo != methodInfo_Place && Called(methodInfo).Contains(methodInfo_Place))
                 {
@@ -397,9 +399,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             names.Sort(StringComparer.Ordinal);
 
-            Assert.Equal(
-                new List<string> { "Button_Reset_Click", "LoadFloorPlan_Geometry", "Overlay_Changed", "Refresh", "set_AnnotationScale" },
-                names);
+            Assert.Equal(new List<string> { "Load", "Refresh", "set_ViewSettings" }, names);
         }
 
         // ------------------------------------------------------------------
@@ -530,21 +530,17 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         /// <summary>
         /// The assessment window's own label-nudging loop - <c>Place(Rect, List&lt;Rect&gt;)</c>, which
-        /// stepped a label down and then up in fixed pixel increments - must not exist any more. Two
-        /// placement paths behind different code entries is how a drawing starts to depend on which one ran,
-        /// so the window is allowed exactly one <c>Place</c>: the parameterless trigger that hands the tags
-        /// to the shared engine.
+        /// stepped a label down and then up in fixed pixel increments - must not exist any more, and neither
+        /// must any other placement in the window: it now has NO placement code at all and delegates to the
+        /// shared renderer. Two placement paths behind different code entries is how a drawing starts to
+        /// depend on which one ran.
         /// </summary>
         [Fact]
-        public void PartFAssessmentWindow_HasOnlyTheSharedPlacementPath()
+        public void PartFAssessmentWindow_HasNoPlacementOfItsOwn()
         {
-            List<MethodInfo> methodInfos = [.. typeof(PartFAssessmentWindow)
+            Assert.Empty(typeof(PartFAssessmentWindow)
                 .GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-                .Where(x => string.Equals(x.Name, "Place", StringComparison.Ordinal))];
-
-            MethodInfo methodInfo = Assert.Single(methodInfos);
-
-            Assert.Empty(methodInfo.GetParameters());
+                .Where(x => string.Equals(x.Name, "Place", StringComparison.Ordinal) || string.Equals(x.Name, "DrawMarks", StringComparison.Ordinal)));
         }
 
         // ------------------------------------------------------------------

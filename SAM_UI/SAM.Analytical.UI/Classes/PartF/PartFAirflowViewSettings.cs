@@ -52,6 +52,7 @@ namespace SAM.Analytical.UI
                 OperatingMode = partFAirflowViewSettings.OperatingMode;
                 DwellingFilter = partFAirflowViewSettings.DwellingFilter;
                 DwellingGuid = partFAirflowViewSettings.DwellingGuid;
+                ZoneCategoryName = partFAirflowViewSettings.ZoneCategoryName;
                 AnnotationScale = partFAirflowViewSettings.AnnotationScale;
 
                 ShowSupply = partFAirflowViewSettings.ShowSupply;
@@ -81,6 +82,18 @@ namespace SAM.Analytical.UI
 
         /// <summary>Which dwellings on the level are drawn.</summary>
         public PartFDwellingFilter DwellingFilter { get; set; } = PartFDwellingFilter.AllDwellingsOnLevel;
+
+        /// <summary>
+        /// The zone category whose zones are the dwellings this view reports on - "Flats", typically. Empty
+        /// means the whole model is one dwelling, which is what the calculation calls single house mode.
+        /// <para>
+        /// A SCOPE and not a regulatory value. It says which dwellings this drawing is about, exactly as
+        /// <see cref="DwellingFilter"/> and <see cref="DwellingGuid"/> do, and it is stored so that reopening
+        /// the view reproduces the same assessment instead of asking again. Nothing calculated from it is
+        /// stored here - the assessment is re-read from the model every time the view is drawn.
+        /// </para>
+        /// </summary>
+        public string ZoneCategoryName { get; set; } = null;
 
         /// <summary>
         /// The dwelling zone drawn when <see cref="DwellingFilter"/> selects a single dwelling. A guid, so
@@ -162,6 +175,7 @@ namespace SAM.Analytical.UI
             }
 
             DwellingGuid = PartFViewJson.Guid(jsonObject, "DwellingGuid");
+            ZoneCategoryName = PartFViewJson.String(jsonObject, "ZoneCategoryName");
             AnnotationScale = PartFViewJson.NullableDouble(jsonObject, "AnnotationScale") ?? AnnotationScale;
 
             ShowSupply = PartFViewJson.Boolean(jsonObject, "ShowSupply", ShowSupply);
@@ -204,6 +218,12 @@ namespace SAM.Analytical.UI
             result["OperatingMode"] = OperatingMode.ToString();
             result["DwellingFilter"] = DwellingFilter.ToString();
             result["DwellingGuid"] = DwellingGuid.ToString();
+
+            if (ZoneCategoryName is not null)
+            {
+                result["ZoneCategoryName"] = ZoneCategoryName;
+            }
+
             result["AnnotationScale"] = AnnotationScale;
 
             result["ShowSupply"] = ShowSupply;

@@ -3458,6 +3458,8 @@ namespace SAM.Analytical.UI.WPF.Windows
                 updateGeometry = false;
             }
 
+            GeometryObjectModel geometryObjectModel_Updated = null;
+
             if (updateGeometry)
             {
                 dirtyViewGuids.Remove(viewSettings.Guid);
@@ -3475,6 +3477,10 @@ namespace SAM.Analytical.UI.WPF.Windows
                     geometryObjectModel = analyticalModel.ToSAM_GeometryObjectModel(viewSettings);
                 }
 
+                //Kept for the Part F annotation below, which reads the text this geometry carries so it can
+                //keep its tags off the room names. Null where the view was not regenerated this time.
+                geometryObjectModel_Updated = geometryObjectModel;
+
                 using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.ViewRegeneration.Viewport", string.Format("{0} [{1}]", name, viewSettings.GetType().Name)))
                 {
                     viewportControl.UIGeometryObjectModel = new UIGeometryObjectModel(geometryObjectModel);
@@ -3488,6 +3494,12 @@ namespace SAM.Analytical.UI.WPF.Windows
             {
                 viewportControl.Mode = mode;
             }
+
+            //Part F annotation on the normal saved view, after the mode is set so the 2D plan this draws on
+            //exists, and after the geometry so the room names it must keep clear of are there to measure.
+            //A view without the Part F parameter takes this branch too, and it removes any annotation the
+            //view used to carry. See AnalyticalWindow.PartF.cs.
+            UpdatePartFAirflow(viewportControl, analyticalModel, viewSettings, geometryObjectModel_Updated);
 
             if (viewSettings != null)
             {
