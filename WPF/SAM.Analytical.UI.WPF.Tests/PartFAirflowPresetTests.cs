@@ -156,8 +156,13 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         /// <summary>
         /// <b>The resolution agrees with the calculator.</b> A category this offers really does size at least
-        /// one dwelling, and one it rejects sizes none - asserted by running the real calculation, so the
-        /// duplicated rule cannot drift away from the one that matters.
+        /// one dwelling, and one it rejects sizes none - asserted by running the real calculation end to end.
+        /// <para>
+        /// Both now go through the one shared rule, <c>Query.PartFDwellingZones</c>, so this is no longer
+        /// guarding against two copies of a policy drifting apart. It is worth keeping as the integration lock:
+        /// it is the only test that proves the whole path from a model's zones to a sized dwelling behaves as
+        /// the preset promises.
+        /// </para>
         /// </summary>
         [Fact]
         public void DwellingCategories_AgreeWithTheCalculator()
