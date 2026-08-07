@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Analytical.Enums;
 using SAM.Core.UI;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
@@ -61,92 +64,223 @@ namespace SAM.Analytical.UI.WPF
             //category was silently sized as a dwelling and nothing was reported to the user.
             partFCalculator.Calculate(zoneCategoryName);
 
+            //The assessment window is the review and editing workflow: terminals, internal doors, purge and
+            //the clause-level checks, plus the airflow overlay drawn from the same data. Anything the
+            //engineer records there is an input the calculation cannot derive, so it is written back into
+            //the model before the model is published.
+            //The model goes in as well as the results: the airflow view draws the dwelling's REAL floor
+            //plan and puts the arrows on it, so it needs the geometry, not only the numbers. Order matters
+            //- DwellingResults selects the first dwelling and triggers the first plan load, so the model
+            //has to be there before it does.
+            PartFAssessmentWindow partFAssessmentWindow = new()
+            {
+                AnalyticalModel = analyticalModel,
+                DwellingResults = partFCalculator.DwellingResults,
+            };
+
+            if (owner != null)
+            {
+                new System.Windows.Interop.WindowInteropHelper(partFAssessmentWindow).Owner = owner.Handle;
+            }
+
+            partFAssessmentWindow.ShowDialog();
+
+            if (partFAssessmentWindow.Applied)
+            {
+                PersistEngineeringInputs(partFCalculator);
+            }
+
             analyticalModel = new AnalyticalModel(analyticalModel, partFCalculator.AdjacencyCluster);
 
             uIAnalyticalModel?.SetJSAMObject(analyticalModel, new FullModification());
-
-            Report(partFCalculator, owner);
         }
 
         /// <summary>
-        /// Builds the calculation's report text: dwelling summaries, excluded zones, unclassified and
-        /// unzoned spaces, warnings, notes and the local kitchen extract limitation. Pure text
-        /// generation with no UI dependency, so it can be unit tested directly - a model with
-        /// thousands of spaces can produce thousands of report lines, and this must not be the layer
-        /// that struggles with that.
+        /// Writes the engineer's recorded inputs back into the model, so they survive the next
+        /// recalculation instead of living only in the window that collected them.
+        /// <para>
+        /// Door transfer records go onto their door apertures. Purge records go onto their spaces. Check
+        /// confirmations go into the dwelling zone's commissioning record, which is where the calculation
+        /// reads them from - Appendix C Parts 2a and 2b are an installation and inspection checklist, so a
+        /// person's answers to the requirements no model contains belong with it.
+        /// </para>
         /// </summary>
-        public static string BuildReportText(PartFCalculator partFCalculator)
+        private static void PersistEngineeringInputs(PartFCalculator partFCalculator)
+        {
+            AdjacencyCluster? adjacencyCluster = partFCalculator?.AdjacencyCluster;
+            if (adjacencyCluster is null)
+            {
+                return;
+            }
+
+            foreach (PartFDwellingResult dwellingResult in partFCalculator!.DwellingResults ?? [])
+            {
+                PartFComplianceResult? complianceResult = dwellingResult?.ComplianceResult;
+                if (complianceResult is null)
+                {
+                    continue;
+                }
+
+                foreach (PartFDoorTransferData partFDoorTransferData in complianceResult.TransferPaths ?? [])
+                {
+                    if (partFDoorTransferData.ApertureGuid != Guid.Empty)
+                    {
+                        adjacencyCluster.SetPartFDoorTransferData(partFDoorTransferData.ApertureGuid, partFDoorTransferData);
+                    }
+                }
+
+                foreach (PartFPurgeVentilationData partFPurgeVentilationData in complianceResult.PurgeVentilation ?? [])
+                {
+                    Space? space = adjacencyCluster.GetObject<Space>(partFPurgeVentilationData.SpaceGuid);
+
+                    if (space?.GetValue<PartFSpaceData>(SpaceParameter.PartFSpaceData) is PartFSpaceData partFSpaceData)
+                    {
+                        partFSpaceData.Purge = partFPurgeVentilationData;
+                        space.SetValue(SpaceParameter.PartFSpaceData, partFSpaceData);
+                        adjacencyCluster.AddObject(space);
+                    }
+                }
+
+                PersistConfirmations(adjacencyCluster, dwellingResult!, complianceResult);
+            }
+        }
+
+        private static void PersistConfirmations(AdjacencyCluster adjacencyCluster, PartFDwellingResult partFDwellingResult, PartFComplianceResult partFComplianceResult)
+        {
+            //Everything a person entered is kept, not only the checks that ended up confirmed. A
+            //confirmation recorded against a check the calculation found FAILING does not produce a pass -
+            //it lands on engineering review, or on an alternative solution pending approval - and if only
+            //UserConfirmed checks were persisted, the evidence, the alternative method and the reason
+            //behind exactly those entries would be silently discarded on Apply. They are the entries most
+            //worth keeping.
+            List<PartFComplianceCheck> checks_Recorded = [.. (partFComplianceResult.Checks ?? []).Where(Recorded)];
+            if (checks_Recorded.Count == 0)
+            {
+                return;
+            }
+
+            //Single dwelling mode has no zone to hold the record. The confirmations stand for this session
+            //and are reported, but there is nowhere in the model to keep them; putting a dwelling in a zone
+            //is what gives it somewhere.
+            Zone? zone = string.IsNullOrWhiteSpace(partFDwellingResult.Name)
+                ? null
+                : adjacencyCluster.GetZones()?.Find(x => x.Name == partFDwellingResult.Name);
+
+            if (zone is null)
+            {
+                return;
+            }
+
+            PartFCommissioningData partFCommissioningData = partFComplianceResult.Commissioning ?? new PartFCommissioningData(partFDwellingResult.Name)
+            {
+                DwellingName = partFDwellingResult.Name,
+            };
+
+            foreach (PartFComplianceCheck check in checks_Recorded)
+            {
+                PartFComplianceCheck? check_Persisted = partFCommissioningData.InstallationChecks.Find(x => x is not null && string.Equals(x.Name, check.Name, StringComparison.Ordinal));
+
+                if (check_Persisted is null)
+                {
+                    check_Persisted = new PartFComplianceCheck(check.Name, check.SourceReference, check.Requirement);
+                    partFCommissioningData.InstallationChecks.Add(check_Persisted);
+                }
+
+                //What is stored is the ANSWER the person gave, not the status the guard let the check
+                //report. Storing the guarded outcome would make the record read as though they had asked
+                //for engineering review when what they actually claimed was compliance, and the next
+                //recalculation would re-apply that softened answer instead of re-testing the original one.
+                check_Persisted.Status = PartFComplianceStatus.UserConfirmed;
+                check_Persisted.ConfirmedBy = check.ConfirmedBy;
+                check_Persisted.ConfirmationDate = check.ConfirmationDate;
+                check_Persisted.Notes = check.Notes;
+                check_Persisted.UserEvidence = check.UserEvidence;
+                check_Persisted.AlternativeComplianceMethod = check.AlternativeComplianceMethod;
+                check_Persisted.OverrideReason = check.OverrideReason;
+            }
+
+            partFComplianceResult.Commissioning = partFCommissioningData;
+
+            zone.SetValue(ZoneParameter.PartFCommissioningData, partFCommissioningData);
+            adjacencyCluster.AddObject(zone);
+        }
+
+        /// <summary>
+        /// True where a person has entered something against this check that the model could not have
+        /// produced, and which must therefore survive the next recalculation.
+        /// </summary>
+        private static bool Recorded(PartFComplianceCheck partFComplianceCheck)
+        {
+            if (partFComplianceCheck is null)
+            {
+                return false;
+            }
+
+            return partFComplianceCheck.Status == PartFComplianceStatus.UserConfirmed
+                || partFComplianceCheck.IsUserResolved
+                || !string.IsNullOrWhiteSpace(partFComplianceCheck.UserEvidence)
+                || !string.IsNullOrWhiteSpace(partFComplianceCheck.AlternativeComplianceMethod)
+                || !string.IsNullOrWhiteSpace(partFComplianceCheck.OverrideReason);
+        }
+
+        /// <summary>
+        /// Builds the Part F conformance assessment report shown to the user: the shared engineering
+        /// report from SAM.Analytical, followed by the model-level notes that belong to the run rather
+        /// than to any one dwelling.
+        /// <para>
+        /// The report body itself is generated by <see cref="PartFReport"/>, which has no user interface
+        /// dependency at all. The same text therefore appears here, on the clipboard, in the Grasshopper
+        /// output and in the regression tests, and a change to it is caught by a test rather than noticed
+        /// on screen. This layer adds only what is specific to a SAM_UI run and wraps the result for
+        /// reading.
+        /// </para>
+        /// <para>
+        /// Pure text generation, so it can be unit tested directly: a model with thousands of spaces can
+        /// produce thousands of report lines, and this must not be the layer that struggles with that.
+        /// </para>
+        /// </summary>
+        public static string BuildReportText(PartFCalculator partFCalculator, PartFOperatingMode partFOperatingMode = PartFOperatingMode.ContinuousDesign)
         {
             StringBuilder stringBuilder = new();
 
-            if (partFCalculator.DwellingResults is not null && partFCalculator.DwellingResults.Count != 0)
+            //The assessment opens with its assumptions, before any number, so a reader can see the basis
+            //of it before reading a result. That ordering is fixed and asserted by a regression test.
+            stringBuilder.Append(PartFReport.Build(partFCalculator, partFOperatingMode));
+
+            List<string> notes = [];
+
+            if (partFCalculator?.ExcludedZoneNames is not null && partFCalculator.ExcludedZoneNames.Count != 0)
             {
-                stringBuilder.AppendLine(string.Format("{0} dwelling(s) sized.", partFCalculator.DwellingResults.Count));
+                notes.Add("Zones not sized as dwellings: " + string.Join(", ", partFCalculator.ExcludedZoneNames));
+            }
 
-                foreach (PartFDwellingResult dwellingResult in partFCalculator.DwellingResults)
+            if (partFCalculator?.UnclassifiedSpaceNames is not null && partFCalculator.UnclassifiedSpaceNames.Count != 0)
+            {
+                notes.Add("Unclassified space(s): " + string.Join(", ", partFCalculator.UnclassifiedSpaceNames));
+            }
+
+            //Warnings that belong to the model rather than to a dwelling - a missing zone category, a
+            //space in two dwelling zones - never reach a dwelling result, so they would be lost if this
+            //layer did not add them.
+            List<string> warnings_Model = [.. (partFCalculator?.Warnings ?? []).Where(x => !partFCalculator.DwellingResults.Exists(y => y.Warnings.Exists(z => x.EndsWith(z, StringComparison.Ordinal))))];
+
+            if (warnings_Model.Count != 0)
+            {
+                notes.Add("Model-level warnings:");
+                notes.AddRange(warnings_Model.ConvertAll(x => "- " + x));
+            }
+
+            if (notes.Count != 0)
+            {
+                stringBuilder.AppendLine();
+                stringBuilder.AppendLine("MODEL NOTES");
+                stringBuilder.AppendLine(new string('-', "MODEL NOTES".Length));
+
+                foreach (string note in notes)
                 {
-                    int spaceCount = dwellingResult.SpaceNames?.Count ?? 0;
-
-                    stringBuilder.AppendLine(string.Format(
-                        "{0}{1} space(s), {2:0.##} m2, {3} habitable room(s), {4} bedroom(s), continuous design {5:0.##} l/s, setback {6:0.##} l/s ({7:0.##}% of continuous design).{8}",
-                        string.IsNullOrWhiteSpace(dwellingResult.Name) ? string.Empty : dwellingResult.Name + ": ",
-                        spaceCount,
-                        dwellingResult.InternalFloorArea_M2,
-                        dwellingResult.HabitableRoomCount,
-                        dwellingResult.BedroomCount,
-                        dwellingResult.ContinuousDesignSystemRate_Lps,
-                        dwellingResult.SetbackSystemRate_Lps,
-                        dwellingResult.SetbackFlowRateFactor * 100,
-                        dwellingResult.OneHabitableRoomRuleApplied ? " Table 1.3 note 1 (one habitable room) applied." : string.Empty));
+                    stringBuilder.AppendLine(note);
                 }
             }
-            else
-            {
-                stringBuilder.AppendLine("No dwelling was sized.");
-            }
-
-            if (partFCalculator.ExcludedZoneNames is not null && partFCalculator.ExcludedZoneNames.Count != 0)
-            {
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine("Zones not sized as dwellings: " + string.Join(", ", partFCalculator.ExcludedZoneNames));
-            }
-
-            if (partFCalculator.UnclassifiedSpaceNames is not null && partFCalculator.UnclassifiedSpaceNames.Count != 0)
-            {
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine("Unclassified space(s): " + string.Join(", ", partFCalculator.UnclassifiedSpaceNames));
-            }
-
-            if (partFCalculator.Warnings is not null && partFCalculator.Warnings.Count != 0)
-            {
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine("WARNINGS");
-                foreach (string warning in partFCalculator.Warnings)
-                {
-                    stringBuilder.AppendLine(warning);
-                }
-            }
-
-            if (partFCalculator.Remarks is not null && partFCalculator.Remarks.Count != 0)
-            {
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine("NOTES");
-                foreach (string remark in partFCalculator.Remarks)
-                {
-                    stringBuilder.AppendLine(remark);
-                }
-            }
-
-            //Called out separately from the warning list so the local kitchen extract limitation is not
-            //lost among the other messages: it is a standing limitation of the model, not a modelling slip.
-            if (partFCalculator.Warnings is not null && partFCalculator.Warnings.Any(x => x.Contains("ENGINEERING CHECK REQUIRED")))
-            {
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine("LOCAL KITCHEN EXTRACT: one or more dwellings contain a cooking space with no explicit local kitchen or cooker extract represented. Wet-room extract may balance the dwelling airflow but does not demonstrate compliance with the local kitchen-extract requirement. Model and verify it separately.");
-            }
-
-            stringBuilder.AppendLine();
-            stringBuilder.AppendLine("Using this tool does not by itself demonstrate compliance with Building Regulations Part F. Results must be checked by a suitably qualified engineer against the full Approved Document.");
 
             return Wrap(stringBuilder.ToString(), reportLineLength);
         }
@@ -192,7 +326,7 @@ namespace SAM.Analytical.UI.WPF
 
                 string line_Trimmed = line.TrimEnd('\r');
 
-                if (line_Trimmed.Length <= maxLineLength)
+                if (line_Trimmed.Length <= maxLineLength || IsDiagram(line_Trimmed))
                 {
                     result.AppendLine(line_Trimmed);
                     continue;
@@ -225,6 +359,30 @@ namespace SAM.Analytical.UI.WPF
 
             return result.ToString();
         }
+
+        /// <summary>
+        /// True for a line of the airflow schematic. Those lines are a DRAWING: their indentation places
+        /// each branch under the arrow above it, and breaking one at a column would leave the diagram
+        /// pointing at nothing. A long branch line is left to scroll instead.
+        /// </summary>
+        private static bool IsDiagram(string line)
+        {
+            return line.IndexOfAny(diagramCharacters) != -1;
+        }
+
+        /// <summary>
+        /// The box-drawing and arrow characters the schematic is built from. Taken from the renderer
+        /// itself rather than repeated here, so the two cannot drift apart.
+        /// </summary>
+        private static readonly char[] diagramCharacters =
+        [
+            PartFSchematic.Vertical[0],
+            PartFSchematic.Horizontal[0],
+            PartFSchematic.CornerLast[0],
+            PartFSchematic.CornerTee[0],
+            PartFSchematic.ArrowDown[0],
+            PartFSchematic.ArrowRight[0],
+        ];
 
         /// <summary>
         /// Surfaces the calculation's warnings and remarks. Without this the dwelling filter, the
