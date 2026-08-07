@@ -8,6 +8,7 @@ using SAM.Geometry.Planar;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace SAM.Analytical.UI.WPF.Tests
@@ -41,6 +42,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartFAirflowViewSettings partFAirflowViewSettings = Analytical.UI.Create.PartFAirflowViewSettings(Model().AdjacencyCluster);
 
             Assert.True(partFAirflowViewSettings.Enabled);
+            Assert.Equal(PartFDwellingScope.ZoneCategory, partFAirflowViewSettings.DwellingScope);
+            Assert.True(partFAirflowViewSettings.HasDwellingScope);
             Assert.Equal(PartFDwellingFilter.AllDwellingsOnLevel, partFAirflowViewSettings.DwellingFilter);
             Assert.Equal(Guid.Empty, partFAirflowViewSettings.DwellingGuid);
             Assert.Equal(PartFOperatingMode.ContinuousDesign, partFAirflowViewSettings.OperatingMode);
@@ -68,7 +71,48 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(partFAirflowViewSettings.Enabled);
             Assert.Equal("Flats", partFAirflowViewSettings.ZoneCategoryName);
+            Assert.Equal(PartFDwellingScope.ZoneCategory, partFAirflowViewSettings.DwellingScope);
             Assert.Equal(50, partFAirflowViewSettings.AnnotationScale);
+        }
+
+        /// <summary>
+        /// An undecided scope survives being saved and reopened AS undecided. A round trip that quietly
+        /// turned it into whole-house mode would put the wrong drawing back exactly where it was avoided.
+        /// </summary>
+        [Fact]
+        public void UndecidedScope_RoundTrips()
+        {
+            PartFPlanModel model = Model();
+
+            model.Zone("House 1", "Houses", true, "Bedroom");
+
+            PartFAirflowViewSettings partFAirflowViewSettings = new(Analytical.UI.Create.PartFAirflowViewSettings(model.AdjacencyCluster).ToJsonObject());
+
+            Assert.Equal(PartFDwellingScope.Undefined, partFAirflowViewSettings.DwellingScope);
+            Assert.False(partFAirflowViewSettings.HasDwellingScope);
+            Assert.Null(partFAirflowViewSettings.ZoneCategoryName);
+        }
+
+        /// <summary>
+        /// A view saved before the scope existed is read by what it says: a named category is a category, and
+        /// a blank one is UNDECIDED, not whole-house. The safe direction - such a view reopens drawing
+        /// nothing rather than presenting a block of flats as a single dwelling.
+        /// </summary>
+        [Fact]
+        public void ViewSavedBeforeTheScopeExisted_IsReadFromItsCategory()
+        {
+            JsonObject jsonObject = Analytical.UI.Create.PartFAirflowViewSettings(Model().AdjacencyCluster).ToJsonObject();
+
+            jsonObject.Remove("DwellingScope");
+
+            Assert.Equal(PartFDwellingScope.ZoneCategory, new PartFAirflowViewSettings(jsonObject).DwellingScope);
+
+            jsonObject.Remove("ZoneCategoryName");
+
+            PartFAirflowViewSettings partFAirflowViewSettings = new(jsonObject);
+
+            Assert.Equal(PartFDwellingScope.Undefined, partFAirflowViewSettings.DwellingScope);
+            Assert.False(partFAirflowViewSettings.HasDwellingScope);
         }
 
         // ------------------------------------------------------------------
@@ -76,35 +120,26 @@ namespace SAM.Analytical.UI.WPF.Tests
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// One unambiguous dwelling category is selected automatically. Nothing hard-codes the name - the
-        /// fixture calls it "Flats", and the resolution would find "Apartments" or "Dwellings" just the same.
+        /// <b>Case 1 - exactly one dwelling category.</b> Selected automatically and the annotation turned
+        /// on: the only thing a person could do here is retype what the model already says. Nothing
+        /// hard-codes the name - the fixture calls it "Flats", and the resolution would find "Apartments" or
+        /// "Dwellings" just the same.
         /// </summary>
         [Fact]
         public void Preset_OneDwellingCategory_IsSelectedAutomatically()
         {
-            Assert.Equal("Flats", Analytical.UI.Create.PartFAirflowViewSettings(Model().AdjacencyCluster).ZoneCategoryName);
+            PartFAirflowViewSettings partFAirflowViewSettings = Analytical.UI.Create.PartFAirflowViewSettings(Model().AdjacencyCluster);
+
+            Assert.Equal("Flats", partFAirflowViewSettings.ZoneCategoryName);
+            Assert.Equal(PartFDwellingScope.ZoneCategory, partFAirflowViewSettings.DwellingScope);
+            Assert.True(partFAirflowViewSettings.HasDwellingScope);
+            Assert.True(partFAirflowViewSettings.Enabled);
         }
 
         /// <summary>
-        /// Several valid dwelling categories are left UNSET, for the user to choose. Which flats a drawing
-        /// reports on is an engineering decision, and guessing it would produce a confident drawing of the
-        /// wrong half of a mixed-use building.
-        /// </summary>
-        [Fact]
-        public void Preset_SeveralDwellingCategories_AreLeftForTheUser()
-        {
-            PartFPlanModel model = Model();
-
-            //A second, equally valid dwelling category.
-            model.Zone("House 1", "Houses", true, "Bedroom");
-
-            Assert.Equal(2, model.AdjacencyCluster.PartFDwellingZoneCategories().Count);
-            Assert.Null(Analytical.UI.Create.PartFAirflowViewSettings(model.AdjacencyCluster).ZoneCategoryName);
-        }
-
-        /// <summary>
-        /// A model with no zones at all gets no category, which selects the calculation's whole-house mode -
-        /// the correct answer for a single dwelling that was never zoned.
+        /// <b>Case 2 - no zones at all.</b> Whole-model single-house mode, turned on: the correct answer for
+        /// a dwelling that was never zoned. Recorded as a CHOICE rather than left as the blank category that
+        /// used to stand in for it, so it cannot be confused with the two undecided cases below.
         /// </summary>
         [Fact]
         public void Preset_NoDwellingStructure_UsesWholeHouseMode()
@@ -116,7 +151,134 @@ namespace SAM.Analytical.UI.WPF.Tests
                 .Close();
 
             Assert.Empty(model.AdjacencyCluster.PartFDwellingZoneCategories());
-            Assert.Null(Analytical.UI.Create.PartFAirflowViewSettings(model.AdjacencyCluster).ZoneCategoryName);
+
+            PartFAirflowViewSettings partFAirflowViewSettings = Analytical.UI.Create.PartFAirflowViewSettings(model.AdjacencyCluster);
+
+            Assert.Equal(PartFDwellingScope.WholeModel, partFAirflowViewSettings.DwellingScope);
+            Assert.Null(partFAirflowViewSettings.ZoneCategoryName);
+            Assert.True(partFAirflowViewSettings.HasDwellingScope);
+            Assert.True(partFAirflowViewSettings.Enabled);
+        }
+
+        /// <summary>
+        /// <b>Case 3 - several valid dwelling categories.</b> Left undecided, for the user to choose. Which
+        /// flats a drawing reports on is an engineering decision, and guessing it would produce a confident
+        /// drawing of the wrong half of a mixed-use building.
+        /// <para>
+        /// The annotation stays ON. That is deliberate and it is safe: the switch says this view wants Part
+        /// F annotation, and <c>HasDwellingScope</c> - not the switch - is what stops anything being
+        /// assessed. See <see cref="ScopeSelection_IsTheOnlyRemainingAction"/>.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void Preset_SeveralDwellingCategories_AreLeftForTheUser()
+        {
+            PartFPlanModel model = Model();
+
+            //A second, equally valid dwelling category.
+            model.Zone("House 1", "Houses", true, "Bedroom");
+
+            Assert.Equal(2, model.AdjacencyCluster.PartFDwellingZoneCategories().Count);
+
+            PartFAirflowViewSettings partFAirflowViewSettings = Analytical.UI.Create.PartFAirflowViewSettings(model.AdjacencyCluster);
+
+            Assert.Equal(PartFDwellingScope.Undefined, partFAirflowViewSettings.DwellingScope);
+            Assert.Null(partFAirflowViewSettings.ZoneCategoryName);
+            Assert.False(partFAirflowViewSettings.HasDwellingScope);
+            Assert.True(partFAirflowViewSettings.Enabled);
+        }
+
+        /// <summary>
+        /// <b>Case 4 - zones, but no dwelling among them.</b> Left undecided, NOT quietly treated as a
+        /// single house. The model is telling us its zones are not dwellings, usually because Is Dwelling
+        /// was never set; falling back to whole-house would assess an entire block as one dwelling on the
+        /// strength of a missing parameter, and issue it as a result.
+        /// </summary>
+        [Fact]
+        public void Preset_ZonesButNoDwellingCategory_DoesNotFallBackToWholeHouse()
+        {
+            PartFPlanModel model = new PartFPlanModel()
+                .Room("Studio", 8)
+                .Room("Bathroom", 3)
+                .Room("Corridor", 2)
+                .Partition("Studio", "Bathroom", "D01")
+                .Partition("Bathroom", "Corridor")
+                .Zone("Corridor Zone", "Communal", false, "Corridor")
+                .Zone("Landlord Zone", "Communal", false, "Studio", "Bathroom");
+
+            Assert.NotEmpty(model.AdjacencyCluster.GetZones());
+            Assert.Empty(model.AdjacencyCluster.PartFDwellingZoneCategories());
+
+            PartFAirflowViewSettings partFAirflowViewSettings = Analytical.UI.Create.PartFAirflowViewSettings(model.AdjacencyCluster);
+
+            Assert.Equal(PartFDwellingScope.Undefined, partFAirflowViewSettings.DwellingScope);
+            Assert.False(partFAirflowViewSettings.HasDwellingScope);
+            Assert.True(partFAirflowViewSettings.Enabled);
+        }
+
+        /// <summary>
+        /// <b>The failure this whole change is about.</b> A two-category model gets no category, and the
+        /// saved-view path must not read that as "assess the whole model as one dwelling" - which is exactly
+        /// what a null category means to <c>PartFCalculator.Calculate(string)</c>.
+        /// <para>
+        /// Asserted through the real object the saved view calculates with, not a restatement of the rule.
+        /// <b>The annotation is ON throughout</b> - which is the point: the switch is the user's intent and
+        /// the scope is the safety mechanism, so an enabled view with nothing decided still assesses
+        /// nothing. The positive half at the end matters too; without it this would pass just as well if
+        /// the assessment were simply broken.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TwoCategories_NeverProduceAWholeModelAssessment()
+        {
+            PartFPlanModel model = Model();
+
+            model.Zone("House 1", "Houses", true, "Bedroom");
+
+            AnalyticalModel analyticalModel = new("Two categories", null, null, null, model.AdjacencyCluster);
+
+            PartFAirflowViewSettings partFAirflowViewSettings = Analytical.UI.Create.PartFAirflowViewSettings(model.AdjacencyCluster);
+
+            //Enabled, and still undecided: nothing is assessed. The switch is not the gate.
+            Assert.True(partFAirflowViewSettings.Enabled);
+            Assert.Empty(Cache().Results(analyticalModel, partFAirflowViewSettings));
+
+            //Whereas whole-model mode, once somebody has actually chosen it, does assess.
+            partFAirflowViewSettings.DwellingScope = PartFDwellingScope.WholeModel;
+
+            Assert.NotEmpty(Cache().Results(analyticalModel, partFAirflowViewSettings));
+        }
+
+        /// <summary>
+        /// <b>Choosing the dwellings is the ONLY remaining action.</b> The preset left the annotation on and
+        /// the scope undecided, so answering the one question SAM could not answer itself produces the
+        /// drawing - with no second trip back to re-enable anything.
+        /// <para>
+        /// This is why an undecided scope does not switch the annotation off. Off would be safe too, but it
+        /// would put a second, easily forgotten step between an engineer and the drawing they asked for,
+        /// which is the discoverability problem the preset exists to solve.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void ScopeSelection_IsTheOnlyRemainingAction()
+        {
+            PartFPlanModel model = Model();
+
+            model.Zone("House 1", "Houses", true, "Bedroom");
+
+            AnalyticalModel analyticalModel = new("Two categories", null, null, null, model.AdjacencyCluster);
+
+            PartFAirflowViewSettings partFAirflowViewSettings = Analytical.UI.Create.PartFAirflowViewSettings(model.AdjacencyCluster);
+
+            //The one action: the dialog records which category the drawing reports on. Nothing else changes.
+            partFAirflowViewSettings.DwellingScope = PartFDwellingScope.ZoneCategory;
+            partFAirflowViewSettings.ZoneCategoryName = "Flats";
+
+            Assert.True(partFAirflowViewSettings.Enabled);
+            Assert.True(partFAirflowViewSettings.HasDwellingScope);
+
+            //Two flats in that category, and the drawing can be made.
+            Assert.Equal(2, Cache().Results(analyticalModel, partFAirflowViewSettings).Count);
         }
 
         /// <summary>
@@ -297,6 +459,15 @@ namespace SAM.Analytical.UI.WPF.Tests
                 .Zone("Flat 2", "Flats", true, "Bedroom", "Kitchen")
                 .LocalExtractMethod("Studio", PartFExtractMethod.MVHRContinuousTerminal)
                 .LocalExtractMethod("Kitchen", PartFExtractMethod.MVHRContinuousTerminal);
+        }
+
+        /// <summary>
+        /// The assessment the saved 2D views run through, calculating with the shipped rule set rather than
+        /// the installed one, which a test machine need not have.
+        /// </summary>
+        private static PartFAssessmentCache Cache()
+        {
+            return new PartFAssessmentCache(() => new PartFCalculator(Analytical.Create.PartFData(RuleSetPath())));
         }
 
         private static List<PartFComplianceResult> Calculate(PartFPlanModel model, string zoneCategoryName)

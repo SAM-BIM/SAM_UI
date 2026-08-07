@@ -1,4 +1,7 @@
-﻿using SAM.Architectural;
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Architectural;
 using SAM.Geometry.Object;
 using SAM.Geometry.UI;
 using System;
@@ -240,10 +243,23 @@ namespace SAM.Analytical.UI.WPF
             UpdatePartFAirflowButton();
         }
 
-        /// <summary>Says on the button whether this view carries the annotation, so it reads at a glance.</summary>
+        /// <summary>
+        /// Says on the button whether this view carries the annotation, so it reads at a glance.
+        /// <para>
+        /// The middle case is the one that matters, and it is asked BEFORE <c>Enabled</c>. Where the preset
+        /// could not tell what the drawing is about - several dwelling categories, or a zoned model with no
+        /// dwelling among them - the annotation is on and the scope is undecided, so nothing is assessed and
+        /// nothing is drawn. The switch alone would then read "on" over an empty plan; the button says what
+        /// is actually outstanding instead, which is the one action left.
+        /// </para>
+        /// </summary>
         private void UpdatePartFAirflowButton()
         {
-            button_PartFAirflow.Content = partFAirflowViewSettings?.Enabled == true ? "Part F Airflow: on..." : "Part F Airflow...";
+            button_PartFAirflow.Content =
+                partFAirflowViewSettings is null ? "Part F Airflow..."
+                : !partFAirflowViewSettings.HasDwellingScope ? "Part F Airflow: choose the dwellings..."
+                : partFAirflowViewSettings.Enabled ? "Part F Airflow: on..."
+                : "Part F Airflow...";
         }
 
         private TwoDimensionalViewSettings GetTwoDimensionalViewSettings()

@@ -146,6 +146,10 @@ namespace SAM.Analytical.UI.WPF
 
             bool terminals = CheckBox_Terminals.IsChecked == true;
 
+            //No DwellingScope: this tab draws the dwelling already selected in the window and hands the
+            //renderer that dwelling's assessment directly, so it never asks a scope which dwellings to
+            //assess. The scope belongs to a SAVED view, which has to reproduce an assessment from what it
+            //stored - see PartFAssessmentCache.
             renderer.ViewSettings = new PartFAirflowViewSettings()
             {
                 Enabled = true,

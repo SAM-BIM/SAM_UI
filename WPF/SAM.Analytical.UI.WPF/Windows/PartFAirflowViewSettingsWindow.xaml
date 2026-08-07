@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
-        Title="Part F Airflow" Height="470" Width="430" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+        Title="Part F Airflow" Height="530" Width="430" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -27,10 +27,11 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Label Grid.Row="0" Grid.Column="0" Content="Dwelling zone category:"/>
-                <ComboBox x:Name="ComboBox_ZoneCategory" Grid.Row="0" Grid.Column="1" Height="22" IsEditable="True" VerticalAlignment="Center"/>
+                <Label Grid.Row="0" Grid.Column="0" Content="Dwellings assessed:"/>
+                <ComboBox x:Name="ComboBox_DwellingScope" Grid.Row="0" Grid.Column="1" Height="22" VerticalAlignment="Center" SelectionChanged="ComboBox_DwellingScope_SelectionChanged"/>
 
                 <Label Grid.Row="1" Grid.Column="0" Content="Dwellings drawn:"/>
                 <ComboBox x:Name="ComboBox_Dwelling" Grid.Row="1" Grid.Column="1" Height="22" VerticalAlignment="Center"/>
@@ -40,6 +41,9 @@
 
                 <Label Grid.Row="3" Grid.Column="0" Content="Annotation scale  1 :"/>
                 <TextBox x:Name="TextBox_AnnotationScale" Grid.Row="3" Grid.Column="1" Height="22" Text="50" VerticalAlignment="Center" HorizontalAlignment="Left" Width="80"/>
+
+                <TextBlock x:Name="TextBlock_ScopeMessage" Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" TextWrapping="Wrap"
+                           Margin="0,8,0,0" Foreground="#A03000" Visibility="Collapsed"/>
             </Grid>
         </GroupBox>
 

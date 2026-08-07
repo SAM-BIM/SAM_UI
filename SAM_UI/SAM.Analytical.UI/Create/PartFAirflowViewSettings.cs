@@ -29,13 +29,25 @@ namespace SAM.Analytical.UI
         /// <see cref="Analytical.Query.PartFDwellingZoneCategories"/>.
         /// </param>
         /// <returns>
-        /// Settings with the annotation on, everything visible, at 1:50 and the continuous design condition.
+        /// Settings with the annotation on, everything visible, at 1:50 and the continuous design condition,
+        /// scoped where the model says unambiguously what the drawing is about and left explicitly undecided
+        /// where it does not. See <see cref="DwellingScope(AdjacencyCluster, out string)"/>.
         /// </returns>
         public static PartFAirflowViewSettings PartFAirflowViewSettings(AdjacencyCluster adjacencyCluster)
         {
+            PartFDwellingScope partFDwellingScope = DwellingScope(adjacencyCluster, out string zoneCategoryName);
+
             return new PartFAirflowViewSettings()
             {
+                //On even where the scope is undecided, and that is safe: the switch says this view WANTS Part
+                //F annotation, and PartFAirflowViewSettings.HasDwellingScope says whether SAM knows enough to
+                //calculate any. The scope gate is what prevents an assessment, not this. Keeping the switch
+                //on is also what makes the preset worth having - choosing the dwellings is then the single
+                //remaining action, rather than a choice followed by remembering to turn the overlay back on.
                 Enabled = true,
+
+                DwellingScope = partFDwellingScope,
+                ZoneCategoryName = zoneCategoryName,
 
                 //The Approved Document F sizing case, which is the condition a drawing is normally issued at.
                 OperatingMode = PartFOperatingMode.ContinuousDesign,
@@ -43,8 +55,6 @@ namespace SAM.Analytical.UI
                 //A floor plan is a drawing of a floor: every dwelling on it, not one flat with the rest blank.
                 DwellingFilter = PartFDwellingFilter.AllDwellingsOnLevel,
                 DwellingGuid = System.Guid.Empty,
-
-                ZoneCategoryName = ZoneCategoryName(adjacencyCluster),
 
                 AnnotationScale = PartFTagPlacement.DefaultAnnotationScale,
 
@@ -64,21 +74,52 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
-        /// The dwelling zone category to start a new Part F view on, or null to leave it unset.
-        /// <para>
-        /// Resolved from the model rather than assumed - nothing here knows the word "Flats". One unambiguous
-        /// dwelling category is chosen automatically, because that is the case where a person would only be
-        /// retyping what the model already says. Several are left unset ON PURPOSE: which flats a drawing
+        /// What a new Part F view reports on, resolved from the model rather than assumed - nothing here
+        /// knows the word "Flats". Four situations, and they are NOT the same answer:
+        /// <list type="number">
+        /// <item><b>Exactly one dwelling category</b> - selected automatically. The only thing a person
+        /// could do here is retype what the model already says.</item>
+        /// <item><b>No zones at all</b> - whole-model single-house mode. A house that was never zoned, and
+        /// the choice is still recorded as a choice rather than left as a blank that reads like one.</item>
+        /// <item><b>Several dwelling categories</b> - left undecided, ON PURPOSE. Which flats a drawing
         /// reports on is an engineering decision, and guessing it would produce a confident drawing of the
-        /// wrong half of a mixed-use building. None means the model has no dwelling-zone structure, and the
-        /// calculation's whole-house mode - which an empty category selects - is the right answer.
+        /// wrong half of a mixed-use building.</item>
+        /// <item><b>Zones, but no dwelling among them</b> - left undecided. Something is wrong with the
+        /// model, typically no zone marked Is Dwelling; falling back to whole-house here would assess a
+        /// whole block as one dwelling because of a missing parameter, and report it as a result.</item>
+        /// </list>
+        /// <para>
+        /// Cases 3 and 4 are why this returns a scope rather than a name. Both once produced a null
+        /// category, indistinguishable from case 2, which the calculation reads as single-house mode.
         /// </para>
         /// </summary>
-        private static string ZoneCategoryName(AdjacencyCluster adjacencyCluster)
+        /// <param name="zoneCategoryName">
+        /// The category resolved in case 1, otherwise null.
+        /// </param>
+        private static PartFDwellingScope DwellingScope(AdjacencyCluster adjacencyCluster, out string zoneCategoryName)
         {
-            List<string> names = adjacencyCluster?.PartFDwellingZoneCategories();
+            zoneCategoryName = null;
 
-            return names != null && names.Count == 1 ? names[0] : null;
+            List<string> names = adjacencyCluster?.PartFDwellingZoneCategories() ?? [];
+
+            if (names.Count == 1)
+            {
+                zoneCategoryName = names[0];
+
+                return PartFDwellingScope.ZoneCategory;
+            }
+
+            if (names.Count != 0)
+            {
+                return PartFDwellingScope.Undefined;
+            }
+
+            //No dwelling category. Whether that is a house or a broken model is decided by whether the model
+            //is zoned at all: an unzoned model has nothing to say about dwellings and is one; a zoned model
+            //has been asked and has answered that none of its zones is a dwelling, which is not a house.
+            List<Zone> zones = adjacencyCluster?.GetZones();
+
+            return zones is null || zones.Count == 0 ? PartFDwellingScope.WholeModel : PartFDwellingScope.Undefined;
         }
     }
 }

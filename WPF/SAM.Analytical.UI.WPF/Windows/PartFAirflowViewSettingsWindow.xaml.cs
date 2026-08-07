@@ -31,6 +31,19 @@ namespace SAM.Analytical.UI.WPF
     {
         private List<Zone> zones = [];
 
+        /// <summary>
+        /// The dwelling zone categories offered, in the order they appear in the scope list after its two
+        /// fixed entries. Only categories the calculation would actually find dwellings in: offering one it
+        /// would find none in is offering a drawing with nothing on it.
+        /// </summary>
+        private List<string> zoneCategoryNames = [];
+
+        /// <summary>Whether the model is zoned at all, which is what tells a house from an unmarked block.</summary>
+        private bool hasZones;
+
+        /// <summary>The scope list's fixed entries: not chosen, then the whole model.</summary>
+        private const int index_WholeModel = 1;
+
         public PartFAirflowViewSettingsWindow()
         {
             InitializeComponent();
@@ -41,6 +54,11 @@ namespace SAM.Analytical.UI.WPF
             }
 
             ComboBox_Mode.SelectedIndex = 0;
+
+            //Built here as well as when the model arrives, so the two fixed entries exist even if no model
+            //ever does: an empty list would read every saved scope back as "not chosen" and quietly discard
+            //a whole-model view's scope on OK.
+            RebuildDwellingScope();
         }
 
         /// <summary>
@@ -51,14 +69,13 @@ namespace SAM.Analytical.UI.WPF
         {
             set
             {
-                ComboBox_ZoneCategory.Items.Clear();
-
-                foreach (string zoneCategory in value?.GetZoneCategories() ?? [])
-                {
-                    ComboBox_ZoneCategory.Items.Add(zoneCategory);
-                }
-
                 zones = [.. (value?.GetZones() ?? []).Where(x => x is not null).OrderBy(x => x.Name, StringComparer.Ordinal)];
+
+                hasZones = zones.Count != 0;
+
+                zoneCategoryNames = value?.PartFDwellingZoneCategories() ?? [];
+
+                RebuildDwellingScope();
 
                 ComboBox_Dwelling.Items.Clear();
                 ComboBox_Dwelling.Items.Add("All dwellings on this level");
@@ -86,7 +103,8 @@ namespace SAM.Analytical.UI.WPF
                     Enabled = CheckBox_Enabled.IsChecked == true,
                     OperatingMode = (PartFOperatingMode)System.Math.Max(0, ComboBox_Mode.SelectedIndex),
 
-                    ZoneCategoryName = string.IsNullOrWhiteSpace(ComboBox_ZoneCategory.Text) ? null : ComboBox_ZoneCategory.Text,
+                    DwellingScope = DwellingScope(out string zoneCategoryName),
+                    ZoneCategoryName = zoneCategoryName,
 
                     ShowSupply = CheckBox_Supply.IsChecked == true,
                     ShowGeneralExtract = CheckBox_GeneralExtract.IsChecked == true,
@@ -128,7 +146,9 @@ namespace SAM.Analytical.UI.WPF
 
                 CheckBox_Enabled.IsChecked = partFAirflowViewSettings.Enabled;
                 ComboBox_Mode.SelectedIndex = (int)partFAirflowViewSettings.OperatingMode;
-                ComboBox_ZoneCategory.Text = partFAirflowViewSettings.ZoneCategoryName ?? string.Empty;
+
+                SelectDwellingScope(partFAirflowViewSettings.DwellingScope, partFAirflowViewSettings.ZoneCategoryName);
+
                 TextBox_AnnotationScale.Text = partFAirflowViewSettings.AnnotationScale.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
                 CheckBox_Supply.IsChecked = partFAirflowViewSettings.ShowSupply;
@@ -158,16 +178,139 @@ namespace SAM.Analytical.UI.WPF
             UpdateEnabled();
         }
 
+        private void ComboBox_DwellingScope_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            UpdateScopeMessage();
+        }
+
         /// <summary>
         /// Everything below the switch is greyed out when the annotation is off - the settings are still there
         /// and are still saved, so turning it back on restores the drawing rather than resetting it.
+        /// <para>
+        /// The scope group stays reachable while the annotation is off, because choosing the dwellings is
+        /// what a person has come here to do when the preset left it undecided.
+        /// </para>
         /// </summary>
         private void UpdateEnabled()
         {
-            bool enabled = CheckBox_Enabled.IsChecked == true;
+            //GroupBox_Scope is deliberately left alone: it stays usable with the annotation off.
+            GroupBox_Show.IsEnabled = CheckBox_Enabled.IsChecked == true;
 
-            GroupBox_Scope.IsEnabled = enabled;
-            GroupBox_Show.IsEnabled = enabled;
+            UpdateScopeMessage();
+        }
+
+        // ------------------------------------------------------------------
+        // What this drawing reports on
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// The scope list: not chosen, the whole model as one dwelling, then each dwelling zone category the
+        /// model actually holds.
+        /// <para>
+        /// "Not chosen" is a real entry rather than an empty box, because it is a real state with a
+        /// consequence - nothing is assessed and nothing is drawn - and the consequence is spelled out
+        /// underneath. It used to be the empty text of an editable combo, which the rest of the chain read as
+        /// "the whole model is one dwelling": the same blank meant both, and a block of flats waiting to be
+        /// scoped was drawn as a single dwelling.
+        /// </para>
+        /// </summary>
+        private void RebuildDwellingScope()
+        {
+            ComboBox_DwellingScope.Items.Clear();
+
+            ComboBox_DwellingScope.Items.Add("Not chosen - nothing is assessed or drawn");
+            ComboBox_DwellingScope.Items.Add(Core.Query.Description(PartFDwellingScope.WholeModel));
+
+            foreach (string zoneCategoryName in zoneCategoryNames)
+            {
+                ComboBox_DwellingScope.Items.Add(string.Format("Dwellings in zone category '{0}'", zoneCategoryName));
+            }
+
+            ComboBox_DwellingScope.SelectedIndex = 0;
+
+            UpdateScopeMessage();
+        }
+
+        /// <summary>
+        /// Shows a saved scope. A category the model no longer offers is added back to the list rather than
+        /// dropped, so reopening the settings of a view scoped to a category somebody has since renamed shows
+        /// what the view says and does not silently rescope it.
+        /// </summary>
+        private void SelectDwellingScope(PartFDwellingScope partFDwellingScope, string zoneCategoryName)
+        {
+            if (partFDwellingScope == PartFDwellingScope.ZoneCategory && !string.IsNullOrWhiteSpace(zoneCategoryName))
+            {
+                int index = zoneCategoryNames.FindIndex(x => string.Equals(x, zoneCategoryName, StringComparison.Ordinal));
+
+                if (index < 0)
+                {
+                    zoneCategoryNames.Add(zoneCategoryName);
+
+                    index = zoneCategoryNames.Count - 1;
+
+                    ComboBox_DwellingScope.Items.Add(string.Format("Dwellings in zone category '{0}'", zoneCategoryName));
+                }
+
+                ComboBox_DwellingScope.SelectedIndex = index_WholeModel + 1 + index;
+            }
+            else
+            {
+                ComboBox_DwellingScope.SelectedIndex = partFDwellingScope == PartFDwellingScope.WholeModel ? index_WholeModel : 0;
+            }
+
+            UpdateScopeMessage();
+        }
+
+        /// <summary>What the scope list currently says, as the settings record it.</summary>
+        private PartFDwellingScope DwellingScope(out string zoneCategoryName)
+        {
+            zoneCategoryName = null;
+
+            int index = ComboBox_DwellingScope.SelectedIndex;
+
+            if (index == index_WholeModel)
+            {
+                return PartFDwellingScope.WholeModel;
+            }
+
+            index -= index_WholeModel + 1;
+
+            if (index < 0 || index >= zoneCategoryNames.Count)
+            {
+                return PartFDwellingScope.Undefined;
+            }
+
+            zoneCategoryName = zoneCategoryNames[index];
+
+            return PartFDwellingScope.ZoneCategory;
+        }
+
+        /// <summary>
+        /// Says, in the dialog, why nothing will be drawn and what would fix it. Silent once the scope is
+        /// chosen.
+        /// </summary>
+        private void UpdateScopeMessage()
+        {
+            if (DwellingScope(out _) != PartFDwellingScope.Undefined)
+            {
+                TextBlock_ScopeMessage.Visibility = System.Windows.Visibility.Collapsed;
+                return;
+            }
+
+            TextBlock_ScopeMessage.Visibility = System.Windows.Visibility.Visible;
+
+            TextBlock_ScopeMessage.Text = zoneCategoryNames.Count switch
+            {
+                //Zones, and not one of them a dwelling. Usually Is Dwelling has not been set. Assessing the
+                //whole model here would report a block of flats as one dwelling because of a missing
+                //parameter, so it is offered as an explicit choice and never assumed.
+                0 when hasZones => "This model is zoned, but no zone is marked Is Dwelling = true, so there is no dwelling zone category to report on. Set Is Dwelling on the zones that are flats or houses - or choose the whole model as one dwelling above, if that is really what this is. Nothing is assessed or drawn until this says what the drawing is about.",
+
+                //Several. Which flats a drawing reports on is an engineering decision.
+                > 1 => "Choose which dwellings this drawing reports on. Nothing is assessed or drawn until you do: this model holds more than one dwelling zone category, and the drawing will not assume the whole building is a single dwelling.",
+
+                _ => "Choose what this drawing reports on. Nothing is assessed or drawn until you do.",
+            };
         }
 
         private void Button_OK_Click(object sender, RoutedEventArgs e)

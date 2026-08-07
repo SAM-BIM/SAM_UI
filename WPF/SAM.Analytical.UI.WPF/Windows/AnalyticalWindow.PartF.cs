@@ -6,7 +6,6 @@ using SAM.Geometry.UI;
 using SAM.Geometry.UI.WPF;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace SAM.Analytical.UI.WPF.Windows
 {
@@ -34,20 +33,10 @@ namespace SAM.Analytical.UI.WPF.Windows
         private readonly Dictionary<Guid, PartFAirflowRenderer> dictionary_PartFAirflowRenderer = [];
 
         /// <summary>
-        /// The assessment last calculated, and the model it was calculated from.
-        /// <para>
-        /// Cached against the model INSTANCE, not copied into the view. A view holds no result and no rate -
-        /// it holds how to present them - so every regeneration re-reads the assessment; and since
-        /// <c>UIAnalyticalModel</c> hands out a new <c>AnalyticalModel</c> on every edit, a stale cache cannot
-        /// survive a change to the building. Several Part F views on one model then share one calculation
-        /// instead of running it once per tab.
-        /// </para>
+        /// The assessment behind every Part F view in this window, and the gate that stops one being made
+        /// for a drawing whose dwelling scope nobody has chosen. See <see cref="PartFAssessmentCache"/>.
         /// </summary>
-        private AnalyticalModel analyticalModel_PartF;
-
-        private string zoneCategoryName_PartF;
-
-        private List<PartFComplianceResult> partFComplianceResults;
+        private readonly PartFAssessmentCache partFAssessmentCache = new();
 
         /// <summary>
         /// Draws, refreshes or removes the Part F annotation on one view, from the view's own settings.
@@ -67,7 +56,9 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             //Nothing to draw, or nowhere to draw it: a 3D view, or the legacy orthographic 2D path. Any
             //renderer this view had is torn down rather than left holding a plan that is no longer shown.
-            if (partFAirflowViewSettings is null || !partFAirflowViewSettings.Enabled || floorPlan2DControl is null || analyticalModel?.AdjacencyCluster is null)
+            //A view whose dwelling scope has not been chosen takes this branch too: it is not yet a drawing
+            //of anything, so it gets no renderer and - see PartFAssessmentCache - no assessment either.
+            if (partFAirflowViewSettings is null || !partFAirflowViewSettings.Enabled || !partFAirflowViewSettings.HasDwellingScope || floorPlan2DControl is null || analyticalModel?.AdjacencyCluster is null)
             {
                 RemovePartFAirflow(viewportControl.Guid);
                 return;
@@ -82,7 +73,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             partFAirflowRenderer.ViewSettings = partFAirflowViewSettings;
 
-            partFAirflowRenderer.Load(analyticalModel.AdjacencyCluster, PartFComplianceResults(analyticalModel, partFAirflowViewSettings), geometryObjectModel);
+            partFAirflowRenderer.Load(analyticalModel.AdjacencyCluster, partFAssessmentCache.Results(analyticalModel, partFAirflowViewSettings), geometryObjectModel);
         }
 
         /// <summary>Takes the Part F annotation off a view and stops the renderer listening to it.</summary>
@@ -113,48 +104,6 @@ namespace SAM.Analytical.UI.WPF.Windows
                 && viewSettings_Temp.TryGetValue(AnalyticalViewSettingsParameter.PartFAirflow, out PartFAirflowViewSettings result)
                 ? result
                 : null;
-        }
-
-        /// <summary>
-        /// The calculated assessment of every dwelling in the scope this view reports on.
-        /// <para>
-        /// Run through the same <c>PartFCalculator</c> the Part F command uses, so a view and the assessment
-        /// window can never disagree about a number, and cached per model and scope so several Part F views
-        /// do not each pay for it.
-        /// </para>
-        /// </summary>
-        private List<PartFComplianceResult> PartFComplianceResults(AnalyticalModel analyticalModel, PartFAirflowViewSettings partFAirflowViewSettings)
-        {
-            string zoneCategoryName = partFAirflowViewSettings.ZoneCategoryName;
-
-            if (ReferenceEquals(analyticalModel, analyticalModel_PartF)
-                && string.Equals(zoneCategoryName, zoneCategoryName_PartF, StringComparison.Ordinal)
-                && partFComplianceResults is not null)
-            {
-                return partFComplianceResults;
-            }
-
-            PartFCalculator partFCalculator = Analytical.Query.DefaultPartFCalculator();
-            if (partFCalculator is null)
-            {
-                return [];
-            }
-
-            partFCalculator.AdjacencyCluster = analyticalModel.AdjacencyCluster;
-
-            using (Core.UI.PerformanceLog.Measure("AnalyticalWindow.PartF.Calculate", zoneCategoryName ?? "(whole model)"))
-            {
-                partFCalculator.Calculate(zoneCategoryName);
-            }
-
-            analyticalModel_PartF = analyticalModel;
-            zoneCategoryName_PartF = zoneCategoryName;
-
-            partFComplianceResults = [.. (partFCalculator.DwellingResults ?? [])
-                .Where(x => x?.ComplianceResult is not null)
-                .Select(x => x.ComplianceResult)];
-
-            return partFComplianceResults;
         }
     }
 }

@@ -52,6 +52,7 @@ namespace SAM.Analytical.UI
                 OperatingMode = partFAirflowViewSettings.OperatingMode;
                 DwellingFilter = partFAirflowViewSettings.DwellingFilter;
                 DwellingGuid = partFAirflowViewSettings.DwellingGuid;
+                DwellingScope = partFAirflowViewSettings.DwellingScope;
                 ZoneCategoryName = partFAirflowViewSettings.ZoneCategoryName;
                 AnnotationScale = partFAirflowViewSettings.AnnotationScale;
 
@@ -72,8 +73,15 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
-        /// Whether this view draws the overlay at all. False by default, so a view that has never been
-        /// told about Part F never shows it.
+        /// Whether this view wants the Part F airflow annotation. False by default, so a view that has never
+        /// been told about Part F never shows it.
+        /// <para>
+        /// <b>A statement of intent, and not the safety mechanism.</b> This says the drawing is meant to
+        /// carry Part F annotation; <see cref="HasDwellingScope"/> says whether SAM knows enough to
+        /// calculate any. The two are separate on purpose - an engineer who has asked for the annotation
+        /// and not yet said which dwellings it is about should get the drawing the moment they answer, not
+        /// have to remember to come back and switch it on again.
+        /// </para>
         /// </summary>
         public bool Enabled { get; set; }
 
@@ -84,8 +92,22 @@ namespace SAM.Analytical.UI
         public PartFDwellingFilter DwellingFilter { get; set; } = PartFDwellingFilter.AllDwellingsOnLevel;
 
         /// <summary>
-        /// The zone category whose zones are the dwellings this view reports on - "Flats", typically. Empty
-        /// means the whole model is one dwelling, which is what the calculation calls single house mode.
+        /// What this view treats as its dwellings: the whole model, the zones of a category, or - the
+        /// default - nothing decided yet.
+        /// <para>
+        /// <b>An empty <see cref="ZoneCategoryName"/> is not a decision.</b> It used to be read as one,
+        /// because a blank name reaches the calculation as single-house mode; so a new view of a block of
+        /// flats whose category was still ambiguous would assess and draw the whole building as one
+        /// dwelling while waiting to be told which flats it was about. This says which of the three
+        /// situations a blank name meant. See <see cref="HasDwellingScope"/>.
+        /// </para>
+        /// </summary>
+        public PartFDwellingScope DwellingScope { get; set; } = PartFDwellingScope.Undefined;
+
+        /// <summary>
+        /// The zone category whose zones are the dwellings this view reports on - "Flats", typically. Read
+        /// only where <see cref="DwellingScope"/> is <see cref="PartFDwellingScope.ZoneCategory"/>; the
+        /// whole-model case is <see cref="PartFDwellingScope.WholeModel"/> and not a blank name here.
         /// <para>
         /// A SCOPE and not a regulatory value. It says which dwellings this drawing is about, exactly as
         /// <see cref="DwellingFilter"/> and <see cref="DwellingGuid"/> do, and it is stored so that reopening
@@ -94,6 +116,30 @@ namespace SAM.Analytical.UI
         /// </para>
         /// </summary>
         public string ZoneCategoryName { get; set; } = null;
+
+        /// <summary>
+        /// Whether somebody - the preset or a person - has actually said what this drawing reports on.
+        /// <b>Nothing may be assessed or drawn until this is true</b>, and it is the one predicate that
+        /// decides it, so the rule cannot be enforced in one place and forgotten in another. This is the
+        /// safety mechanism; <see cref="Enabled"/> is the user's intent and never stands in for it.
+        /// <para>
+        /// A category scope with no category named is still undecided. That combination is not something
+        /// the dialog produces, and treating it as whole-house would reintroduce exactly the ambiguity this
+        /// property exists to remove.
+        /// </para>
+        /// </summary>
+        public bool HasDwellingScope
+        {
+            get
+            {
+                return DwellingScope switch
+                {
+                    PartFDwellingScope.WholeModel => true,
+                    PartFDwellingScope.ZoneCategory => !string.IsNullOrWhiteSpace(ZoneCategoryName),
+                    _ => false,
+                };
+            }
+        }
 
         /// <summary>
         /// The dwelling zone drawn when <see cref="DwellingFilter"/> selects a single dwelling. A guid, so
@@ -176,6 +222,14 @@ namespace SAM.Analytical.UI
 
             DwellingGuid = PartFViewJson.Guid(jsonObject, "DwellingGuid");
             ZoneCategoryName = PartFViewJson.String(jsonObject, "ZoneCategoryName");
+
+            //Read after the category name, because a view saved before the scope existed has to be
+            //interpreted from it: a named category is a category, and a blank one is UNDECIDED rather than
+            //whole-house. That is the safe direction - such a view reopens drawing nothing and says why,
+            //instead of quietly presenting a block of flats as a single dwelling.
+            DwellingScope = jsonObject.ContainsKey("DwellingScope")
+                ? Core.Query.Enum<PartFDwellingScope>(PartFViewJson.String(jsonObject, "DwellingScope"))
+                : string.IsNullOrWhiteSpace(ZoneCategoryName) ? PartFDwellingScope.Undefined : PartFDwellingScope.ZoneCategory;
             AnnotationScale = PartFViewJson.NullableDouble(jsonObject, "AnnotationScale") ?? AnnotationScale;
 
             ShowSupply = PartFViewJson.Boolean(jsonObject, "ShowSupply", ShowSupply);
@@ -218,6 +272,7 @@ namespace SAM.Analytical.UI
             result["OperatingMode"] = OperatingMode.ToString();
             result["DwellingFilter"] = DwellingFilter.ToString();
             result["DwellingGuid"] = DwellingGuid.ToString();
+            result["DwellingScope"] = DwellingScope.ToString();
 
             if (ZoneCategoryName is not null)
             {
