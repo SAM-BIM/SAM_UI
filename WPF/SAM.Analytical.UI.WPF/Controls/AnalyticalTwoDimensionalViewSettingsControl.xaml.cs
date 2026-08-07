@@ -28,6 +28,18 @@ namespace SAM.Analytical.UI.WPF
 
         private AdjacencyCluster adjacencyCluster_PartF;
 
+        /// <summary>
+        /// True while this panel is editing a view that does not exist yet.
+        /// <para>
+        /// The one thing that decides whether the Part F preset may be applied. This same panel edits a new
+        /// view and an existing one, and the difference matters: choosing the Part F colour scheme on a NEW
+        /// view should give the engineer a working Part F drawing, and doing the same on a view somebody has
+        /// already set up must not overwrite how they set it up. Set by whoever is creating the view; false by
+        /// default, which is the safe direction.
+        /// </para>
+        /// </summary>
+        public bool IsNewViewSettings { get; set; }
+
         public AnalyticalTwoDimensionalViewSettingsControl()
         {
             InitializeComponent();
@@ -58,7 +70,47 @@ namespace SAM.Analytical.UI.WPF
 
         private void SpaceAppearanceSettingsControl_ValueChanged(object sender, EventArgs e)
         {
+            ApplyPartFAirflowPreset();
+
             UpdateName();
+        }
+
+        /// <summary>
+        /// Gives a NEW view a usable Part F drawing the moment its colour scheme is set to Part F data,
+        /// instead of leaving the engineer to discover that nine more options are behind another dialog.
+        /// <para>
+        /// Deliberately narrow. It applies only while <see cref="IsNewViewSettings"/> is true - so no existing
+        /// view is ever touched - and only where the view has no Part F settings yet, so a person who has
+        /// already configured this view, or reopened its settings, or duplicated a Part F view, keeps exactly
+        /// what they had. Once applied it is theirs to edit; selecting the scheme again does not reset it.
+        /// </para>
+        /// <para>
+        /// It does not turn the annotation OFF again if the colour scheme is then changed to something else.
+        /// The two are independent - the fills say what each room is, the tags say what its air does - and a
+        /// person who wants the tags without the Part F colours is entitled to that combination.
+        /// </para>
+        /// </summary>
+        private void ApplyPartFAirflowPreset()
+        {
+            if (!IsNewViewSettings || partFAirflowViewSettings is not null || !IsPartFColorScheme())
+            {
+                return;
+            }
+
+            //Qualified: an unqualified Create here is SAM.Analytical.UI.WPF's own, which shadows it.
+            partFAirflowViewSettings = Analytical.UI.Create.PartFAirflowViewSettings(adjacencyCluster_PartF);
+
+            UpdatePartFAirflowButton();
+        }
+
+        /// <summary>
+        /// Whether the colour scheme currently chosen is the Part F one. Asked of the settings object rather
+        /// than of the radio button, so it is the same question the rest of the code asks and no control name
+        /// or caption is depended on.
+        /// </summary>
+        private bool IsPartFColorScheme()
+        {
+            return spaceAppearanceSettingsControl.SpaceAppearanceSettings?.GetValueAppearanceSettings<ValueAppearanceSettings>() is PartFSpaceDataAppearanceSettings;
         }
 
         public TwoDimensionalViewSettings TwoDimensionalViewSettings

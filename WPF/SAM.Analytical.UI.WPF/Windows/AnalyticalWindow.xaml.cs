@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using HoneybeeSchema;
@@ -2180,7 +2180,9 @@ namespace SAM.Analytical.UI.WPF.Windows
             TwoDimensionalViewSettings twoDimensionalViewSettings = new TwoDimensionalViewSettings(Guid.NewGuid(), "New Section View", Geometry.Spatial.Create.Plane(0.0), null, new Type[] { typeof(Space), typeof(Panel), typeof(Aperture) }, Geometry.Object.Query.DefaultTextAppearance(), null);
             twoDimensionalViewSettings.AddAppearanceSettings(new SpaceAppearanceSettings("Name"));
 
-            ViewSettingsWindow viewSettingsWindow = new ViewSettingsWindow(twoDimensionalViewSettings, analyticalModel);
+            //Creating, not editing: this is what lets choosing the Part F colour scheme initialise a usable
+            //Part F drawing. Editing an existing view never does. See AnalyticalTwoDimensionalViewSettingsControl.
+            ViewSettingsWindow viewSettingsWindow = new ViewSettingsWindow(twoDimensionalViewSettings, analyticalModel, true);
             bool? result = viewSettingsWindow.ShowDialog();
             if (result == null || !result.HasValue || !result.Value)
             {

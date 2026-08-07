@@ -182,6 +182,29 @@ namespace SAM.Analytical.UI.WPF.Tests.Helpers
             return this;
         }
 
+        /// <summary>
+        /// Adds a zone that carries NO Is Dwelling parameter, as a model built before that parameter existed
+        /// does. The calculation treats such a category as all dwellings rather than sizing nothing, and the
+        /// dwelling-category resolution has to agree with it.
+        /// </summary>
+        public PartFPlanModel ZoneWithoutIsDwelling(string name_Zone, string zoneCategory, params string[] names_Space)
+        {
+            Close();
+
+            Zone zone = new(name_Zone);
+
+            zone.SetValue(ZoneParameter.ZoneCategory, zoneCategory);
+
+            AdjacencyCluster.AddObject(zone);
+
+            foreach (string name_Space in names_Space)
+            {
+                AdjacencyCluster.AddRelation(zone, Space(name_Space));
+            }
+
+            return this;
+        }
+
         /// <summary>Records how a cooking space's local extract is provided.</summary>
         public PartFPlanModel LocalExtractMethod(string name, Analytical.Enums.PartFExtractMethod partFExtractMethod)
         {
