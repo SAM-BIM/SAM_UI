@@ -43,7 +43,7 @@ namespace SAM.Analytical.UI.WPF.Grasshopper
         /// </summary>
         public SAMAnalyticalMultitaskerWorkflow()
           : base("SAMAnalytical.MultitaskerWorkflow", "SAMAnalytical.MultitaskerWorkflow",
-              "MultitaskerWorkflow",
+              "Runs the full TAS thermal simulation workflow (export, sizing, simulation) for multiple analytical models in batch",
               "SAM WIP", "Tas")
         {
         }
@@ -56,8 +56,8 @@ namespace SAM.Analytical.UI.WPF.Grasshopper
             get
             {
                 List<GH_SAMParam> result = new List<GH_SAMParam>();
-                result.Add(new GH_SAMParam(new GooAnalyticalModelParam { Name = "_analyticalModels", NickName = "_analyticalModels", Description = "AnalyticalModels", Access = GH_ParamAccess.list }, ParamVisibility.Binding));
-                result.Add(new GH_SAMParam(new global::Grasshopper.Kernel.Parameters.Param_String() { Name = "_directory", NickName = "_directory", Description = "Directory", Access = GH_ParamAccess.item }, ParamVisibility.Binding));
+                result.Add(new GH_SAMParam(new GooAnalyticalModelParam { Name = "_analyticalModels", NickName = "_analyticalModels", Description = "List of SAM Analytical Models to process through the TAS workflow", Access = GH_ParamAccess.list }, ParamVisibility.Binding));
+                result.Add(new GH_SAMParam(new global::Grasshopper.Kernel.Parameters.Param_String() { Name = "_directory", NickName = "_directory", Description = "Root output directory for TBD, TSD and results files", Access = GH_ParamAccess.item }, ParamVisibility.Binding));
 
                 result.Add(new GH_SAMParam(new Weather.Grasshopper.GooWeatherDataParam() { Name = "weatherData_", NickName = "weatherData_", Description = "SAM WeatherData", Access = GH_ParamAccess.item, Optional = true }, ParamVisibility.Binding));
                 result.Add(new GH_SAMParam(new GooAnalyticalObjectParam() { Name = "coolingDesignDays_", NickName = "coolingDesignDays_", Description = "The SAM Analytical Design Days for Cooling", Access = GH_ParamAccess.list, Optional = true }, ParamVisibility.Voluntary));
@@ -65,7 +65,7 @@ namespace SAM.Analytical.UI.WPF.Grasshopper
 
                 global::Grasshopper.Kernel.Parameters.Param_Boolean @boolean = null;
 
-                boolean = new global::Grasshopper.Kernel.Parameters.Param_Boolean() { Name = "_addIZAMs_", NickName = "_addIZAMs_", Description = "Add IZAMs", Access = GH_ParamAccess.item };
+                boolean = new global::Grasshopper.Kernel.Parameters.Param_Boolean() { Name = "_addIZAMs_", NickName = "_addIZAMs_", Description = "If True, adds internal zone air mass (IZAM) elements to the TAS model", Access = GH_ParamAccess.item };
                 @boolean.SetPersistentData(true);
                 result.Add(new GH_SAMParam(boolean, ParamVisibility.Voluntary));
 
@@ -125,7 +125,7 @@ namespace SAM.Analytical.UI.WPF.Grasshopper
                 List<GH_SAMParam> result = [];
                 result.Add(new GH_SAMParam(new global::Grasshopper.Kernel.Parameters.Param_String() { Name = "CaseDescriptions", NickName = "CaseDescriptions", Description = "CaseDescriptions", Access = GH_ParamAccess.list }, ParamVisibility.Binding));
                 result.Add(new GH_SAMParam(new global::Grasshopper.Kernel.Parameters.Param_String() { Name = "Directories", NickName = "Directories", Description = "Directories", Access = GH_ParamAccess.list }, ParamVisibility.Binding));
-                result.Add(new GH_SAMParam(new global::Grasshopper.Kernel.Parameters.Param_Boolean() { Name = "successful", NickName = "successful", Description = "successful", Access = GH_ParamAccess.item }, ParamVisibility.Binding));
+                result.Add(new GH_SAMParam(new global::Grasshopper.Kernel.Parameters.Param_Boolean() { Name = "successful", NickName = "successful", Description = "Returns True if the workflow completed without being cancelled", Access = GH_ParamAccess.item }, ParamVisibility.Binding));
                 return [.. result];
             }
         }
