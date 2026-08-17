@@ -342,6 +342,10 @@ namespace SAM.Analytical.UI.WPF
         {
             if (!loading)
             {
+                //Commit the dwelling being left before its rows are rebuilt, so edits made in one dwelling
+                //are not silently discarded when the engineer moves to the next one.
+                ApplyRows();
+
                 Load();
             }
         }
@@ -493,6 +497,20 @@ namespace SAM.Analytical.UI.WPF
 
         private void Button_OK_Click(object sender, RoutedEventArgs e)
         {
+            ApplyRows();
+
+            Applied = true;
+            DialogResult = true;
+        }
+
+        /// <summary>
+        /// Writes the rows currently on screen back into the dwelling they came from, so an edit survives
+        /// both a dwelling switch and the OK button. The row objects hold their source records, so they know
+        /// which dwelling to write to - applying them here writes to the dwelling being left, not the one
+        /// now selected.
+        /// </summary>
+        private void ApplyRows()
+        {
             //Commit whatever cell the user is still editing, so a value typed but not tabbed out of is not
             //silently lost.
             DataGrid_Doors.CommitEdit(DataGridEditingUnit.Row, true);
@@ -515,14 +533,11 @@ namespace SAM.Analytical.UI.WPF
             }
 
             //The confirmations just recorded can change the dwelling's overall outcome, so it is resolved
-            //again before the window closes rather than left showing the status from before the edit.
+            //again rather than left showing the status from before the edit.
             foreach (PartFDwellingResult dwellingResult in dwellingResults)
             {
                 dwellingResult?.ComplianceResult?.Resolve();
             }
-
-            Applied = true;
-            DialogResult = true;
         }
 
         // ------------------------------------------------------------------

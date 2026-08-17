@@ -145,7 +145,7 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        private static void PersistConfirmations(AdjacencyCluster adjacencyCluster, PartFDwellingResult partFDwellingResult, PartFComplianceResult partFComplianceResult)
+        internal static void PersistConfirmations(AdjacencyCluster adjacencyCluster, PartFDwellingResult partFDwellingResult, PartFComplianceResult partFComplianceResult)
         {
             //Everything a person entered is kept, not only the checks that ended up confirmed. A
             //confirmation recorded against a check the calculation found FAILING does not produce a pass -
@@ -187,10 +187,15 @@ namespace SAM.Analytical.UI.WPF
                 }
 
                 //What is stored is the ANSWER the person gave, not the status the guard let the check
-                //report. Storing the guarded outcome would make the record read as though they had asked
-                //for engineering review when what they actually claimed was compliance, and the next
-                //recalculation would re-apply that softened answer instead of re-testing the original one.
-                check_Persisted.Status = PartFComplianceStatus.UserConfirmed;
+                //report. A confirmation against a calculated failure is redirected to engineering review
+                //or an alternative solution, but the answer was still "confirmed", so it is stored as
+                //UserConfirmed and re-tested on the next calculation. A check the person WITHDREW has
+                //returned to its calculated status, and storing UserConfirmed anyway would reinstate the
+                //confirmation they removed - so it is stored as NotAssessed, and the supporting notes
+                //below are kept either way.
+                check_Persisted.Status = check.Status == PartFComplianceStatus.UserConfirmed || check.IsUserResolved
+                    ? PartFComplianceStatus.UserConfirmed
+                    : PartFComplianceStatus.NotAssessed;
                 check_Persisted.ConfirmedBy = check.ConfirmedBy;
                 check_Persisted.ConfirmationDate = check.ConfirmationDate;
                 check_Persisted.Notes = check.Notes;

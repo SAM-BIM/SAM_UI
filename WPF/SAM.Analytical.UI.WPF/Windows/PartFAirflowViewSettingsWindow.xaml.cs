@@ -32,6 +32,14 @@ namespace SAM.Analytical.UI.WPF
         private List<Zone> zones = [];
 
         /// <summary>
+        /// The dwelling zones the selector offers: those of the scope currently chosen, or none where the
+        /// scope is not a zone category. Held separately from <see cref="zones"/> because offering every
+        /// model zone would let a person save a dwelling the assessment of that scope never produces, and
+        /// the saved view would draw nothing.
+        /// </summary>
+        private List<Zone> zones_Dwelling = [];
+
+        /// <summary>
         /// The dwelling zone categories offered, in the order they appear in the scope list after its two
         /// fixed entries. Only categories the calculation would actually find dwellings in: offering one it
         /// would find none in is offering a drawing with nothing on it.
@@ -76,16 +84,7 @@ namespace SAM.Analytical.UI.WPF
                 zoneCategoryNames = value?.PartFDwellingZoneCategories() ?? [];
 
                 RebuildDwellingScope();
-
-                ComboBox_Dwelling.Items.Clear();
-                ComboBox_Dwelling.Items.Add("All dwellings on this level");
-
-                foreach (Zone zone in zones)
-                {
-                    ComboBox_Dwelling.Items.Add(zone.Name);
-                }
-
-                ComboBox_Dwelling.SelectedIndex = 0;
+                RebuildDwellingComboBox();
             }
         }
 
@@ -121,10 +120,10 @@ namespace SAM.Analytical.UI.WPF
                 //does not silently change what this view shows.
                 int index = ComboBox_Dwelling.SelectedIndex - 1;
 
-                if (index >= 0 && index < zones.Count)
+                if (index >= 0 && index < zones_Dwelling.Count)
                 {
                     result.DwellingFilter = PartFDwellingFilter.SelectedDwelling;
-                    result.DwellingGuid = zones[index].Guid;
+                    result.DwellingGuid = zones_Dwelling[index].Guid;
                 }
                 else
                 {
@@ -162,7 +161,7 @@ namespace SAM.Analytical.UI.WPF
                 CheckBox_Context.IsChecked = partFAirflowViewSettings.ShowContextGeometry;
 
                 int index = partFAirflowViewSettings.DwellingFilter == PartFDwellingFilter.SelectedDwelling
-                    ? zones.FindIndex(x => x.Guid == partFAirflowViewSettings.DwellingGuid)
+                    ? zones_Dwelling.FindIndex(x => x.Guid == partFAirflowViewSettings.DwellingGuid)
                     : -1;
 
                 ComboBox_Dwelling.SelectedIndex = index >= 0 ? index + 1 : 0;
@@ -180,6 +179,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void ComboBox_DwellingScope_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
+            RebuildDwellingComboBox();
             UpdateScopeMessage();
         }
 
@@ -229,6 +229,45 @@ namespace SAM.Analytical.UI.WPF
             ComboBox_DwellingScope.SelectedIndex = 0;
 
             UpdateScopeMessage();
+        }
+
+        /// <summary>
+        /// The dwelling selector: "all dwellings" always, then the dwelling zones of the scope currently
+        /// chosen. Nothing else - a zone from another category would be offered a drawing the scope's
+        /// assessment never produces, so a view saved against it would draw nothing.
+        /// </summary>
+        private void RebuildDwellingComboBox()
+        {
+            zones_Dwelling = DwellingZones();
+
+            ComboBox_Dwelling.Items.Clear();
+            ComboBox_Dwelling.Items.Add("All dwellings on this level");
+
+            foreach (Zone zone in zones_Dwelling)
+            {
+                ComboBox_Dwelling.Items.Add(zone.Name);
+            }
+
+            ComboBox_Dwelling.SelectedIndex = 0;
+        }
+
+        /// <summary>
+        /// The dwelling zones of the selected scope, decided by the same rule the calculation uses rather
+        /// than restated here: the zones of the chosen category that
+        /// <see cref="Query.PartFDwellingZones"/> would size. Empty where the scope is not a zone category.
+        /// </summary>
+        private List<Zone> DwellingZones()
+        {
+            PartFDwellingScope partFDwellingScope = DwellingScope(out string zoneCategoryName);
+
+            if (partFDwellingScope != PartFDwellingScope.ZoneCategory || string.IsNullOrWhiteSpace(zoneCategoryName))
+            {
+                return [];
+            }
+
+            List<Zone> zones_Category = zones.FindAll(x => string.Equals(x.GetValue<string>(ZoneParameter.ZoneCategory), zoneCategoryName, StringComparison.Ordinal));
+
+            return zones_Category.PartFDwellingZones();
         }
 
         /// <summary>
