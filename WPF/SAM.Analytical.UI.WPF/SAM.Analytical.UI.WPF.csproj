@@ -15,6 +15,12 @@
     <LangVersion>12.0</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <!-- The Part F grid row types and the rule that decides which of their columns are editable are
+         implementation detail of this assembly, but the rule has to be testable: a two-way binding onto
+         a read-only property throws only when WPF realises the cell, i.e. when the tab is first shown. -->
+    <InternalsVisibleTo Include="SAM.Analytical.UI.WPF.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Remove="Controls\Filter\**" />
     <EmbeddedResource Remove="Controls\Filter\**" />
     <None Remove="Controls\Filter\**" />
