@@ -154,17 +154,21 @@ namespace SAM.Analytical.UI.WPF
 
             overlays = [];
             placements = [];
-            textObstacle2Ds = [];
 
             Plane plane = floorPlan2DControl?.Plane;
 
             if (adjacencyCluster is null || plane is null)
             {
+                textObstacle2Ds = [];
                 Draw();
                 return;
             }
 
-            textObstacle2Ds = TextObstacle2Ds(geometryObjectModel, plane);
+            //A camera-only or attribute-only update regenerates no geometry, and the plan this load draws
+            //over still carries the text of the previous one - so where no replacement geometry was
+            //supplied, the previous load's text obstacles are kept rather than cleared, or the tags would
+            //be re-placed on top of the room names the plan is still showing.
+            textObstacle2Ds = ResolveTextObstacles(geometryObjectModel, plane, textObstacle2Ds);
 
             foreach (PartFComplianceResult partFComplianceResult in Filtered())
             {
@@ -718,6 +722,21 @@ namespace SAM.Analytical.UI.WPF
             dictionary_LimitArea[guid_Space] = result;
 
             return result;
+        }
+
+        /// <summary>
+        /// The text obstacles a load lays the tags out against:
+        /// <list type="bullet">
+        /// <item><b>a replacement geometry was supplied</b> - the obstacles are measured from it, so a tag
+        /// is never placed over the room names the plan is now showing;</item>
+        /// <item><b>none was supplied</b> - the previous load's obstacles are kept, because a camera-only or
+        /// attribute-only update has not regenerated the plan and its text is still there to keep clear
+        /// of. Clearing them here would re-place the tags onto labels that are still drawn.</item>
+        /// </list>
+        /// </summary>
+        internal static List<IClosed2D> ResolveTextObstacles(GeometryObjectModel geometryObjectModel, Plane plane, List<IClosed2D> previous)
+        {
+            return geometryObjectModel is null ? previous ?? [] : TextObstacle2Ds(geometryObjectModel, plane);
         }
 
         /// <summary>

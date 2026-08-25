@@ -213,6 +213,12 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// True where a person has entered something against this check that the model could not have
         /// produced, and which must therefore survive the next recalculation.
+        /// <para>
+        /// The supporting fields count even on their own. A withdrawn confirmation whose only remaining
+        /// trace is a note, or the name and date of the person who gave it, is still a recorded answer -
+        /// PersistConfirmations must reach it to store the withdrawal, or the previous UserConfirmed record
+        /// would survive and the next calculation would reinstate the confirmation.
+        /// </para>
         /// </summary>
         private static bool Recorded(PartFComplianceCheck partFComplianceCheck)
         {
@@ -223,6 +229,9 @@ namespace SAM.Analytical.UI.WPF
 
             return partFComplianceCheck.Status == PartFComplianceStatus.UserConfirmed
                 || partFComplianceCheck.IsUserResolved
+                || !string.IsNullOrWhiteSpace(partFComplianceCheck.Notes)
+                || !string.IsNullOrWhiteSpace(partFComplianceCheck.ConfirmedBy)
+                || !string.IsNullOrWhiteSpace(partFComplianceCheck.ConfirmationDate)
                 || !string.IsNullOrWhiteSpace(partFComplianceCheck.UserEvidence)
                 || !string.IsNullOrWhiteSpace(partFComplianceCheck.AlternativeComplianceMethod)
                 || !string.IsNullOrWhiteSpace(partFComplianceCheck.OverrideReason);

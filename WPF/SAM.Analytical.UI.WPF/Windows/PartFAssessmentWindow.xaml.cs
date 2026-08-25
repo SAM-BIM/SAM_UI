@@ -463,6 +463,10 @@ namespace SAM.Analytical.UI.WPF
 
         private void Button_Report_Click(object sender, RoutedEventArgs e)
         {
+            //Commit whatever the engineer is still editing before the report reads the rows, so the report
+            //shows the values on screen rather than the ones from before the edit.
+            ApplyRows();
+
             PartFDwellingResult dwellingResult = Selected;
             if (dwellingResult is null)
             {
@@ -479,7 +483,10 @@ namespace SAM.Analytical.UI.WPF
 
         private void Button_CopyAll_Click(object sender, RoutedEventArgs e)
         {
-            //The whole assessment, every dwelling, not just the one on screen: Copy All means all.
+            //The whole assessment, every dwelling, not just the one on screen: Copy All means all. The
+            //rows still being edited are committed first, for the same reason the report is.
+            ApplyRows();
+
             string text = PartFReport.Build(dwellingResults, OperatingMode);
 
             try
