@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Enums;
@@ -43,11 +43,45 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// <summary>Creates a real file, because a completed run requires results that exist.</summary>
         private static string TemporaryTsd()
         {
-            string result = Path.Combine(Path.GetTempPath(), string.Format("SAM_PartORunTests_{0}.tsd", Guid.NewGuid()));
+            string result = TemporaryTsdPath();
 
-            File.WriteAllText(result, "not a real tsd - only its existence and write time are read here");
+            File.WriteAllText(result, "not a real tsd - only its existence, length and write time are read here");
 
             return result;
+        }
+
+        /// <summary>A path with no file behind it, for the "this workflow created it" case.</summary>
+        private static string TemporaryTsdPath()
+        {
+            return Path.Combine(Path.GetTempPath(), string.Format("SAM_PartORunTests_{0}.tsd", Guid.NewGuid()));
+        }
+
+        /// <summary>
+        /// What the workflow does to the results file: writes it. Deliberately a different length as well as a
+        /// new write time, so the change is detectable whatever the filesystem's timestamp granularity.
+        /// </summary>
+        private static void WriteResults(string path_TSD)
+        {
+            File.WriteAllText(path_TSD, string.Format("results this workflow wrote - {0}", Guid.NewGuid()));
+        }
+
+        /// <summary>
+        /// The production sequence, in the order <c>Modify.Simulate</c> performs it: announce the results file
+        /// <b>before</b> the workflow - which it does only where <c>Query.IsPartOFullYearSimulation</c> says the
+        /// settings describe a full-year run - let the workflow write that file, then complete.
+        /// <para>
+        /// Every successful completion in these tests goes through here. A test that called <c>Complete</c>
+        /// without arming would be exercising a caller that does not exist, and would keep passing while the
+        /// guarantee this helper stands for was broken.
+        /// </para>
+        /// </summary>
+        private static bool CompleteThroughAFullYearWorkflow(PartORun partORun, AnalyticalModel analyticalModel_Workflow, string path_TSD, out string refusal)
+        {
+            Assert.True(partORun.ExpectResults(path_TSD));
+
+            WriteResults(path_TSD);
+
+            return partORun.Complete(analyticalModel_Workflow, path_TSD, out refusal);
         }
 
         /// <summary>A fresh run has nothing to assess and says so rather than offering a default.</summary>
@@ -103,7 +137,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 PartORun partORun = new();
 
                 Assert.True(partORun.Prepare(analyticalModel_Prepared, Scenarios()));
-                Assert.True(partORun.Complete(analyticalModel_Workflow, path_TSD, out string refusal));
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun, analyticalModel_Workflow, path_TSD, out string refusal));
                 Assert.Null(refusal);
 
                 Assert.Equal(PartORunState.WorkflowCompleted, partORun.State);
@@ -236,7 +270,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             {
                 PartORun partORun = new();
                 partORun.Prepare(Model("prepared"), Scenarios());
-                Assert.True(partORun.Complete(analyticalModel_Workflow_1, path_TSD, out string _));
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun, analyticalModel_Workflow_1, path_TSD, out string _));
 
                 Assert.False(partORun.Complete(Model("workflow 2"), path_TSD, out string refusal));
                 Assert.Contains("already has results", refusal);
@@ -264,7 +298,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             {
                 PartORun partORun = new();
                 partORun.Prepare(Model("prepared"), Scenarios());
-                Assert.True(partORun.Complete(Model("workflow"), path_TSD, out string _));
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun, Model("workflow"), path_TSD, out string _));
                 Assert.True(partORun.IsAssessable(out string _));
 
                 //Another session, or a rerun from outside this window.
@@ -307,6 +341,334 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.Equal(PartORunState.None, partORun.State);
             Assert.Null(partORun.InvalidationReason);
+        }
+
+        // ------------------------------------------------------------------------------------------------
+        // The full-year requirement. WorkflowCompleted must mean the prepared run produced the FULL annual
+        // series a TM59 assessment reads - a workflow returning an analytical model proves nothing, since
+        // sizing alone returns one.
+        // ------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// The three fields <c>Modify.Simulate</c> hands to <c>WorkflowCalculator</c> that decide this. Each
+        /// caller below states the combination one branch of that method actually produces.
+        /// </summary>
+        private static SAM.Analytical.Tas.WorkflowSettings Settings(bool simulate, int simulateFrom, int simulateTo, bool sizing = true)
+        {
+            return new SAM.Analytical.Tas.WorkflowSettings
+            {
+                Simulate = simulate,
+                SimulateFrom = simulateFrom,
+                SimulateTo = simulateTo,
+                Sizing = sizing,
+            };
+        }
+
+        /// <summary>
+        /// <b>Full Year Simulation ticked, days 1 to 365.</b> <c>Modify.Simulate</c> sets
+        /// <c>simulate = fullYearSimulation</c> and takes the range from the two text boxes, which the dialog
+        /// ships defaulted to 1 and 365. This is the only combination that may complete a Part O run, and the
+        /// run does complete on it.
+        /// </summary>
+        [Fact]
+        public void AFullYearWorkflow_MayCompleteAPreparedPartORun()
+        {
+            Assert.True(Query.IsPartOFullYearSimulation(Settings(true, 1, 365)));
+
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                Assert.True(partORun.Prepare(Model("prepared"), Scenarios()));
+
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun, Model("workflow"), path_TSD, out string refusal));
+                Assert.Null(refusal);
+
+                Assert.Equal(PartORunState.WorkflowCompleted, partORun.State);
+                Assert.True(partORun.CanAssess);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// <b>Full Year Simulation unticked.</b> <c>simulate</c> stays false and the range stays at its -1
+        /// sentinels, so <c>WorkflowCalculator</c> sizes and returns a model without simulating a single day.
+        /// The gate refuses it, and because <c>Modify.Simulate</c> arms <c>ExpectResults</c> only for a
+        /// full-year run, the run cannot be completed even if <c>Complete</c> is reached anyway.
+        /// </summary>
+        [Fact]
+        public void FullYearUnticked_CannotCompleteAPreparedPartORun()
+        {
+            Assert.False(Query.IsPartOFullYearSimulation(Settings(false, -1, -1)));
+
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                //Unarmed, exactly as this path leaves it. A model and a real results file are both present, so
+                //nothing but the arming stands between this and a completed run.
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD, out string refusal));
+                Assert.Contains("not announced as this Part O run's", refusal);
+
+                AssertNothingToAssess(partORun);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// <b>A one-day run forced because shading changed.</b> With Full Year unticked and
+        /// <c>shadingUpdated</c> true, <c>Modify.Simulate</c> turns the run into days 1 to 1 - a real
+        /// simulation that returns a real model and writes a real TSD holding 24 hours. This is the case a
+        /// "did the workflow return a model?" test would have blessed.
+        /// </summary>
+        [Fact]
+        public void AShadingForcedOneDaySimulation_CannotCompleteAPreparedPartORun()
+        {
+            Assert.False(Query.IsPartOFullYearSimulation(Settings(true, 1, 1)));
+
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                //A one-day workflow really does write a TSD, so the file is rewritten here: existence and
+                //freshness are both satisfied and the run is still refused, because it was never armed.
+                WriteResults(path_TSD);
+
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD, out string refusal));
+                Assert.Contains("not announced as this Part O run's", refusal);
+
+                AssertNothingToAssess(partORun);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// <b>A partial date range.</b> Full Year ticked does not on its own mean 1 to 365 - the range is still
+        /// read from the text boxes - so a run of days 90 to 200 reaches the gate looking ticked and is refused.
+        /// Days 1 to 364 and 2 to 366 are refused for the same reason: a different year from the one the TM59
+        /// criteria are defined over.
+        /// </summary>
+        [Fact]
+        public void APartialDateRange_IsNotAFullYear()
+        {
+            Assert.False(Query.IsPartOFullYearSimulation(Settings(true, 90, 200)));
+            Assert.False(Query.IsPartOFullYearSimulation(Settings(true, 1, 364)));
+            Assert.False(Query.IsPartOFullYearSimulation(Settings(true, 2, 366)));
+        }
+
+        /// <summary>
+        /// <b>Sizing only.</b> The workflow path that returns a model having simulated nothing - the one the
+        /// old predicate could not tell apart from a completed annual run.
+        /// </summary>
+        [Fact]
+        public void ASizingOnlyWorkflow_IsNotAFullYear()
+        {
+            Assert.False(Query.IsPartOFullYearSimulation(Settings(false, -1, -1, sizing: true)));
+            Assert.False(Query.IsPartOFullYearSimulation(null));
+        }
+
+        /// <summary>
+        /// A refused completion leaves nothing behind that an assessment could pick up: no model, no results
+        /// path, no <c>CanAssess</c>, and a reason the ribbon can show.
+        /// </summary>
+        private static void AssertNothingToAssess(PartORun partORun)
+        {
+            Assert.Equal(PartORunState.None, partORun.State);
+            Assert.False(partORun.CanAssess);
+            Assert.Null(partORun.AnalyticalModel_Assessment);
+            Assert.Null(partORun.Path_TSD);
+            Assert.Null(partORun.AnalyticalModel_Prepared);
+
+            Assert.False(partORun.IsAssessable(out string refusal_IsAssessable));
+            Assert.False(string.IsNullOrWhiteSpace(refusal_IsAssessable));
+            Assert.False(string.IsNullOrWhiteSpace(partORun.InvalidationReason));
+        }
+
+        // ------------------------------------------------------------------------------------------------
+        // The results-lineage requirement. Complete must not accept an old <project>.tsd merely because it is
+        // at the derived path: the workflow deletes only the TBD, so an earlier session's results survive a
+        // non-simulating run.
+        // ------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// <b>An old TSD this workflow did not write.</b> The file was already at the derived path before the
+        /// workflow ran and is byte-for-byte unchanged after it - so this workflow wrote nothing, and pairing
+        /// those results with the model just prepared is the stale pairing the type exists to prevent.
+        /// Recording the write time only after the run would have blessed it.
+        /// </summary>
+        [Fact]
+        public void AnOldResultsFileThisWorkflowDidNotWrite_CannotCompleteTheRun()
+        {
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                //Announced for a full-year run that then produced nothing: the file is untouched.
+                Assert.True(partORun.ExpectResults(path_TSD));
+
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD, out string refusal));
+                Assert.Contains("unchanged from before this workflow ran", refusal);
+
+                AssertNothingToAssess(partORun);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// <b>A results file this workflow created.</b> Nothing was at the path when the run was announced, so
+        /// the file existing afterwards is unambiguously this workflow's.
+        /// </summary>
+        [Fact]
+        public void AResultsFileThisWorkflowCreated_CompletesTheRun()
+        {
+            string path_TSD = TemporaryTsdPath();
+
+            Assert.False(File.Exists(path_TSD));
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                Assert.True(partORun.ExpectResults(path_TSD));
+
+                WriteResults(path_TSD);
+
+                Assert.True(partORun.Complete(Model("workflow"), path_TSD, out string refusal));
+                Assert.Null(refusal);
+
+                Assert.True(partORun.CanAssess);
+                Assert.True(partORun.IsAssessable(out string _));
+            }
+            finally
+            {
+                if (File.Exists(path_TSD))
+                {
+                    File.Delete(path_TSD);
+                }
+            }
+        }
+
+        /// <summary>
+        /// <b>A results file this workflow rewrote.</b> An older TSD was there and this run replaced it, which
+        /// is the ordinary case on a re-simulated project. The fingerprint changed, so it completes.
+        /// </summary>
+        [Fact]
+        public void AResultsFileThisWorkflowRewrote_CompletesTheRun()
+        {
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                long length_Before = new FileInfo(path_TSD).Length;
+
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                Assert.True(partORun.ExpectResults(path_TSD));
+
+                WriteResults(path_TSD);
+
+                Assert.NotEqual(length_Before, new FileInfo(path_TSD).Length);
+
+                Assert.True(partORun.Complete(Model("workflow"), path_TSD, out string refusal));
+                Assert.Null(refusal);
+
+                Assert.True(partORun.CanAssess);
+                Assert.Equal(path_TSD, partORun.Path_TSD);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// The arming is for one path. A run announced against one results file cannot be completed by another,
+        /// so a changed output directory or project name between the two is not a way in.
+        /// </summary>
+        [Fact]
+        public void ResultsAnnouncedForADifferentPath_CannotCompleteTheRun()
+        {
+            string path_TSD_Announced = TemporaryTsd();
+            string path_TSD_Other = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                Assert.True(partORun.ExpectResults(path_TSD_Announced));
+
+                WriteResults(path_TSD_Other);
+
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD_Other, out string refusal));
+                Assert.Contains("not announced as this Part O run's", refusal);
+
+                AssertNothingToAssess(partORun);
+            }
+            finally
+            {
+                File.Delete(path_TSD_Announced);
+                File.Delete(path_TSD_Other);
+            }
+        }
+
+        /// <summary>
+        /// Arming is state-gated and is dropped with the run: a workflow announced to a run that has since been
+        /// dropped cannot complete its successor.
+        /// </summary>
+        [Fact]
+        public void AnnouncedResults_AreDroppedWithTheRun()
+        {
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+
+                //Nothing is prepared, so there is no run to announce results to.
+                Assert.False(partORun.ExpectResults(path_TSD));
+
+                partORun.Prepare(Model("prepared"), Scenarios());
+                Assert.True(partORun.ExpectResults(path_TSD));
+
+                //An edit drops the run, and the announcement with it.
+                partORun.NotifyModified();
+
+                partORun.Prepare(Model("prepared again"), Scenarios());
+
+                WriteResults(path_TSD);
+
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD, out string refusal));
+                Assert.Contains("not announced as this Part O run's", refusal);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
         }
     }
 }

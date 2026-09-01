@@ -2,18 +2,20 @@
 
 ## Branch
 `feature/parto-iteration2-ui-orchestration`, branched from `sow/2026-Q3` at **`43564e6`**
-(the merge of PR #75). Not pushed yet; no PR raised yet.
+(the merge of PR #75). Pushed; **PR #76** open against `sow/2026-Q3`, not merged. First push `1437d88`
+passed both checks (build 8m13s, spdx 9s); two P1 review findings have since been fixed on the same PR -
+see "Review findings addressed" below.
 
 ## Last updated
 2026-09-01
 
 ## Current status
 Approved Document O Iteration 1a / 1b / 2 orchestration implemented in SAM_UI, plus the fix to the
-pre-existing zone-identity corruption in `Modify.Simulate`. Builds clean; all **217** tests in
-`WPF/SAM.Analytical.UI.WPF.Tests` pass (187 baseline + 30 new). Final review done, and the
+pre-existing zone-identity corruption in `Modify.Simulate`. Builds clean; all **227** tests in
+`WPF/SAM.Analytical.UI.WPF.Tests` pass (187 baseline + 40 new). Final review done, and the
 zone-identity justification corrected (see BLOCKER 1) - the exporter does not refuse an unstamped
-space, it silently exports the wrong identity, and the two new tests pin that. Awaiting commit/push
-and review.
+space, it silently exports the wrong identity, and the two new tests pin that. Both P1 review findings
+on PR #76 are fixed (see "Review findings addressed"). Awaiting review; not merged.
 
 ## Integration state
 All sibling repos are on `sow/2026-Q3` at the heads this work was written against, and **none of them
@@ -106,11 +108,24 @@ compatibility fallback, no match is a refusal, never a guess") rather than inven
   `Path_TSD`.
 - `AnalyticalModel_Assessment` is non-null **only** in `WorkflowCompleted`. There is no code path on
   which it can be the preparation output, the loaded model, or a later run's model.
-- `Complete` is legal **only from `Prepared`**, requires a non-null workflow model, and requires the TSD
-  to **exist** (a derived file name alone is a guess; a sizing-only run writes none). It captures the
-  TSD's write time.
-- `IsAssessable` re-checks the file's existence and write time, so results rewritten by another session
-  are refused.
+- **`WorkflowCompleted` means "this prepared run produced the full-year results being assessed"** - not
+  "a TSD exists". `Complete` is legal **only from `Prepared`** and requires, in addition to a non-null
+  workflow model and a TSD that exists:
+  - **the simulation to have been the full annual run** (days 1-365), which
+    `Query.IsPartOFullYearSimulation` decides from the `WorkflowSettings` actually handed to
+    `WorkflowCalculator` - not from the "Full Year Simulation" tick box, whose day range still comes from
+    the two text boxes beside it and which `shadingUpdated` can turn into a one-day run;
+  - **the results file to have been created or rewritten by this workflow**, measured against a
+    fingerprint (`exists` + length + write time) captured by `PartORun.ExpectResults` **before** the
+    workflow ran.
+
+  Both are enforced through the same arming: `Modify.Simulate` calls `ExpectResults` only where the
+  settings describe a full-year run, and `Complete` refuses anything unarmed or announced for a different
+  path. So a partial, one-day or sizing-only workflow cannot complete a run even if `Complete` is reached,
+  and an earlier session's `<project>.tsd` left in the output directory cannot be adopted as this run's.
+- `IsAssessable` re-checks the file's existence and write time **after** completion, so results rewritten
+  by another session later are refused. That is a different problem from the one above and both checks are
+  kept.
 - **Staleness is rejected, not detected.** `ExpectModification()` / `NotifyModified()`: Part O commands
   arm one expectation immediately before their own `SetJSAMObject`; every other model replacement (edit,
   import, undo, redo, a second or unrelated simulation) arrives unarmed and drops the run with a reason.
@@ -174,6 +189,56 @@ computed or reformatted in WPF.
 - The simulation window's "Domestic Overheating" tick (TAS DomOv XML) is untouched and kept conceptually
   separate.
 
+## Review findings addressed (PR #76, 2026-09-01)
+
+Two P1 findings on the first push (`1437d88`), both accepted and both about the same invariant: what
+`PartORunState.WorkflowCompleted` is allowed to mean. Restated at the top of `PartORun`'s own
+documentation - **"this prepared run produced the full-year results being assessed"**, never "a TSD
+exists". No architecture change, no Iteration 2B.
+
+### P1-A - a Part O run may only be completed by a full-year simulation
+
+`completePartORun` required only that `WorkflowCalculator` returned a model. It returns one for a sizing
+run too, and `Modify.Simulate` can produce a *fresh one-day* TSD when `shadingUpdated` forces a
+simulation over an unticked Full Year box. Any of those promoted the run, and the TM59 command then
+assessed criteria and verdicts over an incomplete hourly series.
+
+New pure query `Query.IsPartOFullYearSimulation(WorkflowSettings)` - `Simulate && SimulateFrom == 1 &&
+SimulateTo == 365`, read off the settings **actually handed to `WorkflowCalculator`** rather than off the
+tick box, because the day range still comes from the two text boxes beside it. `Modify.Simulate` now
+carries `workflowSimulatedFullYear` beside `workflowCompleted` and ANDs it into the predicate. Nothing
+else reads it, so a normal non-Part-O simulation is unchanged.
+
+A prepared run this simulation cannot complete is now dropped **with the reason it was actually refused
+for**, before the model replacement that would otherwise report it as an outside edit, and that sentence
+is appended to the completion dialog.
+
+### P1-B - the TSD must be the one this workflow wrote
+
+`Complete` accepted `<project>.tsd` because it existed and then recorded its *already old* write time as
+this run's, so `IsAssessable` afterwards approved an earlier session's results against the newly prepared
+model. `Modify.Simulate` deletes only the TBD, so a non-simulating workflow leaves the old TSD in place.
+
+New `PartORun.ExpectResults(path_TSD)`, called **before** the workflow, fingerprints whatever is at that
+path (`exists` + length + write time). `Complete` now refuses unless a fingerprint was armed for exactly
+that path and the file has since been created or changed. Length as well as write time, so a rewrite
+inside the filesystem's timestamp granularity is still seen; where both match, the file is treated as
+untouched - refusing a genuine rerun is the safe way to be wrong.
+
+Deleting the prior TSD was considered and rejected: it would destroy a user's previous results whenever a
+Part O run failed, and it changes the existing workflow contract. The fingerprint changes nothing outside
+the Part O promotion.
+
+**Arming is where both fixes meet.** `ExpectResults` is armed only where the settings describe a
+full-year run, so a partial, one-day or sizing-only workflow leaves the run unarmed and `Complete`
+refuses it *even if reached* - the invariant is held by the state machine, not by the caller remembering
+to check. `IsAssessable`'s post-completion stale-file check is kept unchanged: it solves the different
+problem of a rewrite after a legitimate completion.
+
+Ten regressions added to `PartORunLineageTests` (11 -> 21), and every successful completion in that file
+now goes through a `CompleteThroughAFullYearWorkflow` helper that performs the production
+arm -> write -> complete sequence, so a test cannot pass by calling `Complete` the way no caller does.
+
 ## Decisions / assumptions
 - `PartORun` holds model + scenarios directly rather than a `PartOIterationPreparation`, because that
   type's setters are `internal` to `SAM.Analytical` and so could not be constructed by a test. The
@@ -205,20 +270,21 @@ Added:
 - `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartOEquipmentRow.cs`
 - `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartOSpaceRow.cs`
 - `WPF/SAM.Analytical.UI.WPF/Modify/RestampSimulationZoneIdentity.cs`
+- `WPF/SAM.Analytical.UI.WPF/Query/IsPartOFullYearSimulation.cs`
 - `WPF/SAM.Analytical.UI.WPF/Modify/PreparePartOIteration.cs`
 - `WPF/SAM.Analytical.UI.WPF/Modify/AssessPartOTM59.cs`
 - `WPF/SAM.Analytical.UI.WPF/Windows/PartOIterationWindow.xaml{,.cs}`
 - `WPF/SAM.Analytical.UI.WPF/Windows/PartOPreparationWindow.xaml{,.cs}`
 - `WPF/SAM.Analytical.UI.WPF/Windows/PartOTM59ResultWindow.xaml{,.cs}`
 - `WPF/SAM.Analytical.UI.WPF.Tests/SimulationZoneIdentityTests.cs` (7)
-- `WPF/SAM.Analytical.UI.WPF.Tests/PartORunLineageTests.cs` (11)
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartORunLineageTests.cs` (21)
 - `WPF/SAM.Analytical.UI.WPF.Tests/PartOPresentationTests.cs` (12)
 
 ## Validation
 - `dotnet build SAM_UI.sln -c Debug` - succeeded, 0 errors (the pre-existing MSB3245/MSB3270 warnings for
   `System.Data.DataSetExtensions`, `Microsoft.CSharp`, `PresentationFramework.Aero2` and the Interop
   architecture mismatch are unchanged).
-- `dotnet test WPF/SAM.Analytical.UI.WPF.Tests` - **Passed 217, Failed 0, Skipped 0** (187 baseline + 30).
+- `dotnet test WPF/SAM.Analytical.UI.WPF.Tests` - **Passed 227, Failed 0, Skipped 0** (187 baseline + 40).
 - BLOCKER 1's regression was written first and confirmed red (5 x CS0117, missing seam) before the fix.
 - Two genuine defects in this work were caught by its own tests and fixed:
   1. `PartOIterationWindow` reported unmarked zones as out of scope even where `PartFDwellingZones` had
@@ -338,7 +404,7 @@ button is unavailable because `RibbonButton_AssessPartOTM59` declares
   description fix in `SAM_Tas_Grasshopper`, deliberately not bundled here.
 
 ## Next step
-1. Review the diff and the licensed acceptance evidence above, then commit and push
-   `feature/parto-iteration2-ui-orchestration` and raise the PR against `sow/2026-Q3`.
+1. Review PR #76 - the GitHub diff, both P1 resolutions and CI - then merge. Nothing is pending in this
+   working tree.
 2. Before release, click the two new ribbon buttons by hand once in the real application - the licensed
-   run drove the commands and their windows, not the ribbon.
+   runs drove the commands and their windows, not the ribbon.

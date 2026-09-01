@@ -36,6 +36,15 @@ namespace SAM.Analytical.UI
     /// unreachable rather than merely unlikely.
     /// </para>
     /// <para>
+    /// <b><see cref="PartORunState.WorkflowCompleted"/> means "this prepared run produced the full-year
+    /// results being assessed"</b> - not "a TSD exists". Three things are required, and the second and third
+    /// are what <see cref="ExpectResults"/> exists for: the workflow must have returned a model; the
+    /// simulation must have been the full annual run a TM59 assessment reads, which is enforced by arming
+    /// only for that case; and the results file must have been created or rewritten by <i>this</i> workflow,
+    /// measured against a fingerprint taken before it ran. An earlier session's <c>&lt;project&gt;.tsd</c>
+    /// left in the output directory satisfies none of them.
+    /// </para>
+    /// <para>
     /// <b>Session state, deliberately.</b> Nothing here is written into the model. Scenarios have no
     /// persistence seam in <c>SAM.Analytical</c>, and inventing one in the UI would put engineering state
     /// under the UI's ownership; a run that does not survive closing the model is the honest alternative,
@@ -55,6 +64,17 @@ namespace SAM.Analytical.UI
         private System.DateTime dateTime_TSD;
 
         private bool modificationExpected;
+
+        //The pre-run fingerprint of the results file this workflow is expected to write. See ExpectResults.
+        private bool resultsExpected;
+
+        private string path_TSD_Expected;
+
+        private bool exists_TSD_Expected;
+
+        private long length_TSD_Expected = -1;
+
+        private System.DateTime dateTime_TSD_Expected;
 
         /// <summary>How far this run has got.</summary>
         public PartORunState State { get; private set; } = PartORunState.None;
@@ -111,6 +131,63 @@ namespace SAM.Analytical.UI
         public void ExpectModification()
         {
             modificationExpected = true;
+        }
+
+        /// <summary>
+        /// Announces, <b>before the workflow runs</b>, which results file this run expects it to write, and
+        /// fingerprints whatever is at that path now.
+        /// <para>
+        /// <b>Why a pre-run fingerprint and not a post-run timestamp.</b> The results path is derived from the
+        /// TBD's, so an earlier session's <c>&lt;project&gt;.tsd</c> can already be sitting in the output
+        /// directory. <c>Modify.Simulate</c> deletes only the TBD before running, so a sizing-only or otherwise
+        /// non-simulating workflow leaves that old file untouched - and <see cref="Complete"/> reading its write
+        /// time <i>after</i> the run would record a stale file as this run's result and then let
+        /// <see cref="IsAssessable"/> approve it against the newly prepared model and scenarios. Captured here,
+        /// the same file being unchanged afterwards is exactly the signal that this workflow wrote nothing.
+        /// </para>
+        /// <para>
+        /// <b>Arming is also where the full-year requirement is enforced.</b> The caller arms this only for the
+        /// simulation a TM59 assessment can actually read - a full annual hourly series - so a partial,
+        /// one-day or sizing-only workflow leaves the run unarmed and <see cref="Complete"/> refuses it even if
+        /// it is reached. <see cref="PartORunState.WorkflowCompleted"/> therefore means "this prepared run
+        /// produced the full-year results being assessed", not "a TSD exists".
+        /// </para>
+        /// <para>
+        /// One shot per run, and only from <see cref="PartORunState.Prepared"/>: re-arming replaces the
+        /// fingerprint, and <see cref="Invalidate"/> clears it, so a dropped run cannot be completed by a
+        /// workflow that was announced to its predecessor.
+        /// </para>
+        /// </summary>
+        /// <param name="path_TSD">The results file the workflow about to run is expected to write.</param>
+        /// <returns>Whether a fingerprint was armed.</returns>
+        public bool ExpectResults(string path_TSD)
+        {
+            resultsExpected = false;
+            path_TSD_Expected = null;
+            exists_TSD_Expected = false;
+            length_TSD_Expected = -1;
+            dateTime_TSD_Expected = default;
+
+            if (State != PartORunState.Prepared || string.IsNullOrWhiteSpace(path_TSD))
+            {
+                return false;
+            }
+
+            path_TSD_Expected = path_TSD;
+            resultsExpected = true;
+
+            //Length as well as write time: two different observations of the same file, and a rewrite that
+            //landed inside the filesystem's timestamp granularity still changes one of them. Where they both
+            //match, the file is treated as untouched - refusing a genuine rerun is the safe way to be wrong.
+            FileInfo fileInfo = new(path_TSD);
+            if (fileInfo.Exists)
+            {
+                exists_TSD_Expected = true;
+                length_TSD_Expected = fileInfo.Length;
+                dateTime_TSD_Expected = fileInfo.LastWriteTimeUtc;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -205,9 +282,11 @@ namespace SAM.Analytical.UI
         /// not the loaded model read back afterwards.
         /// </param>
         /// <param name="path_TSD">
-        /// The simulation results. Required to exist: a derived file name is a guess, and a run whose results
-        /// were never written is not a completed run. Its write time is captured so
-        /// <see cref="IsAssessable"/> can tell that the file being assessed is still the one this run wrote.
+        /// The simulation results. Required to exist, to be the path <see cref="ExpectResults"/> was armed
+        /// with, and to have been <b>created or rewritten since that arming</b> - a derived file name is a
+        /// guess, an old file at that name is somebody else's run, and a workflow that wrote nothing did not
+        /// complete this one. Its write time is then captured so <see cref="IsAssessable"/> can tell that the
+        /// file being assessed is still the one this run wrote.
         /// </param>
         /// <param name="refusal">Why the run was not completed, or null where it was.</param>
         public bool Complete(AnalyticalModel analyticalModel_Workflow, string path_TSD, out string refusal)
@@ -240,6 +319,30 @@ namespace SAM.Analytical.UI
             if (string.IsNullOrWhiteSpace(path_TSD) || !File.Exists(path_TSD))
             {
                 refusal = string.Format("No simulation results were found at '{0}', so the workflow did not complete a run that can be assessed. A sizing-only run writes no TSD.", path_TSD ?? "?");
+
+                Invalidate(refusal);
+
+                return false;
+            }
+
+            //Nothing announced this workflow's results, so nothing establishes that they are this run's. That
+            //is the state a partial, one-day or sizing-only simulation leaves the run in, because the caller
+            //arms ExpectResults only for the full-year run a TM59 assessment can read.
+            if (!resultsExpected || !string.Equals(path_TSD_Expected, path_TSD, System.StringComparison.Ordinal))
+            {
+                refusal = string.Format("The results at '{0}' were not announced as this Part O run's, so it cannot be established that this workflow produced them. Only a full-year simulation of the prepared model completes a Part O run - prepare the iteration again and simulate with Full Year Simulation ticked.", path_TSD);
+
+                Invalidate(refusal);
+
+                return false;
+            }
+
+            //The file that was already there, byte-length and write-time unchanged: this workflow did not write
+            //it. Accepting it would pair an earlier session's results with the model just prepared.
+            FileInfo fileInfo = new(path_TSD);
+            if (exists_TSD_Expected && fileInfo.Length == length_TSD_Expected && fileInfo.LastWriteTimeUtc == dateTime_TSD_Expected)
+            {
+                refusal = string.Format("The simulation results at '{0}' are unchanged from before this workflow ran, so they are an earlier run's and not this one's. Simulate the prepared model with Full Year Simulation ticked to produce results this Part O run can be assessed against.", path_TSD);
 
                 Invalidate(refusal);
 
@@ -303,6 +406,14 @@ namespace SAM.Analytical.UI
             path_TSD = null;
             dateTime_TSD = default;
             modificationExpected = false;
+
+            //Cleared with everything else: a workflow announced to the run that has just been dropped must not
+            //be able to complete its successor.
+            resultsExpected = false;
+            path_TSD_Expected = null;
+            exists_TSD_Expected = false;
+            length_TSD_Expected = -1;
+            dateTime_TSD_Expected = default;
 
             State = PartORunState.None;
 

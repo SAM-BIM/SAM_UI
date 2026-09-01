@@ -134,9 +134,18 @@ namespace SAM.Analytical.UI.WPF
 
             bool cancelled = false;
 
-            // Whether WorkflowCalculator actually ran and returned a model. The only condition under which the
-            // adopted model is a workflow output, and so the only one under which a Part O run may be completed.
+            // Whether WorkflowCalculator actually ran and returned a model. Necessary for a Part O run to be
+            // completed, and on its own NOT sufficient - see workflowSimulatedFullYear.
             bool workflowCompleted = false;
+
+            // Whether the workflow that ran was the FULL-YEAR simulation a TM59 assessment reads: days 1 to
+            // 365, taken from the settings actually handed to WorkflowCalculator rather than from the tick box.
+            // A workflow can return a model without producing an annual series at all - Full Year Simulation
+            // unticked, a partial date range, a one-day run forced because shading changed, or sizing only -
+            // and a Part O assessment of any of those reports criteria and verdicts computed over an
+            // incomplete series. Only this promotes a prepared run to WorkflowCompleted. Nothing else in this
+            // method reads it, so a normal non-Part-O simulation is unaffected.
+            bool workflowSimulatedFullYear = false;
 
             // Reported at the end rather than raised as they happen: a space left without a TAS zone identity
             // is a gap in whatever is exported next - and the DomOv XML does NOT refuse such a space, it
@@ -333,6 +342,22 @@ namespace SAM.Analytical.UI.WPF
                             SimulateTo = simulate_To
                         };
 
+                        // Read off the settings that are about to run, not off simulateWindow.FullYearSimulation:
+                        // the day range is still taken from the two text boxes when that box is ticked, and
+                        // shadingUpdated above can turn an unticked run into a one-day one. See
+                        // Query.IsPartOFullYearSimulation for why nothing less may complete a Part O run.
+                        bool fullYearWorkflow = workflowSettings.IsPartOFullYearSimulation();
+
+                        // Announced BEFORE the workflow, and only for the full-year case. Two guarantees in one
+                        // arming: a partial/one-day/sizing-only workflow leaves the run unarmed and so cannot
+                        // complete it, and the results file is fingerprinted now so an old <project>.tsd left in
+                        // this directory by an earlier session cannot be accepted as this run's. See
+                        // PartORun.ExpectResults - recording the timestamp after the run would bless that file.
+                        if (fullYearWorkflow && partORun != null && partORun.State == PartORunState.Prepared)
+                        {
+                            partORun.ExpectResults(System.IO.Path.ChangeExtension(path_TBD, "tsd"));
+                        }
+
                         analyticalModel = Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled);
 
                         // A cancelled workflow returns null, so everything below - including writing the
@@ -345,6 +370,8 @@ namespace SAM.Analytical.UI.WPF
                             // not carry the current TAS zone identities, so it is not a workflow output and must
                             // not be assessed as one.
                             workflowCompleted = true;
+
+                            workflowSimulatedFullYear = fullYearWorkflow;
 
                             if (printRoomDataSheets)
                             {
@@ -453,6 +480,30 @@ namespace SAM.Analytical.UI.WPF
 
             TimeSpan timeSpan = new TimeSpan(DateTime.Now.Ticks - dateTime.Ticks);
 
+            // Whether this run may complete a pending Part O run. Read BEFORE the model is adopted, because
+            // adopting it raises the modification that consumes the armed expectation further down.
+            bool completePartORun = partORun != null
+                && partORun.State == PartORunState.Prepared
+                && workflowCompleted
+                && workflowSimulatedFullYear
+                && !cancelled
+                && analyticalModel != null;
+
+            // A prepared run this simulation cannot complete is dropped HERE, with the reason it was actually
+            // refused for. Left to the model replacement below, it would be reported as an outside edit - true,
+            // but useless: what the user needs to be told is that the simulation was not the full year a TM59
+            // assessment reads. Nothing is dropped where the run was cancelled or no model was adopted, since
+            // the loaded model is then untouched and the preparation still describes it.
+            string? note_PartORun = null;
+            if (partORun != null && partORun.State == PartORunState.Prepared && !completePartORun && !cancelled && analyticalModel != null)
+            {
+                note_PartORun = workflowCompleted
+                    ? "The Part O run was not completed: the simulation that ran was not a full-year simulation, and a TM59 assessment reads a full annual hourly series. Prepare the iteration again and simulate with Full Year Simulation ticked over days 1 to 365."
+                    : "The Part O run was not completed: the TAS workflow did not run over the prepared model, so there are no results to assess. Prepare the iteration again and run the energy simulation.";
+
+                partORun.Invalidate(note_PartORun);
+            }
+
             string message;
             if (cancelled)
             {
@@ -480,9 +531,12 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            // Whether this run may complete a pending Part O run. Read BEFORE the model is adopted, because
-            // adopting it raises the modification that consumes the armed expectation below.
-            bool completePartORun = partORun != null && partORun.State == PartORunState.Prepared && workflowCompleted && !cancelled && analyticalModel != null;
+            // Appended separately rather than added to notes_Simulate, whose cap counts the remainder as
+            // "space(s) with no TAS zone identity" - which this is not.
+            if (note_PartORun != null)
+            {
+                message += string.Format("\n\n{0}", note_PartORun);
+            }
 
             MessageBox.Show(message);
 
