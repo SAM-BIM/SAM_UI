@@ -21,6 +21,22 @@
     <Reference Include="SAM.Geometry">
       <HintPath>..\..\..\SAM\build\SAM.Geometry.dll</HintPath>
     </Reference>
+    <!-- The Part O tests read and write SAM.Analytical.Tas.SpaceParameter.ZoneGuid, the identity the TAS
+         round trip preserves. Declared here because a HintPath Reference on the referenced project does not
+         flow to this one for compilation - the three above are re-declared for exactly that reason. Nothing
+         in these tests touches a TBD/TSD/TAS3D COM type, so the interop assemblies are never loaded: the
+         same property SAM.Analytical.Tas.TM59's PartODiagnosticLog relies on to stay testable without an
+         installed TAS. -->
+    <Reference Include="SAM.Analytical.Tas">
+      <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.dll</HintPath>
+    </Reference>
+    <!-- SimulationZoneIdentityTests exports the DomOv XML through Tas.TM59.Convert.ToXml - the one consumer
+         that actually depends on Modify.RestampSimulationZoneIdentity - and asserts which identity comes out
+         of it. Convert.ToTM59 / Convert.ToXml / Building / Zone are XML writers over analytical objects, so
+         this stays as COM-free as the reference above. -->
+    <Reference Include="SAM.Analytical.Tas.TM59">
+      <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.TM59.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

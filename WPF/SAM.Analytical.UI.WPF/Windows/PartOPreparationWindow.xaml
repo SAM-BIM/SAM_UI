@@ -1,0 +1,59 @@
+<Window x:Class="SAM.Analytical.UI.WPF.PartOPreparationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
+        mc:Ignorable="d"
+        Title="Part O Iteration" Height="640" Width="1080" FontFamily="Roboto Light">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="160"/>
+            <RowDefinition Height="30"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="textBlock_Summary" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+        <Label Grid.Row="1" Content="Equipment - design duty and selected product are different quantities" Padding="0,0,0,2" FontWeight="Bold"/>
+        <DataGrid x:Name="dataGrid_Equipment" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" MinHeight="90">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Unit" Binding="{Binding UnitName}" Width="90"/>
+                <DataGridTextColumn Header="System" Binding="{Binding SystemName}" Width="150"/>
+                <!-- Design duty and Maximum capacity are deliberately in separate, differently headed
+                     columns. A dwelling designed at 30 l/s that selects a 150 l/s unit is a 30 l/s
+                     dwelling. -->
+                <DataGridTextColumn Header="Design supply&#x0a;l/s" Binding="{Binding DesignSupplyDuty_Lps, StringFormat=N1}" Width="85"/>
+                <DataGridTextColumn Header="Design extract&#x0a;l/s" Binding="{Binding DesignExtractDuty_Lps, StringFormat=N1}" Width="85"/>
+                <DataGridTextColumn Header="Selected product" Binding="{Binding SelectedProduct}" Width="240"/>
+                <DataGridTextColumn Header="Maximum supply&#x0a;l/s" Binding="{Binding MaximumSupply_Lps, StringFormat=N1}" Width="95"/>
+                <DataGridTextColumn Header="Maximum extract&#x0a;l/s" Binding="{Binding MaximumExtract_Lps, StringFormat=N1}" Width="95"/>
+                <DataGridTextColumn Header="Supply headroom&#x0a;l/s" Binding="{Binding SupplyHeadroom_Lps, StringFormat=N1}" Width="95"/>
+                <DataGridTextColumn Header="Extract headroom&#x0a;l/s" Binding="{Binding ExtractHeadroom_Lps, StringFormat=N1}" Width="95"/>
+                <DataGridTextColumn Header="Selection" Binding="{Binding SelectionOutcome}" Width="80"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Label Grid.Row="3" Content="Spaces - Approved Document F requirement and design airflow are different quantities" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <DataGrid x:Name="dataGrid_Spaces" Grid.Row="4" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" MinHeight="90">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Space" Binding="{Binding Name}" Width="220"/>
+                <DataGridTextColumn Header="Part F required&#x0a;l/s" Binding="{Binding PartFRequired_Lps, StringFormat=N1}" Width="100"/>
+                <DataGridTextColumn Header="Design supply&#x0a;l/s" Binding="{Binding DesignSupply_Lps, StringFormat=N1}" Width="100"/>
+                <DataGridTextColumn Header="Design extract&#x0a;l/s" Binding="{Binding DesignExtract_Lps, StringFormat=N1}" Width="100"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Label Grid.Row="5" Content="Notes, warnings and refusals" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <TextBox x:Name="textBox_Notes" Grid.Row="6" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
+
+        <Button x:Name="button_CopyAll" Grid.Row="7" Width="70" Height="20" Margin="0,6,150,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
+        <Button x:Name="button_OK" Grid.Row="7" Width="60" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_OK_Click">OK</Button>
+        <Button x:Name="button_Cancel" IsCancel="True" Grid.Row="7" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
+    </Grid>
+</Window>
