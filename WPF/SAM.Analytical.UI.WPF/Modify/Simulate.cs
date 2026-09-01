@@ -19,6 +19,25 @@ namespace SAM.Analytical.UI.WPF
     {
         public static void Simulate(this UIAnalyticalModel uIAnalyticalModel)
         {
+            Simulate(uIAnalyticalModel, null);
+        }
+
+        /// <summary>
+        /// Runs the TAS workflow, optionally completing the session's Approved Document O run with the model
+        /// the workflow returned and the results it wrote.
+        /// </summary>
+        /// <param name="partORun">
+        /// The session's Part O run, or null where the caller has none.
+        /// <para>
+        /// <b>Only a run that is <see cref="PartORunState.Prepared"/> is completed here</b>, and only by a
+        /// workflow that actually ran. In every other case this method's own model replacement reaches the run
+        /// as an unexpected modification and drops it - which is the intended outcome, not a side effect: a
+        /// second simulation, or a simulation of a model that was edited after preparation, must not be paired
+        /// with the earlier preparation's overheating scenarios.
+        /// </para>
+        /// </summary>
+        public static void Simulate(this UIAnalyticalModel uIAnalyticalModel, PartORun partORun)
+        {
             AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
             if(analyticalModel == null)
             {
@@ -114,6 +133,26 @@ namespace SAM.Analytical.UI.WPF
             bool converted = false;
 
             bool cancelled = false;
+
+            // Whether WorkflowCalculator actually ran and returned a model. Necessary for a Part O run to be
+            // completed, and on its own NOT sufficient - see workflowSimulatedFullYear.
+            bool workflowCompleted = false;
+
+            // Whether the workflow that ran was the FULL-YEAR simulation a TM59 assessment reads: days 1 to
+            // 365, taken from the settings actually handed to WorkflowCalculator rather than from the tick box.
+            // A workflow can return a model without producing an annual series at all - Full Year Simulation
+            // unticked, a partial date range, a one-day run forced because shading changed, or sizing only -
+            // and a Part O assessment of any of those reports criteria and verdicts computed over an
+            // incomplete series. Only this promotes a prepared run to WorkflowCompleted. Nothing else in this
+            // method reads it, so a normal non-Part-O simulation is unaffected.
+            bool workflowSimulatedFullYear = false;
+
+            // Reported at the end rather than raised as they happen: a space left without a TAS zone identity
+            // is a gap in whatever is exported next - and the DomOv XML does NOT refuse such a space, it
+            // writes the SAM space guid in place of the TAS zone guid, so nothing downstream announces the
+            // gap. A run that says "converted" while quietly having produced that is the failure mode being
+            // closed. A dialog per space would be unusable on a block of flats.
+            List<string> notes_Simulate = [];
 
             if(simulateWindow.Simulate)
             {
@@ -303,12 +342,37 @@ namespace SAM.Analytical.UI.WPF
                             SimulateTo = simulate_To
                         };
 
+                        // Read off the settings that are about to run, not off simulateWindow.FullYearSimulation:
+                        // the day range is still taken from the two text boxes when that box is ticked, and
+                        // shadingUpdated above can turn an unticked run into a one-day one. See
+                        // Query.IsPartOFullYearSimulation for why nothing less may complete a Part O run.
+                        bool fullYearWorkflow = workflowSettings.IsPartOFullYearSimulation();
+
+                        // Announced BEFORE the workflow, and only for the full-year case. Two guarantees in one
+                        // arming: a partial/one-day/sizing-only workflow leaves the run unarmed and so cannot
+                        // complete it, and the results file is fingerprinted now so an old <project>.tsd left in
+                        // this directory by an earlier session cannot be accepted as this run's. See
+                        // PartORun.ExpectResults - recording the timestamp after the run would bless that file.
+                        if (fullYearWorkflow && partORun != null && partORun.State == PartORunState.Prepared)
+                        {
+                            partORun.ExpectResults(System.IO.Path.ChangeExtension(path_TBD, "tsd"));
+                        }
+
                         analyticalModel = Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled);
 
                         // A cancelled workflow returns null, so everything below - including writing the
                         // weather data back onto the model - has to be skipped, not just the room data sheets.
                         if (!cancelled && analyticalModel != null)
                         {
+                            // The one place a Part O run may be completed from. Set here rather than inferred
+                            // later from `converted`, which is also true when the .tbd was written without the
+                            // workflow ever running - a model that never went through WorkflowCalculator does
+                            // not carry the current TAS zone identities, so it is not a workflow output and must
+                            // not be assessed as one.
+                            workflowCompleted = true;
+
+                            workflowSimulatedFullYear = fullYearWorkflow;
+
                             if (printRoomDataSheets)
                             {
                                 if (!System.IO.Directory.Exists(outputDirectory))
@@ -343,25 +407,32 @@ namespace SAM.Analytical.UI.WPF
                         if(analyticalModel != null && analyticalModel_TBD != null)
                         {
                             AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
-                            List<Space> spaces_TBD = analyticalModel_TBD.AdjacencyCluster?.GetSpaces();
-                            if(spaces_TBD != null && spaces_TBD.Count != 0)
-                            {
-                                List<Space> spaces = adjacencyCluster.GetSpaces();
-                                foreach(Space space in spaces)
-                                {
-                                    Space space_TBD = spaces_TBD.Find(x => x?.Name == space?.Name);
-                                    if(space_TBD == null)
-                                    {
-                                        continue;
-                                    }
 
-                                    if(space_TBD.TryGetValue(Tas.SpaceParameter.ZoneGuid, out Guid guid))
-                                    {
-                                        space.SetValue(Tas.SpaceParameter.ZoneGuid, guid);
-                                        adjacencyCluster.AddObject(space);
-                                    }
-                                }
+                            // Makes every space's TAS zone identity describe the .tbd about to be exported.
+                            // This used to match by NAME for every space and overwrite unconditionally, which
+                            // discarded the strong identity Modify.UpdateIds had just written and collapsed
+                            // same-named rooms in different dwellings onto one zone - see
+                            // Modify.RestampSimulationZoneIdentity for both defects, and for why this seam is
+                            // needed by the Simulate-unticked DomOv path (only that one: SAP is handed
+                            // analyticalModel_TBD, which Tas.Convert.ToSAM stamps itself, and Part L reads no
+                            // ZoneGuid).
+                            //
+                            // workflowCompleted is the whole discriminator, and it is the authoritative one.
+                            // TRUE: WorkflowCalculator wrote path_TBD and stamped this model against it, so the
+                            // stamps already here name zones in the file being re-read - authoritative, current,
+                            // left alone. FALSE: Tas.Convert.ToTBD wrote path_TBD above, deleting whatever was
+                            // there and minting new zone guids, so any stamp this model carries belongs to an
+                            // earlier .tbd and names nothing in this one - it is replaced from an unambiguous
+                            // name match and discarded where there is none. Passing the wrong value here
+                            // exports either a stale identity or a weak one.
+                            List<Space> spaces_Restamped = Modify.RestampSimulationZoneIdentity(adjacencyCluster.GetSpaces(), analyticalModel_TBD.AdjacencyCluster?.GetSpaces(), workflowCompleted, out List<string> notes_ZoneIdentity);
+
+                            foreach (Space space_Restamped in spaces_Restamped)
+                            {
+                                adjacencyCluster.AddObject(space_Restamped);
                             }
+
+                            notes_Simulate.AddRange(notes_ZoneIdentity);
 
                             analyticalModel = new AnalyticalModel(analyticalModel, adjacencyCluster);
                         }
@@ -418,6 +489,30 @@ namespace SAM.Analytical.UI.WPF
 
             TimeSpan timeSpan = new TimeSpan(DateTime.Now.Ticks - dateTime.Ticks);
 
+            // Whether this run may complete a pending Part O run. Read BEFORE the model is adopted, because
+            // adopting it raises the modification that consumes the armed expectation further down.
+            bool completePartORun = partORun != null
+                && partORun.State == PartORunState.Prepared
+                && workflowCompleted
+                && workflowSimulatedFullYear
+                && !cancelled
+                && analyticalModel != null;
+
+            // A prepared run this simulation cannot complete is dropped HERE, with the reason it was actually
+            // refused for. Left to the model replacement below, it would be reported as an outside edit - true,
+            // but useless: what the user needs to be told is that the simulation was not the full year a TM59
+            // assessment reads. Nothing is dropped where the run was cancelled or no model was adopted, since
+            // the loaded model is then untouched and the preparation still describes it.
+            string? note_PartORun = null;
+            if (partORun != null && partORun.State == PartORunState.Prepared && !completePartORun && !cancelled && analyticalModel != null)
+            {
+                note_PartORun = workflowCompleted
+                    ? "The Part O run was not completed: the simulation that ran was not a full-year simulation, and a TM59 assessment reads a full annual hourly series. Prepare the iteration again and simulate with Full Year Simulation ticked over days 1 to 365."
+                    : "The Part O run was not completed: the TAS workflow did not run over the prepared model, so there are no results to assess. Prepare the iteration again and run the energy simulation.";
+
+                partORun.Invalidate(note_PartORun);
+            }
+
             string message;
             if (cancelled)
             {
@@ -429,7 +524,38 @@ namespace SAM.Analytical.UI.WPF
             }
 
             message += string.Format("\n Time elapsed: {0}min{1}sec", timeSpan.Minutes, timeSpan.Seconds);
+
+            if (notes_Simulate.Count != 0)
+            {
+                // Capped, with the remainder counted rather than dropped silently. A model with many unzoned
+                // or unexported spaces can produce one note each, and a dialog listing all of them is one
+                // nobody reads - but a cap that hid how much it was hiding would be worse than either.
+                const int count_NotesShown = 5;
+
+                message += string.Format("\n\n{0}", string.Join("\n", notes_Simulate.GetRange(0, Math.Min(count_NotesShown, notes_Simulate.Count))));
+
+                if (notes_Simulate.Count > count_NotesShown)
+                {
+                    message += string.Format("\n... and {0} more space(s) with no TAS zone identity.", notes_Simulate.Count - count_NotesShown);
+                }
+            }
+
+            // Appended separately rather than added to notes_Simulate, whose cap counts the remainder as
+            // "space(s) with no TAS zone identity" - which this is not.
+            if (note_PartORun != null)
+            {
+                message += string.Format("\n\n{0}", note_PartORun);
+            }
+
             MessageBox.Show(message);
+
+            if (completePartORun)
+            {
+                // Armed immediately before the write it belongs to, so nothing can consume it in between.
+                // Deliberately NOT armed on any other path: a simulation that is not completing a prepared
+                // Part O run must drop it, and the unexpected modification is how that happens.
+                partORun.ExpectModification();
+            }
 
             // A cancelled run leaves analyticalModel null, and pushing that back would replace the model the
             // user still has open with nothing. Not adopting it really does leave the loaded model untouched,
@@ -437,6 +563,20 @@ namespace SAM.Analytical.UI.WPF
             if (!cancelled && analyticalModel != null)
             {
                 uIAnalyticalModel.SetJSAMObject(analyticalModel, new FullModification());
+            }
+
+            if (completePartORun)
+            {
+                // The model handed over is the one this workflow produced and the window has just adopted -
+                // not the preparation output, and not read back from uIAnalyticalModel (whose getter clones).
+                // The TSD is required to exist: the file name is derived, and a derived name is a guess until
+                // the file behind it is there. A sizing-only run writes none, and is correctly not completable.
+                string path_TSD = System.IO.Path.ChangeExtension(path_TBD, "tsd");
+
+                if (!partORun.Complete(analyticalModel, path_TSD, out string refusal_PartORun))
+                {
+                    MessageBox.Show(string.Format("The Part O run was not completed, so its TM59 assessment is not available.\n\n{0}", refusal_PartORun));
+                }
             }
         }
 

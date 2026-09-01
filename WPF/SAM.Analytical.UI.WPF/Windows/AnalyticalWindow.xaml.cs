@@ -44,6 +44,19 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private UIAnalyticalModel? uIAnalyticalModel = null;
         private WindowHandle? windowHandle = null;
+
+        /// <summary>
+        /// The Approved Document O run in progress in this window: the preparation, and - once a TAS workflow
+        /// has completed over it - the model that workflow returned and the results it wrote.
+        /// <para>
+        /// Session state, held here and never written into the model. It is the object that keeps the TM59
+        /// assessment from being handed the preparation model or the currently loaded one, and it is dropped by
+        /// <see cref="UIAnalyticalModel_Modified"/> whenever something other than a Part O command replaces the
+        /// model. Readonly, so the invalidation wiring above can never be left pointing at a discarded
+        /// instance.
+        /// </para>
+        /// </summary>
+        private readonly PartORun partORun = new();
         
         public AnalyticalWindow()
         {
@@ -773,6 +786,12 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             RibbonButton_AddVentilationPartF.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_AddVentilationPartF.Click += RibbonButton_AddVentilationPartF_Click;
+
+            RibbonButton_PreparePartOIteration.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_PreparePartOIteration.Click += RibbonButton_PreparePartOIteration_Click;
+
+            RibbonButton_AssessPartOTM59.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_AssessPartOTM59.Click += RibbonButton_AssessPartOTM59_Click;
 
             RibbonButton_EditInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditInternalConditions.Click += RibbonButton_EditInternalConditions_Click;
@@ -1932,6 +1951,44 @@ namespace SAM.Analytical.UI.WPF.Windows
         {
             Modify.AddVentilationByPartF(uIAnalyticalModel, windowHandle);
         }
+
+        private void RibbonButton_PreparePartOIteration_Click(object sender, RoutedEventArgs e)
+        {
+            Modify.PreparePartOIteration(uIAnalyticalModel, partORun, windowHandle);
+
+            //The assessment gate moves with the run, not with the model, so it is refreshed here rather than
+            //left to the modification handler - a preparation the user cancelled raises no modification.
+            RefreshPartOButtons();
+        }
+
+        private void RibbonButton_AssessPartOTM59_Click(object sender, RoutedEventArgs e)
+        {
+            Modify.AssessPartOTM59(partORun, windowHandle);
+
+            //A stale results file is discovered by IsAssessable at click time, so the gate can have closed.
+            RefreshPartOButtons();
+        }
+
+        /// <summary>
+        /// Enables the Part O assessment only for a run that has actually completed a TAS workflow, and says
+        /// through the tooltip why it is unavailable when it is not.
+        /// <para>
+        /// <c>PartORun.CanAssess</c> is the only condition read. The command re-checks it - and re-checks the
+        /// results file - so this is presentation, not the gate.
+        /// </para>
+        /// </summary>
+        private void RefreshPartOButtons()
+        {
+            bool canAssess = partORun.CanAssess;
+
+            RibbonButton_AssessPartOTM59.IsEnabled = canAssess;
+
+            RibbonButton_AssessPartOTM59.ToolTipDescription = canAssess
+                ? "Assess the completed Part O run against the CIBSE TM59 criteria, using the model the TAS workflow returned."
+                : partORun.State == PartORunState.Prepared
+                    ? "A Part O iteration is prepared but not simulated. Run the energy simulation first."
+                    : partORun.InvalidationReason ?? "Prepare a Part O iteration and run the energy simulation first.";
+        }
         
         private void RibbonButton_AirHandlingUnitDiagram_Click(object sender, RoutedEventArgs e)
         {
@@ -2073,7 +2130,11 @@ namespace SAM.Analytical.UI.WPF.Windows
         private void RibbonButton_EnergySimulation_Click(object sender, RoutedEventArgs e)
         {
             //uIAnalyticalModel?.EnergySimulation(windowHandle);
-            uIAnalyticalModel?.Simulate();
+            //The Part O run goes in so a workflow over a prepared model can complete it. A run in any other
+            //state is dropped by this simulation's own model replacement, which is the intended behaviour.
+            uIAnalyticalModel?.Simulate(partORun);
+
+            RefreshPartOButtons();
         }
 
         private void RibbonButton_ExportAnalyticalModel_Click(object sender, RoutedEventArgs e)
@@ -2954,6 +3015,8 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_EditInternalConditions.IsEnabled = false;
             RibbonButton_AssignMechanicalSystems.IsEnabled = false;
             RibbonButton_RemoveAirMovementObjects.IsEnabled = false;
+            RibbonButton_PreparePartOIteration.IsEnabled = false;
+            RibbonButton_AssessPartOTM59.IsEnabled = false;
 
             RibbonButton_OpenMollierChart.IsEnabled = true;
             RibbonButton_Wiki.IsEnabled = true;
@@ -2998,6 +3061,11 @@ namespace SAM.Analytical.UI.WPF.Windows
                 RibbonButton_EditInternalConditions.IsEnabled = true;
                 RibbonButton_AssignMechanicalSystems.IsEnabled = true;
                 RibbonButton_RemoveAirMovementObjects.IsEnabled = true;
+
+                //Preparing needs only a model; assessing needs a completed run, which is a fact about the
+                //session rather than about the model, so it is gated separately.
+                RibbonButton_PreparePartOIteration.IsEnabled = true;
+                RefreshPartOButtons();
 
                 List<AirHandlingUnit> airHandlingUnits = analyticalModel.AdjacencyCluster?.GetObjects<AirHandlingUnit>();
                 if (airHandlingUnits != null && airHandlingUnits.Count != 0)
@@ -3292,6 +3360,10 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void UIAnalyticalModel_Closed(object sender, ClosedEventArgs e)
         {
+            //Cleared rather than invalidated: the run did not go stale, it stopped applying. Nothing to
+            //explain, so no reason is retained.
+            partORun.Reset();
+
             Reload(e);
             RefreshHistoryButtons();
 
@@ -3300,12 +3372,21 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void UIAnalyticalModel_Modified(object sender, ModifiedEventArgs e)
         {
+            //Every model replacement passes through here - an edit, an import, an undo, a redo, a simulation.
+            //A Part O command arms the run first so its own write is recognised; anything else drops the run,
+            //which is what stops one preparation's overheating scenarios being paired with another run's
+            //results. See PartORun.
+            partORun.NotifyModified();
+
             Reload(e);
             RefreshHistoryButtons();
         }
 
         private void UIAnalyticalModel_Opened(object sender, OpenedEventArgs e)
         {
+            //A different model. Whatever was pending belonged to the previous one.
+            partORun.Reset();
+
             SetDefaultViewSettings();
             Reload(e);
 

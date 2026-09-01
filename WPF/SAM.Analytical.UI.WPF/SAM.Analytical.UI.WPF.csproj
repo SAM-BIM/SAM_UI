@@ -59,6 +59,14 @@
     <Reference Include="SAM.Analytical.GEM">
       <HintPath>..\..\..\SAM_GEM\build\SAM.Analytical.GEM.dll</HintPath>
     </Reference>
+    <!-- The manufacturer ventilation-unit catalogue reader, for Approved Document O Iteration 2 equipment
+         selection. Referenced HERE rather than from SAM.Analytical.UI on purpose: reading an installed
+         resource is application orchestration, and SAM.Analytical.UI stays free of the SAM_Systems
+         dependency. The selection RULE is not here - it is SAM.Analytical's, inside
+         Modify.PreparePartOIteration. See Classes\PartO\VentilationUnitCatalogue.cs. -->
+    <Reference Include="SAM.Analytical.Systems">
+      <HintPath>..\..\..\SAM_Systems\build\SAM.Analytical.Systems.dll</HintPath>
+    </Reference>
     <Reference Include="SAM.Analytical.LadybugTools">
       <HintPath>..\..\..\SAM_LadybugTools\build\SAM.Analytical.LadybugTools.dll</HintPath>
     </Reference>

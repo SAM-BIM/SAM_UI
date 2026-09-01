@@ -466,6 +466,12 @@
                     <RibbonButton x:Name="RibbonButton_RemoveAirMovementObjects" Label="Remove IZAMs" />
                     <RibbonButton x:Name="RibbonButton_SetDefaultLayers" Label="Set Default Layers" />
                 </RibbonGroup>
+                <!-- Part O is its own group rather than another button beside AddVent PartF: preparing an
+                     iteration is a different step from sizing to Approved Document F, and it must be followed
+                     by a simulation before the assessment on the Results tab becomes available. -->
+                <RibbonGroup x:Name="RibbonGroup_Edit_PartO" Header="Part O">
+                    <RibbonButton x:Name="RibbonButton_PreparePartOIteration" Label="Prepare Iteration" />
+                </RibbonGroup>
             </RibbonTab>
             <RibbonTab x:Name="RibbonTab_Simulate" Header="Simulate">
                 <RibbonGroup x:Name="RibbonGroup_Simulate_Simulate" Header="Simulate">
@@ -476,6 +482,14 @@
             <RibbonTab x:Name="RibbonTab_Results" Header="Results">
                 <RibbonGroup x:Name="RibbonGroup_Results_General" Header="General">
                     <RibbonButton x:Name="RibbonButton_RemoveResults" Label="Remove" />
+                </RibbonGroup>
+                <!-- SAM's own TM59 assessment of a completed Part O run. Distinct from the simulation
+                     window's "Domestic Overheating" tick, which writes the TAS DomOv XML for TAS to assess. -->
+                <RibbonGroup x:Name="RibbonGroup_Results_PartO" Header="Part O">
+                    <!-- ShowOnDisabled because the tooltip is the only place the reason appears while the
+                         button is unavailable, and "unavailable with no reason given" is the state this
+                         command most needs to explain. -->
+                    <RibbonButton x:Name="RibbonButton_AssessPartOTM59" Label="Overheating (TM59)" ToolTipService.ShowOnDisabled="True" />
                 </RibbonGroup>
                 <RibbonGroup x:Name="RibbonGroup_Results_Mollier" Header="Mollier Diagram">
                     <RibbonButton x:Name="RibbonButton_AirHandlingUnitDiagram" Label="AHU" />
