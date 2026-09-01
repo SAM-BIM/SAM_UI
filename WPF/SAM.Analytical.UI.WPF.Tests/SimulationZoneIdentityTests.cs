@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.UI.WPF;
@@ -30,12 +30,21 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// difference in form between the two sides of the round trip stops every space resolving.
     /// </para>
     /// <para>
-    /// <b>The fix is not a better matching algorithm.</b> An existing stamp is authoritative and is left
-    /// alone - <c>WorkflowCalculator.Calculate</c> has already stamped it through
+    /// <b>The fix is not a better matching algorithm.</b> A stamp written <i>for the .tbd being exported</i> is
+    /// authoritative and is left alone - <c>WorkflowCalculator.Calculate</c> has already written it through
     /// <c>SAM.Analytical.Tas.Modify.UpdateIds</c>, which prefers the captured guid and only falls back to a
-    /// name. The name match survives solely for the model that never went through the workflow (see
-    /// <c>Modify.Simulate</c>'s own note), and there it refuses an ambiguous name rather than guessing, which
-    /// is the rule <c>Query.ResolvedZone</c> already states for the same decision.
+    /// name. The name match is what the model that did not go through the workflow needs, and there it
+    /// refuses an ambiguous name rather than guessing, which is the rule <c>Query.ResolvedZone</c> already
+    /// states for the same decision.
+    /// </para>
+    /// <para>
+    /// <b>"Authoritative" is about the run, not the stamp</b> - and getting that wrong was a third defect,
+    /// found in review. On the Simulate-unticked path the .tbd is minted fresh by <c>Tas.Convert.ToTBD</c>, so
+    /// a stamp the model was already carrying names a zone in an <i>earlier</i> file and can identify nothing
+    /// in this one; leaving it alone exported a DomOv document whose GUIDs the TAS tool cannot find in the TBD
+    /// beside it. The mode flag is therefore the caller's <c>workflowCompleted</c>, and the tests below assert
+    /// both modes on the same inputs: a stale stamp is replaced or discarded, a workflow stamp is untouched,
+    /// and <b>ambiguity is refused in both</b>.
     /// </para>
     /// <para>
     /// <b>Why the fill-only seam is kept - stated correctly.</b> An earlier justification claimed
@@ -94,7 +103,8 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Stamped("Bedroom 2", zoneGuid_Flat3_Bedroom2),
             ];
 
-            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, out List<string> notes);
+            //true: these stamps were written by the workflow that wrote the .tbd being re-read.
+            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, true, out List<string> notes);
 
             Assert.Empty(written);
 
@@ -116,7 +126,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             List<Space> spaces_Design = [Stamped("Kitchen", zoneGuid_Flat1_Bedroom2)];
             List<Space> spaces_Simulation = [Stamped("Kitchen", zoneGuid_Flat1_Bedroom2)];
 
-            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, out List<string> _);
+            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, true, out List<string> _);
 
             Assert.Empty(written);
             Assert.Equal(zoneGuid_Flat1_Bedroom2, ZoneGuid(spaces_Design[0]));
@@ -132,7 +142,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             List<Space> spaces_Design = [new Space("Kitchen")];
             List<Space> spaces_Simulation = [Stamped("Kitchen", zoneGuid_Flat1_Bedroom2)];
 
-            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, out List<string> _);
+            //false: no workflow ran, which is the only way a space reaches here unstamped.
+            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, false, out List<string> _);
 
             Assert.Single(written);
             Assert.Equal(zoneGuid_Flat1_Bedroom2, ZoneGuid(spaces_Design[0]));
@@ -153,7 +164,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Stamped("Bedroom 2", zoneGuid_Flat2_Bedroom2),
             ];
 
-            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, out List<string> notes);
+            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, false, out List<string> notes);
 
             Assert.Empty(written);
             Assert.Null(ZoneGuid(spaces_Design[0]));
@@ -170,7 +181,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             List<Space> spaces_Design = [new Space("Store")];
             List<Space> spaces_Simulation = [Stamped("Kitchen", zoneGuid_Flat1_Bedroom2)];
 
-            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, out List<string> notes);
+            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, false, out List<string> notes);
 
             Assert.Empty(written);
             Assert.Contains(notes, x => x != null && x.Contains("Store"));
@@ -264,7 +275,8 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
 
-            List<Space> written = Modify.RestampSimulationZoneIdentity(adjacencyCluster.GetSpaces(), spaces_Simulation, out List<string> _);
+            //false - this helper models the Simulate-unticked DomOv path, where no workflow stamped the model.
+            List<Space> written = Modify.RestampSimulationZoneIdentity(adjacencyCluster.GetSpaces(), spaces_Simulation, false, out List<string> _);
             foreach (Space space_Written in written)
             {
                 adjacencyCluster.AddObject(space_Written);
@@ -314,6 +326,120 @@ namespace SAM.Analytical.UI.WPF.Tests
                     File.Delete(path);
                 }
             }
+        }
+
+        // ------------------------------------------------------------------------------------------------
+        // Stale stamps on the non-workflow export path. Tas.Convert.ToTBD deletes any existing .tbd and mints
+        // new zone guids, so a stamp the model was already carrying names a zone in a file that no longer
+        // exists - and must not be treated as authoritative just because it is present.
+        // ------------------------------------------------------------------------------------------------
+
+        //A zone guid from an earlier .tbd. Not in the file being exported, and never will be: TAS mints a new
+        //one per export - measured, three exports of one fixture gave three disjoint sets of nine.
+        private const string zoneGuid_Stale = "{6F1B0F2E-0000-4000-8000-00000000DEAD}";
+
+        /// <summary>
+        /// <b>The same inputs in both modes, side by side.</b> This is the distinction the whole flag exists
+        /// for: whether a stamp is authoritative is a fact about the run that produced the .tbd, not about the
+        /// stamp being present.
+        /// </summary>
+        [Fact]
+        public void AStampIsAuthoritativeOnlyWhenTheWorkflowWroteTheTbdBeingExported()
+        {
+            //Workflow path: the stamp is UpdateIds' own, for this .tbd. Untouched, even though the name match
+            //would resolve.
+            List<Space> spaces_Design_Workflow = [Stamped("Kitchen", zoneGuid_Stale)];
+            List<Space> written_Workflow = Modify.RestampSimulationZoneIdentity(spaces_Design_Workflow, [Stamped("Kitchen", zoneGuid_Flat1_Bedroom2)], true, out List<string> _);
+
+            Assert.Empty(written_Workflow);
+            Assert.Equal(zoneGuid_Stale, ZoneGuid(spaces_Design_Workflow[0]));
+
+            //Non-workflow path: byte-identical input, and now the stamp is an earlier .tbd's and is replaced by
+            //the zone of the file actually being exported.
+            List<Space> spaces_Design_NoWorkflow = [Stamped("Kitchen", zoneGuid_Stale)];
+            List<Space> written_NoWorkflow = Modify.RestampSimulationZoneIdentity(spaces_Design_NoWorkflow, [Stamped("Kitchen", zoneGuid_Flat1_Bedroom2)], false, out List<string> _);
+
+            Assert.Single(written_NoWorkflow);
+            Assert.Equal(zoneGuid_Flat1_Bedroom2, ZoneGuid(spaces_Design_NoWorkflow[0]));
+        }
+
+        /// <summary>
+        /// <b>The duplicate-name refusal is not relaxed by the stale-stamp handling.</b> Three flats, one
+        /// "Bedroom 2" each, all carrying stale stamps: the name cannot tell them apart, so none of them is
+        /// given one of the three candidates. The stale stamps are discarded rather than exported, because
+        /// they name zones this TBD does not contain - absent is reportable, wrong is not.
+        /// </summary>
+        [Fact]
+        public void StaleStamps_WithAmbiguousNames_AreDiscardedAndNeverCollapsed()
+        {
+            List<Space> spaces_Design =
+            [
+                Stamped("Bedroom 2", zoneGuid_Stale),
+                Stamped("Bedroom 2", zoneGuid_Stale),
+                Stamped("Bedroom 2", zoneGuid_Stale),
+            ];
+
+            List<Space> spaces_Simulation =
+            [
+                Stamped("Bedroom 2", zoneGuid_Flat1_Bedroom2),
+                Stamped("Bedroom 2", zoneGuid_Flat2_Bedroom2),
+                Stamped("Bedroom 2", zoneGuid_Flat3_Bedroom2),
+            ];
+
+            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, false, out List<string> notes);
+
+            //All three changed - by having the stale stamp removed, not by being given a guess.
+            Assert.Equal(3, written.Count);
+
+            Assert.Null(ZoneGuid(spaces_Design[0]));
+            Assert.Null(ZoneGuid(spaces_Design[1]));
+            Assert.Null(ZoneGuid(spaces_Design[2]));
+
+            //And none of them took any of the three candidates.
+            Assert.DoesNotContain(spaces_Design, x => ZoneGuid(x) == zoneGuid_Flat1_Bedroom2);
+
+            Assert.Equal(3, notes.Count);
+            Assert.All(notes, x => Assert.Contains("discarded", x));
+        }
+
+        /// <summary>
+        /// A stale stamp on a space the exported TBD does not contain at all is discarded and reported. It
+        /// cannot be replaced - there is nothing to replace it from - and keeping it would export an identity
+        /// for a room that is not in the file.
+        /// </summary>
+        [Fact]
+        public void AStaleStamp_WithNoCounterpart_IsDiscardedAndReported()
+        {
+            List<Space> spaces_Design = [Stamped("Store", zoneGuid_Stale)];
+
+            List<Space> written = Modify.RestampSimulationZoneIdentity(spaces_Design, [Stamped("Kitchen", zoneGuid_Flat1_Bedroom2)], false, out List<string> notes);
+
+            Assert.Single(written);
+            Assert.Null(ZoneGuid(spaces_Design[0]));
+
+            Assert.Contains(notes, x => x != null && x.Contains("Store") && x.Contains("discarded"));
+        }
+
+        /// <summary>
+        /// <b>The defect as the TAS tool sees it.</b> The exported DomOv document must name a zone of the TBD
+        /// written beside it, not one from the run before. Before the fix this exported
+        /// <c>zoneGuid_Stale</c> - a GUID matching nothing in the TBD, in a document reporting success.
+        /// </summary>
+        [Fact]
+        public void TheDomOvXmlNamesTheExportedTbdsZone_NotAStaleStamp()
+        {
+            Space space_Design = Room("Bedroom 2");
+            space_Design.SetValue(Analytical.Tas.SpaceParameter.ZoneGuid, zoneGuid_Stale);
+
+            AnalyticalModel analyticalModel = Model(space_Design);
+
+            //Control: the stale stamp is what would be exported if it were left alone.
+            Assert.Equal(GuidElement(Guid.Parse(zoneGuid_Stale)), ExportedGuidElement(analyticalModel));
+
+            //The newly written .tbd, read back - its zone is zoneGuid_Flat1_Bedroom2.
+            analyticalModel = Filled(analyticalModel, [Stamped("Bedroom 2", zoneGuid_Flat1_Bedroom2)]);
+
+            Assert.Equal(GuidElement(Guid.Parse(zoneGuid_Flat1_Bedroom2)), ExportedGuidElement(analyticalModel));
         }
     }
 }

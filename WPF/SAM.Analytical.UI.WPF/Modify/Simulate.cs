@@ -408,15 +408,24 @@ namespace SAM.Analytical.UI.WPF
                         {
                             AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
 
-                            // Fills in a TAS zone identity for any space that has none, and leaves every space
-                            // that already has one exactly as the workflow stamped it. This used to match by
-                            // NAME for every space and overwrite unconditionally, which discarded the strong
-                            // identity Modify.UpdateIds had just written and collapsed same-named rooms in
-                            // different dwellings onto one zone - see Modify.RestampSimulationZoneIdentity for
-                            // both defects, and for why the name fallback is still needed by the
-                            // Simulate-unticked DomOv path (only that one: SAP is handed analyticalModel_TBD,
-                            // which Tas.Convert.ToSAM stamps itself, and Part L reads no ZoneGuid).
-                            List<Space> spaces_Restamped = Modify.RestampSimulationZoneIdentity(adjacencyCluster.GetSpaces(), analyticalModel_TBD.AdjacencyCluster?.GetSpaces(), out List<string> notes_ZoneIdentity);
+                            // Makes every space's TAS zone identity describe the .tbd about to be exported.
+                            // This used to match by NAME for every space and overwrite unconditionally, which
+                            // discarded the strong identity Modify.UpdateIds had just written and collapsed
+                            // same-named rooms in different dwellings onto one zone - see
+                            // Modify.RestampSimulationZoneIdentity for both defects, and for why this seam is
+                            // needed by the Simulate-unticked DomOv path (only that one: SAP is handed
+                            // analyticalModel_TBD, which Tas.Convert.ToSAM stamps itself, and Part L reads no
+                            // ZoneGuid).
+                            //
+                            // workflowCompleted is the whole discriminator, and it is the authoritative one.
+                            // TRUE: WorkflowCalculator wrote path_TBD and stamped this model against it, so the
+                            // stamps already here name zones in the file being re-read - authoritative, current,
+                            // left alone. FALSE: Tas.Convert.ToTBD wrote path_TBD above, deleting whatever was
+                            // there and minting new zone guids, so any stamp this model carries belongs to an
+                            // earlier .tbd and names nothing in this one - it is replaced from an unambiguous
+                            // name match and discarded where there is none. Passing the wrong value here
+                            // exports either a stale identity or a weak one.
+                            List<Space> spaces_Restamped = Modify.RestampSimulationZoneIdentity(adjacencyCluster.GetSpaces(), analyticalModel_TBD.AdjacencyCluster?.GetSpaces(), workflowCompleted, out List<string> notes_ZoneIdentity);
 
                             foreach (Space space_Restamped in spaces_Restamped)
                             {

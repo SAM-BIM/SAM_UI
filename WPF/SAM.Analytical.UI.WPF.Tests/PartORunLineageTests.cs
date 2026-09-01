@@ -306,11 +306,108 @@ namespace SAM.Analytical.UI.WPF.Tests
 
                 Assert.False(partORun.IsAssessable(out string refusal));
                 Assert.Contains("rewritten", refusal);
+
+                //And the run is DROPPED, not merely refused. Left in WorkflowCompleted, CanAssess stays true
+                //and the ribbon re-enables the command with its success tooltip as soon as the refusal dialog
+                //closes - offering a click that is known to fail, indefinitely.
+                Assert.Equal(PartORunState.None, partORun.State);
+                Assert.False(partORun.CanAssess);
+                Assert.Null(partORun.AnalyticalModel_Assessment);
+                Assert.Null(partORun.Path_TSD);
+
+                //The reason survives for the tooltip, and says which file and why.
+                Assert.Contains("rewritten", partORun.InvalidationReason);
             }
             finally
             {
                 File.Delete(path_TSD);
             }
+        }
+
+        /// <summary>
+        /// The same for results that have been deleted rather than rewritten, and the reason a *deleted* file
+        /// matters here: the ribbon's tooltip has to explain an unavailable command, so the run must carry the
+        /// explanation rather than simply stop working.
+        /// </summary>
+        [Fact]
+        public void ResultsDeletedAfterTheRun_DropTheRunWithAReason()
+        {
+            string path_TSD = TemporaryTsd();
+
+            PartORun partORun = new();
+            partORun.Prepare(Model("prepared"), Scenarios());
+            Assert.True(CompleteThroughAFullYearWorkflow(partORun, Model("workflow"), path_TSD, out string _));
+
+            File.Delete(path_TSD);
+
+            Assert.False(partORun.IsAssessable(out string refusal));
+            Assert.Contains("no longer at", refusal);
+
+            Assert.Equal(PartORunState.None, partORun.State);
+            Assert.False(partORun.CanAssess);
+            Assert.Contains("no longer at", partORun.InvalidationReason);
+
+            //The ribbon expression: disabled, and the tooltip is the reason rather than the generic prompt.
+            Assert.Equal(partORun.InvalidationReason, ToolTipDescription(partORun));
+        }
+
+        /// <summary>
+        /// A run whose results are intact is not dropped by being asked about - repeatedly. `IsAssessable` is
+        /// called by the command on every click and this must stay a query for the healthy case.
+        /// </summary>
+        [Fact]
+        public void AHealthyCompletedRun_SurvivesBeingCheckedRepeatedly()
+        {
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun, Model("workflow"), path_TSD, out string _));
+
+                for (int i = 0; i < 3; i++)
+                {
+                    Assert.True(partORun.IsAssessable(out string _));
+                    Assert.Equal(PartORunState.WorkflowCompleted, partORun.State);
+                    Assert.True(partORun.CanAssess);
+                }
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// A prepared run is not dropped by being asked either - only the two results checks drop anything, and
+        /// a run waiting for its simulation has no results to check.
+        /// </summary>
+        [Fact]
+        public void APreparedRun_IsNotDroppedByBeingChecked()
+        {
+            PartORun partORun = new();
+            partORun.Prepare(Model("prepared"), Scenarios());
+
+            Assert.False(partORun.IsAssessable(out string refusal));
+            Assert.Contains("not been simulated", refusal);
+
+            Assert.Equal(PartORunState.Prepared, partORun.State);
+            Assert.NotNull(partORun.AnalyticalModel_Prepared);
+            Assert.Null(partORun.InvalidationReason);
+        }
+
+        /// <summary>
+        /// The expression <c>AnalyticalWindow.RefreshPartOButtons</c> evaluates for the assessment button's
+        /// tooltip, reproduced so what the user is told about an unavailable command is assertable.
+        /// </summary>
+        private static string ToolTipDescription(PartORun partORun)
+        {
+            return partORun.CanAssess
+                ? "Assess the completed Part O run against the CIBSE TM59 criteria, using the model the TAS workflow returned."
+                : partORun.State == PartORunState.Prepared
+                    ? "A Part O iteration is prepared but not simulated. Run the energy simulation first."
+                    : partORun.InvalidationReason ?? "Prepare a Part O iteration and run the energy simulation first.";
         }
 
         /// <summary>

@@ -3,19 +3,20 @@
 ## Branch
 `feature/parto-iteration2-ui-orchestration`, branched from `sow/2026-Q3` at **`43564e6`**
 (the merge of PR #75). Pushed; **PR #76** open against `sow/2026-Q3`, not merged. First push `1437d88`
-passed both checks (build 8m13s, spdx 9s); two P1 review findings have since been fixed on the same PR -
-see "Review findings addressed" below.
+passed both checks (build 8m13s, spdx 9s), and `f502586` passed both again. Four review findings over two
+rounds have since been fixed on the same PR - see "Review findings addressed" below.
 
 ## Last updated
 2026-09-01
 
 ## Current status
 Approved Document O Iteration 1a / 1b / 2 orchestration implemented in SAM_UI, plus the fix to the
-pre-existing zone-identity corruption in `Modify.Simulate`. Builds clean; all **227** tests in
-`WPF/SAM.Analytical.UI.WPF.Tests` pass (187 baseline + 40 new). Final review done, and the
+pre-existing zone-identity corruption in `Modify.Simulate`. Builds clean; all **234** tests in
+`WPF/SAM.Analytical.UI.WPF.Tests` pass (187 baseline + 47 new). Final review done, and the
 zone-identity justification corrected (see BLOCKER 1) - the exporter does not refuse an unstamped
-space, it silently exports the wrong identity, and the two new tests pin that. Both P1 review findings
-on PR #76 are fixed (see "Review findings addressed"). Awaiting review; not merged.
+space, it silently exports the wrong identity, and the two new tests pin that. **All four review findings
+on PR #76 are fixed** - two P1 on the first push, one P1 + one P2 on the second (see "Review findings
+addressed"). Awaiting review; not merged.
 
 ## Integration state
 All sibling repos are on `sow/2026-Q3` at the heads this work was written against, and **none of them
@@ -60,7 +61,10 @@ What makes the seam necessary is that the fallback value is the wrong identity:
   `updateGuids: true`, but `AnalyticalModel.AdjacencyCluster`
   (`SAM/SAM.Analytical/Classes/AnalyticalModel.cs:179-186`) returns `new AdjacencyCluster(...)` - a copy -
   so the zone guids `Tas.Modify.Update` stamps land on a throwaway cluster and never reach the model
-  `Modify.Simulate` holds. The model reaches the export **unstamped**.
+  `Modify.Simulate` holds. Nothing on that path stamps the model, so it reaches the export either
+  unstamped or - if it was saved after an earlier simulation - carrying a *stale* stamp. **Measured on the
+  acceptance fixture: `SAM_zoningAM.sam` carries nine saved stamps with zero overlap with the zones of the
+  `.tbd` the export writes.** See round 2's P1 under "Review findings addressed".
 - A SAM `space.Guid` is not a TAS zone guid. A TBD zone's guid is minted by `building.AddZone()`
   (`SAM.Analytical.Tas/Modify/Update.cs:577`) and bears no relation to the space it was written from, so
   the two values differ by construction.
@@ -87,9 +91,12 @@ Per the brief, the *removal* was stopped and the (now correctly stated) dependen
 **What was done instead** - new internal seam `Modify.RestampSimulationZoneIdentity`, and no new matching
 algorithm:
 
-- a space that already carries a `ZoneGuid` is **left untouched** (the workflow's stamp is authoritative);
-- the name fallback applies only to **unstamped** spaces, i.e. exactly the non-workflow path that depends
-  on it;
+- a space carrying a `ZoneGuid` **written for the `.tbd` being exported** is left untouched (the
+  workflow's stamp is authoritative *and* current). Whether that is so is the caller's
+  `workflowCompleted`, passed in as `stampsWrittenForThisTBD` - see round 2's P1 below, which corrected an
+  earlier version of this rule that trusted any stamp;
+- on the non-workflow path every space is re-derived from the newly read `.tbd`: an unambiguous name match
+  replaces the stamp, anything less discards it with a note;
 - an ambiguous name **refuses with a reason** instead of taking the first hit. Two simulated spaces
   stating the *same* guid are one answer, not a conflict (the rule `VentilationStrategyMap` already
   applies to a repeated claim);
@@ -191,6 +198,9 @@ computed or reformatted in WPF.
 
 ## Review findings addressed (PR #76, 2026-09-01)
 
+Four findings over two review rounds. Round 1: two P1 on the completion predicate and the results file.
+Round 2: one P1 on stale stamps and one P2 on the assessment gate.
+
 Two P1 findings on the first push (`1437d88`), both accepted and both about the same invariant: what
 `PartORunState.WorkflowCompleted` is allowed to mean. Restated at the top of `PartORun`'s own
 documentation - **"this prepared run produced the full-year results being assessed"**, never "a TSD
@@ -239,6 +249,54 @@ Ten regressions added to `PartORunLineageTests` (11 -> 21), and every successful
 now goes through a `CompleteThroughAFullYearWorkflow` helper that performs the production
 arm -> write -> complete sequence, so a test cannot pass by calling `Complete` the way no caller does.
 
+### Round 2, P1 - a stamp is authoritative only if the current run wrote it
+
+`RestampSimulationZoneIdentity` treated **any** present `ZoneGuid` as authoritative. On the workflow path
+that is right. On the Simulate-unticked DomOv path it is wrong: `Tas.Convert.ToTBD` deletes any existing
+`.tbd` and mints new zone guids, so a stamp the model was already carrying names a zone in an *earlier*
+file. The early exit preserved it and `Tas.TM59.Convert.ToXml` then exported GUIDs from the previous TBD,
+which the TAS tool cannot associate with the TBD beside them.
+
+**Not hypothetical, and not rare.** The acceptance fixture itself carries nine saved stamps, spelled
+unbraced/lower-case (the fingerprint of the old `Guid` round trip), with **zero overlap** with the zones of
+the `.tbd` the export writes.
+
+The fix is a mode, because "is this stamp current?" is a fact about the run and not about the stamp:
+
+```csharp
+RestampSimulationZoneIdentity(spaces_Design, spaces_Simulation, workflowCompleted, out notes)
+```
+
+- `true` - `WorkflowCalculator` wrote `path_TBD` and stamped this model against it. Existing stamps are
+  authoritative and current: **untouched**, fill only where absent. Unchanged from before.
+- `false` - no workflow ran, so every space is re-derived from the newly read `.tbd`. An unambiguous name
+  match **replaces** the stamp; anything less **discards** it with a note.
+
+**The duplicate-name fix is intact.** Ambiguity is refused in both modes - the mode decides whether a
+*stale* stamp survives, never whether a name may be guessed at. Three flats each with a "Bedroom 2" are
+still refused, and on the non-workflow path their stale stamps are dropped rather than exported.
+
+**Discarding, not keeping, an unreplaceable stale stamp** follows `Tas.Modify.UpdateIds`'s own rule: it
+clears every stamp before re-resolving, so a failed resolution leaves the space unstamped. Absent beats
+wrong - every consumer already handles and reports absent (`Query.ResolvedZone` falls back to the name,
+`SimulationSpaceKey` reads null, the DomOv exporter falls back to `space.Guid` and the note says so),
+whereas a stamp naming a zone in a discarded `.tbd` looks exactly like a good one.
+
+### Round 2, P2 - a completed run whose results have gone is dropped, not just refused
+
+`IsAssessable` refused the click but left `State` at `WorkflowCompleted`, so `RefreshPartOButtons`
+re-enabled the button with the success tooltip as soon as the dialog closed - offering a click known to
+fail, indefinitely.
+
+`IsAssessable`'s two results checks now `Invalidate` the run with their own reason. The state check does
+**not**: a `Prepared` run is live and waiting for its simulation, and `None` has already been explained.
+So one click gives a dialog, a disabled button, and the exact reason in the tooltip.
+
+`CanAssess` stays a pure state read - a property the ribbon evaluates on every refresh must not touch the
+filesystem, and must not drop a run as a side effect of being looked at. The command reads `IsAssessable`,
+which is the real gate. The window between the file changing and the next click is unavoidable without
+polling, and the command re-checks at click time by design.
+
 ## Decisions / assumptions
 - `PartORun` holds model + scenarios directly rather than a `PartOIterationPreparation`, because that
   type's setters are `internal` to `SAM.Analytical` and so could not be constructed by a test. The
@@ -276,15 +334,15 @@ Added:
 - `WPF/SAM.Analytical.UI.WPF/Windows/PartOIterationWindow.xaml{,.cs}`
 - `WPF/SAM.Analytical.UI.WPF/Windows/PartOPreparationWindow.xaml{,.cs}`
 - `WPF/SAM.Analytical.UI.WPF/Windows/PartOTM59ResultWindow.xaml{,.cs}`
-- `WPF/SAM.Analytical.UI.WPF.Tests/SimulationZoneIdentityTests.cs` (7)
-- `WPF/SAM.Analytical.UI.WPF.Tests/PartORunLineageTests.cs` (21)
+- `WPF/SAM.Analytical.UI.WPF.Tests/SimulationZoneIdentityTests.cs` (11)
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartORunLineageTests.cs` (24)
 - `WPF/SAM.Analytical.UI.WPF.Tests/PartOPresentationTests.cs` (12)
 
 ## Validation
 - `dotnet build SAM_UI.sln -c Debug` - succeeded, 0 errors (the pre-existing MSB3245/MSB3270 warnings for
   `System.Data.DataSetExtensions`, `Microsoft.CSharp`, `PresentationFramework.Aero2` and the Interop
   architecture mismatch are unchanged).
-- `dotnet test WPF/SAM.Analytical.UI.WPF.Tests` - **Passed 227, Failed 0, Skipped 0** (187 baseline + 40).
+- `dotnet test WPF/SAM.Analytical.UI.WPF.Tests` - **Passed 234, Failed 0, Skipped 0** (187 baseline + 47).
 - BLOCKER 1's regression was written first and confirmed red (5 x CS0117, missing seam) before the fix.
 - Two genuine defects in this work were caught by its own tests and fixed:
   1. `PartOIterationWindow` reported unmarked zones as out of scope even where `PartFDwellingZones` had

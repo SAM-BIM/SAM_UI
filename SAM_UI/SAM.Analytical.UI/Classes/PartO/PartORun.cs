@@ -116,7 +116,15 @@ namespace SAM.Analytical.UI
         /// <summary>The TSD the completed workflow wrote. Null outside <see cref="PartORunState.WorkflowCompleted"/>.</summary>
         public string Path_TSD => State == PartORunState.WorkflowCompleted ? path_TSD : null;
 
-        /// <summary>Whether an assessment may run. The single gate the ribbon and the command both read.</summary>
+        /// <summary>
+        /// Whether this run has results at all - what the ribbon enables on.
+        /// <para>
+        /// A pure state read, evaluated on every ribbon refresh, so it deliberately does not touch the
+        /// filesystem. <see cref="IsAssessable"/> is the real gate and the command reads that one; a completed
+        /// run whose results have since gone is dropped there, which turns this false and puts the reason in
+        /// <see cref="InvalidationReason"/> for the tooltip.
+        /// </para>
+        /// </summary>
         public bool CanAssess => State == PartORunState.WorkflowCompleted;
 
         /// <summary>
@@ -366,6 +374,20 @@ namespace SAM.Analytical.UI
         /// - another SAM session, a rerun from outside this window - can have replaced it since. A result read
         /// from a file this run did not write would be attributed to this run's scenarios.
         /// </para>
+        /// <para>
+        /// <b>A completed run that fails that check is dropped here, not merely refused.</b> Otherwise
+        /// <see cref="State"/> stays <see cref="PartORunState.WorkflowCompleted"/>, <see cref="CanAssess"/>
+        /// stays true, and the ribbon re-enables the command with its success tooltip the moment the refusal
+        /// dialog is dismissed - offering a click that is known to fail, over and over. It is also what the
+        /// invariant requires: the state means "this run produced the full-year results being assessed", and a
+        /// deleted or rewritten file is no longer those results. Same rule as everywhere else in this type -
+        /// staleness is rejected, not carried.
+        /// </para>
+        /// <para>
+        /// Deliberately <b>not</b> read by <see cref="CanAssess"/>, which stays a pure state read: a property
+        /// the ribbon evaluates on every refresh must not touch the filesystem, and must not drop a run as a
+        /// side effect of being looked at.
+        /// </para>
         /// </summary>
         public bool IsAssessable(out string refusal)
         {
@@ -373,6 +395,8 @@ namespace SAM.Analytical.UI
 
             if (State != PartORunState.WorkflowCompleted)
             {
+                //NOT invalidated: Prepared is a live run waiting for its simulation, and None has already been
+                //explained. Only the two results checks below drop anything.
                 refusal = State == PartORunState.Prepared
                     ? "The Part O iteration is prepared but has not been simulated, so there are no results to assess. Run the TAS simulation first."
                     : "No Part O run is available to assess. " + (InvalidationReason ?? "Prepare an iteration and run the TAS simulation.");
@@ -382,7 +406,9 @@ namespace SAM.Analytical.UI
 
             if (!File.Exists(path_TSD))
             {
-                refusal = string.Format("The simulation results this run produced are no longer at '{0}'.", path_TSD);
+                refusal = string.Format("The simulation results this run produced are no longer at '{0}'. Prepare the iteration again and re-run the simulation.", path_TSD);
+
+                Invalidate(refusal);
 
                 return false;
             }
@@ -390,6 +416,8 @@ namespace SAM.Analytical.UI
             if (File.GetLastWriteTimeUtc(path_TSD) != dateTime_TSD)
             {
                 refusal = string.Format("The simulation results at '{0}' have been rewritten since this Part O run produced them, so they are no longer the results this run's overheating scenarios describe. Prepare the iteration again and re-run the simulation.", path_TSD);
+
+                Invalidate(refusal);
 
                 return false;
             }
