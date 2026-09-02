@@ -384,7 +384,10 @@ namespace SAM.Analytical.UI.WPF
                 // the file behind it is there. A sizing-only run writes none, and is correctly not completable.
                 string path_TSD = System.IO.Path.ChangeExtension(path_TBD, "tsd");
 
-                if (!partORun.Complete(analyticalModel, path_TSD, out string refusal_PartORun))
+                // WITH the case that just ran. Completing without it leaves PartORun.SimulationContext
+                // null, which Modify.CanOptimise refuses - so every baseline produced through this window
+                // would be rejected by the Optimise command with no way for a user to tell why.
+                if (!partORun.Complete(analyticalModel, path_TSD, partOSimulationContext, out string refusal_PartORun))
                 {
                     MessageBox.Show(string.Format("The Part O run was not completed, so its TM59 assessment is not available.\n\n{0}", refusal_PartORun));
                 }

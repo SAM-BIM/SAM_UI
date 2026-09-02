@@ -1,31 +1,138 @@
 # Project Progress
 
 ## Branch
-`feature/parto-iteration2-ui-orchestration`, branched from `sow/2026-Q3` at **`43564e6`**
-(the merge of PR #75). Pushed; **PR #76** open against `sow/2026-Q3`, not merged. First push `1437d88`
-passed both checks (build 8m13s, spdx 9s), and `f502586` passed both again. Four review findings over two
-rounds have since been fixed on the same PR - see "Review findings addressed" below.
+`feature/parto-iteration2b-automatic-optimisation`, branched from `sow/2026-Q3` at **`1e9a0a1`**
+(the merge of PR #76). Pushed; **PR #77** open against `sow/2026-Q3`, **not merged**.
+
+**Depends on `SAM-BIM/SAM` PR #88** (`feature/parto-iteration2b-design-airflow-round`), which adds the
+deterministic multi-target design airflow round this orchestrates. **SAM #88 must merge first** - until it
+does, the `Build (Windows)` check here fails with `CS0246: DesignAirFlowTargetRefusal could not be found`,
+because `.github/workflows/build.yml` clones sibling repos by head-branch name, then the `sow/*` base, and
+the two branches are not identically named, so it falls back to `sow/2026-Q3` which does not yet carry the
+new types. `spdx` passes. Locally, built against the SAM feature branch, both solutions build clean.
+
+Everything below "Completed" is history from PR #76 (Iteration 1a / 1b / 2 orchestration), retained for
+context.
 
 ## Last updated
-2026-09-01
+2026-09-02 - Approved Document O **Iteration 2B** automatic optimisation implemented and accepted on a
+licensed future-weather TAS run. Five Codex findings fixed across two review rounds.
 
 ## Current status
-Approved Document O Iteration 1a / 1b / 2 orchestration implemented in SAM_UI, plus the fix to the
-pre-existing zone-identity corruption in `Modify.Simulate`. Builds clean; all **234** tests in
-`WPF/SAM.Analytical.UI.WPF.Tests` pass (187 baseline + 47 new). Final review done, and the
-zone-identity justification corrected (see BLOCKER 1) - the exporter does not refuse an unstamped
-space, it silently exports the wrong identity, and the two new tests pin that. **All four review findings
-on PR #76 are fixed** - two P1 on the first push, one P1 + one P2 on the second (see "Review findings
-addressed"). Awaiting review; not merged.
+Iteration 2B is implemented end to end in SAM_UI and accepted on the licensed future-weather fixture.
+From a completed Iteration 2 run it raises the design airflow of every eligible failing mechanically
+ventilated room by a fixed step, rebalances through the new SAM round, rebuilds the Part O state,
+re-simulates the **same** weather case under its own project name, reassesses with production TM59, and
+repeats until an explicit stop reason is reached.
+
+Builds clean; **264** tests in `WPF/SAM.Analytical.UI.WPF.Tests` pass (237 baseline + 27 new). Awaiting
+review; not merged.
 
 ## Integration state
-All sibling repos are on `sow/2026-Q3` at the heads this work was written against, and **none of them
-was changed**:
+Sibling repos, and what changed:
 
-- `SAM` @ `46e450f7` - Iterations 1a/1b/2 licensed acceptance (PR #85).
-- `SAM_Systems` @ `fea5055` - Nuaire `MRXBOXAB-ECO5-AECV + MR-ECO-COOL-V`, 150/150 l/s maximum (PR #18).
-- `SAM_Tas_Grasshopper` @ `01508b8`.
-- `SAM_Tas` @ `78f7afb`.
+- `SAM` @ `sow/2026-Q3` `0ae4b929` + **PR #88** - the new `Modify.EvaluateTargetedDesignAirFlows` round.
+  **This is a required companion change.**
+- `SAM_Systems` @ `fea5055` - **unchanged**. Nuaire `MRXBOXAB-ECO5-AECV + MR-ECO-COOL-V`, 150/150 l/s.
+- `SAM_Tas` @ `78f7afb` - **unchanged**.
+
+## Latest (2026-09-02): Iteration 2B automatic optimisation
+
+### What was built
+
+- `PartOOptimisationSettings` - the fixed step (5 l/s default) and the mandatory iteration guard.
+- `PartOPreparationContext` / `PartOSimulationContext`, both carried on `PartORun` - how the run was
+  prepared and which TAS case produced it, so a round repeats **both** rather than re-asking. Cleared when
+  a run is dropped.
+- `Modify.RunPartOSimulation` - `Simulate`'s TAS pipeline, extracted so the optimiser repeats the exact
+  same case under its own project name (and therefore its own TBD/TSD) without a second copy existing to
+  drift. `Simulate` now calls it.
+- `PartOTM59Assessment` - the assessment sequence, extracted for the same reason, and resolving every
+  result to its **design** space by identity through `SimulationSpaceMap`.
+- `Query.PartOOptimisationTargets` - the target policy: production TM59 mechanical failures, inside the
+  Part O dwelling scope, supply/extract/both-means-supply, and an explicit *not automatically optimisable*
+  record where a room has no design terminal. Scope excludes the corridor and the AHU simulation zones
+  **by scope, not by name**.
+- `Modify.OptimisePartOTM59` - the loop. Each round is a complete `PartORun` lifecycle, so every PR #76
+  guarantee holds rather than being worked around.
+- `PartOOptimisationRun` / `PartOOptimisationStep` / `PartOOptimisationStopReason` - the history, with the
+  baseline as run 0.
+- UI: the 2B tick with step and iteration limit on the preparation window (**not** in the base-provision
+  dropdown), an *Optimise (2B)* ribbon button, and a results window with both histories.
+
+### Two settled judgement calls
+
+1. **Per-dwelling capacity.** A dwelling whose selected unit refuses a round leaves the optimisation and
+   its last valid design is preserved; independently served dwellings continue. No partial or clamped step
+   is ever adopted for the blocked dwelling.
+2. **Run 0 keeps the Iteration 2 workflow's own TSD** rather than being re-simulated as `-Opt00.tsd`. It
+   retains its original TSD, weather and workflow identity in the history.
+
+### Equipment is fixed for the whole optimisation
+
+The re-preparation is given **no catalogue**. `PreparePartOIteration` with one re-runs smallest-capable
+selection against the realized duty, so every round the design grew it would quietly buy the next product
+up and capacity would keep moving. With null it reuses the existing system and unit through their design
+terminals, so the Iteration 2 selection survives. The catalogue is still used - by the round, to read what
+the selected product is rated at.
+
+### Licensed acceptance - ACCEPTED
+
+`SAM_zoningAM-CIBSEfutureZ1.sam`, weather `Z1_DSY1_2050s_HIGH90_CIBSE_v1.1`, 12 full-year TAS runs, 13 min.
+
+- Iteration 2 Run 0 reproduces the Iteration 1a baseline **exactly**; product selection caused **no**
+  thermal change (8 results identical, 0 different).
+- Round 1 produced the intended targets: Flat 1 Studio 1_0 supply 30->35 and Bathroom_2 extract 8->13 with
+  **no** derived change (they balance directly); Flats 2 and 3 two extract targets each deriving
+  Bedroom 2_3 / 2_6 supply 63->**73**.
+- TM59 improved monotonically every round (Bathroom_2 731->375, Ensuite_8 677->331, Studio 1_0 388->361).
+  Passing rooms were never targeted.
+- MVHR-02/03 reached 143/143 l/s (7 l/s headroom) by round 8; at round 9 the round would have designed
+  153/153 against 150/150 and was **refused**, those flats left the optimisation, and Flat 1 continued
+  alone to 80/80. Product `Kept` on every row, never `Reselected`.
+- Final stop `IterationLimitReached` at the guard of 10, last valid design = run 10.
+
+### Review findings addressed (Codex, PR #77)
+
+Round 1 (`dd6b24a`):
+1. **P1** - a round whose assessment failed left `PartORun` in `WorkflowCompleted` holding that round's
+   model and TSD while the previous design was restored. Now invalidated, and the command arms
+   `ExpectModification` only where the run holds the very model being adopted.
+2. **P2** - 2B was offered on the natural-ventilation route. Now gated on the selected option's
+   ventilation mode and refreshed when the base provision changes.
+3. **P2** - the airflow history began at run 1. Baseline rows are now synthesised from each room's first
+   adjustment plus the baseline step's own production verdict.
+
+Round 2:
+4. **P1** - `Simulate` built the simulation context and then completed the run through the **context-less**
+   `Complete` overload, so every baseline produced through the window had a null `SimulationContext` and
+   was refused by `CanOptimise`. The Optimise button could never have started. Fixed; a test pins the
+   invariant.
+5. **P1** - `OccupiedSpaceComplianceStatus != Fail` treated `Undefined` / `NotApplicable` as a pass, so an
+   assessment that reached no verdict would have been reported as every eligible space passing. Only an
+   explicit `Pass` now ends a run as passed; anything else stops as `AssessmentFailed`.
+
+### Validation
+
+- `SAM_UI.sln` builds clean.
+- `WPF/SAM.Analytical.UI.WPF.Tests`: **264 passed, 0 failed** (237 baseline + 27 new).
+- `PartORunLineageTests` + `PartOPresentationTests` + `SimulationZoneIdentityTests`: 47/47 - no lineage
+  regression.
+- SAM side: `SAM.Tests` **1694 passed, 0 failed**.
+
+### Issues / blockers
+
+- `Build (Windows)` on PR #77 fails until SAM #88 merges - see "Branch". Expected, not a defect here.
+- One Codex P2 on SAM #88 was **declined with reasons**: validating terminal quantities across every room
+  of a touched system, not only the rooms a round writes. `ApplyTargetedDesignAirFlow` validates the same
+  narrow set, and widening only the round would make it refuse dwellings a manual edit accepts - the exact
+  drift the shared-helper design prevents. Raised as a separate follow-up against both seams.
+
+### Next step
+
+- Merge `SAM-BIM/SAM` #88 first, then this PR.
+- The parked manual-seam defect (`ApplyTargetedDesignAirFlow` ventilation-unit reselection leaking onto the
+  caller's `AnalyticalModel`) remains untouched and outstanding.
 
 ## Completed
 

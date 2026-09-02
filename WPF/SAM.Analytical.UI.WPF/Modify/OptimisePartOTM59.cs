@@ -110,9 +110,19 @@ namespace SAM.Analytical.UI.WPF
 
             partOOptimisationStep.IsCompleted = true;
 
-            if (partOTM59Assessment.OccupiedSpaceComplianceStatus != TM59ComplianceStatus.Fail)
+            if (partOTM59Assessment.OccupiedSpaceComplianceStatus == TM59ComplianceStatus.Pass)
             {
                 return Stop(result, PartOOptimisationStopReason.Passed, "The Iteration 2 baseline already passes, so no optimisation round was run.", analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
+            }
+
+            if (partOTM59Assessment.OccupiedSpaceComplianceStatus != TM59ComplianceStatus.Fail)
+            {
+                //Neither a pass nor a failure: the assessment produced no occupied-space verdict at all.
+                //There is nothing to optimise towards, and - far more importantly - nothing here may be
+                //reported as passing. "Not Fail" is not "Pass", and treating it as one would have this run
+                //claim every eligible space meets its criteria on the strength of an assessment that
+                //reached no conclusion about any of them.
+                return Stop(result, PartOOptimisationStopReason.AssessmentFailed, NoVerdict(partOTM59Assessment), analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
             }
 
             //Dwellings whose selected unit has already refused a full step. Their rooms stay out of every
@@ -254,9 +264,15 @@ namespace SAM.Analytical.UI.WPF
                 path_TSD_LastValid = partORun.Path_TSD;
                 overheatingScenarios_LastValid = partORun.OverheatingScenarios;
 
-                if (partOTM59Assessment.OccupiedSpaceComplianceStatus != TM59ComplianceStatus.Fail)
+                if (partOTM59Assessment.OccupiedSpaceComplianceStatus == TM59ComplianceStatus.Pass)
                 {
                     return Stop(result, PartOOptimisationStopReason.Passed, null, analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
+                }
+
+                //As at the baseline: only an explicit Pass ends this run as a pass.
+                if (partOTM59Assessment.OccupiedSpaceComplianceStatus != TM59ComplianceStatus.Fail)
+                {
+                    return Stop(result, PartOOptimisationStopReason.AssessmentFailed, NoVerdict(partOTM59Assessment), analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
                 }
             }
 
@@ -394,6 +410,22 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Why a run that produced an assessment stops anyway: it reached no occupied-space verdict.
+        /// <para>
+        /// Said in terms of what the assessment did rather than what the optimisation wanted, because the
+        /// thing an engineer has to fix is upstream - spaces that did not resolve, or a scenario stating a
+        /// strategy no criterion is known for.
+        /// </para>
+        /// </summary>
+        private static string NoVerdict(PartOTM59Assessment partOTM59Assessment)
+        {
+            return string.Format(
+                "The production TM59 assessment reached no occupied-space verdict for this design - its combined status is '{0}', which is neither a pass nor a failure - so there is nothing to optimise towards and nothing that may be reported as passing.{1}",
+                Core.Query.Description(partOTM59Assessment.OccupiedSpaceComplianceStatus),
+                partOTM59Assessment.AssociationRefusals.Count == 0 ? string.Empty : string.Format(" {0} space(s) produced no result; see the notes.", partOTM59Assessment.AssociationRefusals.Count));
         }
 
         /// <summary>The baseline step - iteration 0, no targets, its own results and its own assessment.</summary>

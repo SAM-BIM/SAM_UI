@@ -283,6 +283,38 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Contains("full-year", refusal);
         }
 
+        /// <summary>
+        /// A run completed <b>without</b> its TAS case recorded cannot start an optimisation - there is
+        /// nothing to rerun the same weather from.
+        /// <para>
+        /// This is the shape of a real defect: <c>Modify.Simulate</c> built the context and then completed
+        /// the run through the context-less overload, so every baseline produced through the window was
+        /// refused here with no way for a user to tell why. The command now completes with the case it
+        /// actually ran; this pins the invariant that made it matter.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void ARunCompletedWithoutItsTasCase_CannotBeOptimised()
+        {
+            PartORun partORun = new();
+
+            Assert.True(partORun.Prepare(Model("prepared"), Scenarios(), Context(select: true)));
+
+            string path_TSD = Path.Combine(Path.GetTempPath(), string.Format("SAM_PartOOptimisationTests_{0}.tsd", Guid.NewGuid()));
+
+            Assert.True(partORun.ExpectResults(path_TSD));
+
+            File.WriteAllText(path_TSD, string.Format("results this workflow wrote - {0}", Guid.NewGuid()));
+
+            //The overload that records no case - what Simulate used to call.
+            Assert.True(partORun.Complete(Model("workflow"), path_TSD, out string refusal_Complete), refusal_Complete);
+
+            Assert.Null(partORun.SimulationContext);
+
+            Assert.False(Modify.CanOptimise(partORun, new PartOOptimisationSettings(), out string refusal));
+            Assert.Contains("full-year TAS case", refusal);
+        }
+
         /// <summary>An eligible Iteration 2 run can start one.</summary>
         [Fact]
         public void ACompletedIteration2Run_CanBeOptimised()
