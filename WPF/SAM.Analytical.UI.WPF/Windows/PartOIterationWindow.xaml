@@ -54,6 +54,12 @@
                  costs one more full-year TAS run, and only on a run that stops short of a pass. -->
             <CheckBox x:Name="checkBox_CapacityEnvelope" Content="Also report what the selected unit could deliver at its capacity ceiling (diagnostic)" Margin="20,8,0,0"/>
             <TextBlock x:Name="textBlock_CapacityEnvelope" Margin="40,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+
+            <!-- A workflow optimisation, not an engineering choice - which is why it is worded as reusing the
+                 conversion rather than as anything about the simulation. Offered as a tick because the full
+                 conversion has to stay available as the reference path. -->
+            <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted geometry between iterations (faster; no change to results)" Margin="20,8,0,0"/>
+            <TextBlock x:Name="textBlock_WarmStart" Margin="40,4,0,10" TextWrapping="Wrap" Foreground="#555555"/>
         </StackPanel>
 
         <Button x:Name="button_OK" Grid.Row="7" Width="60" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_OK_Click">OK</Button>

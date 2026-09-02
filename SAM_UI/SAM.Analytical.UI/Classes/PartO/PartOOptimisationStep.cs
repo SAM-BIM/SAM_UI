@@ -86,6 +86,24 @@ namespace SAM.Analytical.UI
         public string WeatherData { get; set; }
 
         /// <summary>
+        /// Whether this iteration was <b>warm started</b> from the run's canonical TBD rather than
+        /// converting the geometry again.
+        /// <para>
+        /// <b>Recorded per iteration, not per run.</b> A warm start is allowed only while the canonical
+        /// baseline is provably still the conversion of this model and this TAS case, and that is checked
+        /// every round - so one round of a run can fall back to the full conversion while the others do not,
+        /// and a reader has to be able to see which did. The reason for any fallback is on
+        /// <see cref="Notes"/>.
+        /// </para>
+        /// <para>
+        /// It changes <b>nothing</b> about what the iteration means: either way it is a real full-year
+        /// simulation of this design, assessed with production TM59, and either way the result is this
+        /// iteration's own.
+        /// </para>
+        /// </summary>
+        public bool WarmStarted { get; set; }
+
+        /// <summary>
         /// The rooms this round <b>deliberately</b> targeted, with the airflow each was designed at before
         /// the round, what was requested of it, and what it achieved. Empty on the baseline.
         /// <para>

@@ -48,6 +48,29 @@ namespace SAM.Analytical.UI
         public double Tolerance_Lps { get; set; } = 0.001;
 
         /// <summary>
+        /// Whether each iteration may be <b>warm started</b> from the canonical TBD the run's own baseline
+        /// conversion produced, instead of converting the same geometry again.
+        ///
+        /// <para><b>A workflow optimisation, and only that</b></para>
+        /// <para>
+        /// Between Iteration 2B rounds only the ventilation design and network change; the geometry, zones,
+        /// surfaces, apertures, constructions and the shading calculation are identical every round. A
+        /// warm-started round still performs a <b>real full-year TAS simulation</b> of the current design
+        /// and is still assessed with production TM59 - it simply does not recompute the conversion of
+        /// inputs that did not change. Measured on the licensed acceptance model, that conversion is 41.6 s
+        /// of a 64.2 s round while the simulation itself is 3.6 s.
+        /// </para>
+        /// <para>
+        /// <b>The full conversion remains the authority.</b> Warm starting is allowed only while the
+        /// canonical baseline is provably still the conversion of this model and this TAS case, checked
+        /// every round; anything unproven falls back to the full path and says why. Turning this off runs
+        /// exactly the workflow every round ran before it existed, which is what makes it usable as a
+        /// reference.
+        /// </para>
+        /// </summary>
+        public bool WarmStart { get; set; } = true;
+
+        /// <summary>
         /// Whether, when the optimisation stops with eligible rooms still failing, one further
         /// <b>diagnostic</b> run is made: the deliberate target vector scaled coherently until the
         /// <i>already-selected</i> unit's own design-capacity ceiling binds.

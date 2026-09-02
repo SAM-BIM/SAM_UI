@@ -170,6 +170,39 @@ namespace SAM.Analytical.UI.WPF
                 return Stop(result, PartOOptimisationStopReason.AssessmentFailed, NoVerdict(partOTM59Assessment), analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
             }
 
+            //The run's own canonical TBD - the conversion the baseline's own simulation already produced,
+            //beside the results file it wrote. Adopted ONCE, here, and only ever read from: every later
+            //round is given a COPY of it.
+            //
+            //Never chained. Round 3 is copied from run 0, not from round 2, so no round can inherit
+            //another's leftover ventilation state - which is the whole reason a canonical baseline exists
+            //rather than a running TBD.
+            //
+            //Adopted from the BASELINE's results path rather than from the context's project name, because
+            //an optimisation run over a previous optimisation's output starts from that run's files, and
+            //the conversion to reuse is the one beside the design actually being optimised.
+            PartOCanonicalTBD partOCanonicalTBD = null;
+
+            if (!partOOptimisationSettings.WarmStart)
+            {
+                result.CanonicalTBDRefusal = "Warm starting was not asked for, so every iteration converted the model in full.";
+            }
+            else
+            {
+                partOCanonicalTBD = PartOCanonicalTBD.Adopt(
+                    string.IsNullOrWhiteSpace(path_TSD_LastValid) ? null : Path.ChangeExtension(path_TSD_LastValid, "tbd"),
+                    analyticalModel_LastValid,
+                    partOSimulationContext,
+                    out string refusal_Canonical);
+
+                result.CanonicalTBD = partOCanonicalTBD;
+                result.CanonicalTBDRefusal = refusal_Canonical;
+
+                partOOptimisationStep.Notes.Add(partOCanonicalTBD is null
+                    ? refusal_Canonical
+                    : string.Format("This run's later iterations start from the converted TBD this baseline produced - '{0}' - rather than converting the same geometry again. Each one is given its own copy of it, always from this baseline and never from the previous iteration, and each still performs a real full-year simulation of its own design. The baseline itself is only ever read.", partOCanonicalTBD.Path_TBD));
+            }
+
             //Dwellings whose selected unit has already refused a full step. Their rooms stay out of every
             //later round: a dwelling at its unit's ceiling cannot take another step, and asking again every
             //round would rerun the same refusal.
@@ -259,7 +292,16 @@ namespace SAM.Analytical.UI.WPF
 
                 // ---- The same full-year case, under this iteration's own name --------------------------
 
-                AnalyticalModel analyticalModel_Workflow = RunPartOSimulation(partOIterationPreparation.AnalyticalModel, partOSimulationContext, partOOptimisationStep.ProjectName, partORun, cancellationTokenSource.Token, out string _, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes_Simulation, out string refusal_Simulation);
+                //Checked EVERY round, not once: the canonical file can be replaced underneath a running
+                //optimisation, and a round that has to convert in full must say so on its own record.
+                //
+                //Compared against the LAST VALID design - a workflow output, like the one the canonical was
+                //fingerprinted from - so like is compared with like across the TAS round trip. The design
+                //airflow this round changed is deliberately not part of the comparison: it is what the
+                //warm-started run re-applies, and including it would turn the warm start off every round.
+                PartOCanonicalTBD partOCanonicalTBD_Round = WarmStart(partOCanonicalTBD, analyticalModel_LastValid, partOSimulationContext, partOOptimisationStep);
+
+                AnalyticalModel analyticalModel_Workflow = RunPartOSimulation(partOIterationPreparation.AnalyticalModel, partOSimulationContext, partOOptimisationStep.ProjectName, partORun, cancellationTokenSource.Token, out string _, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes_Simulation, out string refusal_Simulation, partOCanonicalTBD_Round);
 
                 partOOptimisationStep.Notes.AddRange(notes_Simulation);
                 partOOptimisationStep.Path_TSD = path_TSD;
@@ -871,7 +913,11 @@ namespace SAM.Analytical.UI.WPF
 
             using CancellationTokenSource cancellationTokenSource = new();
 
-            AnalyticalModel analyticalModel_Workflow = RunPartOSimulation(partOIterationPreparation.AnalyticalModel, partOSimulationContext, partOOptimisationStep.ProjectName, partORun_Envelope, cancellationTokenSource.Token, out string _, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes_Simulation, out string refusal_Simulation);
+            //The envelope is one more full-year run of the same building, so it warm starts on exactly the
+            //same terms as a round - and is checked on exactly the same terms too.
+            PartOCanonicalTBD partOCanonicalTBD_Envelope = WarmStart(partOOptimisationRun.CanonicalTBD, analyticalModel_LastValid, partOSimulationContext, partOOptimisationStep);
+
+            AnalyticalModel analyticalModel_Workflow = RunPartOSimulation(partOIterationPreparation.AnalyticalModel, partOSimulationContext, partOOptimisationStep.ProjectName, partORun_Envelope, cancellationTokenSource.Token, out string _, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes_Simulation, out string refusal_Simulation, partOCanonicalTBD_Envelope);
 
             partOOptimisationStep.Notes.AddRange(notes_Simulation);
             partOOptimisationStep.Path_TSD = path_TSD;
@@ -964,6 +1010,49 @@ namespace SAM.Analytical.UI.WPF
                     : "It was NOT successfully simulated and assessed - see its refusals.",
                 partOOptimisationStep.IsCompleted ? Core.Query.Description(partOOptimisationStep.OccupiedSpaceComplianceStatus) : "not established",
                 partOOptimisationStep.Refusals.Count == 0 ? string.Empty : " " + string.Join(" ", partOOptimisationStep.Refusals));
+        }
+
+        /// <summary>
+        /// Whether this iteration may start from the run's canonical TBD - and, where it may not, the reason
+        /// recorded on the iteration that had to convert in full.
+        ///
+        /// <para><b>Why the check is per iteration</b></para>
+        /// <para>
+        /// A canonical TBD is a file on disk for the several minutes an optimisation runs, and anything with
+        /// access to that directory can replace it. Checking once at adoption would leave every later round
+        /// reusing a file on the strength of its path alone - which is precisely the stale-conversion
+        /// failure this whole design exists to avoid. So the check is repeated, and a single round can fall
+        /// back while the others do not.
+        /// </para>
+        /// <para>
+        /// <b>A fallback is a note, not a refusal.</b> The full conversion is always available and always
+        /// authoritative, so a round that cannot warm start simply runs the workflow every round ran before
+        /// this existed. Nothing about its result is different or weaker; only its duration is.
+        /// </para>
+        /// </summary>
+        /// <returns>The canonical TBD to start from, or null for the full conversion.</returns>
+        private static PartOCanonicalTBD? WarmStart(PartOCanonicalTBD? partOCanonicalTBD, AnalyticalModel? analyticalModel, PartOSimulationContext partOSimulationContext, PartOOptimisationStep partOOptimisationStep)
+        {
+            if (partOCanonicalTBD is null)
+            {
+                return null;
+            }
+
+            if (!partOCanonicalTBD.IsValidFor(analyticalModel, partOSimulationContext, out string? refusal))
+            {
+                partOOptimisationStep.Notes.Add(refusal ?? "The canonical TBD could not be shown to be valid for this iteration, so it converted the model in full.");
+
+                return null;
+            }
+
+            partOOptimisationStep.WarmStarted = true;
+
+            partOOptimisationStep.Notes.Add(string.Format(
+                "This iteration started from the canonical TBD '{0}', copied to its own '{1}.tbd'. The geometry, constructions, apertures and shading calculation were not recomputed - they are unchanged by a design airflow round. The zone identities, the zones, the ventilation network and the full-year simulation all were.",
+                partOCanonicalTBD.Path_TBD,
+                partOOptimisationStep.ProjectName ?? "?"));
+
+            return partOCanonicalTBD;
         }
 
         /// <summary>
