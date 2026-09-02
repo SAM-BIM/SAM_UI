@@ -84,6 +84,28 @@ namespace SAM.Analytical.UI
         /// <summary>The scenarios of that same iteration's preparation, so its assessment can be re-run.</summary>
         public List<OverheatingScenario> OverheatingScenarios_LastValid { get; } = [];
 
+        /// <summary>
+        /// The converted TBD this run's later iterations were started from, or null where every iteration
+        /// converted the model in full.
+        /// <para>
+        /// <b>Owned by this run and by nothing else.</b> It is not a cache and does not outlive the
+        /// optimisation that made it - see <see cref="PartOCanonicalTBD"/>.
+        /// </para>
+        /// </summary>
+        public PartOCanonicalTBD CanonicalTBD { get; set; }
+
+        /// <summary>
+        /// Why no canonical TBD was adopted, where none was - so a run that converted every iteration in
+        /// full says why rather than simply being slow.
+        /// </summary>
+        public string CanonicalTBDRefusal { get; set; }
+
+        /// <summary>
+        /// How many iterations were warm started from <see cref="CanonicalTBD"/> rather than converting the
+        /// geometry again. Counted off the steps, so it cannot disagree with them.
+        /// </summary>
+        public int WarmStarted => Steps.FindAll(x => x.WarmStarted).Count;
+
         /// <summary>The baseline, or null where the run never established one.</summary>
         public PartOOptimisationStep Step_Baseline => Steps.Count == 0 ? null : Steps[0];
 

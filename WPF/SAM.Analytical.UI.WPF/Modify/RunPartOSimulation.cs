@@ -47,6 +47,27 @@ namespace SAM.Analytical.UI.WPF
         /// are the evidence for another round.
         /// </para>
         ///
+        /// <para><b>Warm starting from a canonical TBD</b></para>
+        /// <para>
+        /// Where <paramref name="partOCanonicalTBD"/> is supplied, this run does <b>not</b> convert the
+        /// geometry: the canonical TBD is copied to this run's own TBD by
+        /// <c>WorkflowSettings.Path_TBD_Canonical</c> and everything after the conversion still runs on the
+        /// copy - the zone identity stamps, the zones, the ventilation network, and a real full-year
+        /// simulation. Between Iteration 2B rounds only the ventilation state changes, and on the licensed
+        /// acceptance model the conversion is 41.6 s of a 64.2 s round against 3.6 s of simulation.
+        /// </para>
+        /// <para>
+        /// <b>No gbXML is written on that path</b>, which is the point: the export, the T3D import and the
+        /// shading calculation are the work being skipped. The solar calculation the canonical TBD already
+        /// carries is the one this round uses, which is correct precisely because the geometry and the
+        /// shading inputs are what did not change.
+        /// </para>
+        /// <para>
+        /// <b>Whether the canonical is still valid is decided before this is called</b> - see
+        /// <see cref="PartOCanonicalTBD.IsValidFor"/>. A caller that cannot prove it passes null and gets
+        /// the full conversion, which is always available and always authoritative.
+        /// </para>
+        ///
         /// <para><b>The Part O arming happens here, before the workflow, or not at all</b></para>
         /// <para>
         /// <paramref name="partORun"/> is armed with <c>ExpectResults</c> only where the case about to run
@@ -60,6 +81,10 @@ namespace SAM.Analytical.UI.WPF
         /// <param name="partOSimulationContext">The case to run it as.</param>
         /// <param name="projectName">The project name for this run - what makes its TBD and TSD its own.</param>
         /// <param name="partORun">The run to arm, or null where the caller has none.</param>
+        /// <param name="partOCanonicalTBD">
+        /// An already-converted TBD to start this run from instead of converting the geometry again, or null
+        /// for the full conversion. <b>Only ever read</b>; this run works on its own copy of it.
+        /// </param>
         /// <param name="externalCancellationToken">Lets one Cancel click abort a whole optimisation, not just this run.</param>
         /// <param name="path_TBD">The TBD this run wrote or would have written.</param>
         /// <param name="path_TSD">The results file beside it. Existence is not guaranteed - a run that did not simulate writes none.</param>
@@ -76,7 +101,7 @@ namespace SAM.Analytical.UI.WPF
         /// </para>
         /// </param>
         /// <returns>The model the workflow returned, or null where it did not run, failed or was cancelled.</returns>
-        public static AnalyticalModel RunPartOSimulation(AnalyticalModel analyticalModel, PartOSimulationContext partOSimulationContext, string projectName, PartORun partORun, CancellationToken externalCancellationToken, out string path_TBD, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes, out string refusal)
+        public static AnalyticalModel RunPartOSimulation(AnalyticalModel analyticalModel, PartOSimulationContext partOSimulationContext, string projectName, PartORun partORun, CancellationToken externalCancellationToken, out string path_TBD, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes, out string refusal, PartOCanonicalTBD partOCanonicalTBD = null)
         {
             path_TBD = null;
             path_TSD = null;
@@ -104,8 +129,11 @@ namespace SAM.Analytical.UI.WPF
                 Name = projectName,
             };
 
+            //Skipped entirely on the warm-start path: the gbXML exists to be imported into a T3D and
+            //converted, and a canonical TBD is the product of having done exactly that. Writing one and then
+            //not converting it would cost the export for nothing.
             string path_Xml = null;
-            if (solarCalculationMethod == SolarCalculationMethod.TAS)
+            if (solarCalculationMethod == SolarCalculationMethod.TAS && partOCanonicalTBD is null)
             {
                 path_Xml = System.IO.Path.Combine(outputDirectory, projectName + ".xml");
                 if (!gbXML.Convert.ToFile(analyticalModel, path_Xml))
@@ -166,7 +194,9 @@ namespace SAM.Analytical.UI.WPF
 
                     analyticalModel = partOSimulationContext.UpdateConstructionLayersByPanelType ? analyticalModel.UpdateConstructionLayersByPanelType() : analyticalModel;
 
-                    if (System.IO.File.Exists(path_TBD))
+                    //NOT on the warm-start path: the copy from the canonical overwrites this run's TBD
+                    //anyway, and deleting first would only widen the window in which the run has no TBD.
+                    if (partOCanonicalTBD is null && System.IO.File.Exists(path_TBD))
                     {
                         try
                         {
@@ -184,7 +214,10 @@ namespace SAM.Analytical.UI.WPF
                         }
                     }
 
-                    if (solarCalculationMethod == SolarCalculationMethod.SAM)
+                    //The SAM solar path builds the TBD here, from scratch, which is the very work a warm
+                    //start exists to avoid - so a canonical TBD supersedes it and the workflow does the
+                    //rest on the copy.
+                    if (solarCalculationMethod == SolarCalculationMethod.SAM && partOCanonicalTBD is null)
                     {
                         List<int> hoursOfYear = Analytical.Query.DefaultHoursOfYear();
 
@@ -278,6 +311,12 @@ namespace SAM.Analytical.UI.WPF
                 WorkflowSettings workflowSettings = new()
                 {
                     Path_TBD = path_TBD,
+
+                    //The seam. WorkflowCalculator copies this to Path_TBD, skips the conversion a canonical
+                    //TBD already carries, and runs everything after it - see
+                    //WorkflowSettings.Path_TBD_Canonical.
+                    Path_TBD_Canonical = partOCanonicalTBD?.Path_TBD,
+
                     Path_gbXML = path_Xml,
                     WeatherData = solarCalculationMethod == SolarCalculationMethod.TAS ? weatherData : null,
                     DesignDays_Heating = heatingDesignDays,
@@ -286,7 +325,10 @@ namespace SAM.Analytical.UI.WPF
                     UnmetHours = partOSimulationContext.UnmetHours,
                     Simulate = simulate,
                     Sizing = partOSimulationContext.Sizing,
-                    UpdateZones = solarCalculationMethod == SolarCalculationMethod.TAS,
+                    //TRUE on the warm-start path whatever the solar method. The zones carry the internal
+                    //conditions, and re-deriving them from the current model is half of what makes a
+                    //warm-started round the current design rather than the baseline's.
+                    UpdateZones = partOCanonicalTBD is not null || solarCalculationMethod == SolarCalculationMethod.TAS,
                     UseWidths = partOSimulationContext.UseWidths,
                     SimulateFrom = simulate_From,
                     SimulateTo = simulate_To

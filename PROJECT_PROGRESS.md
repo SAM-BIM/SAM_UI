@@ -1,19 +1,141 @@
 # Project Progress
 
 ## Branch
-`feature/parto-iteration2b-capacity-envelope`, branched from `sow/2026-Q3` at **`eda947a8`**
-(the merge of PR #78, itself on top of PR #77's merge `d056af7`).
+`feature/parto-iteration2b-tas-warm-start`, branched from
+`feature/parto-iteration2b-capacity-envelope` at **`38c16c3`**.
 
-**Depends on `SAM-BIM/SAM` `feature/parto-iteration2b-capacity-envelope`**, which adds
-`Modify.EvaluateDesignAirFlowCapacityEnvelope`. That PR merges first.
+**Depends on, and merges after:**
 
-No `SAM_Tas` change - it was not touched.
+1. `SAM-BIM/SAM#90` - the capacity-envelope authority.
+2. `SAM-BIM/SAM_UI#79` - the capacity-envelope orchestration, which this branch is stacked on.
+3. `SAM-BIM/SAM_Tas` `feature/parto-iteration2b-tas-warm-start` - `WorkflowSettings.Path_TBD_Canonical`,
+   without which this does not compile.
 
 ## Last updated
-2026-09-02 - the diagnostic selected-equipment capacity envelope, orchestrated and reported apart from the
-optimisation's own answer.
+2026-09-02 - Iteration 2B rounds start from the run's own canonical TBD instead of converting the same
+geometry again.
 
-## Latest (2026-09-02): the capacity envelope, kept apart from the optimisation's answer
+## Latest (2026-09-02): warm starting each round from the canonical TBD
+
+**Status: implemented, tested, and proven equivalent to the full path on the licensed model.**
+
+### Why - measured, not assumed
+
+Between 2B rounds only the ventilation state changes. The licensed acceptance run's own timing CSV shows
+what re-converting the rest costs: of a **64.2 s** round on `SAM_zoningAM-CIBSEfutureZ1.sam`, the
+gbXML/T3D/shading conversion is **41.6 s** and the full-year TAS simulation is **3.6 s**. Ten more rounds
+of conversion is most of the wall clock of a 2B run, and none of it is physics.
+
+### Measured result
+
+| | full conversion | warm start |
+| --- | --- | --- |
+| run 0 (the conversion itself) | 71.1 s | 71.1 s - unchanged, it *is* the baseline |
+| each later round | ~64 s | **21.0 / 23.2 / 21.9 s** |
+| of which full-year simulation | 3.6 s | **4.0 s - still a real one** |
+| copy of the canonical TBD | - | 4.1 ms |
+
+A warm round's step list is the full one **minus exactly nine conversion steps** - `Opening TBD file`,
+`Updating Weather Data`, `Updating HDD and CDD Day Types`, `Opening T3D file`, `Importing gbXML`,
+`Updating T3D file`, `T3D to TBD -> Shading`, `Reusing Aperture Definitions`, `Updating Aperture Types` -
+and nothing else. `Updating Ids`, `Updating Zones`, `Add IZAMs`, `Simulating Model` and `Adding Results` all
+still run.
+
+### Architecture
+
+```
+run 0     full production conversion -> canonical TBD + its own TSD   (unchanged)
+round N   canonical TBD -> copy to <project>-OptNN.tbd
+          -> the current round's complete ventilation state re-applied
+          -> full-year TAS -> <project>-OptNN.tsd
+          -> workflow-returned AnalyticalModel -> production TM59
+```
+
+- **Always cloned from run 0, never from the previous round.** `Run0 -> Opt01`, `Run0 -> Opt02`. Chaining
+  would accumulate stale state, which is the whole failure mode being avoided.
+- **The clone is `SAM_Tas`'s job, not the UI's.** `WorkflowSettings.Path_TBD_Canonical` makes
+  `WorkflowCalculator` copy and skip the conversion block; SAM_UI decides *whether* to, and never touches a
+  TBD itself. No low-level TBD mutation was added to the UI.
+- **No gbXML is written on the warm path.** The export exists to be imported and converted, and a canonical
+  TBD is the product of having done that.
+- **`UpdateZones` is forced on** for a warm-started run whatever the solar method: the zones carry the
+  internal conditions, and re-deriving them from the current model is half of what makes the round the
+  current design rather than the baseline's.
+
+### `PartOCanonicalTBD` - the invalidation authority
+
+**Not a cache.** It is created by run 0 of one optimisation, used only by that optimisation's rounds, and
+never persisted or found again. The classic failure of a reused conversion is a stale one surviving a model
+edit; a baseline that cannot outlive the run that made it cannot go stale that way at all.
+
+A **fingerprint** over what the conversion reads - space and zone identities *and names* (TAS matches a
+zone to a space by name), zone topology, panel and aperture identities, types, constructions and a
+millimetre-rounded geometry digest, plus the solar method, weather, day range, sizing, unmet hours,
+aperture widths and construction-layer update. **Design airflow is deliberately absent**: it is the thing
+that changes every round and the thing the warm-started run re-applies, so including it would turn the warm
+start off entirely.
+
+Re-checked **every round**, plus the file's length and write time, so a baseline replaced underneath a
+running optimisation is caught. Any mismatch **falls back to the full conversion** and names the category
+that changed. A fallback is a note, never a refusal - the full path is always available and always
+authoritative.
+
+The digest is FNV-1a rather than `string.GetHashCode`, which is randomized per process and would have made
+the comparison work in one place and not another.
+
+### Files
+
+| File | Change |
+| --- | --- |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOCanonicalTBD.cs` | New - the baseline and its fingerprint. |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOOptimisationSettings.cs` | `WarmStart`. |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOOptimisationStep.cs` | `WarmStarted`, per iteration. |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOOptimisationRun.cs` | `CanonicalTBD`, its refusal, and the derived `WarmStarted` count. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/RunPartOSimulation.cs` | The optional canonical; no gbXML, no SAM-side TBD build, `UpdateZones` on. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` | Adopt once, check every round, and the same for the envelope. |
+| `WPF/SAM.Analytical.UI.WPF/Windows/PartOIterationWindow.xaml(.cs)` | The tick, so the full path stays available as the reference. |
+| `WPF/SAM.Analytical.UI.WPF/Windows/PartOOptimisationResultWindow.xaml.cs` | The count, beside the notes. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartOWarmStartTests.cs` | New - 26 tests. |
+
+### Validation
+
+- `SAM_UI.sln` builds clean.
+- `WPF/SAM.Analytical.UI.WPF.Tests`: **325 passed, 0 failed** (299 + 26 new).
+- `SAM_Tas`: **655 passed, 0 failed** (649 + 6 new).
+- SAM: **1731 passed, 0 failed**, unchanged by this branch.
+
+### Licensed A/B equivalence - ACCEPTED
+
+`SAM_zoningAM-CIBSEfutureZ1.sam`, weather `Z1_DSY1_2050s_HIGH90_CIBSE_v1.1`, 3 rounds plus the capacity
+envelope, run twice through the production commands - once with the tick off (the full-conversion
+**reference**) and once with it on (the warm-start **candidate**). Identical model, identical design
+airflows, identical weather, identical workflow settings; only the output directory differed.
+
+**108 comparable lines, every one identical** - 40 production TM59 rows (Actual, Limit, Margin, PASS/FAIL,
+mechanical, per space per step), 24 targeted and 8 derived design airflows, 20 ventilation-unit
+duty/maximum/headroom/outcome rows, 3 capacity-envelope groups (scale, movement, duties, binding side), and
+every run-level verdict including `STOP_REASON`, `ROUNDS`, `ENVELOPE_OUTCOME` and `COMMAND_WOULD_ARM`.
+Paths, project names and the `warm=` flag were excluded from the comparison; nothing else was.
+
+**Canonical immutability, from the production code itself.** `AB.tbd` was written at 16:37:26 and never
+again, while the four rounds wrote their own TBDs at 16:37:55, 16:38:19, 16:38:45 and 16:39:09 - and
+`PartOCanonicalTBD` re-verified its length and write time before every one of them, all four of which warm
+started. The baseline step correctly did **not** warm start: it is the conversion the others start from.
+
+### Issues / blockers
+
+- **One bounded residual risk, stated rather than hidden.** `SAM_Tas`'s `Modify.UpdateIZAMs` removes
+  internal conditions and IZAMs by the names the *current* cluster's air movements produce, and
+  `UpdateZones` removes internal conditions by the current space names. Both then re-add. So a canonical
+  entry could survive only if its name is one the current round does not produce. Between 2B rounds the
+  movement names derive from space and unit names (invariant) and the movement *set* from the transfer-air
+  topology, which is rebuilt from the same Part F requirements (invariant) - and the A/B equivalence above
+  confirms it empirically on the licensed model. Cloning always from run 0 rather than chaining bounds this
+  to run 0's own entries instead of letting anything accumulate, which is why that rule is not negotiable.
+  A model whose round-to-round movement *names* could differ would need `UpdateIZAMs` to remove everything
+  it owns before writing; that is not this change.
+
+## Superseded (2026-09-02): the capacity envelope
 
 **Status: implemented and tested; PR open against `sow/2026-Q3`.**
 

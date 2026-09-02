@@ -115,7 +115,15 @@ namespace SAM.Analytical.UI.WPF
 
             textBox_Diagnostics.Text = stringBuilder.Length == 0 ? "Nothing was recorded." : stringBuilder.ToString();
 
-            label_Diagnostics.Content = string.Format("Notes, warnings and refusals - {0}", count);
+            //The warm-start count is a WORKFLOW fact, so it belongs beside the notes rather than anywhere
+            //near the engineering summary at the top. Reported whenever any iteration warm started, because
+            //an engineer auditing a run's duration needs to know which iterations reused the conversion -
+            //and each of those iterations' own notes says so too.
+            int warmStarted = partOOptimisationRun?.WarmStarted ?? 0;
+
+            label_Diagnostics.Content = warmStarted == 0
+                ? string.Format("Notes, warnings and refusals - {0}", count)
+                : string.Format("Notes, warnings and refusals - {0} ({1} iteration(s) reused the baseline conversion; each still ran its own full-year simulation)", count, warmStarted);
         }
 
         /// <summary>
