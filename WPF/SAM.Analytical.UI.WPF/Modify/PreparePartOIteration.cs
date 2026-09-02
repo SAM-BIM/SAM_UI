@@ -96,6 +96,14 @@ namespace SAM.Analytical.UI.WPF
                 ? ventilationUnitCatalogue.CapacityDescriptors
                 : null;
 
+            //Everything this preparation was asked for, kept so an Iteration 2B optimisation can repeat it
+            //identically over a changed design. Also carries the optimisation the user asked for, which is
+            //not a preparation input and does not affect the call below - see PartOPreparationContext.
+            PartOPreparationContext partOPreparationContext = new(option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors)
+            {
+                OptimisationSettings = partOIterationWindow.OptimisationSettings,
+            };
+
             PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel, option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors);
 
             //A refusal returns no model at all, by contract. Nothing is adopted and the run is dropped with
@@ -131,7 +139,7 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            if (!partORun.Prepare(partOIterationPreparation))
+            if (!partORun.Prepare(partOIterationPreparation, partOPreparationContext))
             {
                 MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason));
 

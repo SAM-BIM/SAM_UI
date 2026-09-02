@@ -21,6 +21,12 @@
     <Reference Include="SAM.Geometry">
       <HintPath>..\..\..\SAM\build\SAM.Geometry.dll</HintPath>
     </Reference>
+    <!-- PartOOptimisationTests builds a PartOSimulationContext, whose WeatherData property makes this type
+         part of the signature the compiler has to resolve. A plain data carrier - no TAS COM type is
+         reached, so the suite still runs on a machine with no TAS installed. -->
+    <Reference Include="SAM.Weather">
+      <HintPath>..\..\..\SAM\build\SAM.Weather.dll</HintPath>
+    </Reference>
     <!-- The Part O tests read and write SAM.Analytical.Tas.SpaceParameter.ZoneGuid, the identity the TAS
          round trip preserves. Declared here because a HintPath Reference on the referenced project does not
          flow to this one for compilation - the three above are re-declared for exactly that reason. Nothing

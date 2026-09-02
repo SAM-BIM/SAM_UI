@@ -103,32 +103,29 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            // From here on the model is mutated in place - the name immediately below, materials at "Update
-            // Materials". Those writes would land on the instance the user still has open, so a cancelled run
-            // would leave it renamed and re-materialled with no modification notification ever issued: changed
-            // behind the UI's back. Work on a copy instead. On success the copy is what SetJSAMObject adopts,
-            // which is already how this ends - UpdateConstructionLayersByPanelType and the workflow both return
-            // fresh instances. The copy constructor carries the Guid over, so identity does not change.
-            analyticalModel = new AnalyticalModel(analyticalModel);
+            // The model is renamed here and, on the export-only path below, converted in place. Those writes
+            // would land on the instance the user still has open, so a cancelled or failed run would change
+            // it behind the UI's back. Work on a copy instead; the copy constructor carries the Guid over, so
+            // identity does not change. RunPartOSimulation takes a copy of its own for the same reason, which
+            // is what leaves THIS one untouched by a run that failed.
+            analyticalModel = new AnalyticalModel(analyticalModel)
+            {
+                Name = projectName,
+            };
 
-            analyticalModel.Name = projectName;
+            // Everything the TAS case needs, in one object - so this run and any Iteration 2B optimisation
+            // that later repeats it are provably the same case. See PartOSimulationContext.
+            PartOSimulationContext partOSimulationContext = new(outputDirectory, projectName, weatherData, solarCalculationMethod, fullYearSimulation ? fullYearSimulation_From : -1, fullYearSimulation ? fullYearSimulation_To : -1)
+            {
+                UnmetHours = unmetHours,
+                Sizing = sizing,
+                UseWidths = useWidths,
+                UpdateConstructionLayersByPanelType = updateConstructionLayersByPanelType,
+            };
 
             DateTime dateTime = DateTime.Now;
 
-            string path_Xml = null;
-            if(solarCalculationMethod == SolarCalculationMethod.TAS)
-            {
-                path_Xml = System.IO.Path.Combine(outputDirectory, projectName + ".xml");
-                if(!gbXML.Convert.ToFile(analyticalModel, path_Xml))
-                {
-                    MessageBox.Show("Could not create gbXML file.");
-                    return;
-                }
-            }
-
             string path_TBD = System.IO.Path.Combine(outputDirectory, projectName + ".tbd");
-
-            bool shadingUpdated = false;
 
             bool converted = false;
 
@@ -156,239 +153,53 @@ namespace SAM.Analytical.UI.WPF
 
             if(simulateWindow.Simulate)
             {
-                // One token spans the preparation steps below and the workflow that follows them, so a single
-                // Cancel click aborts whichever of the two is running.
-                using (CancellationTokenSource cancellationTokenSource = new CancellationTokenSource())
+                // The whole path to a TSD - materials, construction layers, the TBD, the solar calculation,
+                // the zones, the shading, the workflow - and the Part O arming that goes before it. Extracted
+                // so an Iteration 2B optimisation can repeat this exact case over a changed design without a
+                // second copy of it existing to drift. See Modify.RunPartOSimulation.
+                AnalyticalModel analyticalModel_Workflow = Modify.RunPartOSimulation(analyticalModel, partOSimulationContext, projectName, partORun, CancellationToken.None, out path_TBD, out string _, out cancelled, out workflowSimulatedFullYear, out List<string> notes_Simulation, out string refusal_Simulation);
+
+                notes_Simulate.AddRange(notes_Simulation);
+
+                if (refusal_Simulation != null)
                 {
-                    CancellationToken cancellationToken = cancellationTokenSource.Token;
+                    // The run never started, so there is no TBD for the exports below to convert or read
+                    // back. Aborted outright, exactly as this method has always aborted on these two
+                    // conditions - a gbXML that could not be written, and a TBD that could not be replaced.
+                    MessageBox.Show(refusal_Simulation);
 
-                    // Hosted off this thread rather than shown on it: "Converting to TBD" and "Updating
-                    // Shading" below are single COM calls that run for minutes, and Windows ghosts a window
-                    // whose thread has stopped pumping and then discards clicks on the ghost - so a Cancel
-                    // button on this thread would silently lose the click. Not a using either: see
-                    // Modify.RunWorkflow for why the host must be disposed before the final token check.
-                    ProgressWindowHost progressWindowHost = new ProgressWindowHost("Preparing Model", 8, true, Analytical.Tas.Query.CancelNote(null));
-
-                    // Announce the stage, then observe - the order WorkflowCalculator.Step uses, so a click
-                    // that lands while the note is being updated is still seen before the stage starts work.
-                    Action<string> step = description =>
-                    {
-                        progressWindowHost.Note = Analytical.Tas.Query.CancelNote(description);
-                        progressWindowHost.Update(description);
-                        cancellationToken.ThrowIfCancellationRequested();
-                    };
-
-                    try
-                    {
-                        progressWindowHost.CancelRequested += (s, e) => cancellationTokenSource.Cancel();
-
-                        step("Update Materials");
-
-                        IEnumerable<IMaterial> materials = Analytical.Query.Materials(analyticalModel.AdjacencyCluster, Analytical.Query.DefaultMaterialLibrary());
-                        if (materials != null)
-                        {
-                            foreach (IMaterial material in materials)
-                            {
-                                if (analyticalModel.HasMaterial(material))
-                                {
-                                    continue;
-                                }
-
-                                analyticalModel.AddMaterial(material);
-                            }
-                        }
-
-                        step("Update ConstructionLayers By PanelTypes");
-
-                        analyticalModel = updateConstructionLayersByPanelType ? analyticalModel.UpdateConstructionLayersByPanelType() : analyticalModel;
-
-                        if (System.IO.File.Exists(path_TBD))
-                        {
-                            try
-                            {
-                                System.IO.File.Delete(path_TBD);
-                            }
-                            catch
-                            {
-                                // Take the dialog down before the message box: it is topmost and lives on
-                                // another thread, so a modal shown under it can end up hidden behind it.
-                                progressWindowHost.Dispose();
-                                MessageBox.Show("Cannot override existing TBD file.");
-                                return;
-                            }
-                        }
-
-                        if (solarCalculationMethod == SolarCalculationMethod.SAM)
-                        {
-                            List<int> hoursOfYear = Analytical.Query.DefaultHoursOfYear();
-
-                            SolarCalculator.Modify.Simulate(analyticalModel, hoursOfYear.ConvertAll(x => new DateTime(2018, 1, 1).AddHours(x)), false, Tolerance.MacroDistance, Tolerance.MacroDistance, 0.012, Tolerance.Distance);
-
-                            using (SAMTBDDocument sAMTBDDocument = new SAMTBDDocument(path_TBD))
-                            {
-                                TBD.TBDDocument tBDDocument = sAMTBDDocument.TBDDocument;
-
-                                step("Updating WeatherData");
-                                Weather.Tas.Modify.UpdateWeatherData(tBDDocument, weatherData, analyticalModel == null ? 0 : analyticalModel.AdjacencyCluster.BuildingHeight());
-
-                                TBD.Calendar calendar = tBDDocument.Building.GetCalendar();
-
-                                List<TBD.dayType> dayTypes = Query.DayTypes(calendar);
-                                if (dayTypes.Find(x => x.name == "HDD") == null)
-                                {
-                                    TBD.dayType dayType = calendar.AddDayType();
-                                    dayType.name = "HDD";
-                                }
-
-                                if (dayTypes.Find(x => x.name == "CDD") == null)
-                                {
-                                    TBD.dayType dayType = calendar.AddDayType();
-                                    dayType.name = "CDD";
-                                }
-
-                                step("Converting to TBD");
-                                Tas.Convert.ToTBD(analyticalModel, tBDDocument, true);
-
-                                step("Updating Zones");
-                                Tas.Modify.UpdateZones(tBDDocument.Building, analyticalModel, true);
-
-                                step("Updating Shading");
-                                shadingUpdated = Tas.Modify.UpdateShading(tBDDocument, analyticalModel);
-
-                                sAMTBDDocument.Save();
-                            }
-
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        cancelled = true;
-                    }
-                    finally
-                    {
-                        progressWindowHost.Dispose();
-                    }
-
-                    // The host is down, so no further click can arrive and any in-flight one has already run:
-                    // this observation is final - but only once the host confirms it actually shut down. If
-                    // it could not, its thread is still live and may be sitting on a click nothing observed,
-                    // so preparation cannot be reported as having completed uninterrupted.
-                    if (!cancelled && (cancellationTokenSource.IsCancellationRequested || !progressWindowHost.ShutdownCompleted))
-                    {
-                        cancelled = true;
-                    }
-
-                    if (!cancelled)
-                    {
-                        List<DesignDay> heatingDesignDays = new List<DesignDay>() { Analytical.Query.HeatingDesignDay(weatherData) };
-                        List<DesignDay> coolingDesignDays = new List<DesignDay>() { Analytical.Query.CoolingDesignDay(weatherData) };
-
-                        SurfaceOutputSpec surfaceOutputSpec = new SurfaceOutputSpec("Tas.Simulate")
-                        {
-                            SolarGain = true,
-                            Conduction = true,
-                            ApertureData = true,
-                            Condensation = false,
-                            Convection = false,
-                            LongWave = false,
-                            Temperature = true
-                        };
-
-                        List<SurfaceOutputSpec> surfaceOutputSpecs = new List<SurfaceOutputSpec>() { surfaceOutputSpec };
-
-                        int simulate_From = -1;
-                        int simulate_To = -1;
-
-                        bool simulate = fullYearSimulation;
-
-                        if (simulate)
-                        {
-                            simulate_From = fullYearSimulation_From;
-                            simulate_To = fullYearSimulation_To;
-                        }
-
-                        if (shadingUpdated)
-                        {
-                            if (!simulate)
-                            {
-                                simulate_From = 1;
-                                simulate_To = 1;
-                                simulate = true;
-                            }
-                        }
-
-                        WeatherData weatherData_Workflow = null;
-                        bool updateZones_Workflow = false;
-                        if(solarCalculationMethod == SolarCalculationMethod.TAS)
-                        {
-                            weatherData_Workflow = weatherData;
-                            updateZones_Workflow = true;
-                        }
-
-                        WorkflowSettings workflowSettings = new WorkflowSettings()
-                        {
-                            Path_TBD = path_TBD,
-                            Path_gbXML = path_Xml,
-                            WeatherData = weatherData_Workflow,
-                            DesignDays_Heating = heatingDesignDays,
-                            DesignDays_Cooling = coolingDesignDays,
-                            SurfaceOutputSpecs = surfaceOutputSpecs,
-                            UnmetHours = unmetHours,
-                            Simulate = simulate,
-                            Sizing = sizing,
-                            UpdateZones = updateZones_Workflow,
-                            UseWidths = useWidths,
-                            SimulateFrom = simulate_From,
-                            SimulateTo = simulate_To
-                        };
-
-                        // Read off the settings that are about to run, not off simulateWindow.FullYearSimulation:
-                        // the day range is still taken from the two text boxes when that box is ticked, and
-                        // shadingUpdated above can turn an unticked run into a one-day one. See
-                        // Query.IsPartOFullYearSimulation for why nothing less may complete a Part O run.
-                        bool fullYearWorkflow = workflowSettings.IsPartOFullYearSimulation();
-
-                        // Announced BEFORE the workflow, and only for the full-year case. Two guarantees in one
-                        // arming: a partial/one-day/sizing-only workflow leaves the run unarmed and so cannot
-                        // complete it, and the results file is fingerprinted now so an old <project>.tsd left in
-                        // this directory by an earlier session cannot be accepted as this run's. See
-                        // PartORun.ExpectResults - recording the timestamp after the run would bless that file.
-                        if (fullYearWorkflow && partORun != null && partORun.State == PartORunState.Prepared)
-                        {
-                            partORun.ExpectResults(System.IO.Path.ChangeExtension(path_TBD, "tsd"));
-                        }
-
-                        analyticalModel = Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled);
-
-                        // A cancelled workflow returns null, so everything below - including writing the
-                        // weather data back onto the model - has to be skipped, not just the room data sheets.
-                        if (!cancelled && analyticalModel != null)
-                        {
-                            // The one place a Part O run may be completed from. Set here rather than inferred
-                            // later from `converted`, which is also true when the .tbd was written without the
-                            // workflow ever running - a model that never went through WorkflowCalculator does
-                            // not carry the current TAS zone identities, so it is not a workflow output and must
-                            // not be assessed as one.
-                            workflowCompleted = true;
-
-                            workflowSimulatedFullYear = fullYearWorkflow;
-
-                            if (printRoomDataSheets)
-                            {
-                                if (!System.IO.Directory.Exists(outputDirectory))
-                                {
-                                    System.IO.Directory.CreateDirectory(outputDirectory);
-                                }
-
-                                UI.Modify.PrintRoomDataSheets(analyticalModel, outputDirectory);
-                            }
-
-                            analyticalModel.SetValue(Analytical.AnalyticalModelParameter.WeatherData, weatherData);
-                            converted = true;
-                        }
-                    }
+                    return;
                 }
+
+                if (!cancelled && analyticalModel_Workflow != null)
+                {
+                    // The one place a Part O run may be completed from. Set here rather than inferred later
+                    // from `converted`, which is also true when the .tbd was written without the workflow
+                    // ever running - a model that never went through WorkflowCalculator does not carry the
+                    // current TAS zone identities, so it is not a workflow output and must not be assessed
+                    // as one.
+                    workflowCompleted = true;
+
+                    analyticalModel = analyticalModel_Workflow;
+
+                    if (printRoomDataSheets)
+                    {
+                        if (!System.IO.Directory.Exists(outputDirectory))
+                        {
+                            System.IO.Directory.CreateDirectory(outputDirectory);
+                        }
+
+                        UI.Modify.PrintRoomDataSheets(analyticalModel, outputDirectory);
+                    }
+
+                    converted = true;
+                }
+
+                // A run that produced no model leaves `analyticalModel` as the copy taken above - not as a
+                // half-processed one, because RunPartOSimulation worked on a copy of its own. `converted`
+                // stays false, so the export path below still converts it itself, exactly as before.
             }
+
 
             // Skipped outright once cancelled: these read back the .tbd the cancelled run was part-way through
             // writing, and a partial file converts into a model that looks complete but is not.

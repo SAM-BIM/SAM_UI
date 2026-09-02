@@ -793,6 +793,9 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_AssessPartOTM59.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_AssessPartOTM59.Click += RibbonButton_AssessPartOTM59_Click;
 
+            RibbonButton_OptimisePartOTM59.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_OptimisePartOTM59.Click += RibbonButton_OptimisePartOTM59_Click;
+
             RibbonButton_EditInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditInternalConditions.Click += RibbonButton_EditInternalConditions_Click;
 
@@ -1961,6 +1964,13 @@ namespace SAM.Analytical.UI.WPF.Windows
             RefreshPartOButtons();
         }
 
+        private void RibbonButton_OptimisePartOTM59_Click(object sender, RoutedEventArgs e)
+        {
+            Modify.RunPartOOptimisation(uIAnalyticalModel, partORun, windowHandle);
+
+            RefreshPartOButtons();
+        }
+
         private void RibbonButton_AssessPartOTM59_Click(object sender, RoutedEventArgs e)
         {
             Modify.AssessPartOTM59(partORun, windowHandle);
@@ -1988,6 +1998,23 @@ namespace SAM.Analytical.UI.WPF.Windows
                 : partORun.State == PartORunState.Prepared
                     ? "A Part O iteration is prepared but not simulated. Run the energy simulation first."
                     : partORun.InvalidationReason ?? "Prepare a Part O iteration and run the energy simulation first.";
+
+            //The same pure state read as above, plus the two things 2B additionally needs and which are
+            //knowable without touching the filesystem: the run has to have been prepared with an
+            //optimisation, and with a product selected for it to work within. Modify.CanOptimise is still
+            //the gate - it re-checks the results file and the recorded TAS case - so this stays
+            //presentation.
+            bool canOptimise = canAssess
+                && partORun.PreparationContext?.OptimisationSettings is not null
+                && (partORun.PreparationContext?.HasVentilationUnitCatalogue ?? false);
+
+            RibbonButton_OptimisePartOTM59.IsEnabled = canOptimise;
+
+            RibbonButton_OptimisePartOTM59.ToolTipDescription = canOptimise
+                ? "Raise the design airflow of failing mechanically ventilated rooms by the configured step, rebalance, re-prepare, re-simulate the same weather case and reassess - until every eligible space passes or the selected ventilation unit cannot carry another full step. The selected product is never changed."
+                : !canAssess
+                    ? "Iteration 2B optimises a completed Iteration 2 run. " + (partORun.InvalidationReason ?? "Prepare a Part O iteration, simulate it over the full year, and assess it first.")
+                    : "This Part O run was not prepared with automatic TM59 optimisation and a selected ventilation unit. Prepare the iteration again with both.";
         }
         
         private void RibbonButton_AirHandlingUnitDiagram_Click(object sender, RoutedEventArgs e)
@@ -3017,6 +3044,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_RemoveAirMovementObjects.IsEnabled = false;
             RibbonButton_PreparePartOIteration.IsEnabled = false;
             RibbonButton_AssessPartOTM59.IsEnabled = false;
+            RibbonButton_OptimisePartOTM59.IsEnabled = false;
 
             RibbonButton_OpenMollierChart.IsEnabled = true;
             RibbonButton_Wiki.IsEnabled = true;

@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Prepare Part O Iteration" Height="470" Width="560" ResizeMode="NoResize" FontFamily="Roboto Light">
+        Title="Prepare Part O Iteration" Height="580" Width="620" ResizeMode="NoResize" FontFamily="Roboto Light">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -33,6 +33,21 @@
         <StackPanel Grid.Row="6" Margin="0,10,0,0">
             <CheckBox x:Name="checkBox_SelectVentilationUnit" Content="Select a ventilation unit from the manufacturer catalogue (Iteration 2)"/>
             <TextBlock x:Name="textBlock_Catalogue" Margin="20,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+
+            <!-- Iteration 2B is deliberately NOT an entry in the base-provision list above. It is not a base
+                 provision: it is an optimisation performed ON an Iteration 2 design, and it needs a selected
+                 ventilation unit to work within - which is why it is offered here, under the selection tick
+                 it depends on, and disabled without it. -->
+            <CheckBox x:Name="checkBox_Optimise" Content="Automatically optimise TM59 failures (Iteration 2B)" Margin="0,10,0,0"/>
+
+            <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
+                <TextBlock Text="Airflow step [l/s]" VerticalAlignment="Center" Width="120"/>
+                <TextBox x:Name="textBox_AirFlowStep" Width="60" Height="20" VerticalContentAlignment="Center"/>
+                <TextBlock Text="Maximum iterations" VerticalAlignment="Center" Width="130" Margin="20,0,0,0"/>
+                <TextBox x:Name="textBox_MaximumIterations" Width="60" Height="20" VerticalContentAlignment="Center"/>
+            </StackPanel>
+
+            <TextBlock x:Name="textBlock_Optimise" Margin="20,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
         </StackPanel>
 
         <Button x:Name="button_OK" Grid.Row="7" Width="60" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_OK_Click">OK</Button>
