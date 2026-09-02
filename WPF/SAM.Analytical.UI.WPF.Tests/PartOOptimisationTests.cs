@@ -669,6 +669,95 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(22, rows_Baseline.Find(x => x.Space == name_Kitchen).DesignBefore_Lps, 6);
         }
 
+        // ---- A pass over a subset is not a pass ------------------------------------------------------
+
+        /// <summary>
+        /// A pass whose assessment never looked at an <b>in-scope</b> room is not a pass. A room whose
+        /// simulated counterpart does not resolve is excluded before the calculation runs, so the combined
+        /// status can genuinely be <c>Pass</c> over a subset - and believing it would end the run on the
+        /// claim that every eligible occupied space passes, having never assessed one of them.
+        /// </summary>
+        [Fact]
+        public void APassThatNeverLookedAtAnInScopeRoom_IsNotAPass()
+        {
+            AnalyticalModel analyticalModel = Model(out List<Zone> zones);
+
+            Space space_Bedroom = Space(analyticalModel, name_Bedroom);
+
+            PartOPreparationContext partOPreparationContext = new(PartOIteration.BasePassive, zones, [], null);
+
+            //The bedroom produced no result at all; the other rooms were assessed.
+            PartOTM59Assessment partOTM59Assessment = new(null, null, null, null, [space_Bedroom.Guid], null);
+
+            string refusal = Modify.PartialAssessment(analyticalModel, partOPreparationContext, partOTM59Assessment);
+
+            Assert.NotNull(refusal);
+            Assert.Contains("'Bedroom'", refusal);
+            Assert.DoesNotContain("'Kitchen'", refusal);
+            Assert.DoesNotContain("'Bathroom'", refusal);
+        }
+
+        /// <summary>
+        /// Only the <b>dwelling scope</b> is asked about. A communal corridor and the simulation-only zone
+        /// an air handling unit gets were never part of the run's claim, so their absence from the
+        /// assessment is not a hole in it.
+        /// </summary>
+        [Fact]
+        public void APassWhoseOnlyUnassessedRoomsAreOutsideTheScope_IsStillAPass()
+        {
+            AnalyticalModel analyticalModel = Model(out List<Zone> zones);
+
+            Space space_Corridor = Space(analyticalModel, name_Corridor);
+            Space space_AirHandlingUnitZone = Space(analyticalModel, name_AirHandlingUnitZone);
+
+            PartOPreparationContext partOPreparationContext = new(PartOIteration.BasePassive, zones, [], null);
+
+            PartOTM59Assessment partOTM59Assessment = new(null, null, null, null, [space_Corridor.Guid, space_AirHandlingUnitZone.Guid], null);
+
+            Assert.Null(Modify.PartialAssessment(analyticalModel, partOPreparationContext, partOTM59Assessment));
+        }
+
+        /// <summary>A pass that looked at every in-scope room is a pass - the guard adds nothing to it.</summary>
+        [Fact]
+        public void APassThatLookedAtEveryInScopeRoom_IsAPass()
+        {
+            AnalyticalModel analyticalModel = Model(out List<Zone> zones);
+
+            PartOPreparationContext partOPreparationContext = new(PartOIteration.BasePassive, zones, [], null);
+
+            PartOTM59Assessment partOTM59Assessment = new(null, null, null, null, [], null);
+
+            Assert.Null(Modify.PartialAssessment(analyticalModel, partOPreparationContext, partOTM59Assessment));
+        }
+
+        // ---- The round count ---------------------------------------------------------------------------
+
+        /// <summary>
+        /// A round nobody attempted is not a round. A run that stopped before any target could be taken -
+        /// every failure out of scope or without a terminal - is a baseline and nothing else: no run 1 in
+        /// the history, and a round count of zero. The recording side of that guarantee sits behind the TAS
+        /// simulation seam and is not reachable here; what this pins is the contract the run reports.
+        /// </summary>
+        [Fact]
+        public void ARoundNobodyAttempted_IsNotARound()
+        {
+            PartOOptimisationRun partOOptimisationRun = new(new PartOOptimisationSettings());
+
+            PartOOptimisationStep partOOptimisationStep_Baseline = new(0)
+            {
+                ProjectName = "Fixture-Opt00",
+                OccupiedSpaceComplianceStatus = TM59ComplianceStatus.Fail,
+                IsCompleted = true,
+            };
+
+            partOOptimisationRun.Steps.Add(partOOptimisationStep_Baseline);
+            partOOptimisationRun.StopReason = PartOOptimisationStopReason.NoEligibleTargets;
+
+            Assert.Equal(0, partOOptimisationRun.Rounds);
+            Assert.Same(partOOptimisationStep_Baseline, partOOptimisationRun.Step_LastValid);
+            Assert.Contains("0 optimisation round(s)", partOOptimisationRun.Description);
+        }
+
         // ---- Fixture -------------------------------------------------------------------------------------
 
         private static AnalyticalModel Model(out List<Zone> zones)

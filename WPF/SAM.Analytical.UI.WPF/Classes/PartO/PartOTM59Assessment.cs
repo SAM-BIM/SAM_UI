@@ -50,7 +50,9 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public class PartOTM59Assessment
     {
-        private PartOTM59Assessment(TM59AssessmentResult tM59AssessmentResult, TM59AssessmentReport tM59AssessmentReport, List<PartOTM59SpaceResult> spaceResults, List<string> associationRefusals, List<Guid> spaceGuids_Unassessed, string refusal)
+        //Internal rather than private so tests can fabricate the assessment the subset-pass guard reads -
+        //the production route to one remains Assess, which needs a real TSD.
+        internal PartOTM59Assessment(TM59AssessmentResult tM59AssessmentResult, TM59AssessmentReport tM59AssessmentReport, List<PartOTM59SpaceResult> spaceResults, List<string> associationRefusals, List<Guid> spaceGuids_Unassessed, string refusal)
         {
             Result = tM59AssessmentResult;
             Report = tM59AssessmentReport;
