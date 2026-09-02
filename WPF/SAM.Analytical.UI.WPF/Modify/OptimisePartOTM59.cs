@@ -72,9 +72,11 @@ namespace SAM.Analytical.UI.WPF
         /// The session's Part O run, which must be a completed Iteration 2 run. It is driven through a fresh
         /// lifecycle for every round and left holding the last valid one.
         /// </param>
-        /// <param name="partOOptimisationSettings">The step and the iteration guard.</param>
+        /// <param name="partOOptimisationSettings">The step, the iteration guard, and whether the final
+        /// diagnostic capacity envelope is wanted.</param>
         /// <param name="refusal">Why the optimisation could not be started at all.</param>
-        /// <returns>The whole run - the baseline, every round, why it stopped, and the last valid design.</returns>
+        /// <returns>The whole run - the baseline, every round, why it stopped, the last valid design, and -
+        /// separately from all of it - the diagnostic capacity envelope where one was calculated.</returns>
         public static PartOOptimisationRun? OptimisePartOTM59(this PartORun? partORun, PartOOptimisationSettings? partOOptimisationSettings, out string? refusal)
         {
             refusal = null;
@@ -86,9 +88,33 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
+            //Captured HERE, while CanOptimise still guarantees both are there. The ordinary optimisation
+            //below can leave partORun dropped - a cancelled or unassessable round invalidates it - and both
+            //contexts read null in that state, so the envelope stage could not ask for them afterwards.
             PartOPreparationContext partOPreparationContext = partORun!.PreparationContext!;
             PartOSimulationContext partOSimulationContext = partORun.SimulationContext!;
 
+            PartOOptimisationRun result = Optimise(partORun, partOOptimisationSettings, partOPreparationContext, partOSimulationContext);
+
+            //AFTER the ordinary optimisation has finished and its answer is settled, never during it. The
+            //envelope reads the design the optimisation accepted and writes nothing back into the run - see
+            //CapacityEnvelope.
+            CapacityEnvelope(result, partOOptimisationSettings, partOPreparationContext, partOSimulationContext);
+
+            return result;
+        }
+
+        /// <summary>
+        /// The ordinary optimisation, unchanged: rounds at the whole configured step until something
+        /// explicit stops it, and the last design that was actually valid.
+        /// <para>
+        /// Separated from the public entry point only so the diagnostic capacity envelope can run strictly
+        /// <b>after</b> this has reached its terminal condition. Nothing about the loop's behaviour depends
+        /// on whether an envelope follows it, and nothing here knows one might.
+        /// </para>
+        /// </summary>
+        private static PartOOptimisationRun Optimise(PartORun partORun, PartOOptimisationSettings partOOptimisationSettings, PartOPreparationContext partOPreparationContext, PartOSimulationContext partOSimulationContext)
+        {
             PartOOptimisationRun result = new(partOOptimisationSettings);
 
             //Run 0. The Iteration 2 design exactly as it stands - not re-simulated, because it already has
@@ -625,6 +651,319 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// The <b>optional final diagnostic</b>: what the already-selected ventilation units could deliver
+        /// if each were taken to its own design-capacity ceiling - calculated only once the ordinary
+        /// optimisation has stopped, and kept entirely apart from what it accepted.
+        ///
+        /// <para><b>The question, and why it needs its own stage</b></para>
+        /// <para>
+        /// The optimisation above is all-or-nothing at a fixed step, and stays that way. So a run stops on
+        /// the selected unit's capacity, or on the iteration guard, with eligible rooms still failing - and
+        /// an engineer is left holding "this design still fails" with no statement of how close the
+        /// equipment already bought can get. That statement is what this produces. It is <b>not</b> another
+        /// round: it is a partial - or, where the iteration guard stopped the run early, several times over
+        /// - step that the ordinary policy deliberately refuses.
+        /// </para>
+        ///
+        /// <para><b>What it runs, and on what</b></para>
+        /// <code>
+        /// last ACCEPTED ordinary design
+        ///   -> the same deliberate target vector the +5 policy would next have asked for
+        ///   -> Modify.EvaluateDesignAirFlowCapacityEnvelope   one coherent scale per equipment group
+        ///   -> re-prepare Part O                              transfer air, network and duties rebuilt
+        ///   -> full-year TAS, its OWN -OptMax TSD              the SAME weather case
+        ///   -> production TM59, on the model the workflow RETURNED
+        /// </code>
+        /// <para>
+        /// Every guarantee the rounds keep is kept here too: the preparation is offered <b>no</b> catalogue,
+        /// so the product selected at Iteration 2 is not re-chosen against the grown duty; the TAS case is
+        /// the one the baseline was produced by, verbatim; the assessment reads the model the workflow
+        /// returned and never the preparation output; and the results file is the envelope's own, so it
+        /// overwrites no round's evidence.
+        /// </para>
+        ///
+        /// <para><b>Why it gets its own <c>PartORun</c></b></para>
+        /// <para>
+        /// The session's run is left holding the <b>last accepted ordinary design</b> and the results that
+        /// go with it, because that is the design the command adopts and the one an engineer will assess
+        /// again. Driving the envelope's lifecycle through that same run would leave it paired with the
+        /// diagnostic - so <c>RunPartOOptimisation</c>'s reference check would correctly refuse to arm, and
+        /// worse, whatever the user then assessed would be the diagnostic's results against the accepted
+        /// design's model. A private run has no model coupling at all and costs nothing, so the envelope
+        /// gets one and the session's run is never touched.
+        /// </para>
+        ///
+        /// <para><b>Every "no" is recorded</b></para>
+        /// <para>
+        /// Not asked for; the run passed; it did not reach a terminal condition an envelope answers;
+        /// nothing eligible left to target; no useful headroom; an unresolvable capacity; a vector that
+        /// cannot be formed - each is written to
+        /// <see cref="PartOOptimisationRun.CapacityEnvelopeDescription"/> in its own words. An optional
+        /// diagnostic that silently produces nothing leaves a reader unable to tell it was considered.
+        /// </para>
+        /// </summary>
+        /// <remarks>
+        /// Internal rather than private so the no-run decisions are pinned by tests. Every one of them -
+        /// not asked for, the run passed, the wrong terminal condition, no failing verdict, nothing left to
+        /// target, and an envelope that reached no ceiling - is settled <b>before</b> any TAS work, so they
+        /// can be, and are, asserted without a simulation standing behind them.
+        /// </remarks>
+        internal static void CapacityEnvelope(PartOOptimisationRun partOOptimisationRun, PartOOptimisationSettings partOOptimisationSettings, PartOPreparationContext partOPreparationContext, PartOSimulationContext partOSimulationContext)
+        {
+            if (!partOOptimisationSettings.CapacityEnvelope)
+            {
+                partOOptimisationRun.CapacityEnvelopeDescription = "The diagnostic selected-equipment capacity envelope was not asked for, so none was calculated.";
+
+                return;
+            }
+
+            //Passing is the whole point of the optimisation, and there is nothing to diagnose about a design
+            //that met its criteria. Said explicitly rather than left silent, so a reader knows the
+            //diagnostic was considered and correctly declined.
+            if (partOOptimisationRun.StopReason == PartOOptimisationStopReason.Passed)
+            {
+                partOOptimisationRun.CapacityEnvelopeDescription = "The optimisation reached a design in which every eligible occupied space passes its production TM59 criteria, so there is nothing for a capacity envelope to diagnose and none was calculated.";
+
+                return;
+            }
+
+            //The two terminal conditions an envelope answers. Every other stop is a run that did not finish
+            //rather than a design limited by its equipment - a refused round, a preparation or simulation
+            //that failed, an assessment that produced nothing, a cancellation - and enveloping from one
+            //would be diagnosing a design whose own optimisation never established what it could do.
+            if (partOOptimisationRun.StopReason != PartOOptimisationStopReason.CapacityReached && partOOptimisationRun.StopReason != PartOOptimisationStopReason.IterationLimitReached)
+            {
+                partOOptimisationRun.CapacityEnvelopeDescription = string.Format(
+                    "The optimisation stopped at '{0}', which is a run that did not finish rather than a design limited by the equipment selected for it, so no capacity envelope was calculated. An envelope answers a stop on the selected unit's capacity or on the iteration guard; from any other it would diagnose a design whose own optimisation never established what it could do.",
+                    Core.Query.Description(partOOptimisationRun.StopReason));
+
+                return;
+            }
+
+            PartOOptimisationStep? partOOptimisationStep_LastValid = partOOptimisationRun.Step_LastValid;
+
+            AnalyticalModel? analyticalModel_LastValid = partOOptimisationRun.AnalyticalModel_LastValid;
+
+            AdjacencyCluster? adjacencyCluster = analyticalModel_LastValid?.AdjacencyCluster;
+
+            if (partOOptimisationStep_LastValid is null || adjacencyCluster is null)
+            {
+                partOOptimisationRun.CapacityEnvelopeDescription = "The optimisation left no valid design to calculate a capacity envelope from, so none was calculated.";
+
+                return;
+            }
+
+            //An explicit failure, exactly as the optimisation itself requires. "Not Pass" is not "Fail", and
+            //enveloping from an assessment that reached no verdict would scale a design towards its
+            //equipment's ceiling on the strength of results that said nothing about any of its rooms.
+            if (partOOptimisationStep_LastValid.OccupiedSpaceComplianceStatus != TM59ComplianceStatus.Fail)
+            {
+                partOOptimisationRun.CapacityEnvelopeDescription = string.Format(
+                    "The last valid design's production TM59 status is '{0}', which is not a failure, so there is no failing target for a capacity envelope to scale and none was calculated.",
+                    Core.Query.Description(partOOptimisationStep_LastValid.OccupiedSpaceComplianceStatus));
+
+                return;
+            }
+
+            // ---- The same vector the next ordinary round would have asked for -----------------------------
+
+            //The SAME policy, at the SAME step, over the SAME production results - so the envelope scales
+            //what the optimisation would next have requested and not some other set of rooms. Notably NOT
+            //filtered by the dwellings the optimisation marked at capacity: those are precisely the ones
+            //whose equipment ceiling is the thing being diagnosed.
+            PartOOptimisationTargetSelection partOOptimisationTargetSelection = Query.PartOOptimisationTargets(analyticalModel_LastValid, partOOptimisationStep_LastValid.TM59Results, partOPreparationContext.Zones, partOOptimisationSettings.AirFlowStep_Lps);
+
+            if (partOOptimisationTargetSelection.Targets.Count == 0)
+            {
+                //What was learned belongs to the design it was learned about, so the reasons go on the step
+                //that produced that design - the same rule the optimisation follows.
+                partOOptimisationStep_LastValid.Notes.AddRange(partOOptimisationTargetSelection.NotOptimisable);
+
+                partOOptimisationRun.CapacityEnvelopeDescription = "No failing space remained that could be targeted, so there is no deliberate target vector for a capacity envelope to scale and none was calculated.";
+
+                return;
+            }
+
+            // ---- The envelope itself, calculated by SAM and adopted by nobody -----------------------------
+
+            DesignAirFlowCapacityEnvelope designAirFlowCapacityEnvelope = adjacencyCluster.EvaluateDesignAirFlowCapacityEnvelope(
+                partOOptimisationTargetSelection.Targets,
+                PartFExtractAllocationStrategy.MinimumFirstCookingPriority,
+                partOOptimisationSettings.Tolerance_Lps,
+                partOPreparationContext.VentilationUnitCapacityDescriptors);
+
+            partOOptimisationRun.CapacityEnvelope = designAirFlowCapacityEnvelope;
+            partOOptimisationRun.CapacityEnvelopeDescription = designAirFlowCapacityEnvelope.Reason;
+
+            if (!designAirFlowCapacityEnvelope.IsScaled)
+            {
+                //No design to simulate. Nothing is run: a diagnostic with nothing to say must not cost a
+                //full-year TAS run to say it.
+                partOOptimisationStep_LastValid.Notes.AddRange(designAirFlowCapacityEnvelope.Notes);
+                partOOptimisationStep_LastValid.Notes.AddRange(designAirFlowCapacityEnvelope.Refusals);
+
+                //Each equipment group's OWN reason is carried up onto the one line a reader sees. The
+                //envelope's overall sentence only says that no group reached a ceiling; which of "this unit
+                //is already at its rating", "nothing is selected on it" and "its capacity is not in the
+                //catalogue offered" it was is the whole diagnostic, and leaving it further down the notes
+                //would bury it.
+                List<string> reasons = designAirFlowCapacityEnvelope.Groups.ConvertAll(x => x.Reason);
+
+                reasons.RemoveAll(string.IsNullOrWhiteSpace);
+
+                partOOptimisationRun.CapacityEnvelopeDescription = string.Join(" ", [designAirFlowCapacityEnvelope.Reason, .. reasons, .. designAirFlowCapacityEnvelope.Refusals]);
+
+                return;
+            }
+
+            //Its own step, its own kind and its own project name. The iteration number continues the run's
+            //sequence so the step reads in order; the FILE name is -OptMax, which is what keeps the
+            //diagnostic out of the rounds' numbering - see PartOSimulationContext.ProjectName_CapacityEnvelope.
+            PartOOptimisationStep partOOptimisationStep = new(PartOSimulationContext.Iteration_ProjectName(partOOptimisationStep_LastValid.ProjectName) + 1, PartOOptimisationStepKind.CapacityEnvelope)
+            {
+                ProjectName = partOSimulationContext.ProjectName_CapacityEnvelope(),
+                WeatherData = partOSimulationContext.WeatherData?.Name,
+            };
+
+            partOOptimisationRun.Steps.Add(partOOptimisationStep);
+
+            partOOptimisationStep.TargetedAdjustments.AddRange(designAirFlowCapacityEnvelope.TargetedAdjustments);
+            partOOptimisationStep.DerivedAdjustments.AddRange(designAirFlowCapacityEnvelope.DerivedAdjustments);
+            partOOptimisationStep.Notes.AddRange(partOOptimisationTargetSelection.NotOptimisable);
+            partOOptimisationStep.Notes.AddRange(designAirFlowCapacityEnvelope.Notes);
+            partOOptimisationStep.Warnings.AddRange(designAirFlowCapacityEnvelope.Warnings);
+
+            if (designAirFlowCapacityEnvelope.RoundCandidate is not null)
+            {
+                partOOptimisationStep.TargetRefusals.AddRange(designAirFlowCapacityEnvelope.RoundCandidate.TargetRefusals);
+            }
+
+            AnalyticalModel analyticalModel_Envelope = new(analyticalModel_LastValid, designAirFlowCapacityEnvelope.AdjacencyCluster);
+
+            // ---- Rebuild the real Part O state around the envelope design ---------------------------------
+
+            //NULL catalogue, for exactly the reason every round passes null: given one, the preparation runs
+            //its smallest-capable-unit rule against the realized duty and would quietly buy the next product
+            //up - which for an envelope would be absurd, since the envelope's whole subject is what the
+            //CURRENT product can deliver.
+            PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel_Envelope, partOPreparationContext.PartOIteration, partOPreparationContext.Zones, partOPreparationContext.VentilationStrategies, null);
+
+            partOOptimisationStep.Notes.AddRange(partOIterationPreparation.Notes);
+            partOOptimisationStep.Warnings.AddRange(partOIterationPreparation.Warnings);
+
+            //A PRIVATE run, so the session's own - which holds the last accepted ordinary design and its
+            //results - is not touched. See the method documentation.
+            PartORun partORun_Envelope = new();
+
+            if (!partORun_Envelope.Prepare(partOIterationPreparation, partOPreparationContext))
+            {
+                partOOptimisationStep.Refusals.Add(partOIterationPreparation.Refusal ?? partORun_Envelope.InvalidationReason ?? "The Part O iteration could not be re-prepared over the capacity envelope design.");
+
+                partOOptimisationRun.CapacityEnvelopeDescription = Describe(designAirFlowCapacityEnvelope, partOOptimisationStep);
+
+                return;
+            }
+
+            // ---- The same full-year case, under the envelope's own name -----------------------------------
+
+            using CancellationTokenSource cancellationTokenSource = new();
+
+            AnalyticalModel analyticalModel_Workflow = RunPartOSimulation(partOIterationPreparation.AnalyticalModel, partOSimulationContext, partOOptimisationStep.ProjectName, partORun_Envelope, cancellationTokenSource.Token, out string _, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes_Simulation, out string refusal_Simulation);
+
+            partOOptimisationStep.Notes.AddRange(notes_Simulation);
+            partOOptimisationStep.Path_TSD = path_TSD;
+
+            if (cancelled)
+            {
+                partOOptimisationStep.Refusals.Add("The capacity envelope was cancelled during its simulation, so it has no results. The optimisation's own answer above is unaffected.");
+
+                partOOptimisationRun.CapacityEnvelopeDescription = Describe(designAirFlowCapacityEnvelope, partOOptimisationStep);
+
+                return;
+            }
+
+            if (analyticalModel_Workflow is null || !fullYear)
+            {
+                partOOptimisationStep.Refusals.Add(refusal_Simulation ?? (analyticalModel_Workflow is null
+                    ? "The TAS workflow did not run over the capacity envelope design, so there are no results to assess."
+                    : "The simulation that ran over the capacity envelope design was not the full year a TM59 assessment reads."));
+
+                partOOptimisationRun.CapacityEnvelopeDescription = Describe(designAirFlowCapacityEnvelope, partOOptimisationStep);
+
+                return;
+            }
+
+            if (!partORun_Envelope.Complete(analyticalModel_Workflow, path_TSD, partOSimulationContext, out string refusal_Complete))
+            {
+                partOOptimisationStep.Refusals.Add(refusal_Complete);
+
+                partOOptimisationRun.CapacityEnvelopeDescription = Describe(designAirFlowCapacityEnvelope, partOOptimisationStep);
+
+                return;
+            }
+
+            // ---- Production TM59, on the model the workflow returned, stored as the ENVELOPE's ------------
+
+            PartOTM59Assessment partOTM59Assessment = PartOTM59Assessment.Assess(partORun_Envelope.AnalyticalModel_Assessment, partORun_Envelope.Path_TSD, partORun_Envelope.OverheatingScenarios);
+
+            Record(partOOptimisationStep, partORun_Envelope.AnalyticalModel_Assessment, partOPreparationContext, partOTM59Assessment);
+
+            if (!partOTM59Assessment.IsAssessed)
+            {
+                partOOptimisationStep.Refusals.Add(partOTM59Assessment.Refusal ?? "The production TM59 assessment could not be produced for the capacity envelope design.");
+
+                partOOptimisationRun.CapacityEnvelopeDescription = Describe(designAirFlowCapacityEnvelope, partOOptimisationStep);
+
+                return;
+            }
+
+            //Completed - and completed as a CAPACITY ENVELOPE, which is why PartOOptimisationRun.Rounds and
+            //Step_LastValid both exclude this kind. It is a finished diagnostic, not a finished round.
+            partOOptimisationStep.IsCompleted = true;
+
+            partOOptimisationRun.AnalyticalModel_CapacityEnvelope = partORun_Envelope.AnalyticalModel_Assessment;
+            partOOptimisationRun.Path_TSD_CapacityEnvelope = partORun_Envelope.Path_TSD;
+
+            foreach (OverheatingScenario overheatingScenario in partORun_Envelope.OverheatingScenarios)
+            {
+                if (overheatingScenario is not null)
+                {
+                    partOOptimisationRun.OverheatingScenarios_CapacityEnvelope.Add(overheatingScenario);
+                }
+            }
+
+            partOOptimisationRun.CapacityEnvelopeDescription = Describe(designAirFlowCapacityEnvelope, partOOptimisationStep);
+        }
+
+        /// <summary>
+        /// The envelope in one paragraph, worded so it cannot be mistaken for an optimisation result.
+        /// <para>
+        /// It states what the equipment could deliver and what TM59 then made of that - and says, in those
+        /// words, that this is a diagnostic and that the design the optimisation accepted is unchanged.
+        /// </para>
+        /// </summary>
+        private static string Describe(DesignAirFlowCapacityEnvelope designAirFlowCapacityEnvelope, PartOOptimisationStep partOOptimisationStep)
+        {
+            List<string> scales = designAirFlowCapacityEnvelope.Groups_Scaled.ConvertAll(x => string.Format(
+                "'{0}' x{1:0.###} to {2:0.###}/{3:0.###} l/s of {4:0.###}/{5:0.###} l/s",
+                x.Name,
+                x.Scale,
+                x.SupplyDuty_After_Lps,
+                x.ExtractDuty_After_Lps,
+                x.VentilationUnitCapacityDescriptor?.MaximumSupplyFlowRate_Lps ?? double.NaN,
+                x.VentilationUnitCapacityDescriptor?.MaximumExtractFlowRate_Lps ?? double.NaN));
+
+            return string.Format(
+                "DIAGNOSTIC ONLY - this is not an optimisation round and the design the optimisation accepted is unchanged. Taking the already-selected ventilation unit(s) to their own design-capacity ceiling: {0}. {1} No product was reselected, no Approved Document F requirement was altered and no operating airflow was written. Production TM59 for that design: {2}.{3}",
+                scales.Count == 0 ? "no equipment group reached a ceiling" : string.Join("; ", scales),
+                partOOptimisationStep.IsCompleted
+                    ? string.Format("Simulated over the same full-year weather case as its own run '{0}', results '{1}'.", partOOptimisationStep.ProjectName ?? "-", partOOptimisationStep.Path_TSD ?? "-")
+                    : "It was NOT successfully simulated and assessed - see its refusals.",
+                partOOptimisationStep.IsCompleted ? Core.Query.Description(partOOptimisationStep.OccupiedSpaceComplianceStatus) : "not established",
+                partOOptimisationStep.Refusals.Count == 0 ? string.Empty : " " + string.Join(" ", partOOptimisationStep.Refusals));
         }
 
         /// <summary>

@@ -20,12 +20,21 @@ namespace SAM.Analytical.UI.WPF
     /// disagreement here would be visible rather than silent. A derived row has no request - nobody asked
     /// for it - and shows a dash.
     /// </para>
+    /// <para>
+    /// <b><see cref="Stage"/> tells the three kinds of step apart</b> - BASELINE, OPTIMISATION and CAPACITY
+    /// ENVELOPE. The envelope's rows are partial (or several times over) steps that the all-or-nothing
+    /// policy deliberately refuses, evaluated to say what the equipment already bought could deliver; read
+    /// as optimisation rows they would be the run's best result, which they are not. Its <see cref="Run"/>
+    /// is <c>MAX</c> rather than a number, for the same reason its results file is <c>-OptMax</c>: a number
+    /// would place it in the rounds' sequence, where the last of them is the answer.
+    /// </para>
     /// </summary>
     public class PartOOptimisationAirFlowRow
     {
-        private PartOOptimisationAirFlowRow(int iteration, string spaceName, string type, string direction, double before_Lps, double? requested_Lps, double achieved_Lps, double requirement_Lps, TM59ComplianceStatus tM59ComplianceStatus)
+        private PartOOptimisationAirFlowRow(PartOOptimisationStep partOOptimisationStep, string spaceName, string type, string direction, double before_Lps, double? requested_Lps, double achieved_Lps, double requirement_Lps, TM59ComplianceStatus tM59ComplianceStatus)
         {
-            Run = iteration;
+            Run = partOOptimisationStep.IsCapacityEnvelope ? "MAX" : partOOptimisationStep.Iteration.ToString();
+            Stage = Stages(partOOptimisationStep.Kind);
             Space = spaceName;
             Type = type;
             Direction = direction;
@@ -36,8 +45,14 @@ namespace SAM.Analytical.UI.WPF
             ComplianceStatus = tM59ComplianceStatus;
         }
 
-        /// <summary>Which iteration - 0 is the baseline.</summary>
-        public int Run { get; }
+        /// <summary>Which iteration - 0 is the baseline, and MAX is the diagnostic capacity envelope.</summary>
+        public string Run { get; }
+
+        /// <summary>
+        /// BASELINE, OPTIMISATION or CAPACITY ENVELOPE. <b>Read this before reading any airflow on the
+        /// row</b>: an envelope row is a diagnostic and not a design the optimisation accepted.
+        /// </summary>
+        public string Stage { get; }
 
         /// <summary>The room.</summary>
         public string Space { get; }
@@ -93,7 +108,7 @@ namespace SAM.Analytical.UI.WPF
                 foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.TargetedAdjustments)
                 {
                     result.Add(new PartOOptimisationAirFlowRow(
-                        partOOptimisationStep.Iteration,
+                        partOOptimisationStep,
                         designAirFlowAdjustment.SpaceName,
                         "TARGETED",
                         Core.Query.Description(designAirFlowAdjustment.FlowClassification),
@@ -107,7 +122,7 @@ namespace SAM.Analytical.UI.WPF
                 foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.DerivedAdjustments)
                 {
                     result.Add(new PartOOptimisationAirFlowRow(
-                        partOOptimisationStep.Iteration,
+                        partOOptimisationStep,
                         designAirFlowAdjustment.SpaceName,
                         "DERIVED",
                         Core.Query.Description(designAirFlowAdjustment.FlowClassification),
@@ -158,7 +173,11 @@ namespace SAM.Analytical.UI.WPF
 
             foreach (PartOOptimisationStep partOOptimisationStep in partOOptimisationRun.Steps)
             {
-                if (partOOptimisationStep.IsBaseline)
+                //The ENVELOPE is excluded as well as the baseline. Its Before_Lps is the last ACCEPTED
+                //design's airflow, not the baseline's, so a room whose first ever movement is in the
+                //envelope would otherwise contribute a "baseline" row stating a figure the baseline never
+                //carried. Its own rows print that Before honestly, beside its own stage.
+                if (!partOOptimisationStep.IsOptimisationRound)
                 {
                     continue;
                 }
@@ -173,7 +192,7 @@ namespace SAM.Analytical.UI.WPF
                     }
 
                     result.Add(new PartOOptimisationAirFlowRow(
-                        partOOptimisationStep_Baseline.Iteration,
+                        partOOptimisationStep_Baseline,
                         designAirFlowAdjustment.SpaceName,
                         "BASELINE",
                         Core.Query.Description(designAirFlowAdjustment.FlowClassification),
@@ -186,6 +205,20 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// The stage label, in the words the grid shows - the three things a reader has to tell apart, taken
+        /// from what the step says it is rather than from its number.
+        /// </summary>
+        private static string Stages(PartOOptimisationStepKind partOOptimisationStepKind)
+        {
+            return partOOptimisationStepKind switch
+            {
+                PartOOptimisationStepKind.Baseline => "BASELINE",
+                PartOOptimisationStepKind.CapacityEnvelope => "CAPACITY ENVELOPE",
+                _ => "OPTIMISATION",
+            };
         }
 
         /// <summary>

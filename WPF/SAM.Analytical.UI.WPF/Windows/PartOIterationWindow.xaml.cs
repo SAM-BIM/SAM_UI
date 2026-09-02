@@ -51,6 +51,12 @@ namespace SAM.Analytical.UI.WPF
             checkBox_SelectVentilationUnit.Unchecked += (s, e) => UpdateOptimiseAvailability();
             checkBox_Optimise.Checked += (s, e) => UpdateOptimiseText();
             checkBox_Optimise.Unchecked += (s, e) => UpdateOptimiseText();
+            checkBox_CapacityEnvelope.Checked += (s, e) => UpdateOptimiseText();
+            checkBox_CapacityEnvelope.Unchecked += (s, e) => UpdateOptimiseText();
+
+            //On by default: the case the envelope answers is exactly the case in which the optimisation on
+            //its own does not tell an engineer what to do next.
+            checkBox_CapacityEnvelope.IsChecked = new PartOOptimisationSettings().CapacityEnvelope;
 
             textBox_AirFlowStep.Text = PartOOptimisationSettings.DefaultAirFlowStep_Lps.ToString();
             textBox_MaximumIterations.Text = PartOOptimisationSettings.DefaultMaximumIterations.ToString();
@@ -196,6 +202,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     AirFlowStep_Lps = airFlowStep_Lps,
                     MaximumIterations = maximumIterations,
+                    CapacityEnvelope = checkBox_CapacityEnvelope.IsChecked ?? false,
                 };
 
                 return result.IsValid(out string? _) ? result : null;
@@ -265,6 +272,7 @@ namespace SAM.Analytical.UI.WPF
 
             textBox_AirFlowStep.IsEnabled = available;
             textBox_MaximumIterations.IsEnabled = available;
+            checkBox_CapacityEnvelope.IsEnabled = available;
 
             UpdateOptimiseText();
         }
@@ -283,6 +291,10 @@ namespace SAM.Analytical.UI.WPF
             textBlock_Optimise.Text = Optimise
                 ? "After the full-year simulation and the TM59 assessment, each eligible failing room's DESIGN airflow is raised by the step, the dwelling is rebalanced, the Part O state is rebuilt and the same weather case is re-run - until every eligible space passes, or the selected unit cannot carry another full step. The selected product is never changed and no Approved Document F requirement is altered. A design that passes at this step is the first tested passing design, not a minimum."
                 : "Iteration 2B is not a base provision - it is an optimisation performed on this Iteration 2 design, and it can be run once this iteration has been simulated and assessed.";
+
+            textBlock_CapacityEnvelope.Text = (checkBox_CapacityEnvelope.IsChecked ?? false) && checkBox_CapacityEnvelope.IsEnabled
+                ? "Where the optimisation stops with rooms still failing, one further DIAGNOSTIC run scales the same targets coherently until the already-selected unit's own capacity binds, and reports what TM59 makes of that design. It is reported separately, is never the optimisation's answer, and never reselects a product - it says how close the equipment already chosen can get. It costs one more full-year simulation, and nothing at all on a run that passes."
+                : "Without this, a run that stops on the selected unit's capacity or on the iteration limit reports the last valid design and does not say how far that unit could have been taken.";
         }
 
         private void UpdateVentilationStrategyText()

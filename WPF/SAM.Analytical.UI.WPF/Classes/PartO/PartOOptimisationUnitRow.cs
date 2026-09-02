@@ -17,14 +17,26 @@ namespace SAM.Analytical.UI.WPF
     /// <para>
     /// <b>Equipment says "Selected" or "Kept", never "Reselected".</b> Iteration 2B works within the
     /// product chosen at Iteration 2 and does not change it; a run that needs a bigger unit stops and says
-    /// so, leaving that decision to a person.
+    /// so, leaving that decision to a person. That is true of the capacity envelope too: its whole subject
+    /// is what the CURRENT product can deliver, so a row at stage CAPACITY ENVELOPE shows the same product
+    /// as the round above it with its duty taken up to the rating.
     /// </para>
     /// </summary>
     public class PartOOptimisationUnitRow
     {
-        private PartOOptimisationUnitRow(int iteration, PartOOptimisationUnitState partOOptimisationUnitState, bool baseline)
+        private PartOOptimisationUnitRow(PartOOptimisationStep partOOptimisationStep, PartOOptimisationUnitState partOOptimisationUnitState)
         {
-            Run = iteration;
+            bool baseline = partOOptimisationStep.IsBaseline;
+
+            Run = partOOptimisationStep.IsCapacityEnvelope ? "MAX" : partOOptimisationStep.Iteration.ToString();
+
+            Stage = partOOptimisationStep.Kind switch
+            {
+                PartOOptimisationStepKind.Baseline => "BASELINE",
+                PartOOptimisationStepKind.CapacityEnvelope => "CAPACITY ENVELOPE",
+                _ => "OPTIMISATION",
+            };
+
             AHU = partOOptimisationUnitState.AirHandlingUnitName;
             System = partOOptimisationUnitState.VentilationSystemName;
             Duty = string.Format("{0:0.#}/{1:0.#}", partOOptimisationUnitState.SupplyDuty_Lps, partOOptimisationUnitState.ExtractDuty_Lps);
@@ -46,8 +58,14 @@ namespace SAM.Analytical.UI.WPF
                 : baseline ? "Selected" : partOOptimisationUnitState.VentilationUnitSelectionOutcome == Enums.VentilationUnitSelectionOutcome.Refused ? "At capacity" : "Kept";
         }
 
-        /// <summary>Which iteration - 0 is the baseline.</summary>
-        public int Run { get; }
+        /// <summary>Which iteration - 0 is the baseline, and MAX is the diagnostic capacity envelope.</summary>
+        public string Run { get; }
+
+        /// <summary>
+        /// BASELINE, OPTIMISATION or CAPACITY ENVELOPE. An envelope row's duty is what the selected product
+        /// <i>could</i> be taken to, not what the optimisation accepted.
+        /// </summary>
+        public string Stage { get; }
 
         /// <summary>The unit instance.</summary>
         public string AHU { get; }
@@ -79,7 +97,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 foreach (PartOOptimisationUnitState partOOptimisationUnitState in partOOptimisationStep.UnitStates)
                 {
-                    result.Add(new PartOOptimisationUnitRow(partOOptimisationStep.Iteration, partOOptimisationUnitState, partOOptimisationStep.IsBaseline));
+                    result.Add(new PartOOptimisationUnitRow(partOOptimisationStep, partOOptimisationUnitState));
                 }
             }
 
