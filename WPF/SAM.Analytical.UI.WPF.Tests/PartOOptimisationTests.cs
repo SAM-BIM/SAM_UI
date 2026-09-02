@@ -470,8 +470,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             List<PartOOptimisationAirFlowRow> rows = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun);
 
             //Run 1 specifically: run 0 now states where each room started, and those rows are BASELINE.
-            PartOOptimisationAirFlowRow row_Targeted = rows.Find(x => x.Run == 1 && x.Space == name_Kitchen);
-            PartOOptimisationAirFlowRow row_Derived = rows.Find(x => x.Run == 1 && x.Space == name_Bedroom);
+            PartOOptimisationAirFlowRow row_Targeted = rows.Find(x => x.Run == "1" && x.Space == name_Kitchen);
+            PartOOptimisationAirFlowRow row_Derived = rows.Find(x => x.Run == "1" && x.Space == name_Bedroom);
 
             Assert.Equal("TARGETED", row_Targeted.Type);
             Assert.Equal(27, row_Targeted.Requested_Lps);
@@ -609,7 +609,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             List<PartOOptimisationAirFlowRow> rows = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun);
 
-            List<PartOOptimisationAirFlowRow> rows_Baseline = rows.FindAll(x => x.Run == 0);
+            List<PartOOptimisationAirFlowRow> rows_Baseline = rows.FindAll(x => x.Run == "0");
 
             Assert.Equal(2, rows_Baseline.Count);
             Assert.All(rows_Baseline, x => Assert.Equal("BASELINE", x.Type));
@@ -630,8 +630,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(30, row_Bedroom.DesignBefore_Lps, 6);
 
             //And the rounds still follow it.
-            Assert.Contains(rows, x => x.Run == 1 && x.Type == "TARGETED");
-            Assert.Contains(rows, x => x.Run == 1 && x.Type == "DERIVED");
+            Assert.Contains(rows, x => x.Run == "1" && x.Type == "TARGETED");
+            Assert.Contains(rows, x => x.Run == "1" && x.Type == "DERIVED");
         }
 
         /// <summary>
@@ -656,7 +656,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             partOOptimisationRun.Steps.Add(partOOptimisationStep);
 
-            List<PartOOptimisationAirFlowRow> rows_Baseline = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun).FindAll(x => x.Run == 0);
+            List<PartOOptimisationAirFlowRow> rows_Baseline = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun).FindAll(x => x.Run == "0");
 
             //Three rooms have now moved at some point, and each is stated once.
             Assert.Equal(3, rows_Baseline.Count);

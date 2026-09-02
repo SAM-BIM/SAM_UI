@@ -11,6 +11,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="150"/>
@@ -22,13 +23,19 @@
         <TextBlock x:Name="textBlock_StopReason" Grid.Row="0" TextWrapping="Wrap" FontWeight="Bold" Margin="0,0,0,4"/>
         <TextBlock x:Name="textBlock_Summary" Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#555555"/>
 
+        <!-- The diagnostic capacity envelope, stated on its own line and in its own colour. It is NOT the
+             run's answer: it says what the already-selected unit could deliver, which is a different
+             statement from what the optimisation accepted. A reader must not have to work that out. -->
+        <TextBlock x:Name="textBlock_CapacityEnvelope" Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#8A4B08"/>
+
         <!-- TARGETED and DERIVED are never merged: one is an engineering decision, the other a balancing
              consequence of it. Requirement is shown beside them so a reader can see the Approved Document F
              floor was never moved. -->
-        <Label Grid.Row="2" Content="Design airflow history" Padding="0,0,0,2" FontWeight="Bold"/>
-        <DataGrid x:Name="dataGrid_AirFlow" Grid.Row="3" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" FontSize="11">
+        <Label Grid.Row="3" Content="Design airflow history" Padding="0,0,0,2" FontWeight="Bold"/>
+        <DataGrid x:Name="dataGrid_AirFlow" Grid.Row="4" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" FontSize="11">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Run" Binding="{Binding Run}" Width="45"/>
+                <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="125"/>
                 <DataGridTextColumn Header="Space" Binding="{Binding Space}" Width="170"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="90"/>
                 <DataGridTextColumn Header="Direction" Binding="{Binding Direction}" Width="90"/>
@@ -41,10 +48,11 @@
         </DataGrid>
 
         <!-- Maximum is the selected product's rating, never a design airflow and never a target. -->
-        <Label Grid.Row="4" Content="Serving unit history" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
-        <DataGrid x:Name="dataGrid_Unit" Grid.Row="5" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" FontSize="11">
+        <Label Grid.Row="5" Content="Serving unit history" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <DataGrid x:Name="dataGrid_Unit" Grid.Row="6" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" FontSize="11">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Run" Binding="{Binding Run}" Width="45"/>
+                <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="125"/>
                 <DataGridTextColumn Header="AHU" Binding="{Binding AHU}" Width="110"/>
                 <DataGridTextColumn Header="System" Binding="{Binding System}" Width="170"/>
                 <DataGridTextColumn Header="Duty [l/s]" Binding="{Binding Duty}" Width="100"/>
@@ -55,10 +63,10 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <Label x:Name="label_Diagnostics" Grid.Row="6" Content="Notes" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
-        <TextBox x:Name="textBox_Diagnostics" Grid.Row="7" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
+        <Label x:Name="label_Diagnostics" Grid.Row="7" Content="Notes" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <TextBox x:Name="textBox_Diagnostics" Grid.Row="8" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
 
-        <Button x:Name="button_CopyAll" Grid.Row="8" Width="70" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
-        <Button x:Name="button_Close" IsCancel="True" Grid.Row="8" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Close_Click">Close</Button>
+        <Button x:Name="button_CopyAll" Grid.Row="9" Width="70" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
+        <Button x:Name="button_Close" IsCancel="True" Grid.Row="9" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Close_Click">Close</Button>
     </Grid>
 </Window>

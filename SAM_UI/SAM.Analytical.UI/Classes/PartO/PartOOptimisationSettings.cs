@@ -48,6 +48,34 @@ namespace SAM.Analytical.UI
         public double Tolerance_Lps { get; set; } = 0.001;
 
         /// <summary>
+        /// Whether, when the optimisation stops with eligible rooms still failing, one further
+        /// <b>diagnostic</b> run is made: the deliberate target vector scaled coherently until the
+        /// <i>already-selected</i> unit's own design-capacity ceiling binds.
+        ///
+        /// <para><b>What it is for</b></para>
+        /// <para>
+        /// A run that stops on capacity, or on the iteration guard, leaves an engineer with "this design
+        /// still fails" and no statement of how close the equipment already bought can get. The envelope is
+        /// that statement. It is not another round: it is a partial - or several times over - step the
+        /// all-or-nothing policy deliberately refuses, evaluated once, on its own, and reported as its own
+        /// stage.
+        /// </para>
+        ///
+        /// <para><b>Why it is optional, and why it defaults to on</b></para>
+        /// <para>
+        /// It costs one more full-year TAS run, which is minutes, and there are runs where nobody wants to
+        /// spend them. It defaults to on because the case it answers - a run stopping short of a pass - is
+        /// exactly the case in which the run on its own does not tell an engineer what to do next, and
+        /// because it never touches the design the optimisation accepted.
+        /// </para>
+        /// <para>
+        /// It costs <b>nothing</b> on a run that passes: there is then no failing target to envelope and
+        /// none is evaluated.
+        /// </para>
+        /// </summary>
+        public bool CapacityEnvelope { get; set; } = true;
+
+        /// <summary>
         /// Whether these settings describe an optimisation that can actually run, and why not where they do
         /// not.
         /// </summary>

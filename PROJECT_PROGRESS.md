@@ -1,13 +1,129 @@
 # Project Progress
 
 ## Branch
-`feature/parto-iteration2b-optimisation-review-tests`, branched from `sow/2026-Q3` at **`d056af7`**
-(the merge of PR #77, itself preceded by SAM PR #88).
+`feature/parto-iteration2b-capacity-envelope`, branched from `sow/2026-Q3` at **`eda947a8`**
+(the merge of PR #78, itself on top of PR #77's merge `d056af7`).
+
+**Depends on `SAM-BIM/SAM` `feature/parto-iteration2b-capacity-envelope`**, which adds
+`Modify.EvaluateDesignAirFlowCapacityEnvelope`. That PR merges first.
+
+No `SAM_Tas` change - it was not touched.
 
 ## Last updated
-2026-09-02 - regression tests for the two `81d9117` review fixes that shipped without any.
+2026-09-02 - the diagnostic selected-equipment capacity envelope, orchestrated and reported apart from the
+optimisation's own answer.
 
-## Latest (2026-09-02): pinning the subset-pass guard and the round count
+## Latest (2026-09-02): the capacity envelope, kept apart from the optimisation's answer
+
+**Status: implemented and tested; PR open against `sow/2026-Q3`.**
+
+### Why it was needed
+
+The ordinary Iteration 2B loop stops on `CapacityReached` or on its iteration guard with eligible rooms
+still failing TM59, hands back the last valid design, and says why. What it cannot say is how close the
+ventilation unit **already bought** can get - and that is the thing an engineer needs in order to decide
+between changing the fabric, changing the equipment, and accepting the result.
+
+### What was added
+
+One optional final **diagnostic** stage, after the ordinary optimisation has reached its terminal
+condition:
+
+```
+last ACCEPTED ordinary design
+  -> the same deliberate target vector the +5 policy would next have asked for
+  -> Modify.EvaluateDesignAirFlowCapacityEnvelope    one coherent scale per equipment group
+  -> re-prepare Part O (NO catalogue)                transfer air, network and duties rebuilt
+  -> full-year TAS, its own -OptMax TBD/TSD          the SAME weather case
+  -> production TM59, on the model the workflow RETURNED
+```
+
+Every guarantee the rounds keep is kept here: the preparation is offered no catalogue so the Iteration 2
+product survives; the TAS case is the baseline's, verbatim; the assessment reads the model the workflow
+returned and never the preparation output; and the results file is the envelope's own.
+
+### The separation, which is the whole design
+
+An envelope is prepared, simulated over the full year and assessed **exactly** as a round is, and it
+completes. Nothing about its lifecycle distinguishes it from a round - so everything that could read it as
+one was changed to ask what kind of step it is:
+
+- `PartOOptimisationStepKind` - `Baseline` / `OptimisationRound` / `CapacityEnvelope`, stated rather than
+  inferred from an iteration number.
+- `PartOOptimisationRun.Step_LastValid` excludes the envelope. **This is the most important line in the
+  change**: without it the run would hand back, and the command would adopt, a partial step the
+  optimiser's own all-or-nothing policy refuses.
+- `PartOOptimisationRun.Rounds` excludes it, so it is never reported as another successful +5 step.
+- Its model, TSD and scenarios live in their own properties -
+  `AnalyticalModel_CapacityEnvelope`, `Path_TSD_CapacityEnvelope`, `OverheatingScenarios_CapacityEnvelope`
+  - and `CapacityEnvelope` carries SAM's own per-equipment scales and reasons.
+- It runs on its **own private `PartORun`**, so the session's run keeps holding the last accepted ordinary
+  design and its results. Driving it through the session's run would have left the user assessing the
+  diagnostic's results against the accepted design's model.
+- `-OptMax`, named rather than numbered: `-Opt`*nn* would put it in the rounds' sequence where the last one
+  is the answer. `Iteration_ProjectName` reads it back as no iteration at all.
+- Presentation: a `Stage` column in both histories (BASELINE / OPTIMISATION / CAPACITY ENVELOPE), a `MAX`
+  run label, its own line above the grids, and its own labelled clause in `Description`. A room whose first
+  movement is in the envelope contributes **no** synthesised baseline row, because the envelope's "before"
+  is the last accepted design's airflow and not the baseline's.
+
+### Every "no" is recorded
+
+Not asked for; the run passed; a stop reason an envelope does not answer; no failing verdict; nothing
+eligible left to target; no useful headroom; an unresolvable capacity; a vector that cannot be formed. Each
+is written to `CapacityEnvelopeDescription` in its own words, and for a non-scaled envelope each equipment
+group's own reason is carried up onto that line - "this unit is already at its rating" and "its capacity is
+not in the catalogue offered" are different findings and neither may be buried. **No TAS run is spent on
+any of them**: every no-run decision is settled before the simulation.
+
+### Optional, and on by default
+
+A new `PartOOptimisationSettings.CapacityEnvelope`, exposed as its own tick under the 2B controls rather
+than as another number beside the step and the limit - it is a diagnostic, not a further optimisation
+parameter. On by default, because the case it answers is exactly the case in which the run on its own does
+not tell an engineer what to do next; it costs one more full-year simulation, and nothing at all on a run
+that passes.
+
+### Files
+
+| File | Change |
+| --- | --- |
+| `SAM_UI/SAM.Analytical.UI/Enums/PartOOptimisationStepKind.cs` | New - the three kinds of step. |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOOptimisationStep.cs` | `Kind`, `IsOptimisationRound`, `IsCapacityEnvelope`. |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOOptimisationRun.cs` | Envelope model/TSD/scenarios/description; `Rounds` and `Step_LastValid` exclude the envelope. |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOOptimisationSettings.cs` | `CapacityEnvelope`. |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOSimulationContext.cs` | `ProjectName_CapacityEnvelope()` - `-OptMax`. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` | The envelope stage; the loop split out unchanged as `Optimise`. |
+| `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartOOptimisationAirFlowRow.cs` | `Stage`; `Run` is a string; envelope excluded from baseline synthesis. |
+| `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartOOptimisationUnitRow.cs` | `Stage`; `Run` is a string. |
+| `WPF/SAM.Analytical.UI.WPF/Windows/PartOOptimisationResultWindow.xaml(.cs)` | Envelope line, Stage columns, kind-labelled diagnostics, Copy All. |
+| `WPF/SAM.Analytical.UI.WPF/Windows/PartOIterationWindow.xaml(.cs)` | The envelope tick and its explanation. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartOCapacityEnvelopeTests.cs` | New - 22 tests. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartOOptimisationTests.cs` | `Run` comparisons follow the string column. |
+
+### Validation
+
+- `SAM_UI.sln` builds clean.
+- `WPF/SAM.Analytical.UI.WPF.Tests`: **299 passed, 0 failed** (277 post-#78 baseline + 22 new).
+- SAM side: `SAM.Tests` **1727 passed, 0 failed** (1703 + 24 new).
+- The 22 new tests cover: a completed envelope is not the last valid design, by object identity; it is not
+  counted as a round; the description keeps it apart; its production TM59 is stored separately and can pass
+  while the run's answer still fails; `-OptMax` is distinct from every round name and reads back as no
+  iteration; the three stages are distinguishable in both grids; a room only the envelope moves gets no
+  synthesised baseline row; and each no-run decision - not asked for, passed, every non-answering stop
+  reason, no failing verdict, no eligible target, passing rooms only, and no useful headroom - reaches no
+  simulation and appends no step.
+
+### Issues / blockers
+
+- None known.
+
+### Next step
+
+- Merge SAM `feature/parto-iteration2b-capacity-envelope` first, then this PR.
+- Task 2, the canonical-TBD TAS warm-start, is a separate deliverable and a separate PR.
+
+## Superseded (2026-09-02): pinning the subset-pass guard and the round count - merged as PR #78
 
 **Status: implemented and tested; PR open against `sow/2026-Q3`.**
 

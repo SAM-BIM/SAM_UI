@@ -100,6 +100,29 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
+        /// The project name for the diagnostic selected-equipment capacity envelope -
+        /// <c>&lt;project&gt;-OptMax</c>.
+        /// <para>
+        /// <b>Named, not numbered, deliberately.</b> A numbered <c>-Opt</c><i>nn</i> suffix would put the
+        /// diagnostic in the same sequence as the rounds, where a reader sorting the output directory would
+        /// find it beside them and read it as the last and best of them. <c>-OptMax</c> is its own identity,
+        /// so its TBD and TSD sit beside the rounds' without overwriting any of them and without pretending
+        /// to be one.
+        /// </para>
+        /// <para>
+        /// <see cref="Iteration_ProjectName(string)"/> reads this name back as 0, so an optimisation
+        /// started from an envelope design - which is not a supported thing to do, but is a thing a person
+        /// could reach - would number from <c>-Opt01</c> and could overwrite a round's evidence. The
+        /// envelope is therefore never handed back as a design to continue from; see
+        /// <see cref="PartOOptimisationRun.AnalyticalModel_CapacityEnvelope"/>.
+        /// </para>
+        /// </summary>
+        public string ProjectName_CapacityEnvelope()
+        {
+            return string.Format("{0}-OptMax", ProjectName);
+        }
+
+        /// <summary>
         /// The optimisation iteration a project name already carries, or <b>0</b> where it carries none -
         /// the inverse of <see cref="ProjectName_Iteration(int)"/>.
         /// <para>

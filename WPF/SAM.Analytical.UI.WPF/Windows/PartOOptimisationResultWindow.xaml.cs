@@ -22,6 +22,13 @@ namespace SAM.Analytical.UI.WPF
     /// selected unit's capacity with rooms still failing is a real, useful answer; one that ended because a
     /// simulation would not run is not. A reader must not have to work out which they are looking at.
     /// </para>
+    /// <para>
+    /// <b>The diagnostic capacity envelope is shown apart from the run's answer, always.</b> It says what
+    /// the already-selected unit could deliver if taken to its own ceiling - which is a different statement
+    /// from what the optimisation accepted, and would be actively misleading read as the run's best result.
+    /// So it has its own line, its own Stage value in both grids, and its own <c>MAX</c> run label; and
+    /// where none was calculated, the line says why rather than going blank.
+    /// </para>
     /// </summary>
     public partial class PartOOptimisationResultWindow : System.Windows.Window
     {
@@ -42,6 +49,12 @@ namespace SAM.Analytical.UI.WPF
                     : string.Format("Stopped: {0}", Core.Query.Description(value.StopReason));
 
                 textBlock_Summary.Text = value?.Description ?? string.Empty;
+
+                //Stated whatever happened - including "there was nothing to diagnose". An optional
+                //diagnostic that leaves the line blank leaves a reader unable to tell it was considered.
+                textBlock_CapacityEnvelope.Text = value is null || string.IsNullOrWhiteSpace(value.CapacityEnvelopeDescription)
+                    ? string.Empty
+                    : string.Format("Capacity envelope: {0}", value.CapacityEnvelopeDescription);
 
                 dataGrid_AirFlow.ItemsSource = PartOOptimisationAirFlowRow.Rows(value);
                 dataGrid_Unit.ItemsSource = PartOOptimisationUnitRow.Rows(value);
@@ -64,8 +77,8 @@ namespace SAM.Analytical.UI.WPF
             {
                 stringBuilder.AppendLine(string.Format(
                     "RUN {0} ({1}) - weather '{2}', results '{3}'",
-                    partOOptimisationStep.Iteration,
-                    partOOptimisationStep.IsBaseline ? "baseline" : "optimisation round",
+                    partOOptimisationStep.IsCapacityEnvelope ? "MAX" : partOOptimisationStep.Iteration.ToString(),
+                    Core.Query.Description(partOOptimisationStep.Kind),
                     partOOptimisationStep.WeatherData ?? "-",
                     partOOptimisationStep.Path_TSD ?? "-"));
 
@@ -132,15 +145,22 @@ namespace SAM.Analytical.UI.WPF
 
             stringBuilder.AppendLine(textBlock_StopReason.Text);
             stringBuilder.AppendLine(textBlock_Summary.Text);
+
+            if (!string.IsNullOrWhiteSpace(textBlock_CapacityEnvelope.Text))
+            {
+                stringBuilder.AppendLine(textBlock_CapacityEnvelope.Text);
+            }
+
             stringBuilder.AppendLine();
 
-            stringBuilder.AppendLine("Run\tSpace\tType\tDirection\tDesign before\tRequested\tAchieved\tPart F requires\tTM59");
+            stringBuilder.AppendLine("Run\tStage\tSpace\tType\tDirection\tDesign before\tRequested\tAchieved\tPart F requires\tTM59");
 
             foreach (PartOOptimisationAirFlowRow partOOptimisationAirFlowRow in dataGrid_AirFlow.ItemsSource as List<PartOOptimisationAirFlowRow> ?? [])
             {
                 stringBuilder.AppendLine(string.Format(
-                    "{0}\t{1}\t{2}\t{3}\t{4:0.###}\t{5}\t{6:0.###}\t{7:0.###}\t{8}",
+                    "{0}\t{1}\t{2}\t{3}\t{4}\t{5:0.###}\t{6}\t{7:0.###}\t{8:0.###}\t{9}",
                     partOOptimisationAirFlowRow.Run,
+                    partOOptimisationAirFlowRow.Stage,
                     partOOptimisationAirFlowRow.Space,
                     partOOptimisationAirFlowRow.Type,
                     partOOptimisationAirFlowRow.Direction,
@@ -152,13 +172,14 @@ namespace SAM.Analytical.UI.WPF
             }
 
             stringBuilder.AppendLine();
-            stringBuilder.AppendLine("Run\tAHU\tSystem\tDuty\tMaximum\tHeadroom\tProduct\tEquipment");
+            stringBuilder.AppendLine("Run\tStage\tAHU\tSystem\tDuty\tMaximum\tHeadroom\tProduct\tEquipment");
 
             foreach (PartOOptimisationUnitRow partOOptimisationUnitRow in dataGrid_Unit.ItemsSource as List<PartOOptimisationUnitRow> ?? [])
             {
                 stringBuilder.AppendLine(string.Format(
-                    "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}",
+                    "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}",
                     partOOptimisationUnitRow.Run,
+                    partOOptimisationUnitRow.Stage,
                     partOOptimisationUnitRow.AHU,
                     partOOptimisationUnitRow.System,
                     partOOptimisationUnitRow.Duty,

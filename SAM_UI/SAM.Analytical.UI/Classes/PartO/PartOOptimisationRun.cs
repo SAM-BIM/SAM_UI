@@ -28,6 +28,19 @@ namespace SAM.Analytical.UI
     /// time.
     /// </para>
     ///
+    /// <para><b>The diagnostic capacity envelope is kept apart from all of it</b></para>
+    /// <para>
+    /// Where the ordinary optimisation stops with rooms still failing, an optional final
+    /// <see cref="PartOOptimisationStepKind.CapacityEnvelope"/> step answers a different question - what
+    /// the <i>already-selected</i> unit could deliver if taken to its own ceiling. It runs the same full
+    /// year and the same production TM59, so nothing about its lifecycle distinguishes it from a round;
+    /// what distinguishes it is that it is a partial (or several times over) step the all-or-nothing policy
+    /// deliberately refuses. It therefore lives in its own properties -
+    /// <see cref="AnalyticalModel_CapacityEnvelope"/>, <see cref="Path_TSD_CapacityEnvelope"/>,
+    /// <see cref="CapacityEnvelope"/> - is excluded from <see cref="Rounds"/> and
+    /// <see cref="Step_LastValid"/>, and is never what <see cref="AnalyticalModel_LastValid"/> holds.
+    /// </para>
+    ///
     /// <para><b>The last valid design survives every stop</b></para>
     /// <para>
     /// <see cref="AnalyticalModel_LastValid"/> is the model of the last iteration that was prepared,
@@ -74,11 +87,70 @@ namespace SAM.Analytical.UI
         /// <summary>The baseline, or null where the run never established one.</summary>
         public PartOOptimisationStep Step_Baseline => Steps.Count == 0 ? null : Steps[0];
 
-        /// <summary>The last iteration that completed - the one <see cref="AnalyticalModel_LastValid"/> came from.</summary>
-        public PartOOptimisationStep Step_LastValid => Steps.FindLast(x => x.IsCompleted);
+        /// <summary>
+        /// The last iteration that completed - the one <see cref="AnalyticalModel_LastValid"/> came from.
+        /// <para>
+        /// <b>The capacity envelope is excluded, and this is the single most important exclusion here.</b>
+        /// An envelope is prepared, simulated over the full year and assessed, and it completes - so a
+        /// "last step that completed" that did not say <i>which kind</i> of step would answer with the
+        /// diagnostic, and the run would then hand back, and the command would adopt, a design the
+        /// optimiser's own all-or-nothing policy refuses.
+        /// </para>
+        /// </summary>
+        public PartOOptimisationStep Step_LastValid => Steps.FindLast(x => x.IsCompleted && !x.IsCapacityEnvelope);
 
-        /// <summary>How many optimisation rounds ran, not counting the baseline.</summary>
-        public int Rounds => Steps.Count == 0 ? 0 : Steps.Count - 1;
+        /// <summary>
+        /// How many <b>optimisation rounds</b> ran - not the baseline, and <b>not the capacity envelope</b>.
+        /// Counting the envelope would report it as another successful step at the configured airflow, which
+        /// is precisely what it is not.
+        /// </summary>
+        public int Rounds => Steps.FindAll(x => x.IsOptimisationRound).Count;
+
+        /// <summary>
+        /// The diagnostic selected-equipment capacity envelope step, or null where none was calculated -
+        /// because the optimisation passed, nothing eligible was left, the equipment had nothing more to
+        /// give, or it was not asked for.
+        /// </summary>
+        public PartOOptimisationStep Step_CapacityEnvelope => Steps.Find(x => x.IsCapacityEnvelope);
+
+        /// <summary>
+        /// What the capacity envelope came to, as <c>SAM.Analytical</c> calculated it - the per-equipment
+        /// scale factors, ceilings and stated reasons. Null where none was calculated.
+        /// </summary>
+        public DesignAirFlowCapacityEnvelope CapacityEnvelope { get; set; }
+
+        /// <summary>
+        /// Why no capacity envelope was calculated, or - where one was - what it came to. <b>Always
+        /// stated</b>, including when the answer is "the run passed, so there was nothing to diagnose":
+        /// an optional diagnostic that silently produces nothing leaves a reader unable to tell it was
+        /// considered at all.
+        /// </summary>
+        public string CapacityEnvelopeDescription { get; set; }
+
+        /// <summary>
+        /// The <b>diagnostic</b> model the capacity envelope produced, simulated over the same full year
+        /// and assessed with production TM59 - kept here and <b>nowhere near</b>
+        /// <see cref="AnalyticalModel_LastValid"/>.
+        /// <para>
+        /// <b>This is not the run's answer and is never adopted.</b> It is what the already-selected
+        /// equipment could deliver, which is a different statement from what the optimisation accepted.
+        /// Feeding it into a later optimisation would make that run's baseline a design this run's own
+        /// policy refused.
+        /// </para>
+        /// </summary>
+        public AnalyticalModel AnalyticalModel_CapacityEnvelope { get; set; }
+
+        /// <summary>The envelope's own results file - its own <c>-OptMax</c> identity, overwriting no round's evidence.</summary>
+        public string Path_TSD_CapacityEnvelope { get; set; }
+
+        /// <summary>The scenarios of the envelope's own preparation, so its assessment can be re-run.</summary>
+        public List<OverheatingScenario> OverheatingScenarios_CapacityEnvelope { get; } = [];
+
+        /// <summary>
+        /// Whether a diagnostic capacity envelope design was produced, simulated and assessed - and
+        /// therefore whether <see cref="AnalyticalModel_CapacityEnvelope"/> is there to look at.
+        /// </summary>
+        public bool HasCapacityEnvelope => AnalyticalModel_CapacityEnvelope is not null && (Step_CapacityEnvelope?.IsCompleted ?? false);
 
         /// <summary>Whether the optimisation ended with every eligible occupied space passing.</summary>
         public bool IsPassed => StopReason == PartOOptimisationStopReason.Passed;
@@ -129,12 +201,13 @@ namespace SAM.Analytical.UI
                 };
 
                 return string.Format(
-                    "{0} optimisation round(s) after the baseline, at a {1:0.###} l/s step. Last valid design: run {2}. {3}{4}",
+                    "{0} optimisation round(s) after the baseline, at a {1:0.###} l/s step. Last valid design: run {2}. {3}{4}{5}",
                     Rounds,
                     Settings.AirFlowStep_Lps,
                     partOOptimisationStep is null ? "none" : partOOptimisationStep.Iteration.ToString(),
                     outcome,
-                    string.IsNullOrWhiteSpace(StopDescription) ? string.Empty : " " + StopDescription);
+                    string.IsNullOrWhiteSpace(StopDescription) ? string.Empty : " " + StopDescription,
+                    string.IsNullOrWhiteSpace(CapacityEnvelopeDescription) ? string.Empty : " CAPACITY ENVELOPE: " + CapacityEnvelopeDescription);
             }
         }
     }

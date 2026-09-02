@@ -48,6 +48,12 @@
             </StackPanel>
 
             <TextBlock x:Name="textBlock_Optimise" Margin="20,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+
+            <!-- The capacity envelope is a DIAGNOSTIC and not a further optimisation step, which is why it
+                 is a separate tick under 2B rather than another number beside the step and the limit. It
+                 costs one more full-year TAS run, and only on a run that stops short of a pass. -->
+            <CheckBox x:Name="checkBox_CapacityEnvelope" Content="Also report what the selected unit could deliver at its capacity ceiling (diagnostic)" Margin="20,8,0,0"/>
+            <TextBlock x:Name="textBlock_CapacityEnvelope" Margin="40,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
         </StackPanel>
 
         <Button x:Name="button_OK" Grid.Row="7" Width="60" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_OK_Click">OK</Button>

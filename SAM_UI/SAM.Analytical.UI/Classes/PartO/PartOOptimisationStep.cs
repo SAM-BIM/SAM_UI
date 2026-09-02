@@ -27,15 +27,48 @@ namespace SAM.Analytical.UI
     {
         /// <param name="iteration">0 for the baseline, then 1 upwards - one per optimisation round.</param>
         public PartOOptimisationStep(int iteration)
+            : this(iteration, iteration == 0 ? PartOOptimisationStepKind.Baseline : PartOOptimisationStepKind.OptimisationRound)
+        {
+        }
+
+        /// <param name="iteration">0 for the baseline, then 1 upwards - one per optimisation round.</param>
+        /// <param name="partOOptimisationStepKind">
+        /// <b>What this step is</b>, stated rather than inferred from the number. A capacity envelope is
+        /// prepared, simulated and assessed exactly as a round is and it completes, so nothing about its
+        /// lifecycle tells it apart from one - see <see cref="PartOOptimisationStepKind"/>.
+        /// </param>
+        public PartOOptimisationStep(int iteration, PartOOptimisationStepKind partOOptimisationStepKind)
         {
             Iteration = iteration;
+            Kind = partOOptimisationStepKind;
         }
 
         /// <summary>Which iteration this is. <b>0 is the baseline</b>, not the first round.</summary>
         public int Iteration { get; }
 
+        /// <summary>
+        /// What this step is - baseline, ordinary optimisation round, or diagnostic capacity envelope.
+        /// <para>
+        /// <b>Read this rather than the iteration number.</b> The envelope carries an iteration number so
+        /// its files sort with the rest of the run, and that number is not what makes it one.
+        /// </para>
+        /// </summary>
+        public PartOOptimisationStepKind Kind { get; }
+
         /// <summary>Whether this step is the baseline the optimisation started from.</summary>
-        public bool IsBaseline => Iteration == 0;
+        public bool IsBaseline => Kind == PartOOptimisationStepKind.Baseline;
+
+        /// <summary>
+        /// Whether this step is an ordinary optimisation round - the only kind that counts towards the
+        /// round total and the only kind that may become the run's last valid design.
+        /// </summary>
+        public bool IsOptimisationRound => Kind == PartOOptimisationStepKind.OptimisationRound;
+
+        /// <summary>
+        /// Whether this step is the diagnostic selected-equipment capacity envelope. <b>Not a round</b>,
+        /// however completely it ran.
+        /// </summary>
+        public bool IsCapacityEnvelope => Kind == PartOOptimisationStepKind.CapacityEnvelope;
 
         /// <summary>
         /// The project name this iteration's TAS case ran as - <c>&lt;project&gt;-Opt00</c> upwards. The
@@ -127,8 +160,8 @@ namespace SAM.Analytical.UI
         {
             return string.Format(
                 "Run {0} ({1}): {2} targeted, {3} derived, TM59 {4}",
-                Iteration,
-                IsBaseline ? "baseline" : "optimisation round",
+                IsCapacityEnvelope ? "MAX" : Iteration.ToString(),
+                Core.Query.Description(Kind),
                 TargetedAdjustments.Count,
                 DerivedAdjustments.Count,
                 Core.Query.Description(OccupiedSpaceComplianceStatus));
