@@ -127,7 +127,11 @@ namespace SAM.Analytical.UI.WPF
 
             if (partOTM59Assessment.OccupiedSpaceComplianceStatus == TM59ComplianceStatus.Pass)
             {
-                return Stop(result, PartOOptimisationStopReason.Passed, "The Iteration 2 baseline already passes, so no optimisation round was run.", analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
+                string? refusal_Partial = PartialAssessment(analyticalModel_LastValid, partOPreparationContext, partOTM59Assessment);
+
+                return refusal_Partial is null
+                    ? Stop(result, PartOOptimisationStopReason.Passed, "The Iteration 2 baseline already passes, so no optimisation round was run.", analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid)
+                    : Stop(result, PartOOptimisationStopReason.AssessmentFailed, refusal_Partial, analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
             }
 
             if (partOTM59Assessment.OccupiedSpaceComplianceStatus != TM59ComplianceStatus.Fail)
@@ -149,26 +153,20 @@ namespace SAM.Analytical.UI.WPF
 
             for (int iteration = 1; iteration <= partOOptimisationSettings.MaximumIterations; iteration++)
             {
-                partOOptimisationStep = new PartOOptimisationStep(iteration)
-                {
-                    //Offset by where this optimisation started, so a second run over a previous one's
-                    //output continues its numbering rather than overwriting its files.
-                    ProjectName = partOSimulationContext.ProjectName_Iteration(iteration_Baseline + iteration),
-                    WeatherData = partOSimulationContext.WeatherData?.Name,
-                };
-
-                result.Steps.Add(partOOptimisationStep);
-
                 // ---- The targets, and the one round they make ------------------------------------------
 
                 PartOOptimisationTargetSelection partOOptimisationTargetSelection = Query.PartOOptimisationTargets(analyticalModel_LastValid, partOTM59Assessment.SpaceResults, partOPreparationContext.Zones, partOOptimisationSettings.AirFlowStep_Lps);
-
-                partOOptimisationStep.Notes.AddRange(partOOptimisationTargetSelection.NotOptimisable);
 
                 List<DesignAirFlowTarget> designAirFlowTargets = partOOptimisationTargetSelection.Targets.FindAll(x => !guids_AtCapacity.Contains(x.SpaceGuid));
 
                 if (designAirFlowTargets.Count == 0)
                 {
+                    //NO step is recorded here. Nothing was attempted - no round, no preparation, no
+                    //simulation - and appending one anyway would put a run in the history, and in the round
+                    //count, that never happened. What WAS learned belongs to the design it was learned
+                    //about, so the reasons go on the step that produced that design.
+                    result.Step_LastValid?.Notes.AddRange(partOOptimisationTargetSelection.NotOptimisable);
+
                     //Told apart deliberately: nothing left to try because the equipment is full is a
                     //different answer from nothing left to try at all, and an engineer does different things
                     //about them.
@@ -182,6 +180,19 @@ namespace SAM.Analytical.UI.WPF
                         path_TSD_LastValid,
                         overheatingScenarios_LastValid);
                 }
+
+                //Recorded only now that there is a round to attempt.
+                partOOptimisationStep = new PartOOptimisationStep(iteration)
+                {
+                    //Offset by where this optimisation started, so a second run over a previous one's
+                    //output continues its numbering rather than overwriting its files.
+                    ProjectName = partOSimulationContext.ProjectName_Iteration(iteration_Baseline + iteration),
+                    WeatherData = partOSimulationContext.WeatherData?.Name,
+                };
+
+                result.Steps.Add(partOOptimisationStep);
+
+                partOOptimisationStep.Notes.AddRange(partOOptimisationTargetSelection.NotOptimisable);
 
                 DesignAirFlowRoundCandidate? designAirFlowRoundCandidate = Round(analyticalModel_LastValid, designAirFlowTargets, partOPreparationContext, partOOptimisationSettings, guids_AtCapacity, partOOptimisationStep);
 
@@ -283,7 +294,12 @@ namespace SAM.Analytical.UI.WPF
 
                 if (partOTM59Assessment.OccupiedSpaceComplianceStatus == TM59ComplianceStatus.Pass)
                 {
-                    return Stop(result, PartOOptimisationStopReason.Passed, null, analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
+                    //As at the baseline: a pass over a subset is not a pass.
+                    string? refusal_Partial = PartialAssessment(analyticalModel_LastValid, partOPreparationContext, partOTM59Assessment);
+
+                    return refusal_Partial is null
+                        ? Stop(result, PartOOptimisationStopReason.Passed, null, analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid)
+                        : Stop(result, PartOOptimisationStopReason.AssessmentFailed, refusal_Partial, analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
                 }
 
                 //As at the baseline: only an explicit Pass ends this run as a pass.
@@ -427,6 +443,68 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Why a <b>pass</b> may not be believed: an occupied space inside the Part O dwelling scope
+        /// produced no result at all, so the verdict is over a subset of the rooms this run is about.
+        ///
+        /// <para><b>The failure this closes</b></para>
+        /// <para>
+        /// <c>PartOTM59Assessment</c> excludes a space whose simulated counterpart does not resolve to
+        /// exactly one design space - correctly, because attributing it would be a guess - and records the
+        /// exclusion as a warning. The remaining rooms can then all pass. Reading the combined status alone
+        /// would have this run announce that <i>every eligible occupied space passes</i> on the strength of
+        /// an assessment that never looked at one of them, stop, and hand back that design as the answer.
+        /// Requiring an explicit <c>Pass</c> does not catch it: the status genuinely is <c>Pass</c>.
+        /// </para>
+        /// <para>
+        /// Only the <b>dwelling scope</b> is asked about. The air handling units' simulation zones and
+        /// anything else outside it were never part of this run's claim, so their absence is not a hole in
+        /// it.
+        /// </para>
+        /// <para>
+        /// Applied to a pass and not to a failure, deliberately: a failing round carries on optimising and
+        /// reports the unresolved room in its warnings either way, whereas a pass is the claim that ends
+        /// the run and so has to be airtight.
+        /// </para>
+        /// </summary>
+        /// <returns>Null where every in-scope space was assessed, and the reason otherwise.</returns>
+        private static string? PartialAssessment(AnalyticalModel? analyticalModel, PartOPreparationContext partOPreparationContext, PartOTM59Assessment partOTM59Assessment)
+        {
+            AdjacencyCluster? adjacencyCluster = analyticalModel?.AdjacencyCluster;
+            if (adjacencyCluster is null || partOTM59Assessment.SpaceGuids_Unassessed.Count == 0)
+            {
+                return null;
+            }
+
+            HashSet<Guid> guids_Scope = Query.PartODwellingSpaceGuids(adjacencyCluster, partOPreparationContext.Zones);
+
+            List<Space> spaces = adjacencyCluster.GetSpaces() ?? [];
+
+            List<string> names = [];
+
+            foreach (Guid guid in partOTM59Assessment.SpaceGuids_Unassessed)
+            {
+                if (!guids_Scope.Contains(guid))
+                {
+                    continue;
+                }
+
+                names.Add(spaces.Find(x => x is not null && x.Guid == guid)?.Name ?? guid.ToString());
+            }
+
+            if (names.Count == 0)
+            {
+                return null;
+            }
+
+            names.Sort(StringComparer.Ordinal);
+
+            return string.Format(
+                "The production TM59 assessment returned a pass, but {0} space(s) inside the Part O dwelling scope produced no result at all and were excluded from it: {1}. A pass over a subset of the rooms this run is about is not a pass, so it is not reported as one. Resolve those spaces - see the notes - and assess again.",
+                names.Count,
+                string.Join(", ", names.ConvertAll(x => string.Format("'{0}'", x))));
         }
 
         /// <summary>

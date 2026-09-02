@@ -119,6 +119,18 @@ Round 3:
    `-Opt10` and nothing is written twice; the baseline step is also labelled with the run that actually
    produced it rather than the context's base name.
 
+Round 4:
+7. **P1** - a TM59 report can return an explicit `Pass` over a SUBSET: `PartOTM59Assessment` excludes a
+   space whose simulated counterpart does not resolve and records a warning, and the remaining rooms then
+   all pass. The run would have announced that every eligible occupied space passes on the strength of an
+   assessment that never looked at one of them. A pass is now believed only where no space inside the Part
+   O dwelling scope was excluded; `PartOTM59Assessment.SpaceGuids_Unassessed` exposes that as identities
+   rather than prose.
+8. **P2** - a step was appended before the zero-target check, so a run that stopped at
+   `NoEligibleTargets` reported a round that was never attempted and inflated `Rounds`. The step is now
+   recorded only once there is a round to attempt, and the target-selection reasons go on the step that
+   produced the design they were derived from.
+
 ### Validation
 
 - `SAM_UI.sln` builds clean.

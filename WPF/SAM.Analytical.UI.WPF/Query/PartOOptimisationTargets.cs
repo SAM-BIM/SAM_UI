@@ -158,7 +158,7 @@ namespace SAM.Analytical.UI.WPF
         /// generation than the one the scope was chosen on, and only the identity survives that.
         /// </para>
         /// </summary>
-        private static HashSet<Guid> PartODwellingSpaceGuids(AdjacencyCluster adjacencyCluster, IEnumerable<Zone>? zones_Dwelling)
+        internal static HashSet<Guid> PartODwellingSpaceGuids(AdjacencyCluster adjacencyCluster, IEnumerable<Zone>? zones_Dwelling)
         {
             HashSet<Guid> result = [];
 

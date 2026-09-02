@@ -50,12 +50,13 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public class PartOTM59Assessment
     {
-        private PartOTM59Assessment(TM59AssessmentResult tM59AssessmentResult, TM59AssessmentReport tM59AssessmentReport, List<PartOTM59SpaceResult> spaceResults, List<string> associationRefusals, string refusal)
+        private PartOTM59Assessment(TM59AssessmentResult tM59AssessmentResult, TM59AssessmentReport tM59AssessmentReport, List<PartOTM59SpaceResult> spaceResults, List<string> associationRefusals, List<Guid> spaceGuids_Unassessed, string refusal)
         {
             Result = tM59AssessmentResult;
             Report = tM59AssessmentReport;
             SpaceResults = spaceResults ?? [];
             AssociationRefusals = associationRefusals ?? [];
+            SpaceGuids_Unassessed = spaceGuids_Unassessed ?? [];
             Refusal = refusal;
         }
 
@@ -81,6 +82,22 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>Spaces that could not be resolved between the simulation and the design, one sentence each.</summary>
         public List<string> AssociationRefusals { get; }
+
+        /// <summary>
+        /// The <b>design</b> spaces this assessment produced no result for - those whose simulated
+        /// counterpart could not be resolved to exactly one design space, so they were excluded before the
+        /// calculation ran.
+        /// <para>
+        /// <b>Why a caller must look at this before believing a pass.</b> The report's combined status is a
+        /// verdict over the spaces that WERE assessed. Where an occupied room in scope failed to resolve it
+        /// is dropped with a warning, and the remaining rooms can then all pass - so an unguarded reading of
+        /// <see cref="OccupiedSpaceComplianceStatus"/> would announce that every eligible space passes on
+        /// the strength of an assessment that never looked at one of them. The refusal is recorded in
+        /// <see cref="AssociationRefusals"/> as prose; this is the same fact as identities, so a caller can
+        /// act on it.
+        /// </para>
+        /// </summary>
+        public List<Guid> SpaceGuids_Unassessed { get; }
 
         /// <summary>Why no assessment was produced at all, or null where one was.</summary>
         public string? Refusal { get; }
@@ -109,7 +126,7 @@ namespace SAM.Analytical.UI.WPF
         {
             if (analyticalModel_Workflow is null || string.IsNullOrWhiteSpace(path_TSD))
             {
-                return new PartOTM59Assessment(null, null, null, null, "No workflow model or no results path was supplied, so nothing could be assessed.");
+                return new PartOTM59Assessment(null, null, null, null, null, "No workflow model or no results path was supplied, so nothing could be assessed.");
             }
 
             //The same conversion settings the production query uses - the two series the assessment reads,
@@ -124,7 +141,7 @@ namespace SAM.Analytical.UI.WPF
             AnalyticalModel analyticalModel_TSD = Analytical.Tas.Convert.ToSAM(path_TSD, tSDConversionSettings);
             if (analyticalModel_TSD is null)
             {
-                return new PartOTM59Assessment(null, null, null, null, string.Format("The simulation results at '{0}' could not be read.", path_TSD));
+                return new PartOTM59Assessment(null, null, null, null, null, string.Format("The simulation results at '{0}' could not be read.", path_TSD));
             }
 
             List<string> associationRefusals = [];
@@ -151,14 +168,25 @@ namespace SAM.Analytical.UI.WPF
             TM59AssessmentResult tM59AssessmentResult = tM59AssessmentCalculator.Calculate(spaces);
             if (tM59AssessmentResult is null)
             {
-                return new PartOTM59Assessment(null, null, null, associationRefusals, string.Format("The simulation results at '{0}' could not be assessed.", path_TSD));
+                return new PartOTM59Assessment(null, null, null, associationRefusals, null, string.Format("The simulation results at '{0}' could not be assessed.", path_TSD));
             }
 
             TM59AssessmentReport tM59AssessmentReport = new(tM59AssessmentResult, path_TSD);
 
             List<PartOTM59SpaceResult> spaceResults = ResolvedSpaceResults(tM59AssessmentReport, tM59AssessmentCalculator.SimulationSpaceMap, spaces, associationRefusals);
 
-            return new PartOTM59Assessment(tM59AssessmentResult, tM59AssessmentReport, spaceResults, associationRefusals, null);
+            //Design side, not simulation side: which rooms of the model being assessed produced nothing.
+            List<Guid> spaceGuids_Unassessed = [];
+
+            foreach (Space space_Design in analyticalModel_Workflow.GetSpaces() ?? [])
+            {
+                if (space_Design is not null && tM59AssessmentCalculator.SimulationSpaceMap?.Simulation(space_Design) is null)
+                {
+                    spaceGuids_Unassessed.Add(space_Design.Guid);
+                }
+            }
+
+            return new PartOTM59Assessment(tM59AssessmentResult, tM59AssessmentReport, spaceResults, associationRefusals, spaceGuids_Unassessed, null);
         }
 
         /// <summary>
