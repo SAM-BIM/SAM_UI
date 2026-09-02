@@ -86,6 +86,8 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
+            result.AddRange(BaselineRows(partOOptimisationRun));
+
             foreach (PartOOptimisationStep partOOptimisationStep in partOOptimisationRun.Steps)
             {
                 foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.TargetedAdjustments)
@@ -114,6 +116,72 @@ namespace SAM.Analytical.UI.WPF
                         designAirFlowAdjustment.After_Lps,
                         designAirFlowAdjustment.Requirement_Lps,
                         Status(partOOptimisationStep, designAirFlowAdjustment.SpaceGuid)));
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Where every room the optimisation later touched started, as run 0.
+        ///
+        /// <para><b>Why these are synthesised rather than recorded</b></para>
+        /// <para>
+        /// The baseline is the Iteration 2 design as it stood: it has no targets and no round, so it holds
+        /// no adjustments to read rows from. But a before-and-after history that begins at run 1 cannot be
+        /// read as a before-and-after history - a reader looking at "Kitchen_4 55 -> 60" in run 1 has to
+        /// take on trust that 55 was where it started, and a room whose first move is in run 4 has no
+        /// stated origin at all.
+        /// </para>
+        /// <para>
+        /// Each room's baseline design airflow is exactly the <c>Before_Lps</c> of the FIRST adjustment
+        /// that ever moved it, and that is a recorded fact rather than an inference: the round that made
+        /// that adjustment read the value off the design it was given. The baseline TM59 verdict comes from
+        /// the baseline step's own production results. Nothing here is computed.
+        /// </para>
+        /// <para>
+        /// Rooms nothing ever happened to are deliberately not listed - their design airflow is in the
+        /// model, and printing every room would bury the ones that moved.
+        /// </para>
+        /// </summary>
+        private static List<PartOOptimisationAirFlowRow> BaselineRows(PartOOptimisationRun partOOptimisationRun)
+        {
+            List<PartOOptimisationAirFlowRow> result = [];
+
+            PartOOptimisationStep? partOOptimisationStep_Baseline = partOOptimisationRun.Step_Baseline;
+            if (partOOptimisationStep_Baseline is null)
+            {
+                return result;
+            }
+
+            HashSet<string> keys = [];
+
+            foreach (PartOOptimisationStep partOOptimisationStep in partOOptimisationRun.Steps)
+            {
+                if (partOOptimisationStep.IsBaseline)
+                {
+                    continue;
+                }
+
+                //Targeted first, then derived - the order the round itself settled on, so the baseline
+                //block reads in the same order as the rounds beneath it.
+                foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.Adjustments())
+                {
+                    if (!keys.Add(string.Format("{0}|{1}", designAirFlowAdjustment.SpaceGuid, designAirFlowAdjustment.FlowClassification)))
+                    {
+                        continue;
+                    }
+
+                    result.Add(new PartOOptimisationAirFlowRow(
+                        partOOptimisationStep_Baseline.Iteration,
+                        designAirFlowAdjustment.SpaceName,
+                        "BASELINE",
+                        Core.Query.Description(designAirFlowAdjustment.FlowClassification),
+                        designAirFlowAdjustment.Before_Lps,
+                        null,
+                        designAirFlowAdjustment.Before_Lps,
+                        designAirFlowAdjustment.Requirement_Lps,
+                        Status(partOOptimisationStep_Baseline, designAirFlowAdjustment.SpaceGuid)));
                 }
             }
 

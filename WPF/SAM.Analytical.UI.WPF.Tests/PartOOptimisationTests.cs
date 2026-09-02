@@ -37,6 +37,14 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         private const string name_AirHandlingUnitZone = "MVHR-01";
 
+        //Stable, so a fixture that moves the same room in two rounds moves the same ROOM - the history
+        //keys on the design space guid, which is the whole point of it.
+        private static readonly Guid guid_Kitchen = new("11111111-1111-1111-1111-111111111111");
+
+        private static readonly Guid guid_Bedroom = new("22222222-2222-2222-2222-222222222222");
+
+        private static readonly Guid guid_Bathroom = new("33333333-3333-3333-3333-333333333333");
+
         // ---- Settings ------------------------------------------------------------------------------------
 
         /// <summary>
@@ -381,8 +389,9 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             List<PartOOptimisationAirFlowRow> rows = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun);
 
-            PartOOptimisationAirFlowRow row_Targeted = rows.Find(x => x.Space == name_Kitchen);
-            PartOOptimisationAirFlowRow row_Derived = rows.Find(x => x.Space == name_Bedroom);
+            //Run 1 specifically: run 0 now states where each room started, and those rows are BASELINE.
+            PartOOptimisationAirFlowRow row_Targeted = rows.Find(x => x.Run == 1 && x.Space == name_Kitchen);
+            PartOOptimisationAirFlowRow row_Derived = rows.Find(x => x.Run == 1 && x.Space == name_Bedroom);
 
             Assert.Equal("TARGETED", row_Targeted.Type);
             Assert.Equal(27, row_Targeted.Requested_Lps);
@@ -505,6 +514,79 @@ namespace SAM.Analytical.UI.WPF.Tests
             //The same weather case for every round, which is what makes the TM59 movement attributable to
             //the airflow change.
             Assert.Equal(partOOptimisationRun.Steps[0].WeatherData, partOOptimisationRun.Steps[1].WeatherData);
+        }
+
+        /// <summary>
+        /// The history begins at the baseline, not at the first round. Every room the optimisation later
+        /// touched gets a run-0 row saying where it started and what TM59 made of it there - otherwise a
+        /// reader has to take the first round's "before" on trust, and a room whose first move comes in a
+        /// later round has no stated origin at all.
+        /// </summary>
+        [Fact]
+        public void TheHistory_StatesWhereEveryTouchedRoomStarted()
+        {
+            PartOOptimisationRun partOOptimisationRun = History();
+
+            List<PartOOptimisationAirFlowRow> rows = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun);
+
+            List<PartOOptimisationAirFlowRow> rows_Baseline = rows.FindAll(x => x.Run == 0);
+
+            Assert.Equal(2, rows_Baseline.Count);
+            Assert.All(rows_Baseline, x => Assert.Equal("BASELINE", x.Type));
+
+            //Nobody asked for a baseline value - it is where the design already was.
+            Assert.All(rows_Baseline, x => Assert.Null(x.Requested_Lps));
+
+            PartOOptimisationAirFlowRow row_Kitchen = rows_Baseline.Find(x => x.Space == name_Kitchen);
+
+            //Exactly the Before_Lps of the first adjustment that moved it - a recorded fact, not an
+            //inference - and the baseline step's own production verdict.
+            Assert.Equal(22, row_Kitchen.DesignBefore_Lps, 6);
+            Assert.Equal(22, row_Kitchen.Achieved_Lps, 6);
+            Assert.Equal(13, row_Kitchen.Requirement_Lps, 6);
+
+            PartOOptimisationAirFlowRow row_Bedroom = rows_Baseline.Find(x => x.Space == name_Bedroom);
+
+            Assert.Equal(30, row_Bedroom.DesignBefore_Lps, 6);
+
+            //And the rounds still follow it.
+            Assert.Contains(rows, x => x.Run == 1 && x.Type == "TARGETED");
+            Assert.Contains(rows, x => x.Run == 1 && x.Type == "DERIVED");
+        }
+
+        /// <summary>
+        /// A room that first moves in a later round still gets a baseline row, and it is listed once
+        /// however many rounds went on to move it.
+        /// </summary>
+        [Fact]
+        public void TheHistory_StatesTheOriginOfARoomThatFirstMovesLater()
+        {
+            PartOOptimisationRun partOOptimisationRun = History();
+
+            //A second round that moves the kitchen again and a room nothing had touched before.
+            PartOOptimisationStep partOOptimisationStep = new(2)
+            {
+                ProjectName = "Fixture-Opt02",
+                OccupiedSpaceComplianceStatus = TM59ComplianceStatus.Fail,
+                IsCompleted = true,
+            };
+
+            partOOptimisationStep.TargetedAdjustments.Add(new DesignAirFlowAdjustment(guid_Bathroom, name_Bathroom, FlowClassification.Extract, 8, 13, 8, false));
+            partOOptimisationStep.TargetedAdjustments.Add(new DesignAirFlowAdjustment(guid_Kitchen, name_Kitchen, FlowClassification.Extract, 27, 32, 13, false));
+
+            partOOptimisationRun.Steps.Add(partOOptimisationStep);
+
+            List<PartOOptimisationAirFlowRow> rows_Baseline = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun).FindAll(x => x.Run == 0);
+
+            //Three rooms have now moved at some point, and each is stated once.
+            Assert.Equal(3, rows_Baseline.Count);
+
+            PartOOptimisationAirFlowRow row_Bathroom = rows_Baseline.Find(x => x.Space == name_Bathroom);
+
+            Assert.Equal(8, row_Bathroom.DesignBefore_Lps, 6);
+
+            //The kitchen keeps the value it started at, not the one round 2 found it at.
+            Assert.Equal(22, rows_Baseline.Find(x => x.Space == name_Kitchen).DesignBefore_Lps, 6);
         }
 
         // ---- Fixture -------------------------------------------------------------------------------------
@@ -679,9 +761,6 @@ namespace SAM.Analytical.UI.WPF.Tests
             partOOptimisationStep_Baseline.UnitStates.Add(new PartOOptimisationUnitState("MVHR-01", "Flat 1", 30, 30, ventilationUnitCapacityDescriptor.VentilationUnitReference, ventilationUnitCapacityDescriptor, VentilationUnitSelectionOutcome.Kept, null));
 
             result.Steps.Add(partOOptimisationStep_Baseline);
-
-            Guid guid_Kitchen = Guid.NewGuid();
-            Guid guid_Bedroom = Guid.NewGuid();
 
             PartOOptimisationStep partOOptimisationStep_Round = new(1)
             {

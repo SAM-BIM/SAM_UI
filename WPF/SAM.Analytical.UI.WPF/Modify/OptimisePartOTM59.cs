@@ -235,6 +235,14 @@ namespace SAM.Analytical.UI.WPF
                 {
                     partOOptimisationStep.Refusals.Add(partOTM59Assessment.Refusal ?? "The production TM59 assessment could not be produced for this round.");
 
+                    //DROPPED, like every other failed round. The workflow completed, so the run is sitting
+                    //in WorkflowCompleted holding THIS round's model and TSD - but the optimisation is about
+                    //to hand back the previous design, and leaving the run assessable would pair a model the
+                    //user is not looking at with results from a round that was never assessed. That is the
+                    //stale pairing PartORun exists to make unreachable, and an unassessable round has no
+                    //business surviving as one.
+                    partORun.Invalidate(partOTM59Assessment.Refusal ?? "The production TM59 assessment could not be produced for this optimisation round, so it is not a run that can be assessed.");
+
                     return Stop(result, PartOOptimisationStopReason.AssessmentFailed, partOTM59Assessment.Refusal, analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
                 }
 

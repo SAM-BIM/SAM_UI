@@ -82,11 +82,14 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            //Armed only where the run still holds this very design as its completed one - which is every
-            //clean stop, and none of the failed ones. Where the run was dropped mid-optimisation the
-            //modification below is genuinely an outside edit as far as it is concerned, and it correctly
-            //stays dropped: a design whose lineage broke must not remain assessable.
-            if (partORun.State == PartORunState.WorkflowCompleted)
+            //Armed only where the run holds THIS VERY MODEL as its completed one. State alone is not
+            //enough: a round can complete its workflow and then fail its assessment, which would leave the
+            //run in WorkflowCompleted carrying that round's model and TSD while the design being adopted
+            //here is the previous one. Arming on state would then accept the replacement without dropping
+            //the run, and the user would be looking at one design while the assessment command read
+            //another's results. The optimiser drops such a run itself; this is the second lock on the same
+            //door, and where it does not hold the replacement below is correctly read as an outside edit.
+            if (partORun.State == PartORunState.WorkflowCompleted && ReferenceEquals(partORun.AnalyticalModel_Assessment, analyticalModel_LastValid))
             {
                 partORun.ExpectModification();
             }

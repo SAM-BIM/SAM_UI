@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Analytical.Enums;
 using System;
 using System.Collections.Generic;
 using System.Windows;
@@ -37,7 +38,14 @@ namespace SAM.Analytical.UI.WPF
 
             comboBox_BaseProvision.ItemsSource = PartOVentilationStrategyOption.Options;
             comboBox_BaseProvision.SelectedIndex = 0;
-            comboBox_BaseProvision.SelectionChanged += (s, e) => UpdateVentilationStrategyText();
+            comboBox_BaseProvision.SelectionChanged += (s, e) =>
+            {
+                UpdateVentilationStrategyText();
+
+                //The route decides whether 2B is available at all, so this has to be re-asked when the
+                //base provision changes - not only when the equipment tick moves.
+                UpdateOptimiseAvailability();
+            };
 
             checkBox_SelectVentilationUnit.Checked += (s, e) => UpdateOptimiseAvailability();
             checkBox_SelectVentilationUnit.Unchecked += (s, e) => UpdateOptimiseAvailability();
@@ -231,12 +239,22 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// 2B needs a selected product to optimise within, so it follows the selection tick rather than
-        /// standing on its own - and is cleared, not merely greyed, when that tick comes off.
+        /// 2B needs two things, and is cleared rather than merely greyed when either goes away.
+        /// <para>
+        /// <b>A selected product</b>, because the optimisation explores within its capacity; and
+        /// <b>the MVHR route</b>, because 2B raises MECHANICAL design airflow and a naturally ventilated
+        /// dwelling has none for it to raise. <c>Modify.CanOptimise</c> refuses both categorically - but it
+        /// does so after the iteration has been prepared and a full-year simulation has run, which is
+        /// minutes of an engineer's time to be told something this window already knew.
+        /// </para>
+        /// <para>
+        /// The route is read off the selected option, which carries what SAM says that iteration is defined
+        /// over - never decided here.
+        /// </para>
         /// </summary>
         private void UpdateOptimiseAvailability()
         {
-            bool available = SelectVentilationUnit;
+            bool available = SelectVentilationUnit && SelectedOption?.PartOVentilationMode == PartOVentilationMode.MVHR;
 
             checkBox_Optimise.IsEnabled = available;
 
@@ -255,7 +273,9 @@ namespace SAM.Analytical.UI.WPF
         {
             if (!checkBox_Optimise.IsEnabled)
             {
-                textBlock_Optimise.Text = "Iteration 2B raises the design airflow of failing mechanically ventilated rooms within the capacity of the unit already selected for their dwelling, so it needs a ventilation unit to be selected above.";
+                textBlock_Optimise.Text = SelectedOption?.PartOVentilationMode != PartOVentilationMode.MVHR
+                    ? "Iteration 2B raises mechanical design airflow, and the base provision selected above is not a mechanical route. Natural ventilation is not a mechanical airflow optimisation target."
+                    : "Iteration 2B raises the design airflow of failing mechanically ventilated rooms within the capacity of the unit already selected for their dwelling, so it needs a ventilation unit to be selected above.";
 
                 return;
             }

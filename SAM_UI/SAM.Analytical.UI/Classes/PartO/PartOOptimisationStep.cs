@@ -82,6 +82,20 @@ namespace SAM.Analytical.UI
         public List<PartOOptimisationUnitState> UnitStates { get; } = [];
 
         /// <summary>
+        /// Every adjustment this iteration made, <b>targeted first</b> and derived after - the order the
+        /// round itself settled on. Each one still carries <see cref="DesignAirFlowAdjustment.IsDerived"/>,
+        /// so nothing about which were engineering decisions is lost by reading them together.
+        /// </summary>
+        public List<DesignAirFlowAdjustment> Adjustments()
+        {
+            List<DesignAirFlowAdjustment> result = [.. TargetedAdjustments];
+
+            result.AddRange(DerivedAdjustments);
+
+            return result;
+        }
+
+        /// <summary>
         /// The production TM59 result for every resolved design space of this iteration, criterion by
         /// criterion, exactly as the assessment produced them.
         /// </summary>
