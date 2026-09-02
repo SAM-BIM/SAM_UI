@@ -1,42 +1,55 @@
 # Project Progress
 
 ## Branch
-`feature/parto-iteration2b-automatic-optimisation`, branched from `sow/2026-Q3` at **`1e9a0a1`**
-(the merge of PR #76). Pushed; **PR #77** open against `sow/2026-Q3`, **not merged**.
-
-**Depends on `SAM-BIM/SAM` PR #88** (`feature/parto-iteration2b-design-airflow-round`), which adds the
-deterministic multi-target design airflow round this orchestrates. **SAM #88 must merge first** - until it
-does, the `Build (Windows)` check here fails with `CS0246: DesignAirFlowTargetRefusal could not be found`,
-because `.github/workflows/build.yml` clones sibling repos by head-branch name, then the `sow/*` base, and
-the two branches are not identically named, so it falls back to `sow/2026-Q3` which does not yet carry the
-new types. `spdx` passes. Locally, built against the SAM feature branch, both solutions build clean.
-
-Everything below "Completed" is history from PR #76 (Iteration 1a / 1b / 2 orchestration), retained for
-context.
+`feature/parto-iteration2b-optimisation-review-tests`, branched from `sow/2026-Q3` at **`d056af7`**
+(the merge of PR #77, itself preceded by SAM PR #88).
 
 ## Last updated
-2026-09-02 - Approved Document O **Iteration 2B** automatic optimisation implemented and accepted on a
-licensed future-weather TAS run. Five Codex findings fixed across two review rounds.
+2026-09-02 - regression tests for the two `81d9117` review fixes that shipped without any.
 
-## Current status
+## Latest (2026-09-02): pinning the subset-pass guard and the round count
+
+**Status: implemented and tested; PR open against `sow/2026-Q3`.**
+
+`81d9117` fixed two findings - a TM59 pass over a subset is not a pass (P1), and an unattempted round is
+not a round (P2) - with no regression tests, the only review fixes on either PR shipped that way. This
+change pins them.
+
+- `Modify.PartialAssessment` and the `PartOTM59Assessment` constructor are **internal** rather than
+  private, so the guard is testable through the existing `InternalsVisibleTo` - the same seam
+  `PartODwellingSpaceGuids` was given in `81d9117`. The production route to an assessment remains
+  `Assess`, which needs a real TSD.
+- New tests in `PartOOptimisationTests`: an in-scope room the assessment never looked at turns the pass
+  into a refusal naming that room; unassessed rooms outside the dwelling scope (corridor, AHU simulation
+  zone) do not; a fully assessed pass is untouched. Verified the first fails with the guard neutralised.
+- The phantom-step fix's recording side sits behind the TAS seam and is not unit-testable here; what is
+  pinned is the run-level contract it restored - a baseline-only run reports **0 rounds** and the baseline
+  as the last valid design.
+
+**277** tests in `WPF/SAM.Analytical.UI.WPF.Tests` pass (273 + 4 new).
+
+### Next step
+
+- Merge the PR.
+
+## Superseded (2026-09-02): Iteration 2B automatic optimisation - merged as PR #77
+
+## Current status (at the #77 merge)
 Iteration 2B is implemented end to end in SAM_UI and accepted on the licensed future-weather fixture.
 From a completed Iteration 2 run it raises the design airflow of every eligible failing mechanically
 ventilated room by a fixed step, rebalances through the new SAM round, rebuilds the Part O state,
 re-simulates the **same** weather case under its own project name, reassesses with production TM59, and
 repeats until an explicit stop reason is reached.
 
-Builds clean; **273** tests in `WPF/SAM.Analytical.UI.WPF.Tests` pass (237 baseline + 36 new). Awaiting
-review; not merged.
+Merged as PR #77 (`d056af7`); **273** tests in `WPF/SAM.Analytical.UI.WPF.Tests` passed at merge.
 
 ## Integration state
 Sibling repos, and what changed:
 
 - `SAM` @ `sow/2026-Q3` `0ae4b929` + **PR #88** - the new `Modify.EvaluateTargetedDesignAirFlows` round.
-  **This is a required companion change.**
+  **This is a required companion change.** (Merged.)
 - `SAM_Systems` @ `fea5055` - **unchanged**. Nuaire `MRXBOXAB-ECO5-AECV + MR-ECO-COOL-V`, 150/150 l/s.
 - `SAM_Tas` @ `78f7afb` - **unchanged**.
-
-## Latest (2026-09-02): Iteration 2B automatic optimisation
 
 ### What was built
 

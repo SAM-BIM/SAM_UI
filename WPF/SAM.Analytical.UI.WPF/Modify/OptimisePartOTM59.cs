@@ -470,7 +470,8 @@ namespace SAM.Analytical.UI.WPF
         /// </para>
         /// </summary>
         /// <returns>Null where every in-scope space was assessed, and the reason otherwise.</returns>
-        private static string? PartialAssessment(AnalyticalModel? analyticalModel, PartOPreparationContext partOPreparationContext, PartOTM59Assessment partOTM59Assessment)
+        /// <remarks>Internal rather than private so the subset-pass guard is pinned by tests.</remarks>
+        internal static string? PartialAssessment(AnalyticalModel? analyticalModel, PartOPreparationContext partOPreparationContext, PartOTM59Assessment partOTM59Assessment)
         {
             AdjacencyCluster? adjacencyCluster = analyticalModel?.AdjacencyCluster;
             if (adjacencyCluster is null || partOTM59Assessment.SpaceGuids_Unassessed.Count == 0)
