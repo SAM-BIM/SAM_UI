@@ -63,66 +63,28 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            TM59AssessmentResult? tM59AssessmentResult = null;
-            TM59AssessmentReport? tM59AssessmentReport = null;
-            List<string> associationRefusals = [];
+            PartOTM59Assessment partOTM59Assessment;
 
             using (ProgressBarWindowManager progressBarWindowManager = new("Part O TM59", "Reading simulation results..."))
             {
-                //The same conversion settings the production query uses - the two series the assessment reads,
-                //plus the zones and weather data it needs.
-                TSDConversionSettings tSDConversionSettings = new()
-                {
-                    SpaceDataTypes = new HashSet<SpaceDataType>() { SpaceDataType.ResultantTemperature, SpaceDataType.OccupantSensibleGain },
-                    ConvertWeaterData = true,
-                    ConvertZones = true
-                };
+                //The whole assessment, in the one place that owns it - so this command and the Iteration 2B
+                //optimisation can never disagree about what TM59 said. See PartOTM59Assessment.
+                partOTM59Assessment = PartOTM59Assessment.Assess(analyticalModel_Workflow, path_TSD, partORun.OverheatingScenarios);
 
-                AnalyticalModel analyticalModel_TSD = Analytical.Tas.Convert.ToSAM(path_TSD, tSDConversionSettings);
-                if (analyticalModel_TSD is null)
-                {
-                    progressBarWindowManager.Text = "Failed";
-                }
-                else
-                {
-                    progressBarWindowManager.Text = "Assessing...";
-
-                    //The design side of this call is the WORKFLOW model. Its spaces carry the zone guids TAS
-                    //stamped on the round trip, which is what the map matches on.
-                    TM59AssessmentCalculator tM59AssessmentCalculator = analyticalModel_TSD.TM59AssessmentCalculator(analyticalModel_Workflow);
-
-                    //Authoritative over the TM59 criterion, and stated by the scenarios of the preparation
-                    //this run was built on - not derived from an internal condition or a zone name.
-                    OverheatingScenarioMap overheatingScenarioMap = new(partORun.OverheatingScenarios, analyticalModel_Workflow, tM59AssessmentCalculator.SimulationSpaceMap);
-                    tM59AssessmentCalculator.VentilationStrategyMap = overheatingScenarioMap.VentilationStrategyMap;
-
-                    associationRefusals.AddRange(overheatingScenarioMap.Refusals ?? []);
-
-                    tM59AssessmentCalculator.RestoreDesignInternalConditions();
-
-                    associationRefusals.AddRange(tM59AssessmentCalculator.AssociationRefusals);
-
-                    //Null spaces and null zones: the whole model, which for this calculator means every
-                    //simulated space that resolved to exactly one design space.
-                    List<Space> spaces = tM59AssessmentCalculator.Spaces(null, null);
-
-                    associationRefusals.AddRange(tM59AssessmentCalculator.AssociationRefusals);
-
-                    tM59AssessmentResult = tM59AssessmentCalculator.Calculate(spaces);
-
-                    if (tM59AssessmentResult is not null)
-                    {
-                        tM59AssessmentReport = new TM59AssessmentReport(tM59AssessmentResult, path_TSD);
-                    }
-                }
+                progressBarWindowManager.Text = partOTM59Assessment.IsAssessed ? "Assessing..." : "Failed";
             }
 
-            if (tM59AssessmentResult is null || tM59AssessmentReport is null)
+            if (!partOTM59Assessment.IsAssessed)
             {
-                MessageBox.Show(string.Format("The simulation results at '{0}' could not be assessed.", path_TSD));
+                MessageBox.Show(string.Format("The simulation results at '{0}' could not be assessed.\n\n{1}", path_TSD, partOTM59Assessment.Refusal));
 
                 return;
             }
+
+            TM59AssessmentResult tM59AssessmentResult = partOTM59Assessment.Result!;
+            TM59AssessmentReport tM59AssessmentReport = partOTM59Assessment.Report!;
+
+            List<string> associationRefusals = partOTM59Assessment.AssociationRefusals;
 
             PartOTM59ResultWindow partOTM59ResultWindow = new()
             {

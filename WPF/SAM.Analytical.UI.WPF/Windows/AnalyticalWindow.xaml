@@ -490,6 +490,10 @@
                          button is unavailable, and "unavailable with no reason given" is the state this
                          command most needs to explain. -->
                     <RibbonButton x:Name="RibbonButton_AssessPartOTM59" Label="Overheating (TM59)" ToolTipService.ShowOnDisabled="True" />
+                    <!-- Iteration 2B. Deliberately here rather than in the base-provision list: it is an
+                         optimisation performed ON an Iteration 2 design, needs a completed run to start
+                         from, and is enabled by exactly the same condition the assessment is. -->
+                    <RibbonButton x:Name="RibbonButton_OptimisePartOTM59" Label="Optimise (2B)" ToolTipService.ShowOnDisabled="True" />
                 </RibbonGroup>
                 <RibbonGroup x:Name="RibbonGroup_Results_Mollier" Header="Mollier Diagram">
                     <RibbonButton x:Name="RibbonButton_AirHandlingUnitDiagram" Label="AHU" />

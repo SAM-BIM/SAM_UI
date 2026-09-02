@@ -1,0 +1,64 @@
+<Window x:Class="SAM.Analytical.UI.WPF.PartOOptimisationResultWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
+        mc:Ignorable="d"
+        Title="Part O Iteration 2B - Automatic Optimisation" Height="760" Width="1180" FontFamily="Roboto Light">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="150"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="120"/>
+            <RowDefinition Height="30"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="textBlock_StopReason" Grid.Row="0" TextWrapping="Wrap" FontWeight="Bold" Margin="0,0,0,4"/>
+        <TextBlock x:Name="textBlock_Summary" Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#555555"/>
+
+        <!-- TARGETED and DERIVED are never merged: one is an engineering decision, the other a balancing
+             consequence of it. Requirement is shown beside them so a reader can see the Approved Document F
+             floor was never moved. -->
+        <Label Grid.Row="2" Content="Design airflow history" Padding="0,0,0,2" FontWeight="Bold"/>
+        <DataGrid x:Name="dataGrid_AirFlow" Grid.Row="3" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" FontSize="11">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Run" Binding="{Binding Run}" Width="45"/>
+                <DataGridTextColumn Header="Space" Binding="{Binding Space}" Width="170"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="90"/>
+                <DataGridTextColumn Header="Direction" Binding="{Binding Direction}" Width="90"/>
+                <DataGridTextColumn Header="Design before [l/s]" Binding="{Binding DesignBefore_Lps, StringFormat={}{0:0.###}}" Width="130"/>
+                <DataGridTextColumn Header="Requested [l/s]" Binding="{Binding Requested_Lps, StringFormat={}{0:0.###}, TargetNullValue=-}" Width="115"/>
+                <DataGridTextColumn Header="Achieved [l/s]" Binding="{Binding Achieved_Lps, StringFormat={}{0:0.###}}" Width="110"/>
+                <DataGridTextColumn Header="Part F requires [l/s]" Binding="{Binding Requirement_Lps, StringFormat={}{0:0.###}}" Width="135"/>
+                <DataGridTextColumn Header="TM59" Binding="{Binding TM59Status}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Maximum is the selected product's rating, never a design airflow and never a target. -->
+        <Label Grid.Row="4" Content="Serving unit history" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <DataGrid x:Name="dataGrid_Unit" Grid.Row="5" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" FontSize="11">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Run" Binding="{Binding Run}" Width="45"/>
+                <DataGridTextColumn Header="AHU" Binding="{Binding AHU}" Width="110"/>
+                <DataGridTextColumn Header="System" Binding="{Binding System}" Width="170"/>
+                <DataGridTextColumn Header="Duty [l/s]" Binding="{Binding Duty}" Width="100"/>
+                <DataGridTextColumn Header="Maximum [l/s]" Binding="{Binding Maximum}" Width="115"/>
+                <DataGridTextColumn Header="Headroom [l/s]" Binding="{Binding Headroom}" Width="115"/>
+                <DataGridTextColumn Header="Product" Binding="{Binding Product}" Width="*"/>
+                <DataGridTextColumn Header="Equipment" Binding="{Binding Equipment}" Width="110"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Label x:Name="label_Diagnostics" Grid.Row="6" Content="Notes" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <TextBox x:Name="textBox_Diagnostics" Grid.Row="7" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
+
+        <Button x:Name="button_CopyAll" Grid.Row="8" Width="70" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
+        <Button x:Name="button_Close" IsCancel="True" Grid.Row="8" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Close_Click">Close</Button>
+    </Grid>
+</Window>

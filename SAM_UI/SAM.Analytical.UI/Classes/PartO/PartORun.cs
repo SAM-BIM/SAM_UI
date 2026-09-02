@@ -59,6 +59,13 @@ namespace SAM.Analytical.UI
 
         private AnalyticalModel analyticalModel_Workflow;
 
+        //How this run was prepared and how it was simulated - kept so an Iteration 2B optimisation can
+        //repeat BOTH without asking again, which is what makes its rounds comparable. See
+        //PartOPreparationContext and PartOSimulationContext.
+        private PartOPreparationContext partOPreparationContext;
+
+        private PartOSimulationContext partOSimulationContext;
+
         private string path_TSD;
 
         private System.DateTime dateTime_TSD;
@@ -115,6 +122,30 @@ namespace SAM.Analytical.UI
 
         /// <summary>The TSD the completed workflow wrote. Null outside <see cref="PartORunState.WorkflowCompleted"/>.</summary>
         public string Path_TSD => State == PartORunState.WorkflowCompleted ? path_TSD : null;
+
+        /// <summary>
+        /// What this run was prepared with - the base provision, the dwelling scope, the stated routes and
+        /// the product catalogue that was offered. Null outside a live run, and null on a run prepared
+        /// through the overload that states none.
+        /// <para>
+        /// <b>Carried so an optimisation can re-prepare identically.</b> Iteration 2B changes design airflow
+        /// and rebuilds the Part O state around it; re-preparing with a different route or a different
+        /// catalogue would make each round a different engineering case and the TM59 results across the run
+        /// incomparable.
+        /// </para>
+        /// </summary>
+        public PartOPreparationContext PreparationContext => State == PartORunState.None ? null : partOPreparationContext;
+
+        /// <summary>
+        /// The TAS case the completed workflow ran as - the weather, the solar method and the day range.
+        /// Null outside <see cref="PartORunState.WorkflowCompleted"/>, and on a run completed through the
+        /// overload that states none.
+        /// <para>
+        /// <b>Carried so an optimisation reruns the SAME case.</b> A round whose weather or day range moved
+        /// would leave the change in TM59 results unattributable to the airflow change that was made.
+        /// </para>
+        /// </summary>
+        public PartOSimulationContext SimulationContext => State == PartORunState.WorkflowCompleted ? partOSimulationContext : null;
 
         /// <summary>
         /// Whether this run has results at all - what the ribbon enables on.
@@ -233,7 +264,20 @@ namespace SAM.Analytical.UI
         /// <returns>Whether the run is now <see cref="PartORunState.Prepared"/>.</returns>
         public bool Prepare(PartOIterationPreparation partOIterationPreparation)
         {
-            return Prepare(partOIterationPreparation?.AnalyticalModel, partOIterationPreparation?.OverheatingScenarios, partOIterationPreparation?.Refusal);
+            return Prepare(partOIterationPreparation, null);
+        }
+
+        /// <summary>
+        /// The same transition, recording <b>how</b> the preparation was asked for so it can be repeated
+        /// identically by an optimisation - see <see cref="PreparationContext"/>.
+        /// </summary>
+        /// <param name="partOPreparationContext">
+        /// The preparation's own inputs. Null keeps this method's behaviour exactly as it was before an
+        /// optimisation existed: the run is live, and simply cannot be re-prepared automatically.
+        /// </param>
+        public bool Prepare(PartOIterationPreparation partOIterationPreparation, PartOPreparationContext partOPreparationContext)
+        {
+            return Prepare(partOIterationPreparation?.AnalyticalModel, partOIterationPreparation?.OverheatingScenarios, partOPreparationContext, partOIterationPreparation?.Refusal);
         }
 
         /// <summary>
@@ -245,6 +289,21 @@ namespace SAM.Analytical.UI
         /// <param name="overheatingScenarios">The scenarios stated for it.</param>
         /// <param name="refusal">The preparation's fatal refusal, where it had one.</param>
         public bool Prepare(AnalyticalModel analyticalModel_Prepared, IEnumerable<OverheatingScenario> overheatingScenarios, string refusal = null)
+        {
+            return Prepare(analyticalModel_Prepared, overheatingScenarios, null, refusal);
+        }
+
+        /// <summary>
+        /// The same transition from a model, its scenarios and the preparation's own inputs - what production
+        /// reaches through <see cref="Prepare(PartOIterationPreparation, PartOPreparationContext)"/>, and what
+        /// a test can call, since <c>PartOIterationPreparation</c> is only assembled by <c>SAM.Analytical</c>
+        /// itself.
+        /// </summary>
+        /// <param name="partOPreparationContext">
+        /// How the preparation was asked for - see <see cref="PreparationContext"/>. Null leaves the run
+        /// live but not automatically repeatable.
+        /// </param>
+        public bool Prepare(AnalyticalModel analyticalModel_Prepared, IEnumerable<OverheatingScenario> overheatingScenarios, PartOPreparationContext partOPreparationContext, string refusal = null)
         {
             Reset();
 
@@ -276,6 +335,7 @@ namespace SAM.Analytical.UI
 
             this.analyticalModel_Prepared = analyticalModel_Prepared;
             this.overheatingScenarios = overheatingScenarios_Temp;
+            this.partOPreparationContext = partOPreparationContext;
 
             State = PartORunState.Prepared;
 
@@ -298,6 +358,18 @@ namespace SAM.Analytical.UI
         /// </param>
         /// <param name="refusal">Why the run was not completed, or null where it was.</param>
         public bool Complete(AnalyticalModel analyticalModel_Workflow, string path_TSD, out string refusal)
+        {
+            return Complete(analyticalModel_Workflow, path_TSD, null, out refusal);
+        }
+
+        /// <summary>
+        /// The same transition, recording <b>which TAS case</b> produced these results so an optimisation
+        /// can rerun it over a changed design - see <see cref="SimulationContext"/>.
+        /// </summary>
+        /// <param name="partOSimulationContext">
+        /// The case that just ran. Null keeps the behaviour this method had before an optimisation existed.
+        /// </param>
+        public bool Complete(AnalyticalModel analyticalModel_Workflow, string path_TSD, PartOSimulationContext partOSimulationContext, out string refusal)
         {
             refusal = null;
 
@@ -360,6 +432,8 @@ namespace SAM.Analytical.UI
             this.analyticalModel_Workflow = analyticalModel_Workflow;
             this.path_TSD = path_TSD;
             dateTime_TSD = File.GetLastWriteTimeUtc(path_TSD);
+
+            this.partOSimulationContext = partOSimulationContext;
 
             State = PartORunState.WorkflowCompleted;
             InvalidationReason = null;
@@ -434,6 +508,11 @@ namespace SAM.Analytical.UI
             path_TSD = null;
             dateTime_TSD = default;
             modificationExpected = false;
+
+            //Cleared with everything else: a dropped run's preparation inputs and TAS case must not be
+            //picked up by its successor, which was prepared and simulated differently.
+            partOPreparationContext = null;
+            partOSimulationContext = null;
 
             //Cleared with everything else: a workflow announced to the run that has just been dropped must not
             //be able to complete its successor.
