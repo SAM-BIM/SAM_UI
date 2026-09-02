@@ -98,5 +98,38 @@ namespace SAM.Analytical.UI
         {
             return string.Format("{0}-Opt{1:00}", ProjectName, iteration);
         }
+
+        /// <summary>
+        /// The optimisation iteration a project name already carries, or <b>0</b> where it carries none -
+        /// the inverse of <see cref="ProjectName_Iteration(int)"/>.
+        /// <para>
+        /// <b>What it is for.</b> An optimisation can be run again from the design a previous one left
+        /// behind. Numbering the second run's rounds from 1 would point them at the first run's files and
+        /// overwrite the evidence for it - which is the one thing the per-iteration naming exists to
+        /// prevent. Reading the iteration back off the name of the run being started from lets the second
+        /// optimisation continue the numbering instead, so <c>-Opt11</c> follows <c>-Opt10</c> and nothing
+        /// is ever written twice.
+        /// </para>
+        /// <para>
+        /// A name that does not end in the suffix this class writes - the ordinary first optimisation, or a
+        /// project a person happened to call something ending in "-Optional" - reads as 0, which starts the
+        /// numbering at <c>-Opt01</c>.
+        /// </para>
+        /// </summary>
+        public static int Iteration_ProjectName(string projectName)
+        {
+            if (string.IsNullOrWhiteSpace(projectName))
+            {
+                return 0;
+            }
+
+            int index = projectName.LastIndexOf("-Opt", System.StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return 0;
+            }
+
+            return int.TryParse(projectName.Substring(index + 4), out int result) && result >= 0 ? result : 0;
+        }
     }
 }

@@ -25,7 +25,7 @@ ventilated room by a fixed step, rebalances through the new SAM round, rebuilds 
 re-simulates the **same** weather case under its own project name, reassesses with production TM59, and
 repeats until an explicit stop reason is reached.
 
-Builds clean; **264** tests in `WPF/SAM.Analytical.UI.WPF.Tests` pass (237 baseline + 27 new). Awaiting
+Builds clean; **273** tests in `WPF/SAM.Analytical.UI.WPF.Tests` pass (237 baseline + 36 new). Awaiting
 review; not merged.
 
 ## Integration state
@@ -112,10 +112,17 @@ Round 2:
    assessment that reached no verdict would have been reported as every eligible space passing. Only an
    explicit `Pass` now ends a run as passed; anything else stops as `AssessmentFailed`.
 
+Round 3:
+6. **P2** - an optimisation run a second time over the design a previous one left behind restarted its
+   round numbering at `-Opt01`, overwriting the first run's TBD and TSD. The numbering now continues from
+   the iteration read back off the results file the starting design came from, so `-Opt11` follows
+   `-Opt10` and nothing is written twice; the baseline step is also labelled with the run that actually
+   produced it rather than the context's base name.
+
 ### Validation
 
 - `SAM_UI.sln` builds clean.
-- `WPF/SAM.Analytical.UI.WPF.Tests`: **264 passed, 0 failed** (237 baseline + 27 new).
+- `WPF/SAM.Analytical.UI.WPF.Tests`: **273 passed, 0 failed** (237 baseline + 36 new).
 - `PartORunLineageTests` + `PartOPresentationTests` + `SimulationZoneIdentityTests`: 47/47 - no lineage
   regression.
 - SAM side: `SAM.Tests` **1694 passed, 0 failed**.

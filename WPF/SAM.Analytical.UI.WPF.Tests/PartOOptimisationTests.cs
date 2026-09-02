@@ -408,6 +408,54 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal("Fixture-Opt03", names[3]);
         }
 
+        /// <summary>
+        /// An optimisation run a second time over the design the first one left behind continues the
+        /// numbering rather than starting again at <c>-Opt01</c> and overwriting the first run's evidence.
+        /// <para>
+        /// The iteration is read back off the name of the run being started from, which is a recorded fact -
+        /// the results file that produced that design.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void ASecondOptimisation_ContinuesTheNumberingRatherThanOverwriting()
+        {
+            PartOSimulationContext partOSimulationContext = SimulationContext(true);
+
+            //A first optimisation starts from a baseline carrying no suffix, so it numbers from 1.
+            Assert.Equal(0, PartOSimulationContext.Iteration_ProjectName(partOSimulationContext.ProjectName));
+            Assert.Equal("Fixture-Opt01", partOSimulationContext.ProjectName_Iteration(0 + 1));
+
+            //It stops at run 10. A second optimisation starting from that design reads 10 back off it...
+            string projectName_LastValid = partOSimulationContext.ProjectName_Iteration(10);
+
+            Assert.Equal("Fixture-Opt10", projectName_LastValid);
+
+            int iteration_Baseline = PartOSimulationContext.Iteration_ProjectName(projectName_LastValid);
+
+            Assert.Equal(10, iteration_Baseline);
+
+            //...and numbers its own first round 11, so nothing the first run wrote is touched.
+            Assert.Equal("Fixture-Opt11", partOSimulationContext.ProjectName_Iteration(iteration_Baseline + 1));
+        }
+
+        /// <summary>
+        /// A project name that merely happens to contain the suffix's letters is not an iteration - it
+        /// reads as 0 and the numbering starts where it should.
+        /// </summary>
+        [Theory]
+        [InlineData("Fixture", 0)]
+        [InlineData("Fixture-Optional", 0)]
+        [InlineData("Fixture-Opt", 0)]
+        [InlineData("Fixture-Opt00", 0)]
+        [InlineData("Fixture-Opt07", 7)]
+        [InlineData("Fixture-Opt10", 10)]
+        [InlineData("Fixture-Opt01-Opt03", 3)]
+        [InlineData(null, 0)]
+        public void AProjectNamesIteration_IsReadBackOnlyWhereItIsReallyThere(string projectName, int expected)
+        {
+            Assert.Equal(expected, PartOSimulationContext.Iteration_ProjectName(projectName));
+        }
+
         // ---- History -------------------------------------------------------------------------------------
 
         /// <summary>

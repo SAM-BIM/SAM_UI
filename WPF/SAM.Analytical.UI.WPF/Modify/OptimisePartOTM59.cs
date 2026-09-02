@@ -4,6 +4,7 @@
 using SAM.Analytical.Enums;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 
 namespace SAM.Analytical.UI.WPF
@@ -99,7 +100,21 @@ namespace SAM.Analytical.UI.WPF
 
             PartOTM59Assessment partOTM59Assessment = PartOTM59Assessment.Assess(analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
 
-            PartOOptimisationStep partOOptimisationStep = Step(0, partOSimulationContext.ProjectName, path_TSD_LastValid, partOSimulationContext, analyticalModel_LastValid, partOPreparationContext, partOTM59Assessment);
+            //The run this optimisation actually starts from, named by the results file that produced it
+            //rather than by the context's base name. The two differ exactly when this design is itself the
+            //output of a previous optimisation, and getting it wrong would label the baseline with a
+            //project that refers to different results.
+            string projectName_Baseline = string.IsNullOrWhiteSpace(path_TSD_LastValid)
+                ? partOSimulationContext.ProjectName
+                : Path.GetFileNameWithoutExtension(path_TSD_LastValid);
+
+            //And the numbering continues from it. An optimisation run a second time over the design the
+            //first one left behind would otherwise start again at -Opt01 and overwrite the first run's
+            //TBD and TSD - destroying the evidence the whole per-iteration naming exists to keep. See
+            //PartOSimulationContext.Iteration_ProjectName.
+            int iteration_Baseline = PartOSimulationContext.Iteration_ProjectName(projectName_Baseline);
+
+            PartOOptimisationStep partOOptimisationStep = Step(0, projectName_Baseline, path_TSD_LastValid, partOSimulationContext, analyticalModel_LastValid, partOPreparationContext, partOTM59Assessment);
 
             result.Steps.Add(partOOptimisationStep);
 
@@ -136,7 +151,9 @@ namespace SAM.Analytical.UI.WPF
             {
                 partOOptimisationStep = new PartOOptimisationStep(iteration)
                 {
-                    ProjectName = partOSimulationContext.ProjectName_Iteration(iteration),
+                    //Offset by where this optimisation started, so a second run over a previous one's
+                    //output continues its numbering rather than overwriting its files.
+                    ProjectName = partOSimulationContext.ProjectName_Iteration(iteration_Baseline + iteration),
                     WeatherData = partOSimulationContext.WeatherData?.Name,
                 };
 
