@@ -33,13 +33,14 @@ namespace SAM.Analytical.UI
         [Description("Optimisation Round")] OptimisationRound,
 
         /// <summary>
-        /// The final <b>diagnostic</b> selected-equipment capacity envelope: the deliberate target vector
-        /// scaled coherently until the already-selected unit's own ceiling binds.
+        /// The final <b>diagnostic</b> selected-equipment capacity envelope: the last valid design grown
+        /// proportionally - every terminal keeping its share of it - until the already-selected unit's own
+        /// ceiling binds.
         /// <para>
-        /// <b>Never an optimisation round and never the run's answer.</b> It is a partial - or several
-        /// times over - step that the ordinary all-or-nothing policy deliberately refuses, evaluated to
-        /// say what the equipment already bought could deliver. It does not count as a round, is not
-        /// eligible to be the last valid design, and never becomes the baseline of anything.
+        /// <b>Never an optimisation round and never the run's answer.</b> It is a design the ordinary
+        /// all-or-nothing policy deliberately refuses, evaluated to say what the equipment already bought
+        /// could support. It does not count as a round, is not eligible to be the last valid design, and
+        /// never becomes the baseline of anything.
         /// </para>
         /// </summary>
         [Description("Capacity Envelope")] CapacityEnvelope,

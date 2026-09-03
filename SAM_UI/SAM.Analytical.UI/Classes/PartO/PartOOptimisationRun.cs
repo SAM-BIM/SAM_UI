@@ -32,10 +32,10 @@ namespace SAM.Analytical.UI
     /// <para>
     /// Where the ordinary optimisation stops with rooms still failing, an optional final
     /// <see cref="PartOOptimisationStepKind.CapacityEnvelope"/> step answers a different question - what
-    /// the <i>already-selected</i> unit could deliver if taken to its own ceiling. It runs the same full
-    /// year and the same production TM59, so nothing about its lifecycle distinguishes it from a round;
-    /// what distinguishes it is that it is a partial (or several times over) step the all-or-nothing policy
-    /// deliberately refuses. It therefore lives in its own properties -
+    /// design the <i>already-selected</i> unit could support if the last valid design were grown
+    /// proportionally to its ceiling. It runs the same full year and the same production TM59, so nothing
+    /// about its lifecycle distinguishes it from a round; what distinguishes it is that it is a design the
+    /// all-or-nothing policy deliberately refuses. It therefore lives in its own properties -
     /// <see cref="AnalyticalModel_CapacityEnvelope"/>, <see cref="Path_TSD_CapacityEnvelope"/>,
     /// <see cref="CapacityEnvelope"/> - is excluded from <see cref="Rounds"/> and
     /// <see cref="Step_LastValid"/>, and is never what <see cref="AnalyticalModel_LastValid"/> holds.
@@ -137,7 +137,7 @@ namespace SAM.Analytical.UI
 
         /// <summary>
         /// What the capacity envelope came to, as <c>SAM.Analytical</c> calculated it - the per-equipment
-        /// scale factors, ceilings and stated reasons. Null where none was calculated.
+        /// proportional growth factors, ceilings and stated reasons. Null where none was calculated.
         /// </summary>
         public DesignAirFlowCapacityEnvelope CapacityEnvelope { get; set; }
 

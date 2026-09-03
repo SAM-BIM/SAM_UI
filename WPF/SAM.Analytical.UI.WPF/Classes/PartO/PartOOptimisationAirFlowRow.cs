@@ -8,25 +8,69 @@ namespace SAM.Analytical.UI.WPF
     /// <summary>
     /// One row of the Iteration 2B airflow history: what happened to one room at one iteration, and what
     /// the production TM59 assessment said about it afterwards.
+    ///
+    /// <para><b><see cref="Type"/> is the column that matters most - it is the EVIDENCE for the row</b></para>
+    /// <list type="bullet">
+    /// <item><b>BASELINE</b> - where the room started, before any round touched it.</item>
+    /// <item><b>TARGETED</b> - an ordinary optimisation round made an engineering decision about this room:
+    /// it failed TM59, and the policy asked it for one whole step.</item>
+    /// <item><b>DERIVED</b> - the room moved to keep its dwelling balanced. Nobody chose it.</item>
+    /// <item><b>SCALED</b> - <b>capacity envelope rows only.</b> The room moved because the <i>complete last
+    /// valid design vector</i> was grown proportionally towards the selected unit's capacity ceiling. It was
+    /// chosen by the diagnostic and not by the optimisation, and it kept its share of a design rather than
+    /// being handed a figure anybody asked for.</item>
+    /// </list>
     /// <para>
-    /// <b><see cref="Type"/> is the column that matters most.</b> TARGETED means an engineering decision was
-    /// made about this room; DERIVED means it moved to keep its dwelling balanced and nobody chose it. A
-    /// history that merged the two would read as though every room that moved had been optimised, which is
-    /// the misreading the whole design airflow round exists to prevent.
+    /// <b>SCALED exists because TARGETED would be a lie on an envelope row.</b> A history printing the
+    /// envelope's rooms as TARGETED would say the optimisation had asked for those figures, and it never
+    /// did: it asked for one +5 l/s step on the failing rooms, and the envelope answers a different question
+    /// entirely. Merging the two is the same misreading the targeted/derived split exists to prevent.
     /// </para>
+    ///
+    /// <para><b>What the four airflow columns mean, on each kind of row</b></para>
+    /// <list type="table">
+    /// <item>
+    /// <term><see cref="DesignBefore_Lps"/></term>
+    /// <description>The design entering this step. On a CAPACITY ENVELOPE row that is the <b>last valid
+    /// ordinary design</b>, several rounds along - not the baseline.</description>
+    /// </item>
+    /// <item>
+    /// <term><see cref="Requested_Lps"/></term>
+    /// <description>On TARGETED, the deliberate optimisation request. On SCALED, the proportionally grown
+    /// figure the diagnostic asked for at the selected unit's capacity envelope. On BASELINE and DERIVED a
+    /// dash - nobody asked.</description>
+    /// </item>
+    /// <item>
+    /// <term><see cref="Achieved_Lps"/></term>
+    /// <description>The design actually realised after the complete step, its balancing and its capacity
+    /// validation. Printed beside Requested on purpose: a step is adopted at exactly what it asked for or
+    /// not at all, so a disagreement here would be visible rather than silent.</description>
+    /// </item>
+    /// <item>
+    /// <term><see cref="Requirement_Lps"/></term>
+    /// <description>What Approved Document F requires of the room. <b>Never altered by anything in this
+    /// history</b>, on an envelope row least of all.</description>
+    /// </item>
+    /// </list>
+    ///
+    /// <para><b><see cref="Stage"/> tells the three kinds of step apart</b></para>
     /// <para>
-    /// <b>Requested and Achieved are both shown, and on an automatic round they agree.</b> That is the
-    /// point of printing both: a round is adopted at exactly what it asked for or not at all, so a
-    /// disagreement here would be visible rather than silent. A derived row has no request - nobody asked
-    /// for it - and shows a dash.
-    /// </para>
-    /// <para>
-    /// <b><see cref="Stage"/> tells the three kinds of step apart</b> - BASELINE, OPTIMISATION and CAPACITY
-    /// ENVELOPE. The envelope's rows are partial (or several times over) steps that the all-or-nothing
-    /// policy deliberately refuses, evaluated to say what the equipment already bought could deliver; read
+    /// BASELINE, OPTIMISATION and CAPACITY ENVELOPE. The envelope's rows are a design the all-or-nothing
+    /// policy deliberately refuses, evaluated to say what the equipment already bought could support; read
     /// as optimisation rows they would be the run's best result, which they are not. Its <see cref="Run"/>
     /// is <c>MAX</c> rather than a number, for the same reason its results file is <c>-OptMax</c>: a number
     /// would place it in the rounds' sequence, where the last of them is the answer.
+    /// </para>
+    ///
+    /// <para><b>A capacity envelope's rows are complete</b></para>
+    /// <para>
+    /// The proportional growth targets every space and direction the selected units serve, so every
+    /// contribution needed to reconcile a unit's supply and extract duty has its own row - one per space and
+    /// direction, aggregated at the same room grain as the rest of the history rather than terminal by
+    /// terminal. Summing the visible MAX rows of one direction reproduces that unit's duty with nothing
+    /// hidden. An earlier revision could not: for the real Flat 1 it showed the studio's <i>supply</i> and
+    /// the bathroom's <i>extract</i>, and left the studio's own 22 l/s extract contribution nowhere in the
+    /// table, so a reader could not see where the remaining extract duty came from.
     /// </para>
     /// </summary>
     public class PartOOptimisationAirFlowRow
@@ -57,7 +101,10 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>The room.</summary>
         public string Space { get; }
 
-        /// <summary>BASELINE, TARGETED or DERIVED.</summary>
+        /// <summary>
+        /// BASELINE, TARGETED, DERIVED or SCALED - the evidence for the row. See the class summary; the
+        /// distinction between TARGETED and SCALED in particular is not cosmetic.
+        /// </summary>
         public string Type { get; }
 
         /// <summary>Supply or extract.</summary>
@@ -105,12 +152,19 @@ namespace SAM.Analytical.UI.WPF
 
             foreach (PartOOptimisationStep partOOptimisationStep in partOOptimisationRun.Steps)
             {
+                //A deliberate adjustment of the CAPACITY ENVELOPE is SCALED and not TARGETED. Both were
+                //chosen, but by different authorities answering different questions: an optimisation round
+                //asked this room for one +5 l/s step because it failed TM59, and the envelope grew the whole
+                //last valid design vector proportionally towards the selected unit's ceiling. Printing the
+                //second as the first would claim the optimisation had requested figures it never did.
+                string type = partOOptimisationStep.IsCapacityEnvelope ? "SCALED" : "TARGETED";
+
                 foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.TargetedAdjustments)
                 {
                     result.Add(new PartOOptimisationAirFlowRow(
                         partOOptimisationStep,
                         designAirFlowAdjustment.SpaceName,
-                        "TARGETED",
+                        type,
                         Core.Query.Description(designAirFlowAdjustment.FlowClassification),
                         designAirFlowAdjustment.Before_Lps,
                         designAirFlowAdjustment.After_Lps,

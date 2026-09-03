@@ -72,16 +72,17 @@ namespace SAM.Analytical.UI
 
         /// <summary>
         /// Whether, when the optimisation stops with eligible rooms still failing, one further
-        /// <b>diagnostic</b> run is made: the deliberate target vector scaled coherently until the
-        /// <i>already-selected</i> unit's own design-capacity ceiling binds.
+        /// <b>diagnostic</b> run is made: the last valid design grown proportionally - every terminal
+        /// keeping its share of it - until the <i>already-selected</i> unit's own design-capacity ceiling
+        /// binds.
         ///
         /// <para><b>What it is for</b></para>
         /// <para>
         /// A run that stops on capacity, or on the iteration guard, leaves an engineer with "this design
         /// still fails" and no statement of how close the equipment already bought can get. The envelope is
-        /// that statement. It is not another round: it is a partial - or several times over - step the
-        /// all-or-nothing policy deliberately refuses, evaluated once, on its own, and reported as its own
-        /// stage.
+        /// that statement - "what design could the unit I have already bought support?" - and it is not
+        /// another round: it is a design the all-or-nothing policy deliberately refuses, evaluated once, on
+        /// its own, and reported as its own stage.
         /// </para>
         ///
         /// <para><b>Why it is optional, and why it defaults to on</b></para>
