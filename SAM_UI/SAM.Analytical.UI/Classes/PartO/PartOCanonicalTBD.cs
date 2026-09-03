@@ -278,11 +278,16 @@ namespace SAM.Analytical.UI
                     continue;
                 }
 
+                //The adiabatic flag is part of what the CONVERSION reads, not only of what the model says:
+                //SAM_Tas Modify.UpdateAdiabatic nulls the link of every TBD surface that matches an
+                //adiabatic panel, so two models identical but for this flag convert to different TBDs. It
+                //matters most for an isolated run, whose isolation cut is expressed entirely through it.
                 descriptions.Add(string.Format(
-                    "{0}|{1}|{2}|{3}",
+                    "{0}|{1}|{2}|{3}|{4}",
                     panel.Guid,
                     panel.PanelType,
                     panel.Construction?.Name ?? "-",
+                    Analytical.Query.Adiabatic(panel),
                     Digest(panel.GetFace3D(false))));
 
                 foreach (Aperture aperture in panel.Apertures ?? [])

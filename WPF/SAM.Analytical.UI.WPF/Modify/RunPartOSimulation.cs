@@ -141,6 +141,88 @@ namespace SAM.Analytical.UI.WPF
                 Name = projectName,
             };
 
+            //The model TAS will actually be given, normalized before anything looks at it or writes a file
+            //from it.
+            //
+            //Both of these WERE inside the progress dialog below, after the gbXML had been written. They are
+            //here because the pre-simulation gate has to judge the model that is handed to TAS, not the one
+            //handed to this method: the material repair fixes exactly the "Material Library does not contain
+            //Material X" state Create.Log reports as an Error, so gating before it would refuse models this
+            //pipeline was about to make valid - and a defect these two introduced would be invisible.
+            //
+            //Neither is a long COM call, which is what the dialog exists to keep responsive.
+
+            IEnumerable<IMaterial> materials = Analytical.Query.Materials(analyticalModel.AdjacencyCluster, Analytical.Query.DefaultMaterialLibrary());
+            if (materials is not null)
+            {
+                foreach (IMaterial material in materials)
+                {
+                    if (analyticalModel.HasMaterial(material))
+                    {
+                        continue;
+                    }
+
+                    analyticalModel.AddMaterial(material);
+                }
+            }
+
+            analyticalModel = partOSimulationContext.UpdateConstructionLayersByPanelType ? analyticalModel.UpdateConstructionLayersByPanelType() : analyticalModel;
+
+            //The Part O pre-flight: after the normalization above, and before the first byte of any file is
+            //written.
+            //
+            //Scoped to a PREPARED Part O run, which is exactly "the first TAS simulation of a prepared Part
+            //O run" and every re-prepared one after it: Simulate arms this with the session's run, and both
+            //optimisation call sites - an Iteration 2B round and the capacity envelope - call
+            //PartORun.Prepare immediately before calling this. So a full run, an isolated run, Iteration
+            //1a, 1b and 2, every 2B round and the envelope are all gated by this one place, and no Part O
+            //path can be added later that quietly skips it.
+            //
+            //NOT the ordinary Simulate command, which reaches this method with no run or an unprepared one.
+            //Making SAM Check a hard gate on every TAS simulation in SAM is a bigger change than the Part O
+            //contract - Create.Log reports Errors on states a long-standing model may well carry, and a
+            //model that simulates today must not stop simulating because the Part O path grew a gate.
+            //
+            //It runs over this run's own copy, which is by definition the model about to be converted: on an
+            //isolated run that is the DERIVED isolated model, because
+            //Analytical.Modify.PreparePartOIteration applied the isolation and the run adopted its output.
+            //Checking the full-building model it was extracted from would be validating something else.
+            //
+            //Errors stop it, warnings do not - see PartOPreSimulationCheck, and in particular why the
+            //intentional "MVHR-01 is missing internal conditions on some daytypes" state must stay a
+            //warning. Passing is not a promise that TAS will run: licensing, file I/O, the solver and the
+            //weather data are all still ahead of it.
+            PartOPreSimulationCheck partOPreSimulationCheck = PartOPreSimulationCheck.Gate(partORun, analyticalModel);
+            if (partOPreSimulationCheck is not null)
+            {
+                if (!partOPreSimulationCheck.IsValid)
+                {
+                    //Shown here rather than left to the caller's message box, because only the log carries
+                    //the whole list - the type, name and Guid of every record. The refusal the caller then
+                    //shows is the summary of it.
+                    Core.Log log = partOPreSimulationCheck.Log;
+                    if (log is not null)
+                    {
+                        log.Sort();
+
+                        new SAM.Core.UI.WPF.LogWindow(log.Filter([Core.LogRecordType.Error, Core.LogRecordType.Warning, Core.LogRecordType.Undefined])).ShowDialog();
+                    }
+
+                    refusal = partOPreSimulationCheck.Refusal();
+
+                    return null;
+                }
+
+                //Warnings on a model that IS going to be simulated. Carried as notes so they reach the run's
+                //diagnostics and the optimisation step that produced them, and deliberately not shown as a
+                //dialog: a Part O model has intentional warnings on every run, and a dialog per run would
+                //train people to dismiss the one that mattered.
+                foreach (Core.LogRecord logRecord in partOPreSimulationCheck.Warnings)
+                {
+                    notes.Add(string.Format("Pre-simulation check (warning): {0}", logRecord.Text));
+                }
+            }
+
             //Skipped entirely on the warm-start path: the gbXML exists to be imported into a T3D and
             //converted, and a canonical TBD is the product of having done exactly that. Writing one and then
             //not converting it would cost the export for nothing.
@@ -185,26 +267,6 @@ namespace SAM.Analytical.UI.WPF
                 try
                 {
                     progressWindowHost.CancelRequested += (s, e) => cancellationTokenSource.Cancel();
-
-                    step("Update Materials");
-
-                    IEnumerable<IMaterial> materials = Analytical.Query.Materials(analyticalModel.AdjacencyCluster, Analytical.Query.DefaultMaterialLibrary());
-                    if (materials is not null)
-                    {
-                        foreach (IMaterial material in materials)
-                        {
-                            if (analyticalModel.HasMaterial(material))
-                            {
-                                continue;
-                            }
-
-                            analyticalModel.AddMaterial(material);
-                        }
-                    }
-
-                    step("Update ConstructionLayers By PanelTypes");
-
-                    analyticalModel = partOSimulationContext.UpdateConstructionLayersByPanelType ? analyticalModel.UpdateConstructionLayersByPanelType() : analyticalModel;
 
                     //NOT on the warm-start path: the copy from the canonical overwrites this run's TBD
                     //anyway, and deleting first would only widen the window in which the run has no TBD.

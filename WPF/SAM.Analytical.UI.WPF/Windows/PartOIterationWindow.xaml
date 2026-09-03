@@ -30,6 +30,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <Label Grid.Row="0" Content="Base provision" Padding="0,0,0,2"/>
@@ -75,7 +76,24 @@
 
                 <TextBlock x:Name="textBlock_Scope" Grid.Row="7" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
 
+                <!-- ISOLATION belongs here, with the dwelling scope, because it is a statement about which
+                     dwellings are SIMULATED - not about how they are assessed. The Part O criteria, the
+                     Approved Document F requirements and the TM59 classification of the selected dwellings
+                     are identical either way; only the thermal model around them changes. The wording says
+                     that explicitly, because "run in isolation" could otherwise be read as a different
+                     assessment.
+
+                     Offered rather than disabled when every dwelling is ticked: a large building is not
+                     only its dwellings. Selecting all of them still excludes corridors, cores, plant and
+                     commercial areas, which on a 5,000 space model is a substantial reduction - so
+                     disabling the tick would refuse a real saving on a false premise. The note below says
+                     when the reduction is likely to be small instead. -->
                 <StackPanel Grid.Row="8" Margin="0,10,0,0">
+                    <CheckBox x:Name="checkBox_Isolate" Content="Run selected dwellings in isolation (thermal model scope only)"/>
+                    <TextBlock x:Name="textBlock_Isolate" Margin="20,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="9" Margin="0,10,0,0">
                     <CheckBox x:Name="checkBox_SelectVentilationUnit" Content="Select a ventilation unit from the manufacturer catalogue (Iteration 2)"/>
                     <TextBlock x:Name="textBlock_Catalogue" Margin="20,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
 

@@ -219,6 +219,20 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public string ScopeDescription => textBlock_Scope.Text;
 
+        /// <summary>
+        /// Whether the selected dwellings are to be simulated as an isolated thermal model rather than as
+        /// part of the whole building. <b>Off by default</b>: the whole-building simulation is the reference
+        /// case, and isolation is an explicit choice to trade it for speed.
+        /// <para>
+        /// This changes the THERMAL MODEL only. The Approved Document O criteria, the Approved Document F
+        /// requirements and the TM59 classification of the selected dwellings are unaffected by it.
+        /// </para>
+        /// </summary>
+        public bool Isolate => checkBox_Isolate.IsChecked ?? false;
+
+        /// <summary>What the window says about isolation. Exposed so what the user is told is assertable.</summary>
+        public string IsolationDescription => textBlock_Isolate.Text;
+
         /// <summary>The chosen base provision - its iteration and its canonical ventilation strategy.</summary>
         public PartOVentilationStrategyOption SelectedOption => comboBox_BaseProvision.SelectedItem as PartOVentilationStrategyOption;
 
@@ -389,6 +403,32 @@ namespace SAM.Analytical.UI.WPF
                 : string.Format("{0} of {1} dwelling(s) selected. The search is narrowing the list; Select All and None apply to what the search matches.", selected, count);
 
             button_OK.IsEnabled = selected != 0;
+
+            UpdateIsolationText();
+        }
+
+        /// <summary>
+        /// What isolation would do to this selection - including, plainly, that it is a different thermal
+        /// model and not a faster way to compute the same one.
+        /// <para>
+        /// The assumption is disclosed here rather than only in the report, because this is the moment the
+        /// choice is made. A person ticking this is accepting that interfaces to the dwellings they left
+        /// out are simulated as adiabatic, and they cannot accept that from a sentence they only see
+        /// afterwards.
+        /// </para>
+        /// </summary>
+        private void UpdateIsolationText()
+        {
+            string text = "When only part of a building is selected, simulate those dwellings as an isolated thermal model. Interfaces to excluded spaces become adiabatic while surrounding external geometry is retained as shading context. This can substantially reduce simulation time on large buildings. Results may differ from a whole-building simulation, because assuming no heat flows across those interfaces is a different thermal model - it does not change the Part O criteria or the Part F requirements.";
+
+            //Said when it applies, not enforced: the dwellings are not the whole building, so even the full
+            //dwelling set usually still excludes corridors, cores and plant.
+            if (dwellingSelection.Count != 0 && dwellingSelection.SelectedCount == dwellingSelection.Count)
+            {
+                text = string.Format("{0}\n\nEvery assessable dwelling is currently selected, so the reduction will come only from spaces that are not dwellings - corridors, cores and plant. On a building that is mostly dwellings it may be small.", text);
+            }
+
+            textBlock_Isolate.Text = text;
         }
 
         private void button_OK_Click(object sender, RoutedEventArgs e)

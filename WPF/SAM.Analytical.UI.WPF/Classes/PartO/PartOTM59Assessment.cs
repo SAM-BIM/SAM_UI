@@ -186,6 +186,18 @@ namespace SAM.Analytical.UI.WPF
 
             TM59AssessmentReport tM59AssessmentReport = new(tM59AssessmentResult, path_TSD);
 
+            //Read off the DESIGN model, which is where the run's isolation context was stamped and which is
+            //what survives into the .sam - so a restored review states the same scope as the run that
+            //produced it, without either of them consulting a filename.
+            PartOIsolationContext? partOIsolationContext = analyticalModel_Workflow?.GetValue<PartOIsolationContext>(Analytical.AnalyticalModelParameter.PartOIsolationContext);
+
+            if (partOIsolationContext is not null && partOIsolationContext.IsValid)
+            {
+                tM59AssessmentReport.ThermalModelScope = string.Format(
+                    "ISOLATED. Selected dwellings: {0}. Interfaces to excluded spaces were simulated as adiabatic, so these results are not a whole-building simulation of the same dwellings.",
+                    string.Join(", ", partOIsolationContext.Names_Dwelling));
+            }
+
             List<PartOTM59SpaceResult> spaceResults = ResolvedSpaceResults(tM59AssessmentReport, tM59AssessmentCalculator.SimulationSpaceMap, spaces, associationRefusals);
 
             //Design side, not simulation side: which rooms of the model being assessed produced nothing.
