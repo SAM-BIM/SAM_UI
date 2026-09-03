@@ -355,6 +355,67 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
+        /// Whether the results at <paramref name="path_TSD"/> are provably <b>this run's</b> - the results
+        /// lineage rule, on its own, without changing anything.
+        ///
+        /// <para><b>Why this is a separate, askable question</b></para>
+        /// <para>
+        /// <see cref="Complete"/> is the authority on pairing a run with its results, and it applies this
+        /// rule as part of that. But the rule is also needed <i>before</i> Complete is reached: the caller
+        /// stamps <c>SimulationResultProvenance</c> onto the workflow's model and writes the run's persisted
+        /// <c>.sam</c> immediately after the workflow returns, and a workflow that returned a model while
+        /// leaving an existing TSD untouched would otherwise get a fully self-consistent, reopenable artifact
+        /// written for it - model, scenarios and file fingerprints all agreeing - which a later session would
+        /// restore and offer for review against an <i>earlier</i> run's results. Complete would then refuse
+        /// the run, correctly, and the misleading file would already be on disk.
+        /// </para>
+        /// <para>
+        /// So the rule lives here once and is asked twice, rather than being restated at the call site: a
+        /// second copy of a staleness rule is exactly how the two answers drift apart.
+        /// </para>
+        /// <para>
+        /// <b>Pure.</b> It reads state and the filesystem and neither writes nor invalidates - the caller
+        /// decides what a "no" means. <see cref="Complete"/> invalidates on it; the persistence path simply
+        /// declines to write.
+        /// </para>
+        /// </summary>
+        /// <param name="path_TSD">The results file to test.</param>
+        /// <param name="refusal">Why the results are not this run's, or null where they are.</param>
+        public bool IsResultsOfThisRun(string path_TSD, out string refusal)
+        {
+            refusal = null;
+
+            if (string.IsNullOrWhiteSpace(path_TSD) || !File.Exists(path_TSD))
+            {
+                refusal = string.Format("No simulation results were found at '{0}', so the workflow did not complete a run that can be assessed. A sizing-only run writes no TSD.", path_TSD ?? "?");
+
+                return false;
+            }
+
+            //Nothing announced this workflow's results, so nothing establishes that they are this run's. That
+            //is the state a partial, one-day or sizing-only simulation leaves the run in, because the caller
+            //arms ExpectResults only for the full-year run a TM59 assessment can read.
+            if (!resultsExpected || !string.Equals(path_TSD_Expected, path_TSD, System.StringComparison.Ordinal))
+            {
+                refusal = string.Format("The results at '{0}' were not announced as this Part O run's, so it cannot be established that this workflow produced them. Only a full-year simulation of the prepared model completes a Part O run - prepare the iteration again and simulate with Full Year Simulation ticked.", path_TSD);
+
+                return false;
+            }
+
+            //The file that was already there, byte-length and write-time unchanged: this workflow did not
+            //write it. Accepting it would pair an earlier session's results with the model just prepared.
+            FileInfo fileInfo = new(path_TSD);
+            if (exists_TSD_Expected && fileInfo.Length == length_TSD_Expected && fileInfo.LastWriteTimeUtc == dateTime_TSD_Expected)
+            {
+                refusal = string.Format("The simulation results at '{0}' are unchanged from before this workflow ran, so they are an earlier run's and not this one's. Simulate the prepared model with Full Year Simulation ticked to produce results this Part O run can be assessed against.", path_TSD);
+
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Pairs the prepared run with the model a completed TAS workflow returned, and the TSD it wrote.
         /// </summary>
         /// <param name="analyticalModel_Workflow">
@@ -408,34 +469,10 @@ namespace SAM.Analytical.UI
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(path_TSD) || !File.Exists(path_TSD))
+            //THE results lineage rule, asked of the one place that owns it - see IsResultsOfThisRun, which
+            //the persistence path asks the same question of before it writes anything reopenable.
+            if (!IsResultsOfThisRun(path_TSD, out refusal))
             {
-                refusal = string.Format("No simulation results were found at '{0}', so the workflow did not complete a run that can be assessed. A sizing-only run writes no TSD.", path_TSD ?? "?");
-
-                Invalidate(refusal);
-
-                return false;
-            }
-
-            //Nothing announced this workflow's results, so nothing establishes that they are this run's. That
-            //is the state a partial, one-day or sizing-only simulation leaves the run in, because the caller
-            //arms ExpectResults only for the full-year run a TM59 assessment can read.
-            if (!resultsExpected || !string.Equals(path_TSD_Expected, path_TSD, System.StringComparison.Ordinal))
-            {
-                refusal = string.Format("The results at '{0}' were not announced as this Part O run's, so it cannot be established that this workflow produced them. Only a full-year simulation of the prepared model completes a Part O run - prepare the iteration again and simulate with Full Year Simulation ticked.", path_TSD);
-
-                Invalidate(refusal);
-
-                return false;
-            }
-
-            //The file that was already there, byte-length and write-time unchanged: this workflow did not write
-            //it. Accepting it would pair an earlier session's results with the model just prepared.
-            FileInfo fileInfo = new(path_TSD);
-            if (exists_TSD_Expected && fileInfo.Length == length_TSD_Expected && fileInfo.LastWriteTimeUtc == dateTime_TSD_Expected)
-            {
-                refusal = string.Format("The simulation results at '{0}' are unchanged from before this workflow ran, so they are an earlier run's and not this one's. Simulate the prepared model with Full Year Simulation ticked to produce results this Part O run can be assessed against.", path_TSD);
-
                 Invalidate(refusal);
 
                 return false;

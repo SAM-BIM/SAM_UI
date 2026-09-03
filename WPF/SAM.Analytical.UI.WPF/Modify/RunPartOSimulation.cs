@@ -386,7 +386,27 @@ namespace SAM.Analytical.UI.WPF
 
                 //Only the full annual series a TM59 assessment can read is recorded - a partial, one-day or
                 //sizing-only run writes no provenance, exactly as it cannot complete a Part O run.
-                if (fullYear && !string.IsNullOrWhiteSpace(path_TSD) && System.IO.File.Exists(path_TSD))
+                //
+                //AND only where the results are provably THIS run's, asked of PartORun.IsResultsOfThisRun -
+                //the same lineage rule PartORun.Complete refuses on, a moment later, in the caller. Asked
+                //HERE because everything below this line is reopenable: a workflow that returned a model
+                //while leaving an existing TSD untouched would otherwise be stamped and persisted into a
+                //fully self-consistent .sam - model, scenarios and file fingerprints all agreeing - which a
+                //later session would restore and offer for review against an EARLIER run's results. Complete
+                //would then refuse the run, correctly, and the misleading artifact would already be written.
+                //Nothing is stamped and nothing is written for a run that cannot be completed.
+                string refusal_Lineage = "there is no prepared Part O run to have produced them.";
+
+                bool ofThisRun = partORun is not null && partORun.IsResultsOfThisRun(path_TSD, out refusal_Lineage);
+
+                if (fullYear && !ofThisRun)
+                {
+                    //Noted rather than silent: "no reviewable model was written, and why" is the diagnostic.
+                    //The run itself is refused by Complete, which is where that verdict belongs.
+                    notes.Add(string.Format("No persisted run model was written for these results, because they are not provably this run's: {0}", refusal_Lineage));
+                }
+
+                if (fullYear && ofThisRun)
                 {
                     //Constructed AFTER the scenarios are stamped above, deliberately: the record fingerprints
                     //both the design state and the scenarios it finds on the model, and a record taken before

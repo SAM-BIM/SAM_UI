@@ -604,6 +604,138 @@ namespace SAM.Analytical.UI.WPF.Tests
         // ------------------------------------------------------------------------------------------------
 
         /// <summary>
+        /// <b>The lineage rule is askable on its own, and it is the same rule <c>Complete</c> refuses on.</b>
+        ///
+        /// <para><b>Why it has to be askable before Complete is reached</b></para>
+        /// <para>
+        /// <c>Modify.RunPartOSimulation</c> stamps <c>SimulationResultProvenance</c> onto the workflow's
+        /// model and writes the run's persisted <c>.sam</c> as soon as the workflow returns - <i>before</i>
+        /// the caller reaches <c>Complete</c>. A workflow that returns a model while leaving an existing TSD
+        /// untouched would therefore have had a fully self-consistent, reopenable artifact written for it,
+        /// with model, scenario and file fingerprints all agreeing, which a later session would restore and
+        /// offer for review against an <b>earlier</b> run's results. <c>Complete</c> would then refuse the
+        /// run - correctly - and the misleading file would already be on disk.
+        /// </para>
+        /// <para>
+        /// So the rule lives in one place and is asked twice. This pins that the two answers agree: for each
+        /// case, <c>IsResultsOfThisRun</c> and <c>Complete</c> reach the same verdict with the same reason.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TheResultsLineageRule_IsAskableBeforeCompleteAndAgreesWithIt()
+        {
+            //1. The stale case: announced, then the workflow wrote nothing.
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                Assert.True(partORun.ExpectResults(path_TSD));
+
+                Assert.False(partORun.IsResultsOfThisRun(path_TSD, out string refusal_Rule));
+                Assert.Contains("unchanged from before this workflow ran", refusal_Rule);
+
+                //And Complete refuses it with the same sentence, having asked the same question.
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD, out string refusal_Complete));
+                Assert.Equal(refusal_Rule, refusal_Complete);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+
+            //2. The good case: announced, then written. The rule says yes BEFORE Complete is called, which is
+            //what lets the persistence path write an artifact for it.
+            string path_TSD_Written = TemporaryTsdPath();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                Assert.True(partORun.ExpectResults(path_TSD_Written));
+
+                WriteResults(path_TSD_Written);
+
+                Assert.True(partORun.IsResultsOfThisRun(path_TSD_Written, out string refusal_Rule));
+                Assert.Null(refusal_Rule);
+
+                Assert.True(partORun.Complete(Model("workflow"), path_TSD_Written, out string _));
+            }
+            finally
+            {
+                File.Delete(path_TSD_Written);
+            }
+
+            //3. Never announced - the state a partial, one-day or sizing-only workflow leaves the run in. The
+            //file is real and freshly written, and it is still not established as this run's.
+            string path_TSD_Unannounced = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                Assert.False(partORun.IsResultsOfThisRun(path_TSD_Unannounced, out string refusal_Rule));
+                Assert.Contains("were not announced as this Part O run's", refusal_Rule);
+            }
+            finally
+            {
+                File.Delete(path_TSD_Unannounced);
+            }
+
+            //4. No file at all.
+            PartORun partORun_Missing = new();
+            partORun_Missing.Prepare(Model("prepared"), Scenarios());
+
+            Assert.False(partORun_Missing.IsResultsOfThisRun(TemporaryTsdPath(), out string refusal_Missing));
+            Assert.Contains("No simulation results were found", refusal_Missing);
+
+            Assert.False(partORun_Missing.IsResultsOfThisRun(null, out string refusal_Null));
+            Assert.Contains("No simulation results were found", refusal_Null);
+        }
+
+        /// <summary>
+        /// <b>The rule is pure: asking it neither completes nor invalidates a run.</b> The persistence path
+        /// asks it and then declines to write; the run's own verdict stays <c>Complete</c>'s to give. A rule
+        /// that invalidated on being asked would have the artifact decision silently drop the run.
+        /// </summary>
+        [Fact]
+        public void AskingTheLineageRule_ChangesNothingAboutTheRun()
+        {
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+                partORun.Prepare(Model("prepared"), Scenarios());
+
+                Assert.True(partORun.ExpectResults(path_TSD));
+
+                //Asked repeatedly, including in the refusing case, and the run is untouched by all of it.
+                Assert.False(partORun.IsResultsOfThisRun(path_TSD, out string _));
+                Assert.False(partORun.IsResultsOfThisRun(path_TSD, out string _));
+
+                Assert.Equal(PartORunState.Prepared, partORun.State);
+                Assert.Null(partORun.InvalidationReason);
+
+                //Still armed, so the workflow writing the file afterwards can still complete the run - which
+                //an invalidating check would have made impossible.
+                WriteResults(path_TSD);
+
+                Assert.True(partORun.IsResultsOfThisRun(path_TSD, out string _));
+                Assert.True(partORun.Complete(Model("workflow"), path_TSD, out string refusal));
+                Assert.Null(refusal);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
         /// <b>An old TSD this workflow did not write.</b> The file was already at the derived path before the
         /// workflow ran and is byte-for-byte unchanged after it - so this workflow wrote nothing, and pairing
         /// those results with the model just prepared is the stale pairing the type exists to prevent.
