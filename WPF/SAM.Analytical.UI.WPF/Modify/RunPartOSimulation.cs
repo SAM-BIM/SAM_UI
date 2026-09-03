@@ -129,7 +129,47 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
-            //The Part O pre-flight, before the first byte of any file is written.
+            string outputDirectory = partOSimulationContext.OutputDirectory;
+            WeatherData weatherData = partOSimulationContext.WeatherData;
+            SolarCalculationMethod solarCalculationMethod = partOSimulationContext.SolarCalculationMethod;
+
+            //A copy, for the same reason Simulate takes one: everything below mutates in place - the name
+            //here, the materials at "Update Materials" - and a cancelled run must leave the caller's model
+            //exactly as it was rather than renamed and re-materialled behind its back.
+            analyticalModel = new AnalyticalModel(analyticalModel)
+            {
+                Name = projectName,
+            };
+
+            //The model TAS will actually be given, normalized before anything looks at it or writes a file
+            //from it.
+            //
+            //Both of these WERE inside the progress dialog below, after the gbXML had been written. They are
+            //here because the pre-simulation gate has to judge the model that is handed to TAS, not the one
+            //handed to this method: the material repair fixes exactly the "Material Library does not contain
+            //Material X" state Create.Log reports as an Error, so gating before it would refuse models this
+            //pipeline was about to make valid - and a defect these two introduced would be invisible.
+            //
+            //Neither is a long COM call, which is what the dialog exists to keep responsive.
+
+            IEnumerable<IMaterial> materials = Analytical.Query.Materials(analyticalModel.AdjacencyCluster, Analytical.Query.DefaultMaterialLibrary());
+            if (materials is not null)
+            {
+                foreach (IMaterial material in materials)
+                {
+                    if (analyticalModel.HasMaterial(material))
+                    {
+                        continue;
+                    }
+
+                    analyticalModel.AddMaterial(material);
+                }
+            }
+
+            analyticalModel = partOSimulationContext.UpdateConstructionLayersByPanelType ? analyticalModel.UpdateConstructionLayersByPanelType() : analyticalModel;
+
+            //The Part O pre-flight: after the normalization above, and before the first byte of any file is
+            //written.
             //
             //Scoped to a PREPARED Part O run, which is exactly "the first TAS simulation of a prepared Part
             //O run" and every re-prepared one after it: Simulate arms this with the session's run, and both
@@ -143,8 +183,8 @@ namespace SAM.Analytical.UI.WPF
             //contract - Create.Log reports Errors on states a long-standing model may well carry, and a
             //model that simulates today must not stop simulating because the Part O path grew a gate.
             //
-            //It runs over `analyticalModel` as handed in, which is by definition the model about to be
-            //converted: on an isolated run that is the DERIVED isolated model, because
+            //It runs over this run's own copy, which is by definition the model about to be converted: on an
+            //isolated run that is the DERIVED isolated model, because
             //Analytical.Modify.PreparePartOIteration applied the isolation and the run adopted its output.
             //Checking the full-building model it was extracted from would be validating something else.
             //
@@ -182,18 +222,6 @@ namespace SAM.Analytical.UI.WPF
                     notes.Add(string.Format("Pre-simulation check (warning): {0}", logRecord.Text));
                 }
             }
-
-            string outputDirectory = partOSimulationContext.OutputDirectory;
-            WeatherData weatherData = partOSimulationContext.WeatherData;
-            SolarCalculationMethod solarCalculationMethod = partOSimulationContext.SolarCalculationMethod;
-
-            //A copy, for the same reason Simulate takes one: everything below mutates in place - the name
-            //here, the materials at "Update Materials" - and a cancelled run must leave the caller's model
-            //exactly as it was rather than renamed and re-materialled behind its back.
-            analyticalModel = new AnalyticalModel(analyticalModel)
-            {
-                Name = projectName,
-            };
 
             //Skipped entirely on the warm-start path: the gbXML exists to be imported into a T3D and
             //converted, and a canonical TBD is the product of having done exactly that. Writing one and then
@@ -239,26 +267,6 @@ namespace SAM.Analytical.UI.WPF
                 try
                 {
                     progressWindowHost.CancelRequested += (s, e) => cancellationTokenSource.Cancel();
-
-                    step("Update Materials");
-
-                    IEnumerable<IMaterial> materials = Analytical.Query.Materials(analyticalModel.AdjacencyCluster, Analytical.Query.DefaultMaterialLibrary());
-                    if (materials is not null)
-                    {
-                        foreach (IMaterial material in materials)
-                        {
-                            if (analyticalModel.HasMaterial(material))
-                            {
-                                continue;
-                            }
-
-                            analyticalModel.AddMaterial(material);
-                        }
-                    }
-
-                    step("Update ConstructionLayers By PanelTypes");
-
-                    analyticalModel = partOSimulationContext.UpdateConstructionLayersByPanelType ? analyticalModel.UpdateConstructionLayersByPanelType() : analyticalModel;
 
                     //NOT on the warm-start path: the copy from the canonical overwrites this run's TBD
                     //anyway, and deleting first would only widen the window in which the run has no TBD.

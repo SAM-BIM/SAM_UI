@@ -9,13 +9,124 @@ compile without its `PartOIsolationContext` class, the new `AnalyticalModelParam
 `PreparePartOIteration(..., isolate)` parameter and `TM59AssessmentReport.ThermalModelScope`.
 **Merge `SAM` first.**
 
-`SAM_Tas` and `SAM_Systems` untouched; both working trees clean.
+`SAM_Systems` untouched. `SAM_Tas` gained one behaviour-neutral companion PR with the later Part O
+correction - **SAM-BIM/SAM_Tas#46**, `feature/parto-plant-zone-daytypes` - whose merge order is free.
 
 ## Last updated
-2026-09-03 - Running selected dwellings in isolation: the dwelling-scope tick that simulates only the
-selected dwellings as an isolated thermal model, its own project name so its evidence cannot overwrite a
-full run's, the warm start taught to tell isolation scopes apart, and the scope stated in the
-preparation summary and the TM59 report.
+2026-09-03 (later) - SAMAnalytical.Check runs over a prepared Part O model before TAS converts it:
+Errors stop the run, warnings do not, and the model checked is the normalized one actually handed to TAS.
+
+## Latest (2026-09-03, later): SAM Check as a mandatory Part O pre-simulation gate
+
+**Status: implemented, tested, and validated on the licensed acceptance model.** The intended order is
+now **prepared model → `SAMAnalytical.Check` → TAS conversion → TAS simulation**; this is the Check step.
+
+### Why
+
+TAS runs its own pre-simulation check and refuses models that fail it. Several of the things it refuses
+for are properties of the SAM model, settled long before any TBD exists. Discovering them in TAS means
+waiting through a geometry conversion - 40 s on the licensed acceptance model, far longer on a block of
+flats - to be told something knowable before it started, in TAS's words rather than in terms of the SAM
+object at fault. On the run that prompted this, TAS's words were `Simulation Failed` and nothing else.
+
+Two such source-model defects are fixed in `SAM` `feature/parto-isolated-dwellings` (a transposed
+humidistat pair, and an isolated unit that lost the relations to the air it moves) and both are now
+`Create.Log` rules. This is the gate that runs them. See that repository's `PROJECT_PROGRESS.md`.
+
+### Where the gate is
+
+`Modify.RunPartOSimulation`. **Every** Part O TAS simulation comes through that one method, so one place
+is the whole gate and no Part O path can be added later that quietly skips it: a full run, an isolated
+run, Iteration 1a, 1b and 2, every Iteration 2B round, and the capacity envelope diagnostic.
+
+**There is no second validation framework.** `PartOPreSimulationCheck` runs
+`SAM.Analytical.Create.Log` - the same authority behind the `SAMAnalytical.Check` component and the Check
+command - and makes one decision from it.
+
+### It judges the normalized model (Codex P1 on PR #82)
+
+The gate first ran on `analyticalModel` as handed in, which is **not** what TAS is given. The default
+material repair fixes exactly the "Material Library does not contain Material X" state `Create.Log`
+reports as an **Error**, so gating before it would refuse models the pipeline was about to make valid -
+and a defect that step or `UpdateConstructionLayersByPanelType` introduced would have been invisible.
+
+Both normalization steps were therefore **hoisted out of the progress dialog** to immediately after the
+private simulation copy, and the gate runs after them and before the gbXML/TBD. Neither is a long COM
+call, which is what the dialog exists to keep responsive.
+
+### Scoped to a prepared Part O run, deliberately
+
+`PartOPreSimulationCheck.Gate` returns a check only for a run in `PartORunState.Prepared` - exactly "the
+first TAS simulation of a prepared Part O run" and every re-prepared one after it. `Simulate` arms this
+with the session's run, and both optimisation call sites call `PartORun.Prepare` immediately before
+simulating.
+
+**Not** the ordinary Simulate command, which reaches the same method with no run or an unprepared one.
+Making SAM Check a hard gate on *every* TAS simulation in SAM is a larger change than the Part O
+contract: `Create.Log` reports Errors on states a long-standing model may well carry, and a model that
+simulates today must not stop simulating because the Part O path grew a gate. The Check command remains
+available to any model on demand.
+
+### Errors stop the run; warnings do not
+
+`LogRecordType.Error` is the only fatal level, exactly as `Create.Log` already assigns it.
+
+- **Fatal** → the `LogWindow` shows the whole log (type, name and Guid of every record), the refusal the
+  caller shows says the pre-simulation validation failed and that TAS was not started, and the list is
+  capped so a model with hundreds of defects still produces a readable message. No gbXML, no TBD, no
+  workflow.
+- **Warnings** → carried into the run's `notes`, deliberately not shown as a dialog: a Part O model has
+  intentional warnings on every run, and a dialog per run trains people to dismiss the one that mattered.
+
+Nothing promotes a warning, and that is load-bearing. A Part O model deliberately leaves the generated
+MVHR plant zone inactive on the HDD and CDD design daytypes, and TAS says so
+(`Zone 'MVHR-01' is missing internal conditions on some daytypes`). Pinned on the SAM_Tas side in
+**SAM-BIM/SAM_Tas#46**.
+
+### Important decisions and assumptions
+
+- Passing means the model carries no model-validity defect this Check knows how to detect. **Not** that
+  TAS will run: licensing, file I/O, the solver and weather data can still fail, and TAS's own check knows
+  rules this one does not. Where TAS refuses for a deterministic problem SAM could have seen, the answer
+  is to fix the source-model defect and add the missing `Create.Log` rule - not to weaken the gate.
+- On an isolated run the model checked is the **derived** isolated one, because
+  `Analytical.Modify.PreparePartOIteration` applied the isolation and the run adopted its output. The gate
+  never looks for another model than the one it is handed - pinned in both directions.
+- A model that could not be checked at all (none supplied) is **not** valid: "nothing was checked" must
+  never read as "nothing was wrong".
+
+### Files changed
+
+- `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOPreSimulationCheck.cs` - new. The check, the `Gate`
+  decision, and the refusal report.
+- `WPF/SAM.Analytical.UI.WPF/Modify/RunPartOSimulation.cs` - normalization hoisted ahead of the gbXML,
+  then the gate.
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOPreSimulationCheckTests.cs` - new, 18 tests.
+
+### Tests, builds and validation
+
+- Full `SAM.Analytical.UI.WPF.Tests` **410 passed**, 0 failed. `SAM_UI.sln` builds clean (VS 18 MSBuild).
+- **Licensed TAS acceptance run**, Flat 1 isolated out of
+  `000000_SAM_AnalyticalModel-It1a-futureZ1.sam`: the gate reports **0 errors and 0 warnings** on the
+  derived isolated model, the full year runs (TSD **4,691,076 bytes**, against a 22,414-byte stub and
+  `Simulation Failed` before), only Flat 1's two spaces are simulated, and the source `.sam` is
+  byte-identical afterwards - timestamp included.
+
+### Unresolved issues, risks and blockers
+
+- **Depends on `SAM` `feature/parto-isolated-dwellings`; merge `SAM` first.** The gate is only useful with
+  the `Create.Log` rules that PR adds, and the acceptance case needs its `IsolateSpaces` fixes.
+- The gate is Part O only. Whether SAM Check should gate *every* TAS simulation is an open product
+  question, deliberately not decided here; it is a one-line change to `PartOPreSimulationCheck.Gate`.
+- Copilot's PR #82 comment about a duplicate isolation suffix when re-preparing an adopted optimisation
+  result is **open and unaddressed**.
+
+### Exact recommended next step
+
+Wait for the re-requested Codex review on **SAM-BIM/SAM_UI#82**, then decide on the open Copilot comment.
+**Do not merge** - merge order is SAM #92, then this, then SAM_Tas #46 (order free).
+
+---
 
 ## Latest (2026-09-03): running selected dwellings in isolation
 
