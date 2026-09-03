@@ -76,6 +76,15 @@ namespace SAM.Analytical.UI.WPF
         /// therefore leaves the run unarmed and unable to be completed, which is the guarantee PR #76
         /// established and this does not weaken.
         /// </para>
+        ///
+        /// <para><b>And the returned model carries the run's provenance</b></para>
+        /// <para>
+        /// On the full-year path, the model handed back is stamped with the results file it was produced
+        /// from (<c>AnalyticalModelParameter.SimulationResultProvenance</c>) and - where the run has them -
+        /// the overheating scenarios it was prepared with, and the run's JSON beside the TBD is rewritten to
+        /// carry the same two. That is what lets a later session reopen the saved model and review its TM59
+        /// assessment from the existing results, without simulating again; see <c>PartORun.Restore</c>.
+        /// </para>
         /// </summary>
         /// <param name="analyticalModel">The design to simulate. <b>Copied first</b>, so a cancelled run leaves it untouched.</param>
         /// <param name="partOSimulationContext">The case to run it as.</param>
@@ -356,6 +365,45 @@ namespace SAM.Analytical.UI.WPF
             }
 
             result.SetValue(Analytical.AnalyticalModelParameter.WeatherData, weatherData);
+
+            //The run's self-description, persisted onto the model the workflow returned, so a SAVED copy of
+            //it - the per-run JSON the workflow writes beside the TBD, or the user's .sam saved later - can
+            //be reopened in a later session and its results reviewed WITHOUT rerunning the simulation. The
+            //scenarios are the assessment's authority over which TM59 criterion applies to which space; the
+            //provenance is the proof of which results file the model belongs to. See PartORun.Restore.
+            //
+            //A run with no scenarios - a plain, non-Part-O simulation - is left entirely unstamped: there is
+            //nothing to review it against, and its JSON is not written twice.
+            List<OverheatingScenario> overheatingScenarios = partORun?.OverheatingScenarios;
+            if (overheatingScenarios is not null && overheatingScenarios.Count != 0)
+            {
+                result.SetValue(Analytical.AnalyticalModelParameter.OverheatingScenarios, new SAMCollection<OverheatingScenario>(overheatingScenarios));
+
+                //Only the full annual series a TM59 assessment can read is recorded - a partial, one-day or
+                //sizing-only run writes no provenance, exactly as it cannot complete a Part O run.
+                if (fullYear && !string.IsNullOrWhiteSpace(path_TSD) && System.IO.File.Exists(path_TSD))
+                {
+                    result.SetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, new SimulationResultProvenance(result, path_TSD));
+
+                    //The workflow's own "Saving Model" step wrote this same JSON a moment ago, before the two
+                    //parameters above existed on the model. Rewritten once here, so the saved copy and the model
+                    //handed back describe the same run. The file is the workflow's - the path is its own
+                    //convention, <project>.json beside the TBD.
+                    string path_Json = System.IO.Path.ChangeExtension(path_TBD, "json");
+
+                    try
+                    {
+                        if (!Core.Convert.ToFile(result, path_Json, SAMFileType.Json))
+                        {
+                            notes.Add(string.Format("The analytical model with its simulation-result provenance could not be written to '{0}', so reopening that file later will not offer a review of these results. This session is unaffected.", path_Json));
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        notes.Add(string.Format("The analytical model with its simulation-result provenance could not be written to '{0}', so reopening that file later will not offer a review of these results. This session is unaffected. ({1})", path_Json, exception.Message));
+                    }
+                }
+            }
 
             return result;
         }

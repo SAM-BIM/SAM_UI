@@ -4,6 +4,7 @@
 using SAM.Analytical.Tas;
 using SAM.Core.UI.WPF;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace SAM.Analytical.UI.WPF
@@ -84,6 +85,11 @@ namespace SAM.Analytical.UI.WPF
             TM59AssessmentResult tM59AssessmentResult = partOTM59Assessment.Result!;
             TM59AssessmentReport tM59AssessmentReport = partOTM59Assessment.Report!;
 
+            //The durable artifact: every assessment of a run persists its report beside that run's own
+            //results, whether it was produced in-session or reviewed from a reopened model. A failure to
+            //write is reported, never silent - but it fails nothing: the assessment itself is already done.
+            bool reportSaved = SavePartOTM59Report(path_TSD, tM59AssessmentReport, out string? path_TM59Report, out string? refusal_Report);
+
             List<string> associationRefusals = partOTM59Assessment.AssociationRefusals;
 
             PartOTM59ResultWindow partOTM59ResultWindow = new()
@@ -94,7 +100,7 @@ namespace SAM.Analytical.UI.WPF
 
             partOTM59ResultWindow.SetDiagnostics(associationRefusals, tM59AssessmentResult.VentilationStrategyRefusals);
 
-            partOTM59ResultWindow.Summary = Summary(partORun, tM59AssessmentResult);
+            partOTM59ResultWindow.Summary = Summary(partORun, tM59AssessmentResult, reportSaved, path_TM59Report, refusal_Report);
 
             if (owner is not null)
             {
@@ -104,16 +110,69 @@ namespace SAM.Analytical.UI.WPF
             partOTM59ResultWindow.ShowDialog();
         }
 
-        private static string Summary(PartORun partORun, TM59AssessmentResult tM59AssessmentResult)
+        /// <summary>
+        /// The one-line account of what the assessment covered. <b>"Processed" is the simulated spaces the
+        /// calculation ran over; "assessed" is the ones that produced a result.</b> The two differ where a
+        /// space reached the calculation but no criterion produced a verdict for it - the corridor that is
+        /// processed and named as not assessed, for instance - and wording them as one ("Assessed 9
+        /// space(s)") read as though every one of the nine had been.
+        /// </summary>
+        private static string Summary(PartORun partORun, TM59AssessmentResult tM59AssessmentResult, bool reportSaved, string? path_TM59Report, string? refusal_Report)
+        {
+            return Summary(
+                tM59AssessmentResult.Spaces?.Count ?? 0,
+                partORun.Path_TSD,
+                tM59AssessmentResult.NaturalVentilationResults,
+                tM59AssessmentResult.MechanicalVentilationResults,
+                tM59AssessmentResult.CorridorResults,
+                reportSaved,
+                path_TM59Report,
+                refusal_Report);
+        }
+
+        /// <summary>
+        /// The same sentence from the plain counts and lists - separated from <c>TM59AssessmentResult</c> so
+        /// the wording can be pinned by tests without constructing one (its constructor is internal to
+        /// SAM.Analytical).
+        /// </summary>
+        /// <remarks>Internal rather than private so the wording is pinned by tests.</remarks>
+        internal static string Summary(int processed, string? path_TSD, IEnumerable<TMResult>? naturalVentilationResults, IEnumerable<TMResult>? mechanicalVentilationResults, IEnumerable<TMResult>? corridorResults, bool reportSaved, string? path_TM59Report, string? refusal_Report)
         {
             //Counts only. Which criterion applies, what its limit is and whether a space passes are all in the
             //report below, stated by the assessment itself.
-            return string.Format("Assessed {0} space(s) from '{1}': {2} natural ventilation result(s), {3} mechanical ventilation result(s), {4} corridor result(s). The model assessed is the one the TAS workflow returned.",
-                tM59AssessmentResult.Spaces?.Count ?? 0,
-                partORun.Path_TSD,
-                tM59AssessmentResult.NaturalVentilationResults?.Count ?? 0,
-                tM59AssessmentResult.MechanicalVentilationResults?.Count ?? 0,
-                tM59AssessmentResult.CorridorResults?.Count ?? 0);
+            List<TMResult> naturalVentilation = [.. naturalVentilationResults ?? []];
+            List<TMResult> mechanicalVentilation = [.. mechanicalVentilationResults ?? []];
+            List<TMResult> corridor = [.. corridorResults ?? []];
+
+            //One result per space, but counted as distinct references rather than assumed: the count is the
+            //answer to "how many spaces were assessed", and assuming one-result-per-space is how a duplicate
+            //would hide.
+            HashSet<string> references = [];
+            foreach (TMResult tMResult in naturalVentilation.Concat(mechanicalVentilation).Concat(corridor))
+            {
+                if (!string.IsNullOrWhiteSpace(tMResult?.Reference))
+                {
+                    references.Add(tMResult!.Reference);
+                }
+            }
+
+            int assessed = references.Count;
+
+            string result = string.Format(
+                "Processed {0} simulated space(s) from '{1}': {2} assessed ({3} natural ventilation, {4} mechanical ventilation, {5} corridor), {6} not assessed. The model assessed is the one the TAS workflow returned.",
+                processed,
+                path_TSD,
+                assessed,
+                naturalVentilation.Count,
+                mechanicalVentilation.Count,
+                corridor.Count,
+                processed - assessed);
+
+            result += reportSaved
+                ? string.Format(" The report was saved to '{0}'.", path_TM59Report)
+                : string.Format(" {0}", refusal_Report);
+
+            return result;
         }
     }
 }

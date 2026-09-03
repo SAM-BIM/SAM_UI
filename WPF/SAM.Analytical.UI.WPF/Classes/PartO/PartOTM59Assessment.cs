@@ -148,9 +148,20 @@ namespace SAM.Analytical.UI.WPF
 
             List<string> associationRefusals = [];
 
+            //One map, built once, serving both the plant-zone exclusion below and the calculator.
+            SimulationSpaceMap simulationSpaceMap = Analytical.Tas.Create.SimulationSpaceMap(analyticalModel_Workflow, analyticalModel_TSD);
+
+            //The simulation-only plant zones the TAS export generates for the air handling units (one TAS
+            //zone per unit, named after it) come back in the TSD like any other zone. They are not design
+            //spaces, they were never expected to resolve to one, and they must not be assessed - so they are
+            //excluded HERE, by the positive identification of Query.PartOPlantZoneSpaces, before the
+            //calculator sees them. Everything genuinely unresolved that remains still refuses below, exactly
+            //as before: this removes a false warning, never a real one.
+            analyticalModel_TSD = WithoutPlantZoneSpaces(analyticalModel_TSD, analyticalModel_Workflow, simulationSpaceMap);
+
             //The design side of this call is the WORKFLOW model. Its spaces carry the zone guids TAS
             //stamped on the round trip, which is what the map matches on.
-            TM59AssessmentCalculator tM59AssessmentCalculator = analyticalModel_TSD.TM59AssessmentCalculator(analyticalModel_Workflow);
+            TM59AssessmentCalculator tM59AssessmentCalculator = analyticalModel_TSD.TM59AssessmentCalculator(analyticalModel_Workflow, simulationSpaceMap);
 
             OverheatingScenarioMap overheatingScenarioMap = new(overheatingScenarios, analyticalModel_Workflow, tM59AssessmentCalculator.SimulationSpaceMap);
             tM59AssessmentCalculator.VentilationStrategyMap = overheatingScenarioMap.VentilationStrategyMap;
@@ -189,6 +200,32 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return new PartOTM59Assessment(tM59AssessmentResult, tM59AssessmentReport, spaceResults, associationRefusals, spaceGuids_Unassessed, null);
+        }
+
+        /// <summary>
+        /// The simulated model minus its generated air handling unit plant zones - see
+        /// <see cref="Query.PartOPlantZoneSpaces"/> for what identifies one. The input model is returned
+        /// unmodified where there is nothing to exclude; otherwise a new model over a cluster the plant
+        /// zones were removed from, so the exclusion never mutates the caller's conversion result.
+        /// </summary>
+        /// <remarks>Internal rather than private so the exclusion itself is pinned by tests.</remarks>
+        internal static AnalyticalModel WithoutPlantZoneSpaces(AnalyticalModel analyticalModel_Simulated, AnalyticalModel analyticalModel_Design, SimulationSpaceMap simulationSpaceMap)
+        {
+            AdjacencyCluster adjacencyCluster = analyticalModel_Simulated?.AdjacencyCluster;
+            if (adjacencyCluster is null)
+            {
+                return analyticalModel_Simulated;
+            }
+
+            List<Space> spaces_PlantZone = Query.PartOPlantZoneSpaces(adjacencyCluster.GetSpaces(), analyticalModel_Design?.AdjacencyCluster?.GetObjects<AirHandlingUnit>(), simulationSpaceMap);
+            if (spaces_PlantZone.Count == 0)
+            {
+                return analyticalModel_Simulated;
+            }
+
+            adjacencyCluster.Remove(spaces_PlantZone);
+
+            return new AnalyticalModel(analyticalModel_Simulated, adjacencyCluster);
         }
 
         /// <summary>

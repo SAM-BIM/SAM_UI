@@ -610,10 +610,17 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// Writes one iteration's unit states and production TM59 results onto its step - the audit trail
         /// that makes the run reproducible.
+        /// <para>
+        /// <b>And persists the report.</b> An assessed step's production report is written beside the
+        /// results it was assessed from - the baseline's own TSD, each round's <c>-OptNN</c> one, the
+        /// envelope's <c>-OptMax</c> one - so the evidence for every simulated case survives the session
+        /// (see <see cref="SavePartOTM59Report"/>). A failure to write lands on the step as a warning and
+        /// fails nothing.
+        /// </para>
         /// </summary>
         private static void Record(PartOOptimisationStep partOOptimisationStep, AnalyticalModel? analyticalModel, PartOPreparationContext partOPreparationContext, PartOTM59Assessment partOTM59Assessment)
         {
-            partOOptimisationStep.UnitStates.AddRange(UnitStates(analyticalModel, partOPreparationContext.VentilationUnitCapacityDescriptors));
+            partOOptimisationStep.UnitStates.AddRange(UnitStates(analyticalModel, partOPreparationContext.VentilationUnitCapacityDescriptors, partOPreparationContext.Zones));
 
             if (!partOTM59Assessment.IsAssessed)
             {
@@ -623,11 +630,16 @@ namespace SAM.Analytical.UI.WPF
             partOOptimisationStep.TM59Results.AddRange(partOTM59Assessment.SpaceResults);
             partOOptimisationStep.OccupiedSpaceComplianceStatus = partOTM59Assessment.OccupiedSpaceComplianceStatus;
             partOOptimisationStep.Warnings.AddRange(partOTM59Assessment.AssociationRefusals);
+
+            if (!SavePartOTM59Report(partOOptimisationStep.Path_TSD, partOTM59Assessment.Report, out string? path_TM59Report, out string? refusal_Report))
+            {
+                partOOptimisationStep.Warnings.Add(refusal_Report);
+            }
         }
 
         /// <summary>
-        /// What every air handling unit in the model is carrying, beside what its selected product is rated
-        /// to move.
+        /// What every air handling unit <b>of this run's Part O scope</b> is carrying, beside what its
+        /// selected product is rated to move.
         /// <para>
         /// Every value from its own authority: the duty from <c>Query.AirHandlingUnitDesignDuty</c>, which
         /// sums every system the unit supplies rather than assuming it serves one; the product from
@@ -635,8 +647,15 @@ namespace SAM.Analytical.UI.WPF
         /// resolves to in the run's own catalogue. Nothing here is stored on the unit, so nothing here can
         /// go stale against the design.
         /// </para>
+        /// <para>
+        /// <b>Only the iteration's own equipment.</b> The model's authored systems - a legacy mechanical
+        /// ventilation system the building was drawn with, say - are not this run's equipment: the
+        /// preparation never connects them to a design terminal, so
+        /// <see cref="Query.PartOIterationAirHandlingUnits"/> excludes them by relation. The model is not
+        /// edited to achieve that; the evidence is simply scoped to what the run is actually about.
+        /// </para>
         /// </summary>
-        private static List<PartOOptimisationUnitState> UnitStates(AnalyticalModel? analyticalModel, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors)
+        private static List<PartOOptimisationUnitState> UnitStates(AnalyticalModel? analyticalModel, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors, IEnumerable<Zone>? zones_Dwelling)
         {
             List<PartOOptimisationUnitState> result = [];
 
@@ -646,7 +665,7 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
-            List<AirHandlingUnit> airHandlingUnits = adjacencyCluster.GetObjects<AirHandlingUnit>() ?? [];
+            List<AirHandlingUnit> airHandlingUnits = Query.PartOIterationAirHandlingUnits(adjacencyCluster, zones_Dwelling);
 
             airHandlingUnits.Sort((x, y) => string.CompareOrdinal(x?.Name, y?.Name));
 

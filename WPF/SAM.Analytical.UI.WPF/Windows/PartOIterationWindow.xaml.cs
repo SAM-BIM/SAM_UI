@@ -4,7 +4,9 @@
 using SAM.Analytical.Enums;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Windows;
+using System.Windows.Data;
 
 namespace SAM.Analytical.UI.WPF
 {
@@ -21,20 +23,32 @@ namespace SAM.Analytical.UI.WPF
     /// <para>
     /// <b>The dwelling scope is SAM's, not this window's.</b> <c>Query.PartFDwellingZones</c> is the single
     /// source of that policy, including the legacy case where nothing carries
-    /// <c>ZoneParameter.IsDwelling</c> at all; this window shows what it returns and names what it left out.
-    /// A zone outside the scope is reported as outside it - it is not quietly given a strategy, and no
-    /// common-space criterion is chosen for it here.
+    /// <c>ZoneParameter.IsDwelling</c> at all; it is asked ONCE, when the zones are set, and what it returns
+    /// becomes the <see cref="PartODwellingSelection"/> the user then narrows. A zone outside the scope is
+    /// reported as outside it - it is not quietly given a strategy, and no common-space criterion is chosen
+    /// for it here.
+    /// </para>
+    /// <para>
+    /// <b>The selection is real, and it is the scope.</b> Every eligible dwelling starts selected; what the
+    /// user leaves selected is exactly what <see cref="Zones_Dwelling"/> returns, and that is what the
+    /// preparation, and therefore Iteration 2 and Iteration 2B, run over. Selection is by the zone's
+    /// <see cref="Guid"/>, so two dwellings that share a display name are still two scopes.
     /// </para>
     /// </summary>
     public partial class PartOIterationWindow : System.Windows.Window
     {
-        private List<Zone> zones_Dwelling = [];
+        private PartODwellingSelection dwellingSelection = new([]);
 
         private VentilationUnitCatalogue ventilationUnitCatalogue;
 
         public PartOIterationWindow()
         {
             InitializeComponent();
+
+            //The ceiling the auto-sizing gives way to the scroller at. Read from the work area rather than
+            //stated in pixels, so an enlarged system font or a small screen degrades to scrolling with the
+            //buttons reachable instead of to a window taller than the display.
+            MaxHeight = SystemParameters.WorkArea.Height * 0.92;
 
             comboBox_BaseProvision.ItemsSource = PartOVentilationStrategyOption.Options;
             comboBox_BaseProvision.SelectedIndex = 0;
@@ -66,22 +80,44 @@ namespace SAM.Analytical.UI.WPF
             textBox_AirFlowStep.Text = PartOOptimisationSettings.DefaultAirFlowStep_Lps.ToString();
             textBox_MaximumIterations.Text = PartOOptimisationSettings.DefaultMaximumIterations.ToString();
 
+            //The search narrows the VIEW, never the selection: a dwelling filtered out of sight stays
+            //exactly as selected or cleared as it was, and reappears with its state intact.
+            textBox_Search.TextChanged += (s, e) =>
+            {
+                dwellingSelection.SearchText = textBox_Search.Text;
+
+                (listBox_Zones.ItemsSource as ICollectionView)?.Refresh();
+            };
+
+            //Both act on what the search currently matches - the whole eligible set while it is empty, so a
+            //large block can be narrowed by name and then taken or dropped as a group.
+            button_SelectAll.Click += (s, e) => dwellingSelection.SetSelected(true);
+            button_SelectNone.Click += (s, e) => dwellingSelection.SetSelected(false);
+
             UpdateVentilationStrategyText();
             UpdateCatalogueText();
             UpdateOptimiseAvailability();
         }
 
         /// <summary>
-        /// The model's zones. Setting them classifies the dwellings through SAM and fills the scope report.
+        /// The model's zones. Setting them asks SAM which are dwellings - once - and fills the selectable
+        /// scope and the scope report from the answer.
         /// </summary>
         public List<Zone> Zones
         {
             set
             {
-                //The policy call, not a local IsDwelling filter.
-                zones_Dwelling = Analytical.Query.PartFDwellingZones(value) ?? [];
+                //The policy call, not a local IsDwelling filter. Asked here, once; the selection below is
+                //built over the answer and nothing re-asks it per click or per keystroke.
+                List<Zone> zones_Dwelling = Analytical.Query.PartFDwellingZones(value) ?? [];
 
-                listBox_Zones.ItemsSource = zones_Dwelling.ConvertAll(x => x?.Name);
+                dwellingSelection = new PartODwellingSelection(zones_Dwelling);
+                dwellingSelection.Changed += (s, e) => UpdateSelectionText();
+
+                ICollectionView view = CollectionViewSource.GetDefaultView(dwellingSelection.Items);
+                view.Filter = item => dwellingSelection.IsVisible((PartODwellingSelection.Item)item);
+
+                listBox_Zones.ItemsSource = view;
 
                 //What is out of scope is derived from what the policy RETURNED, by difference - never from a
                 //second reading of IsDwelling. Where nothing in the model states the parameter,
@@ -126,7 +162,7 @@ namespace SAM.Analytical.UI.WPF
                     ? string.Format("{0} dwelling zone(s) in scope.", zones_Dwelling.Count)
                     : string.Format("{0} dwelling zone(s) in scope. Outside current Part O dwelling preparation scope: {1}. Common spaces are not covered by Iteration 1a or 1b and are assessed separately.", zones_Dwelling.Count, string.Join(", ", descriptions));
 
-                button_OK.IsEnabled = zones_Dwelling.Count != 0;
+                UpdateSelectionText();
             }
         }
 
@@ -157,8 +193,25 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        /// <summary>The dwelling zones the iteration will be prepared over. SAM's selection, unmodified.</summary>
-        public List<Zone> Zones_Dwelling => zones_Dwelling;
+        /// <summary>
+        /// The dwelling zones the iteration will be prepared over: the ones the user left selected.
+        /// <b>Selection is the scope</b> - this is no longer SAM's answer unmodified but SAM's answer as the
+        /// user narrowed it, and every downstream consumer (preparation, Iteration 2 selection, Iteration 2B
+        /// optimisation) runs over exactly this set.
+        /// </summary>
+        public List<Zone> Zones_Dwelling => dwellingSelection.SelectedZones();
+
+        /// <summary>
+        /// The selection model behind the dwelling list. Exposed for tests: the discovery, selection and
+        /// filtering behaviour is assertable without rendering the window.
+        /// </summary>
+        internal PartODwellingSelection DwellingSelection => dwellingSelection;
+
+        /// <summary>Whether OK is currently offered - false while the selection is empty. Exposed for tests.</summary>
+        internal bool CanAccept => button_OK.IsEnabled;
+
+        /// <summary>What the window says about the current selection - exposed so it is assertable.</summary>
+        public string SelectionDescription => textBlock_Selection.Text;
 
         /// <summary>
         /// What the window says about the scope: how many dwellings are in it, and which zones are outside it
@@ -320,6 +373,22 @@ namespace SAM.Analytical.UI.WPF
         private void UpdateCatalogueText()
         {
             textBlock_Catalogue.Text = ventilationUnitCatalogue?.Description ?? "The ventilation unit catalogue has not been read.";
+        }
+
+        /// <summary>
+        /// What the selection currently is, in one line - and the gate that keeps an empty selection from
+        /// preparing an iteration over nothing.
+        /// </summary>
+        private void UpdateSelectionText()
+        {
+            int selected = dwellingSelection.SelectedCount;
+            int count = dwellingSelection.Count;
+
+            textBlock_Selection.Text = string.IsNullOrWhiteSpace(dwellingSelection.SearchText)
+                ? string.Format("{0} of {1} dwelling(s) selected.", selected, count)
+                : string.Format("{0} of {1} dwelling(s) selected. The search is narrowing the list; Select All and None apply to what the search matches.", selected, count);
+
+            button_OK.IsEnabled = selected != 0;
         }
 
         private void button_OK_Click(object sender, RoutedEventArgs e)
