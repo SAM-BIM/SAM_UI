@@ -129,6 +129,60 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
+            //The Part O pre-flight, before the first byte of any file is written.
+            //
+            //Scoped to a PREPARED Part O run, which is exactly "the first TAS simulation of a prepared Part
+            //O run" and every re-prepared one after it: Simulate arms this with the session's run, and both
+            //optimisation call sites - an Iteration 2B round and the capacity envelope - call
+            //PartORun.Prepare immediately before calling this. So a full run, an isolated run, Iteration
+            //1a, 1b and 2, every 2B round and the envelope are all gated by this one place, and no Part O
+            //path can be added later that quietly skips it.
+            //
+            //NOT the ordinary Simulate command, which reaches this method with no run or an unprepared one.
+            //Making SAM Check a hard gate on every TAS simulation in SAM is a bigger change than the Part O
+            //contract - Create.Log reports Errors on states a long-standing model may well carry, and a
+            //model that simulates today must not stop simulating because the Part O path grew a gate.
+            //
+            //It runs over `analyticalModel` as handed in, which is by definition the model about to be
+            //converted: on an isolated run that is the DERIVED isolated model, because
+            //Analytical.Modify.PreparePartOIteration applied the isolation and the run adopted its output.
+            //Checking the full-building model it was extracted from would be validating something else.
+            //
+            //Errors stop it, warnings do not - see PartOPreSimulationCheck, and in particular why the
+            //intentional "MVHR-01 is missing internal conditions on some daytypes" state must stay a
+            //warning. Passing is not a promise that TAS will run: licensing, file I/O, the solver and the
+            //weather data are all still ahead of it.
+            PartOPreSimulationCheck partOPreSimulationCheck = PartOPreSimulationCheck.Gate(partORun, analyticalModel);
+            if (partOPreSimulationCheck is not null)
+            {
+                if (!partOPreSimulationCheck.IsValid)
+                {
+                    //Shown here rather than left to the caller's message box, because only the log carries
+                    //the whole list - the type, name and Guid of every record. The refusal the caller then
+                    //shows is the summary of it.
+                    Core.Log log = partOPreSimulationCheck.Log;
+                    if (log is not null)
+                    {
+                        log.Sort();
+
+                        new SAM.Core.UI.WPF.LogWindow(log.Filter([Core.LogRecordType.Error, Core.LogRecordType.Warning, Core.LogRecordType.Undefined])).ShowDialog();
+                    }
+
+                    refusal = partOPreSimulationCheck.Refusal();
+
+                    return null;
+                }
+
+                //Warnings on a model that IS going to be simulated. Carried as notes so they reach the run's
+                //diagnostics and the optimisation step that produced them, and deliberately not shown as a
+                //dialog: a Part O model has intentional warnings on every run, and a dialog per run would
+                //train people to dismiss the one that mattered.
+                foreach (Core.LogRecord logRecord in partOPreSimulationCheck.Warnings)
+                {
+                    notes.Add(string.Format("Pre-simulation check (warning): {0}", logRecord.Text));
+                }
+            }
+
             string outputDirectory = partOSimulationContext.OutputDirectory;
             WeatherData weatherData = partOSimulationContext.WeatherData;
             SolarCalculationMethod solarCalculationMethod = partOSimulationContext.SolarCalculationMethod;
