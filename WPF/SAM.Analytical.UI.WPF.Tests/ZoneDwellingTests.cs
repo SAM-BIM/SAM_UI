@@ -8,6 +8,7 @@ using Xunit;
 
 namespace SAM.Analytical.UI.WPF.Tests
 {
+    [Collection(WpfCollection.Name)]
     public class ZoneDwellingTests
     {
         //Not set, true and false are three distinct states: TryGetValue must come back false for

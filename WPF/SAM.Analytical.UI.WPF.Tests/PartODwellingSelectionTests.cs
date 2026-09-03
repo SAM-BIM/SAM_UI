@@ -18,6 +18,7 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// here re-decides it.
     /// </para>
     /// </summary>
+    [Collection(WpfCollection.Name)]
     public class PartODwellingSelectionTests
     {
         private static Zone Dwelling(string name)

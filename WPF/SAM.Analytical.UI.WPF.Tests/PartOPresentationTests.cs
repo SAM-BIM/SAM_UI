@@ -15,6 +15,7 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// What the Part O UI offers and what it shows: the canonical ventilation vocabulary, the dwelling scope,
     /// the separation of design airflow from equipment capacity, and the three catalogue states.
     /// </summary>
+    [Collection(WpfCollection.Name)]
     public class PartOPresentationTests
     {
         // ---------------------------------------------------------------------------------------------

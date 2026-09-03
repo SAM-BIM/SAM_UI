@@ -24,6 +24,7 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// <c>SAM.Tests.PartOIsolationTests</c>. Nothing here restates it.
     /// </para>
     /// </summary>
+    [Collection(WpfCollection.Name)]
     public class PartOIsolationScopeTests
     {
         // ---- The dialog --------------------------------------------------------------------------------
