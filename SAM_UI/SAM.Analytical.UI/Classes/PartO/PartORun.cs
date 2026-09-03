@@ -45,10 +45,14 @@ namespace SAM.Analytical.UI
     /// left in the output directory satisfies none of them.
     /// </para>
     /// <para>
-    /// <b>Session state, deliberately.</b> Nothing here is written into the model. Scenarios have no
-    /// persistence seam in <c>SAM.Analytical</c>, and inventing one in the UI would put engineering state
-    /// under the UI's ownership; a run that does not survive closing the model is the honest alternative,
-    /// and it matches how the Grasshopper canvas holds the same objects on its wires.
+    /// <b>Session state, with one recorded exception.</b> The run itself - how it was prepared and which TAS
+    /// case produced it - lives only for the session. What DOES travel with the model are the two statements
+    /// stamped onto it when it is produced (see <c>Modify.RunPartOSimulation</c>): the
+    /// <c>SimulationResultProvenance</c> naming the results file and its fingerprint, and the overheating
+    /// scenarios the run was prepared with. On reopen, <see cref="Restore"/> reconnects those into a run that
+    /// can be <b>reviewed</b> - assessed again from the same results - but holds no preparation or simulation
+    /// context, so it can never be <b>resumed</b> into Iteration 2B. Preparing again remains the only way to
+    /// optimise.
     /// </para>
     /// </summary>
     public class PartORun
@@ -157,6 +161,14 @@ namespace SAM.Analytical.UI
         /// </para>
         /// </summary>
         public bool CanAssess => State == PartORunState.WorkflowCompleted;
+
+        /// <summary>
+        /// Whether this run was reconnected to a model reopened from disk (see <see cref="Restore"/>) rather
+        /// than produced in this session. A restored run can be <b>reviewed</b> - its results are re-read and
+        /// reassessed - but never <b>resumed</b> into Iteration 2B: it carries no preparation or simulation
+        /// context, by construction, so <c>CanOptimise</c> refuses it.
+        /// </summary>
+        public bool IsRestored { get; private set; }
 
         /// <summary>
         /// Announces that the next model replacement is this run's own, so it is not read as an outside edit.
@@ -343,6 +355,67 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
+        /// Whether the results at <paramref name="path_TSD"/> are provably <b>this run's</b> - the results
+        /// lineage rule, on its own, without changing anything.
+        ///
+        /// <para><b>Why this is a separate, askable question</b></para>
+        /// <para>
+        /// <see cref="Complete"/> is the authority on pairing a run with its results, and it applies this
+        /// rule as part of that. But the rule is also needed <i>before</i> Complete is reached: the caller
+        /// stamps <c>SimulationResultProvenance</c> onto the workflow's model and writes the run's persisted
+        /// <c>.sam</c> immediately after the workflow returns, and a workflow that returned a model while
+        /// leaving an existing TSD untouched would otherwise get a fully self-consistent, reopenable artifact
+        /// written for it - model, scenarios and file fingerprints all agreeing - which a later session would
+        /// restore and offer for review against an <i>earlier</i> run's results. Complete would then refuse
+        /// the run, correctly, and the misleading file would already be on disk.
+        /// </para>
+        /// <para>
+        /// So the rule lives here once and is asked twice, rather than being restated at the call site: a
+        /// second copy of a staleness rule is exactly how the two answers drift apart.
+        /// </para>
+        /// <para>
+        /// <b>Pure.</b> It reads state and the filesystem and neither writes nor invalidates - the caller
+        /// decides what a "no" means. <see cref="Complete"/> invalidates on it; the persistence path simply
+        /// declines to write.
+        /// </para>
+        /// </summary>
+        /// <param name="path_TSD">The results file to test.</param>
+        /// <param name="refusal">Why the results are not this run's, or null where they are.</param>
+        public bool IsResultsOfThisRun(string path_TSD, out string refusal)
+        {
+            refusal = null;
+
+            if (string.IsNullOrWhiteSpace(path_TSD) || !File.Exists(path_TSD))
+            {
+                refusal = string.Format("No simulation results were found at '{0}', so the workflow did not complete a run that can be assessed. A sizing-only run writes no TSD.", path_TSD ?? "?");
+
+                return false;
+            }
+
+            //Nothing announced this workflow's results, so nothing establishes that they are this run's. That
+            //is the state a partial, one-day or sizing-only simulation leaves the run in, because the caller
+            //arms ExpectResults only for the full-year run a TM59 assessment can read.
+            if (!resultsExpected || !string.Equals(path_TSD_Expected, path_TSD, System.StringComparison.Ordinal))
+            {
+                refusal = string.Format("The results at '{0}' were not announced as this Part O run's, so it cannot be established that this workflow produced them. Only a full-year simulation of the prepared model completes a Part O run - prepare the iteration again and simulate with Full Year Simulation ticked.", path_TSD);
+
+                return false;
+            }
+
+            //The file that was already there, byte-length and write-time unchanged: this workflow did not
+            //write it. Accepting it would pair an earlier session's results with the model just prepared.
+            FileInfo fileInfo = new(path_TSD);
+            if (exists_TSD_Expected && fileInfo.Length == length_TSD_Expected && fileInfo.LastWriteTimeUtc == dateTime_TSD_Expected)
+            {
+                refusal = string.Format("The simulation results at '{0}' are unchanged from before this workflow ran, so they are an earlier run's and not this one's. Simulate the prepared model with Full Year Simulation ticked to produce results this Part O run can be assessed against.", path_TSD);
+
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Pairs the prepared run with the model a completed TAS workflow returned, and the TSD it wrote.
         /// </summary>
         /// <param name="analyticalModel_Workflow">
@@ -396,34 +469,10 @@ namespace SAM.Analytical.UI
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(path_TSD) || !File.Exists(path_TSD))
+            //THE results lineage rule, asked of the one place that owns it - see IsResultsOfThisRun, which
+            //the persistence path asks the same question of before it writes anything reopenable.
+            if (!IsResultsOfThisRun(path_TSD, out refusal))
             {
-                refusal = string.Format("No simulation results were found at '{0}', so the workflow did not complete a run that can be assessed. A sizing-only run writes no TSD.", path_TSD ?? "?");
-
-                Invalidate(refusal);
-
-                return false;
-            }
-
-            //Nothing announced this workflow's results, so nothing establishes that they are this run's. That
-            //is the state a partial, one-day or sizing-only simulation leaves the run in, because the caller
-            //arms ExpectResults only for the full-year run a TM59 assessment can read.
-            if (!resultsExpected || !string.Equals(path_TSD_Expected, path_TSD, System.StringComparison.Ordinal))
-            {
-                refusal = string.Format("The results at '{0}' were not announced as this Part O run's, so it cannot be established that this workflow produced them. Only a full-year simulation of the prepared model completes a Part O run - prepare the iteration again and simulate with Full Year Simulation ticked.", path_TSD);
-
-                Invalidate(refusal);
-
-                return false;
-            }
-
-            //The file that was already there, byte-length and write-time unchanged: this workflow did not write
-            //it. Accepting it would pair an earlier session's results with the model just prepared.
-            FileInfo fileInfo = new(path_TSD);
-            if (exists_TSD_Expected && fileInfo.Length == length_TSD_Expected && fileInfo.LastWriteTimeUtc == dateTime_TSD_Expected)
-            {
-                refusal = string.Format("The simulation results at '{0}' are unchanged from before this workflow ran, so they are an earlier run's and not this one's. Simulate the prepared model with Full Year Simulation ticked to produce results this Part O run can be assessed against.", path_TSD);
-
                 Invalidate(refusal);
 
                 return false;
@@ -436,6 +485,125 @@ namespace SAM.Analytical.UI
             this.partOSimulationContext = partOSimulationContext;
 
             State = PartORunState.WorkflowCompleted;
+            InvalidationReason = null;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Reconnects this run to a model <b>reopened from disk</b> that records the results it was produced
+        /// from - so a completed, saved run's TM59 assessment can be reviewed in a later session without
+        /// rerunning the annual simulation.
+        /// <para>
+        /// <b>The other way into <see cref="PartORunState.WorkflowCompleted"/>, and deliberately narrower
+        /// than <see cref="Complete"/>.</b> Complete pairs a run with the workflow this session just watched
+        /// write the results. Restore pairs it with the model's own persisted statement of the same fact:
+        /// the <c>SimulationResultProvenance</c> and the overheating scenarios stamped onto the model when it
+        /// was produced - the run's own <c>&lt;project&gt;.sam</c>, or the user's own save of the same model
+        /// (see <c>Modify.RunPartOSimulation</c>). <c>SimulationResultProvenance.TryResolvePath_TSD</c> then
+        /// validates the whole rule: the record is complete, the results file matches the recorded path,
+        /// length and write time, the design state matches its fingerprint, and the scenarios about to be
+        /// read below match theirs. Anything that fails is refused; nothing is adopted on its name alone.
+        /// </para>
+        /// <para>
+        /// <b>The scenarios are read, never inferred.</b> What is loaded below is exactly the collection
+        /// persisted with this run, and the fingerprint above is what proves it is the collection the results
+        /// were assessed under. They are never rebuilt from room names, zone layout or anything else on the
+        /// reopened model: a regenerated scenario set would be a new assessment authority wearing an old
+        /// run's results.
+        /// </para>
+        /// <para>
+        /// <b>Review, never resume.</b> A restored run holds no <see cref="PreparationContext"/> and no
+        /// <see cref="SimulationContext"/> - those are statements about how this session prepared and ran the
+        /// case, and a file cannot reproduce them. Iteration 2B therefore refuses a restored run, exactly as
+        /// it refuses any run it cannot repeat.
+        /// </para>
+        /// <para>
+        /// <b>A model with no record is not an error.</b> Where the model carries no provenance at all -
+        /// never simulated on this path, or saved before the record existed - the run is simply left cleared
+        /// with <paramref name="refusal"/> null, so the caller's default guidance ("prepare and simulate")
+        /// still applies. A model that DOES carry a record but fails validation gets its reason, which the
+        /// tooltip shows.
+        /// </para>
+        /// </summary>
+        /// <param name="analyticalModel">
+        /// The model just opened. It becomes <see cref="AnalyticalModel_Assessment"/> only where every check
+        /// passes: it is the model the workflow returned, saved with its zone identities, which is what an
+        /// assessment resolves against.
+        /// </param>
+        /// <param name="path_Model">
+        /// The file the model was opened from, if known - used to locate the results beside it when the whole
+        /// output folder moved since the run. Never trusted without the recorded fingerprint.
+        /// </param>
+        /// <param name="refusal">Why no run could be restored, or null where the model simply records none.</param>
+        public bool Restore(AnalyticalModel analyticalModel, string path_Model, out string refusal)
+        {
+            refusal = null;
+
+            Reset();
+
+            if (analyticalModel is null)
+            {
+                return false;
+            }
+
+            //Qualified: this namespace declares its own AnalyticalModelParameter (UIGeometrySettings), which
+            //would otherwise shadow the SAM.Analytical one being read here.
+            if (!analyticalModel.TryGetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, out SimulationResultProvenance simulationResultProvenance) || simulationResultProvenance is null)
+            {
+                //Nothing recorded: a model that never went through the full-year simulation path, or one
+                //saved before the record existed. Not an invalidation - the default guidance already covers
+                //it, and inventing a pairing here is the failure this type exists to prevent.
+                return false;
+            }
+
+            if (!simulationResultProvenance.TryResolvePath_TSD(analyticalModel, path_Model, out string path_TSD, out refusal))
+            {
+                InvalidationReason = refusal;
+
+                return false;
+            }
+
+            //Exactly the scenarios persisted with this run, which the fingerprint check above has already
+            //proved are the ones its results were assessed under. Read, never derived: nothing here looks at
+            //a room name, a zone or the design to decide what was assessed.
+            List<OverheatingScenario> overheatingScenarios_Temp = [];
+            if (analyticalModel.TryGetValue(Analytical.AnalyticalModelParameter.OverheatingScenarios, out SAM.Core.SAMCollection<OverheatingScenario> collection) && collection is not null)
+            {
+                foreach (OverheatingScenario overheatingScenario in collection)
+                {
+                    if (overheatingScenario is not null)
+                    {
+                        overheatingScenarios_Temp.Add(overheatingScenario);
+                    }
+                }
+            }
+
+            if (overheatingScenarios_Temp.Count == 0)
+            {
+                //Belt and braces behind the scenario fingerprint: a complete record is never taken over an
+                //empty scenario set, so reaching here means the record is stating something the model does
+                //not carry. Without the scenarios there is no authoritative ventilation strategy for any
+                //space, and the assessment refuses rather than defaults.
+                refusal = "This model records the simulation results it was produced from, but not the overheating scenarios they were assessed against, so its TM59 assessment cannot be reviewed. Prepare the iteration again and re-run the simulation.";
+
+                InvalidationReason = refusal;
+
+                return false;
+            }
+
+            analyticalModel_Workflow = analyticalModel;
+            this.path_TSD = path_TSD;
+            dateTime_TSD = new System.DateTime(simulationResultProvenance.Timestamp_TSD, System.DateTimeKind.Utc);
+            overheatingScenarios = overheatingScenarios_Temp;
+
+            //Deliberately left null: a restored run can be assessed but not re-prepared or re-simulated as
+            //the case it came from, which is what keeps it out of Iteration 2B.
+            partOPreparationContext = null;
+            partOSimulationContext = null;
+
+            State = PartORunState.WorkflowCompleted;
+            IsRestored = true;
             InvalidationReason = null;
 
             return true;
@@ -508,6 +676,7 @@ namespace SAM.Analytical.UI
             path_TSD = null;
             dateTime_TSD = default;
             modificationExpected = false;
+            IsRestored = false;
 
             //Cleared with everything else: a dropped run's preparation inputs and TAS case must not be
             //picked up by its successor, which was prepared and simulated differently.

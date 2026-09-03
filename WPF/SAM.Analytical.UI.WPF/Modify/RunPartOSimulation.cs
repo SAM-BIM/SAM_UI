@@ -76,6 +76,18 @@ namespace SAM.Analytical.UI.WPF
         /// therefore leaves the run unarmed and unable to be completed, which is the guarantee PR #76
         /// established and this does not weaken.
         /// </para>
+        ///
+        /// <para><b>And the returned model carries the run's provenance</b></para>
+        /// <para>
+        /// On the full-year path, the model handed back is stamped with the overheating scenarios the run was
+        /// prepared with and with the results file it was produced from
+        /// (<c>AnalyticalModelParameter.SimulationResultProvenance</c>, which fingerprints both the design
+        /// state and those scenarios), and that model is written beside the TBD as this run's own
+        /// <c>&lt;project&gt;.sam</c> - the native SAM model form, at the one path
+        /// <see cref="Query.Path_PartORunModel(string)"/> states. That is what lets a later session reopen
+        /// the saved model and review its TM59 assessment from the existing results, without simulating
+        /// again; see <c>PartORun.Restore</c>.
+        /// </para>
         /// </summary>
         /// <param name="analyticalModel">The design to simulate. <b>Copied first</b>, so a cancelled run leaves it untouched.</param>
         /// <param name="partOSimulationContext">The case to run it as.</param>
@@ -356,6 +368,72 @@ namespace SAM.Analytical.UI.WPF
             }
 
             result.SetValue(Analytical.AnalyticalModelParameter.WeatherData, weatherData);
+
+            //The run's self-description, persisted onto the model the workflow returned, so a SAVED copy of
+            //it - the per-run <project>.sam this writes beside the TBD, or the user's own .sam saved later -
+            //can be reopened in a later session and its results reviewed WITHOUT rerunning the simulation.
+            //The scenarios are the assessment's authority over which TM59 criterion applies to which space;
+            //the provenance is the proof of which results file the model belongs to, and it fingerprints the
+            //scenarios along with the design so neither can move underneath the results. See
+            //PartORun.Restore.
+            //
+            //A run with no scenarios - a plain, non-Part-O simulation - is left entirely unstamped: there is
+            //nothing to review it against, and no run model is written for it.
+            List<OverheatingScenario> overheatingScenarios = partORun?.OverheatingScenarios;
+            if (overheatingScenarios is not null && overheatingScenarios.Count != 0)
+            {
+                result.SetValue(Analytical.AnalyticalModelParameter.OverheatingScenarios, new SAMCollection<OverheatingScenario>(overheatingScenarios));
+
+                //Only the full annual series a TM59 assessment can read is recorded - a partial, one-day or
+                //sizing-only run writes no provenance, exactly as it cannot complete a Part O run.
+                //
+                //AND only where the results are provably THIS run's, asked of PartORun.IsResultsOfThisRun -
+                //the same lineage rule PartORun.Complete refuses on, a moment later, in the caller. Asked
+                //HERE because everything below this line is reopenable: a workflow that returned a model
+                //while leaving an existing TSD untouched would otherwise be stamped and persisted into a
+                //fully self-consistent .sam - model, scenarios and file fingerprints all agreeing - which a
+                //later session would restore and offer for review against an EARLIER run's results. Complete
+                //would then refuse the run, correctly, and the misleading artifact would already be written.
+                //Nothing is stamped and nothing is written for a run that cannot be completed.
+                string refusal_Lineage = "there is no prepared Part O run to have produced them.";
+
+                bool ofThisRun = partORun is not null && partORun.IsResultsOfThisRun(path_TSD, out refusal_Lineage);
+
+                if (fullYear && !ofThisRun)
+                {
+                    //Noted rather than silent: "no reviewable model was written, and why" is the diagnostic.
+                    //The run itself is refused by Complete, which is where that verdict belongs.
+                    notes.Add(string.Format("No persisted run model was written for these results, because they are not provably this run's: {0}", refusal_Lineage));
+                }
+
+                if (fullYear && ofThisRun)
+                {
+                    //Constructed AFTER the scenarios are stamped above, deliberately: the record fingerprints
+                    //both the design state and the scenarios it finds on the model, and a record taken before
+                    //them would bind an empty assessment context.
+                    result.SetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, new SimulationResultProvenance(result, path_TSD));
+
+                    //This run's own persisted model, beside its results and named from them by the single
+                    //naming authority - Query.Path_PartORunModel, which is where the extension is stated.
+                    //Written through Core.Convert.ToFile under SAMFileType.SAM: SAM's native model writer,
+                    //the one Save As uses, so this file reopens through the ordinary Open path with no
+                    //special case anywhere.
+                    //
+                    //And then, ONLY once that has succeeded, the workflow's own "Saving Model" export for
+                    //this run - the plain-text <run>.json beside the TBD - is removed, so a Part O run
+                    //leaves one reviewable model artifact rather than the same model twice. The ordering is
+                    //the safety property and lives in Modify.PersistPartORunModel: a failed .sam write
+                    //deletes nothing and leaves the JSON as the fallback copy, and a JSON that could not be
+                    //removed is a note, never a failed run. WorkflowCalculator itself is untouched - every
+                    //ordinary non-Part-O TAS run in SAM still writes and keeps its <project>.json.
+                    Modify.PersistPartORunModel(result, path_TSD, path_TBD, out string note_Persistence);
+
+                    if (!string.IsNullOrWhiteSpace(note_Persistence))
+                    {
+                        notes.Add(note_Persistence);
+                    }
+                }
+            }
 
             return result;
         }

@@ -610,10 +610,17 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// Writes one iteration's unit states and production TM59 results onto its step - the audit trail
         /// that makes the run reproducible.
+        /// <para>
+        /// <b>And persists the report.</b> An assessed step's production report is written beside the
+        /// results it was assessed from - the baseline's own TSD, each round's <c>-OptNN</c> one, the
+        /// envelope's <c>-OptMax</c> one - so the evidence for every simulated case survives the session
+        /// (see <see cref="SavePartOTM59Report"/>). A failure to write lands on the step as a warning and
+        /// fails nothing.
+        /// </para>
         /// </summary>
         private static void Record(PartOOptimisationStep partOOptimisationStep, AnalyticalModel? analyticalModel, PartOPreparationContext partOPreparationContext, PartOTM59Assessment partOTM59Assessment)
         {
-            partOOptimisationStep.UnitStates.AddRange(UnitStates(analyticalModel, partOPreparationContext.VentilationUnitCapacityDescriptors));
+            partOOptimisationStep.UnitStates.AddRange(UnitStates(analyticalModel, partOPreparationContext.VentilationUnitCapacityDescriptors, partOPreparationContext.Zones));
 
             if (!partOTM59Assessment.IsAssessed)
             {
@@ -623,11 +630,16 @@ namespace SAM.Analytical.UI.WPF
             partOOptimisationStep.TM59Results.AddRange(partOTM59Assessment.SpaceResults);
             partOOptimisationStep.OccupiedSpaceComplianceStatus = partOTM59Assessment.OccupiedSpaceComplianceStatus;
             partOOptimisationStep.Warnings.AddRange(partOTM59Assessment.AssociationRefusals);
+
+            if (!SavePartOTM59Report(partOOptimisationStep.Path_TSD, partOTM59Assessment.Report, out string? path_TM59Report, out string? refusal_Report))
+            {
+                partOOptimisationStep.Warnings.Add(refusal_Report);
+            }
         }
 
         /// <summary>
-        /// What every air handling unit in the model is carrying, beside what its selected product is rated
-        /// to move.
+        /// What every air handling unit <b>of this run's Part O scope</b> is carrying, beside what its
+        /// selected product is rated to move.
         /// <para>
         /// Every value from its own authority: the duty from <c>Query.AirHandlingUnitDesignDuty</c>, which
         /// sums every system the unit supplies rather than assuming it serves one; the product from
@@ -635,8 +647,15 @@ namespace SAM.Analytical.UI.WPF
         /// resolves to in the run's own catalogue. Nothing here is stored on the unit, so nothing here can
         /// go stale against the design.
         /// </para>
+        /// <para>
+        /// <b>Only the iteration's own equipment.</b> The model's authored systems - a legacy mechanical
+        /// ventilation system the building was drawn with, say - are not this run's equipment: the
+        /// preparation never connects them to a design terminal, so
+        /// <see cref="Query.PartOIterationAirHandlingUnits"/> excludes them by relation. The model is not
+        /// edited to achieve that; the evidence is simply scoped to what the run is actually about.
+        /// </para>
         /// </summary>
-        private static List<PartOOptimisationUnitState> UnitStates(AnalyticalModel? analyticalModel, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors)
+        private static List<PartOOptimisationUnitState> UnitStates(AnalyticalModel? analyticalModel, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors, IEnumerable<Zone>? zones_Dwelling)
         {
             List<PartOOptimisationUnitState> result = [];
 
@@ -646,7 +665,7 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
-            List<AirHandlingUnit> airHandlingUnits = adjacencyCluster.GetObjects<AirHandlingUnit>() ?? [];
+            List<AirHandlingUnit> airHandlingUnits = Query.PartOIterationAirHandlingUnits(adjacencyCluster, zones_Dwelling);
 
             airHandlingUnits.Sort((x, y) => string.CompareOrdinal(x?.Name, y?.Name));
 
@@ -705,20 +724,34 @@ namespace SAM.Analytical.UI.WPF
         /// The optimisation above is all-or-nothing at a fixed step, and stays that way. So a run stops on
         /// the selected unit's capacity, or on the iteration guard, with eligible rooms still failing - and
         /// an engineer is left holding "this design still fails" with no statement of how close the
-        /// equipment already bought can get. That statement is what this produces. It is <b>not</b> another
-        /// round: it is a partial - or, where the iteration guard stopped the run early, several times over
-        /// - step that the ordinary policy deliberately refuses.
+        /// equipment already bought can get. That statement is what this produces:
+        /// </para>
+        /// <para>
+        /// <i>"If the last valid design were increased coherently while preserving its terminal airflow
+        /// proportions, what design could the already-selected unit support at its capacity ceiling?"</i>
+        /// </para>
+        /// <para>
+        /// It is <b>not</b> another round. It is a design the ordinary policy deliberately refuses, evaluated
+        /// to say what the equipment could support - so for the real Flat 1, a dwelling designed 40 supply /
+        /// 22 + 18 extract on a 150/150 unit becomes 150 supply / 82.5 + 67.5 extract: the same dwelling,
+        /// larger.
         /// </para>
         ///
         /// <para><b>What it runs, and on what</b></para>
         /// <code>
         /// last ACCEPTED ordinary design
-        ///   -> the same deliberate target vector the +5 policy would next have asked for
-        ///   -> Modify.EvaluateDesignAirFlowCapacityEnvelope   one coherent scale per equipment group
+        ///   -> the +5 policy's target vector, read for SCOPE ONLY - which units are being diagnosed
+        ///   -> Modify.EvaluateDesignAirFlowCapacityEnvelope   one proportional factor per equipment group
         ///   -> re-prepare Part O                              transfer air, network and duties rebuilt
         ///   -> full-year TAS, its OWN -OptMax TSD              the SAME weather case
         ///   -> production TM59, on the model the workflow RETURNED
         /// </code>
+        /// <para>
+        /// The vector's <b>figures</b> are not read. An earlier revision scaled those increments, which spent
+        /// the remaining headroom only on the rooms the optimiser happened to be pushing - the same Flat 1
+        /// came out at 150 supply / <b>22</b> + 128 extract, the bathroom carrying the whole increase. See
+        /// <c>Analytical.Modify.EvaluateDesignAirFlowCapacityEnvelope</c>.
+        /// </para>
         /// <para>
         /// Every guarantee the rounds keep is kept here too: the preparation is offered <b>no</b> catalogue,
         /// so the product selected at Iteration 2 is not re-chosen against the grown duty; the TAS case is
@@ -804,18 +837,23 @@ namespace SAM.Analytical.UI.WPF
             if (partOOptimisationStep_LastValid.OccupiedSpaceComplianceStatus != TM59ComplianceStatus.Fail)
             {
                 partOOptimisationRun.CapacityEnvelopeDescription = string.Format(
-                    "The last valid design's production TM59 status is '{0}', which is not a failure, so there is no failing target for a capacity envelope to scale and none was calculated.",
+                    "The last valid design's production TM59 status is '{0}', which is not a failure, so there is no failing room to say which equipment a capacity envelope would be about, and none was calculated.",
                     Core.Query.Description(partOOptimisationStep_LastValid.OccupiedSpaceComplianceStatus));
 
                 return;
             }
 
-            // ---- The same vector the next ordinary round would have asked for -----------------------------
+            // ---- The SCOPE: which equipment the failing rooms sit on --------------------------------------
 
-            //The SAME policy, at the SAME step, over the SAME production results - so the envelope scales
-            //what the optimisation would next have requested and not some other set of rooms. Notably NOT
-            //filtered by the dwellings the optimisation marked at capacity: those are precisely the ones
-            //whose equipment ceiling is the thing being diagnosed.
+            //The SAME policy, at the SAME step, over the SAME production results - so the envelope diagnoses
+            //the equipment serving the rooms the optimisation would next have pushed, and not some other set
+            //of dwellings. Notably NOT filtered by the dwellings the optimisation marked at capacity: those
+            //are precisely the ones whose equipment ceiling is the thing being diagnosed.
+            //
+            //Only the SCOPE. The envelope reads no FIGURE from this vector - it grows the whole last valid
+            //design of each unit these rooms resolve to, proportionally, to that unit's own ceiling. See
+            //Analytical.Modify.EvaluateDesignAirFlowCapacityEnvelope for why the +5 l/s increments are the
+            //wrong thing to spend the remaining headroom on.
             PartOOptimisationTargetSelection partOOptimisationTargetSelection = Query.PartOOptimisationTargets(analyticalModel_LastValid, partOOptimisationStep_LastValid.TM59Results, partOPreparationContext.Zones, partOOptimisationSettings.AirFlowStep_Lps);
 
             if (partOOptimisationTargetSelection.Targets.Count == 0)
@@ -824,7 +862,7 @@ namespace SAM.Analytical.UI.WPF
                 //that produced that design - the same rule the optimisation follows.
                 partOOptimisationStep_LastValid.Notes.AddRange(partOOptimisationTargetSelection.NotOptimisable);
 
-                partOOptimisationRun.CapacityEnvelopeDescription = "No failing space remained that could be targeted, so there is no deliberate target vector for a capacity envelope to scale and none was calculated.";
+                partOOptimisationRun.CapacityEnvelopeDescription = "No failing space remained that could be targeted, so there is no deliberate target vector to say which equipment a capacity envelope would be about, and none was calculated.";
 
                 return;
             }
@@ -878,10 +916,11 @@ namespace SAM.Analytical.UI.WPF
             partOOptimisationStep.Notes.AddRange(designAirFlowCapacityEnvelope.Notes);
             partOOptimisationStep.Warnings.AddRange(designAirFlowCapacityEnvelope.Warnings);
 
-            if (designAirFlowCapacityEnvelope.RoundCandidate is not null)
-            {
-                partOOptimisationStep.TargetRefusals.AddRange(designAirFlowCapacityEnvelope.RoundCandidate.TargetRefusals);
-            }
+            //The ENVELOPE's own dropped targets, not its round's. Its round is given the design that already
+            //exists, which every room can carry by definition, so RoundCandidate.TargetRefusals is empty -
+            //the failing rooms the ordinary policy has no lever for are dropped when the envelope resolves
+            //its scope, and that is where they are recorded.
+            partOOptimisationStep.TargetRefusals.AddRange(designAirFlowCapacityEnvelope.TargetRefusals);
 
             AnalyticalModel analyticalModel_Envelope = new(analyticalModel_LastValid, designAirFlowCapacityEnvelope.AdjacencyCluster);
 

@@ -42,6 +42,14 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         private static readonly Guid guid_Bedroom = new("22222222-2222-2222-2222-222222222222");
 
+        private const string name_Studio = "Studio 1_0";
+
+        private const string name_Bathroom_Studio = "Bathroom_2";
+
+        private static readonly Guid guid_Studio = new("33333333-3333-3333-3333-333333333333");
+
+        private static readonly Guid guid_Bathroom_Studio = new("55555555-5555-5555-5555-555555555555");
+
         // ---- 11. The ordinary accepted design is not replaced ---------------------------------------------
 
         /// <summary>
@@ -194,10 +202,12 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Contains(rows, x => x.Stage == "OPTIMISATION" && x.Run == "1");
             Assert.Contains(rows, x => x.Stage == "CAPACITY ENVELOPE" && x.Run == "MAX");
 
-            //TARGETED and DERIVED are still told apart WITHIN the envelope - a diagnostic still has to say
-            //which rooms were chosen and which only moved to keep the dwelling balanced.
-            Assert.Contains(rows, x => x.Stage == "CAPACITY ENVELOPE" && x.Type == "TARGETED" && x.Space == name_Kitchen);
+            //An envelope's deliberate rows are SCALED, and an ordinary round's are TARGETED. Both were
+            //chosen, but by different authorities answering different questions - see
+            //TheEnvelopesRows_AreScaledRatherThanTargeted.
+            Assert.Contains(rows, x => x.Stage == "CAPACITY ENVELOPE" && x.Type == "SCALED" && x.Space == name_Kitchen);
             Assert.Contains(rows, x => x.Stage == "CAPACITY ENVELOPE" && x.Type == "DERIVED" && x.Space == name_Bedroom);
+            Assert.Contains(rows, x => x.Stage == "OPTIMISATION" && x.Type == "TARGETED" && x.Space == name_Kitchen);
 
             List<PartOOptimisationUnitRow> rows_Unit = PartOOptimisationUnitRow.Rows(partOOptimisationRun);
 
@@ -207,6 +217,136 @@ namespace SAM.Analytical.UI.WPF.Tests
             //is what the CURRENT product can deliver.
             Assert.All(rows_Unit, x => Assert.DoesNotContain("Reselect", x.Equipment));
             Assert.All(rows_Unit, x => Assert.Contains("MVHR-150", x.Product));
+        }
+
+        /// <summary>
+        /// <b>An envelope's deliberate rows read SCALED, and an ordinary round's read TARGETED.</b>
+        /// <para>
+        /// Both were chosen, but by different authorities answering different questions. An optimisation
+        /// round asked one failing room for one +5 l/s step; the envelope grew the <i>complete last valid
+        /// design vector</i> proportionally towards the selected unit's ceiling, so a room moved because its
+        /// dwelling grew and not because anybody requested that figure of it. Printing the second as
+        /// TARGETED would say the optimisation had asked for figures it never did - the same misreading the
+        /// targeted/derived split exists to prevent.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TheEnvelopesRows_AreScaledRatherThanTargeted()
+        {
+            PartOOptimisationRun partOOptimisationRun = History(out AnalyticalModel _);
+
+            Envelope(partOOptimisationRun);
+
+            List<PartOOptimisationAirFlowRow> rows = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun);
+
+            //Not one MAX row claims to be an optimisation target, and not one OPTIMISATION row claims to be
+            //a proportional growth.
+            Assert.DoesNotContain(rows, x => x.Run == "MAX" && x.Type == "TARGETED");
+            Assert.DoesNotContain(rows, x => x.Run != "MAX" && x.Type == "SCALED");
+
+            //And a SCALED row still carries both the request and what was achieved, so the two can be
+            //compared exactly as they are on a round.
+            PartOOptimisationAirFlowRow row = rows.Find(x => x.Run == "MAX" && x.Type == "SCALED");
+
+            Assert.NotNull(row);
+            Assert.Equal(27, row.DesignBefore_Lps, 6);
+            Assert.Equal(63, row.Requested_Lps);
+            Assert.Equal(63, row.Achieved_Lps, 6);
+            Assert.Equal(13, row.Requirement_Lps, 6);
+        }
+
+        // ---- The MAX table is complete, and reconciles ----------------------------------------------------
+
+        /// <summary>
+        /// <b>The reporting defect this change fixes.</b>
+        /// <para>
+        /// For the real Flat 1 the MAX table used to show the studio's <b>supply</b> and the bathroom's
+        /// <b>extract</b>, and nothing else - so a reader saw <c>Studio supply 150</c> and
+        /// <c>Bathroom extract 128</c> against a unit duty of 150/150, and could not tell where the
+        /// remaining 22 l/s of extract came from. The studio's own extract contribution was nowhere in the
+        /// table, and had to be dug out of the narrative notes.
+        /// </para>
+        /// <para>
+        /// Now the proportional growth targets every space and direction the unit serves, so every one of
+        /// them has its own row:
+        /// </para>
+        /// <code>
+        /// Studio 1_0  Supply    40 -> 150
+        /// Studio 1_0  Extract   22 -> 82.5
+        /// Bathroom_2  Extract   18 -> 67.5
+        /// MVHR-01               150/150
+        /// </code>
+        /// <para>
+        /// Both assertions matter: that the studio appears <b>twice</b>, once per direction, and that summing
+        /// the visible rows of one direction reproduces the unit's duty exactly.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TheMaxTable_ShowsEveryContributionNeededToReconcileTheUnitDuty()
+        {
+            PartOOptimisationRun partOOptimisationRun = FlatOneHistory();
+
+            PartOOptimisationStep partOOptimisationStep = FlatOneEnvelope(partOOptimisationRun);
+
+            List<PartOOptimisationAirFlowRow> rows = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun).FindAll(x => x.Run == "MAX");
+
+            //The studio is there on BOTH sides - which is the row the old table left out.
+            PartOOptimisationAirFlowRow row_Studio_Supply = rows.Find(x => x.Space == name_Studio && x.Direction == "Supply");
+            PartOOptimisationAirFlowRow row_Studio_Extract = rows.Find(x => x.Space == name_Studio && x.Direction == "Extract");
+            PartOOptimisationAirFlowRow row_Bathroom_Extract = rows.Find(x => x.Space == name_Bathroom_Studio && x.Direction == "Extract");
+
+            Assert.NotNull(row_Studio_Supply);
+            Assert.NotNull(row_Studio_Extract);
+            Assert.NotNull(row_Bathroom_Extract);
+
+            Assert.Equal(40, row_Studio_Supply.DesignBefore_Lps, 6);
+            Assert.Equal(150, row_Studio_Supply.Achieved_Lps, 6);
+
+            Assert.Equal(22, row_Studio_Extract.DesignBefore_Lps, 6);
+            Assert.Equal(82.5, row_Studio_Extract.Achieved_Lps, 6);
+
+            Assert.Equal(18, row_Bathroom_Extract.DesignBefore_Lps, 6);
+            Assert.Equal(67.5, row_Bathroom_Extract.Achieved_Lps, 6);
+
+            //Summing the VISIBLE rows of one direction reproduces the unit's duty on that side, with no
+            //hidden terminal contribution and no room counted twice.
+            PartOOptimisationUnitState partOOptimisationUnitState = Assert.Single(partOOptimisationStep.UnitStates);
+
+            Assert.Equal(partOOptimisationUnitState.SupplyDuty_Lps, Sum(rows, "Supply"), 6);
+            Assert.Equal(partOOptimisationUnitState.ExtractDuty_Lps, Sum(rows, "Extract"), 6);
+
+            //One row per space and direction, aggregated at the room grain the rest of the history uses -
+            //not one per terminal object.
+            Assert.Equal(3, rows.Count);
+            Assert.Equal(3, new HashSet<string>(rows.ConvertAll(x => string.Format("{0}|{1}", x.Space, x.Direction))).Count);
+
+            //And the unit row a reader reconciles against says 150/150, on the rating.
+            PartOOptimisationUnitRow partOOptimisationUnitRow = Assert.Single(PartOOptimisationUnitRow.Rows(partOOptimisationRun).FindAll(x => x.Run == "MAX"));
+
+            Assert.Equal("150/150", partOOptimisationUnitRow.Duty);
+            Assert.Equal("150/150", partOOptimisationUnitRow.Maximum);
+        }
+
+        /// <summary>
+        /// The Approved Document F column of the MAX table is the <b>unchanged</b> requirement, sitting
+        /// beside a design several times larger - which is the whole point of printing it. The studio still
+        /// requires 30 l/s of supply against a diagnostic design of 150, and the bathroom 8 l/s against 67.5.
+        /// </summary>
+        [Fact]
+        public void TheMaxTable_ShowsTheUnchangedApprovedDocumentFRequirementBesideTheGrownDesign()
+        {
+            PartOOptimisationRun partOOptimisationRun = FlatOneHistory();
+
+            FlatOneEnvelope(partOOptimisationRun);
+
+            List<PartOOptimisationAirFlowRow> rows = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun).FindAll(x => x.Run == "MAX");
+
+            Assert.Equal(30, rows.Find(x => x.Space == name_Studio && x.Direction == "Supply").Requirement_Lps, 6);
+            Assert.Equal(13, rows.Find(x => x.Space == name_Studio && x.Direction == "Extract").Requirement_Lps, 6);
+            Assert.Equal(8, rows.Find(x => x.Space == name_Bathroom_Studio && x.Direction == "Extract").Requirement_Lps, 6);
+
+            //Every row of the diagnostic is above its own floor, and every one of them says so.
+            Assert.All(rows, x => Assert.True(x.Achieved_Lps >= x.Requirement_Lps));
         }
 
         /// <summary>
@@ -414,6 +554,124 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         // ---- Fixture ---------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// <b>The real Flat 1 shape from the brief</b>, as a history to report on: a baseline, one completed
+        /// ordinary round, and a studio carrying design airflow on <i>both</i> sides.
+        /// <code>
+        /// Studio 1_0  supply   requirement 30   design 40
+        /// Studio 1_0  extract  requirement 13   design 22
+        /// Bathroom_2  extract  requirement  8   design 18
+        /// MVHR-01                               40/40 against a 150/150 product
+        /// </code>
+        /// </summary>
+        private static PartOOptimisationRun FlatOneHistory()
+        {
+            PartOOptimisationRun result = new(new PartOOptimisationSettings());
+
+            PartOOptimisationStep partOOptimisationStep_Baseline = new(0)
+            {
+                ProjectName = "Flat1-Opt00",
+                Path_TSD = Path.Combine(Path.GetTempPath(), "Flat1-Opt00.tsd"),
+                WeatherData = "CIBSE Future Z1",
+                OccupiedSpaceComplianceStatus = TM59ComplianceStatus.Fail,
+                IsCompleted = true,
+            };
+
+            result.Steps.Add(partOOptimisationStep_Baseline);
+
+            PartOOptimisationStep partOOptimisationStep_Round = new(2)
+            {
+                ProjectName = "Flat1-Opt02",
+                Path_TSD = Path.Combine(Path.GetTempPath(), "Flat1-Opt02.tsd"),
+                WeatherData = "CIBSE Future Z1",
+                OccupiedSpaceComplianceStatus = TM59ComplianceStatus.Fail,
+                IsCompleted = true,
+            };
+
+            //The last accepted ordinary round, which is where the design the envelope grows comes from.
+            partOOptimisationStep_Round.TargetedAdjustments.Add(new DesignAirFlowAdjustment(guid_Studio, name_Studio, FlowClassification.Supply, 35, 40, 30, false));
+            partOOptimisationStep_Round.DerivedAdjustments.Add(new DesignAirFlowAdjustment(guid_Bathroom_Studio, name_Bathroom_Studio, FlowClassification.Extract, 13, 18, 8, true));
+
+            partOOptimisationStep_Round.UnitStates.Add(Unit(40, 40));
+
+            result.Steps.Add(partOOptimisationStep_Round);
+
+            result.AnalyticalModel_LastValid = new AnalyticalModel("last valid", null, null, null, new AdjacencyCluster(), null, null);
+            result.Path_TSD_LastValid = partOOptimisationStep_Round.Path_TSD;
+            result.StopReason = PartOOptimisationStopReason.CapacityReached;
+
+            return result;
+        }
+
+        /// <summary>
+        /// The Flat 1 capacity envelope, as <c>Modify.CapacityEnvelope</c> records one: the whole last valid
+        /// design vector grown by x3.75 to the selected unit's 150/150 ceiling, with <b>every</b> space and
+        /// direction the unit serves as a deliberate adjustment of the diagnostic.
+        /// <para>
+        /// Built directly rather than simulated, because what is under test here is the <i>presentation</i>.
+        /// The arithmetic that produces these figures belongs to
+        /// <c>SAM.Analytical.Modify.EvaluateDesignAirFlowCapacityEnvelope</c> and is pinned by
+        /// <c>SAM.Tests.PartOCapacityEnvelopeTests</c>; restating it here would be a second copy of an
+        /// engineering rule the UI does not own.
+        /// </para>
+        /// </summary>
+        private static PartOOptimisationStep FlatOneEnvelope(PartOOptimisationRun partOOptimisationRun)
+        {
+            PartOOptimisationStep result = new(3, PartOOptimisationStepKind.CapacityEnvelope)
+            {
+                ProjectName = "Flat1-OptMax",
+                Path_TSD = Path.Combine(Path.GetTempPath(), "Flat1-OptMax.tsd"),
+                WeatherData = "CIBSE Future Z1",
+                OccupiedSpaceComplianceStatus = TM59ComplianceStatus.Pass,
+                IsCompleted = true,
+            };
+
+            //x3.75, applied to everything: 40 -> 150, 22 -> 82.5, 18 -> 67.5. Nothing is derived - the
+            //growth is balanced by construction.
+            result.TargetedAdjustments.Add(new DesignAirFlowAdjustment(guid_Studio, name_Studio, FlowClassification.Supply, 40, 150, 30, false));
+            result.TargetedAdjustments.Add(new DesignAirFlowAdjustment(guid_Studio, name_Studio, FlowClassification.Extract, 22, 82.5, 13, false));
+            result.TargetedAdjustments.Add(new DesignAirFlowAdjustment(guid_Bathroom_Studio, name_Bathroom_Studio, FlowClassification.Extract, 18, 67.5, 8, false));
+
+            result.UnitStates.Add(Unit(150, 150));
+
+            partOOptimisationRun.Steps.Add(result);
+
+            partOOptimisationRun.AnalyticalModel_CapacityEnvelope = new AnalyticalModel("capacity envelope", null, null, null, new AdjacencyCluster(), null, null);
+            partOOptimisationRun.Path_TSD_CapacityEnvelope = result.Path_TSD;
+
+            return result;
+        }
+
+        /// <summary>
+        /// The Flat 1 unit at a stated duty, always selected as the same 150/150 product - the headroom
+        /// beside it is derived from the two, never stated separately.
+        /// </summary>
+        private static PartOOptimisationUnitState Unit(double supplyDuty_Lps, double extractDuty_Lps)
+        {
+            VentilationUnitCapacityDescriptor ventilationUnitCapacityDescriptor = new(new VentilationUnitReference("Test Fixture", "MVHR-150", null), 150, 150, 0);
+
+            return new PartOOptimisationUnitState("MVHR-01", "Flat 1", supplyDuty_Lps, extractDuty_Lps, ventilationUnitCapacityDescriptor.VentilationUnitReference, ventilationUnitCapacityDescriptor, VentilationUnitSelectionOutcome.Kept, null);
+        }
+
+        /// <summary>
+        /// What the visible rows of one direction total - the sum a reader performs to reconcile the table
+        /// against the air handling unit's duty.
+        /// </summary>
+        private static double Sum(List<PartOOptimisationAirFlowRow> partOOptimisationAirFlowRows, string direction)
+        {
+            double result = 0;
+
+            foreach (PartOOptimisationAirFlowRow partOOptimisationAirFlowRow in partOOptimisationAirFlowRows)
+            {
+                if (partOOptimisationAirFlowRow.Direction == direction)
+                {
+                    result += partOOptimisationAirFlowRow.Achieved_Lps;
+                }
+            }
+
+            return result;
+        }
 
         /// <summary>
         /// A baseline and one completed ordinary round, built directly - so what the run and the

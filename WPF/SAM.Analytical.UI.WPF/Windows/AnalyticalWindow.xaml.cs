@@ -1980,11 +1980,20 @@ namespace SAM.Analytical.UI.WPF.Windows
         }
 
         /// <summary>
-        /// Enables the Part O assessment only for a run that has actually completed a TAS workflow, and says
-        /// through the tooltip why it is unavailable when it is not.
+        /// Enables the Part O assessment only for a run that has results to assess, and says through the
+        /// tooltip why it is unavailable when it is not.
         /// <para>
-        /// <c>PartORun.CanAssess</c> is the only condition read. The command re-checks it - and re-checks the
-        /// results file - so this is presentation, not the gate.
+        /// <b>Two ways a run can have results.</b> The session's own completed workflow, and a run
+        /// <i>restored</i> from a reopened model that records the results it was produced from
+        /// (<c>PartORun.Restore</c>) - the review path that needs no new simulation. Both are the same state
+        /// here: <c>PartORun.CanAssess</c> is the only condition read, and it stays a pure state read. The
+        /// command re-checks it - and re-checks the results file - so this is presentation, not the gate.
+        /// </para>
+        /// <para>
+        /// <b>Optimise is deliberately stricter, and stays that way.</b> Reviewing needs a model and its
+        /// results; optimising additionally needs how the run was prepared and which TAS case produced it -
+        /// the session state a restored run provably does not carry - so a restored run can be reviewed but
+        /// never resumed into Iteration 2B, and the tooltip says the two apart.
         /// </para>
         /// </summary>
         private void RefreshPartOButtons()
@@ -1994,7 +2003,9 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_AssessPartOTM59.IsEnabled = canAssess;
 
             RibbonButton_AssessPartOTM59.ToolTipDescription = canAssess
-                ? "Assess the completed Part O run against the CIBSE TM59 criteria, using the model the TAS workflow returned."
+                ? partORun.IsRestored
+                    ? "Review this run's CIBSE TM59 assessment from the results it records - the existing simulation results are read and reassessed; no new simulation is run."
+                    : "Assess the completed Part O run against the CIBSE TM59 criteria, using the model the TAS workflow returned."
                 : partORun.State == PartORunState.Prepared
                     ? "A Part O iteration is prepared but not simulated. Run the energy simulation first."
                     : partORun.InvalidationReason ?? "Prepare a Part O iteration and run the energy simulation first.";
@@ -2012,7 +2023,9 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             RibbonButton_OptimisePartOTM59.ToolTipDescription = canOptimise
                 ? "Raise the design airflow of failing mechanically ventilated rooms by the configured step, rebalance, re-prepare, re-simulate the same weather case and reassess - until every eligible space passes or the selected ventilation unit cannot carry another full step. The selected product is never changed."
-                : !canAssess
+                : canAssess && partORun.IsRestored
+                    ? "This run was reopened from its saved results, which is enough to review its TM59 assessment but not to resume Iteration 2B: optimising repeats the recorded preparation and the same TAS case, and those belong to the session that produced them. Prepare the iteration again and re-run the simulation to optimise."
+                    : !canAssess
                     ? "Iteration 2B optimises a completed Iteration 2 run. " + (partORun.InvalidationReason ?? "Prepare a Part O iteration, simulate it over the full year, and assess it first.")
                     : "This Part O run was not prepared with automatic TM59 optimisation and a selected ventilation unit. Prepare the iteration again with both.";
         }
@@ -3417,6 +3430,14 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             SetDefaultViewSettings();
             Reload(e);
+
+            //... and where the model just opened records the results it was produced from, reconnect the run
+            //to them: the Overheating command can then review that run's TM59 assessment straight away, with
+            //no new simulation. A model recording none - or whose results no longer validate against the
+            //record - keeps the guidance the tooltip already had; a failed validation puts its reason there.
+            //See PartORun.Restore. After Reload deliberately: the run is settled only once the model is.
+            partORun.Restore(uIAnalyticalModel?.JSAMObject, uIAnalyticalModel?.Path, out string _);
+            RefreshPartOButtons();
 
             // A freshly opened model starts with empty history - drop any entry created by the
             // open-time view-settings setup above.

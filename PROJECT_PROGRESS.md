@@ -1,21 +1,251 @@
 # Project Progress
 
 ## Branch
-`feature/parto-iteration2b-tas-warm-start`, branched from
-`feature/parto-iteration2b-capacity-envelope` at **`38c16c3`**.
+`feature/parto-result-review-and-persistence`, branched from `sow/2026-Q3` at **`f8eb4ec`**
+(the merge of PR #80).
 
-**Depends on, and merges after:**
+**Pairs with, and must merge alongside:** `SAM` `feature/parto-result-review-and-persistence`. This branch
+does not compile without its `SimulationResultProvenance` class and the two new
+`AnalyticalModelParameter` entries.
 
-1. `SAM-BIM/SAM#90` - the capacity-envelope authority.
-2. `SAM-BIM/SAM_UI#79` - the capacity-envelope orchestration, which this branch is stacked on.
-3. `SAM-BIM/SAM_Tas` `feature/parto-iteration2b-tas-warm-start` - `WorkflowSettings.Path_TBD_Canonical`,
-   without which this does not compile.
+`SAM_Tas` and `SAM_Systems` untouched; both working trees clean.
 
 ## Last updated
-2026-09-02 - Iteration 2B rounds start from the run's own canonical TBD instead of converting the same
-geometry again.
+2026-09-03 - Part O result review and persistence: reopen a saved `.sam` run and review its TM59
+assessment without re-simulating, provenance bound to the overheating scenarios as well as the design, a
+durable TM59 report per run, explicit Results-tab command enablement, and one persisted run model per run
+- the TAS workflow's redundant `<run>.json` is removed once the authoritative `.sam` is safely written.
 
-## Latest (2026-09-02): warm starting each round from the canonical TBD
+## Latest (2026-09-03): result reopening, report persistence, command enablement
+
+**Status: implemented and tested. Core Iteration 2B engineering/orchestration unchanged (accepted).**
+
+The engineering seams for the naming defect and the "TM59 Application = `-`" defect were both in `SAM`,
+not here - see that repository's `PROJECT_PROGRESS.md`. What changed here is the workflow around them.
+
+### 1. Reviewing a saved run without re-simulating
+
+`Modify.RunPartOSimulation` now stamps the model the workflow returns with the overheating scenarios it
+was prepared with and with the results it was produced from (`SimulationResultProvenance`, constructed
+*after* the scenarios so it fingerprints both), and writes that model beside the TBD as the run's own
+`<project>.sam`. Only the full-year path stamps: a partial or sizing-only run writes nothing, exactly as
+it cannot complete a Part O run.
+
+**The per-run model artifact is `.sam`, not `.json`.** `Query.Path_PartORunModel` (new) is the one naming
+authority - `<the run's own TSD>` -> `<same name>.sam`, beside it - and `RunPartOSimulation` writes
+through it with `Core.Convert.ToFile(..., SAMFileType.SAM)`, SAM's **native** model writer (a compressed
+archive), the same one Save As uses. Not JSON text under a `.sam` name: the test asserts the file's `PK`
+archive signature. It reads back through `Core.Convert.ToSAM`, which the Open command already uses and
+which already offers `*.sam` first, so nothing in the reopen path needed a special case. Only the file at
+`Path_PartORunModel` carries the provenance a review validates against; the TAS workflow's own
+`<project>.json` is now removed on the Part O path once that file is written - see section 5. Run evidence
+is `<run>.sam` / `<run>.tbd` / `<run>.tsd` / `<run>-TM59.txt` plus the timings, for the baseline, each
+`-OptNN` round and `-OptMax` alike, and no second copy of the model as plain text.
+
+`PartORun.Restore` (new) is the second way into `WorkflowCompleted`, and deliberately narrower than
+`Complete`. It reconnects a reopened model to the results it records, validated by the provenance rule -
+never by filename, never by an `Opt01`/`OptMax` pattern, never by a nearby TSD.
+`AnalyticalWindow.UIAnalyticalModel_Opened` calls it once, after `Reload`.
+
+**The scenarios are read, never regenerated.** What `Restore` loads is exactly the collection persisted
+with that run, and `SimulationResultProvenance.Fingerprint_OverheatingScenarios` is what proves it is the
+collection the results were assessed under - the final-review blocker. Nothing infers a scenario from a
+room name, a zone layout or anything else on the reopened model. An incomplete record - missing the TSD
+length, the write time, the design fingerprint or the scenario fingerprint - is refused wholesale rather
+than validated on the fields it happens to carry.
+
+**Review, never resume.** A restored run holds no `PreparationContext` and no `SimulationContext` - those
+describe how *this session* prepared and ran the case, and a file cannot reproduce them. `IsRestored`
+marks it, and `Modify.CanOptimise` refuses it on the missing preparation context, not on the flag. So a
+reopened run can be assessed but never resumed into Iteration 2B. That distinction is the point.
+
+### 2. A durable TM59 report per run
+
+`Query.Path_TM59Report` is the **one naming authority**: `<the run's own TSD>` -> `<same name>-TM59.txt`,
+beside it. It inherits the per-iteration TSD naming
+(`PartOSimulationContext.ProjectName_Iteration`), so baseline, `-Opt01`, `-Opt02` ... `-OptMax` each land
+at their own path and none can overwrite another. `Modify.SavePartOTM59Report` writes it best-effort - a
+locked or read-only path is reported, never thrown, because the assessment already succeeded.
+
+Both writers go through it: `Modify.AssessPartOTM59` (the interactive command) and
+`Modify.OptimisePartOTM59.Record`, which is called at all three points that assess - baseline, each round,
+and the capacity envelope.
+
+### 3. Results-tab command enablement, made explicit
+
+| Command | Previously | Now |
+| --- | --- | --- |
+| Results -> Overheating | `PartORun.CanAssess`, i.e. a workflow completed **in this session** | `PartORun.CanAssess` - now reachable either by this session's workflow **or** by `Restore` from a reopened model with valid provenance |
+| Results -> Optimise (2B) | `CanAssess` + prepared with optimisation settings + a ventilation-unit catalogue | unchanged, and a restored run fails it on the null `PreparationContext` |
+
+`RefreshPartOButtons` stays a **pure state read** - no filesystem, no deserialization - on every ribbon
+refresh. `Modify.CanOptimise` and `PartORun.IsAssessable` remain the real gates and re-check the results
+file at invocation. Tooltips now distinguish the restored case in both directions.
+
+### 4. Report wording
+
+`Modify.Summary` said "Assessed 9 space(s) ... 8 mechanical ventilation result(s)" of a run where one of
+the nine (a corridor) was processed but explicitly not assessed. It now reads "Processed 9 simulated
+space(s) ... 8 assessed (...), 1 not assessed", counting the assessed by distinct result reference rather
+than assuming one result per space. Extracted to an internal overload so the wording is pinned by test
+without constructing a `TM59AssessmentResult`.
+
+### 5. One persisted run model per run - the redundant TAS JSON is removed
+
+The `.sam` change above was made to stop keeping the run model twice, but on its own it did not: TAS's
+`WorkflowCalculator` ends **every** run with a "Saving Model" step that writes the returned model as plain
+JSON at its `Path_TBD`'s directory and base name, so a Part O run was producing both `<run>.json` and
+`<run>.sam` - the same model, once as a compressed archive carrying the provenance a review is validated
+against, once as a very large text file carrying it too but never read, for the baseline and for every
+optimisation round.
+
+`Modify.PersistPartORunModel` (new) is the Part O seam that fixes it, and it owns the whole rule rather
+than half of it, because **the ordering is the safety property**:
+
+1. write the stamped model to `Query.Path_PartORunModel` through `Core.Convert.ToFile(..., SAMFileType.SAM)`;
+2. **if that fails, delete nothing** - the workflow's JSON stays as the only remaining copy of the model,
+   and the failure is a note. A persistence failure must never become the loss of the run model;
+3. only then remove `Query.Path_PartOWorkflowJson` (new) - the one exactly-known file, derived from *this
+   run's own TBD* exactly as `WorkflowCalculator` derives it. No directory sweep, no filename scanning, so
+   a baseline's cleanup cannot touch `-Opt01`'s file;
+4. **if that removal fails** - the file is locked, read-only - the run is still a success. The `.sam` is
+   written and authoritative; the leftover is reported as a note and nothing else changes. Failing a
+   completed simulation and its assessment over a locked leftover would be the far worse answer.
+
+`WorkflowCalculator` itself is **not modified**. Ordinary non-Part-O TAS runs in SAM write and keep their
+`<project>.json` exactly as before; the removal happens only in the Part O orchestration, only after the
+native write has succeeded, and only to that run's own file.
+
+Artifact set for a successful Part O run, baseline and each `OptNN` / `OptMax` independently:
+`<run>.sam`, `<run>.tbd`, `<run>.tsd`, `<run>-TM59.txt`, timings - and **no** `<run>.json`.
+
+### Files
+
+| File | Change |
+| --- | --- |
+| `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartORun.cs` | `Restore`, `IsRestored`. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/RunPartOSimulation.cs` | Stamps scenarios + provenance; persists the run model through `PersistPartORunModel`. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/PersistPartORunModel.cs` | New - writes the native `.sam`, then removes the redundant TAS JSON; owns the fail-safe ordering. |
+| `WPF/SAM.Analytical.UI.WPF/Query/Path_PartORunModel.cs` | New - the one run-model naming authority; states the `.sam` extension. |
+| `WPF/SAM.Analytical.UI.WPF/Query/Path_PartOWorkflowJson.cs` | New - the one authority for the TAS workflow's own `<run>.json`, derived from the run's TBD. |
+| `WPF/SAM.Analytical.UI.WPF/Query/Path_TM59Report.cs` | New - the one report-naming authority. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/SavePartOTM59Report.cs` | New - best-effort persistence. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/AssessPartOTM59.cs` | Saves the report; processed/assessed wording. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` | `Record` saves each step's report; `UnitStates` scoped. |
+| `WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs` | Restore on open; enablement tooltips. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartOResultReopenTests.cs` | New - 17 tests. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartORunModelPersistenceTests.cs` | New - 8 tests, pinned at the Part O orchestration seam rather than over TAS internals. |
+
+### Validation
+
+- `SAM.Analytical.UI.WPF.Tests`: **373 passed, 0 failed** (`PartOResultReopenTests`: 17;
+  `PartORunModelPersistenceTests`: 8).
+- Full `SAM_UI.sln` Debug build: 0 errors.
+- `SAM.Tests`: 1750 passed, 0 failed; `SAM.sln` Debug: 0 errors. **`SAM` is unchanged by the JSON-cleanup
+  round** - the seam is entirely in `SAM_UI`.
+
+`PartORunModelPersistenceTests` pins: the successful run leaves a real `.sam` archive (`PK` signature) and
+no `.json`, with the TBD and TSD untouched and nothing else swept up; baseline / `Opt01` / `Opt02` /
+`OptMax` each name their own JSON, sibling of their own model; a baseline's cleanup leaves `Opt01`'s file
+alone; with the JSON gone the model still reopens, restores, validates both fingerprints, reaches Results
+-> Overheating and resolves after a folder move; a `.sam` write that fails keeps the JSON and reports;
+a JSON that cannot be deleted (held with `FileShare.None`) still returns success with the `.sam`
+authoritative and a note; no JSON and no model are each handled without a spurious complaint.
+
+Tests added in the final-review round: `ScenariosSwappedUnderUnchangedResults_IsRefused` (the blocker -
+the design fingerprint and the results file are assertion-checked as *unchanged*, so the refusal is
+attributable to the scenario half alone), `AnIncompleteRecord_IsRefused` (each required field removed in
+turn, at the `Restore` seam), `EachRun_ModelIsItsOwnSamFile` and
+`EachRun_ResolvesItsOwnCompleteArtifactSet` (baseline / `Opt01` / `Opt02` / `OptMax` each resolve their
+own `.sam`, `.tsd` and `-TM59.txt`), and `TheRecord_SurvivesTheModelBeingSavedAndReopened` reworked to
+round-trip a real `.sam` archive and assert both fingerprints deterministic across it. The folder-move
+and lookalike tests now open `.sam` models.
+- One pre-existing flake fixed: `ARewrittenResultsFile_IsRefused` simulated a rewrite by writing twice in
+  quick succession, and the two writes can land in one filesystem timestamp tick with the same length -
+  indistinguishable to the rule under test. The rewrite is now stated explicitly (different length, later
+  write time). A rewrite that genuinely matches both recorded values is the documented limit of the rule.
+- The licensed 10-round future-weather acceptance was NOT re-run: no engineering semantics changed.
+
+### Not done / watch items
+
+- **A model saved before this round cannot be reviewed**, and this is deliberate. Verified against the
+  user's own `SAM_daily/2026-08-05-PartO` output: the baseline, `Opt01`, `Opt02` and `OptMax` JSONs all
+  report `NONE (legacy)` for both provenance and scenarios. Without the recorded scenarios there is no
+  authoritative ventilation strategy per space, and supplying one would be the guess the design forbids.
+  Those files keep the ordinary "prepare and simulate" guidance. **Session-2 review must be retested with
+  a run produced by this build.**
+- The preparation summary window's space table still lists every space of the prepared model. Display
+  scope only; deliberately left as-is.
+- Manual UI check of the dialog at 125%/150% DPI is worth one look before sign-off.
+
+## Previous (2026-09-02): Iteration 2B user-testing fix round
+
+**Status: implemented and tested. Core Iteration 2B engineering/orchestration unchanged (accepted).**
+
+Four user-testing findings fixed in one pass, all in `WPF/SAM.Analytical.UI.WPF`:
+
+1. **"Dwellings in scope" is now a real selector.** The list showed the policy's answer but selection was
+   cosmetic. Now: `PartODwellingSelection` (new, `Classes/PartO/`) holds one lightweight record per eligible
+   dwelling zone - discovered ONCE through `Query.PartFDwellingZones` (unchanged authority), all selected by
+   default, identity by zone `Guid` so duplicate names stay distinct. The window's `Zones_Dwelling` now
+   returns the SELECTED zones, which flows unchanged into `Modify.PreparePartOIteration` and thereby into
+   `PartOPreparationContext.Zones` - so preparation, Iteration 2 selection and 2B targeting all run over the
+   user's subset. Checkbox list (virtualized `ListBox`, state on the record not the row), search box
+   (case-insensitive substring over the already-discovered names; filtering never loses selection state),
+   Select All / None acting on the search-matched set, OK disabled on an empty selection. No per-space
+   controls; no model traversal per UI event.
+2. **Dialog layout.** Was fixed 580px / `ResizeMode=NoResize`, cramped when 2B expands. Now
+   `SizeToContent="Height"` (auto-grows when 2B options are enabled), `ResizeMode="CanResizeWithGrip"`,
+   MinHeight/MinWidth, `MaxHeight = 92% of the work area` (set in code, DPI-safe), content in a
+   `ScrollViewer` with OK/Cancel in a fixed row outside it - always reachable.
+3. **MVHR plant-zone warnings excluded.** `SAM.Analytical.Tas.Modify.UpdateIZAMs` builds one TAS zone per
+   AHU (named after it) as the unit's simulated plant zone; it comes back in the TSD and resolved to no
+   design space, producing a "does not resolve to exactly one design space" refusal every round. New
+   `Query.PartOPlantZoneSpaces` identifies them POSITIVELY (unresolved through the `SimulationSpaceMap` AND
+   named after a design-model AHU, normalised as the export's own zone lookup is);
+   `PartOTM59Assessment.WithoutPlantZoneSpaces` removes them from the converted TSD model copy before the
+   calculator runs. They are no longer restored or assessed and no longer warn. A genuinely unresolved room
+   still refuses - pinned by tests over the production seam. Both callers (interactive assessment and 2B)
+   go through `PartOTM59Assessment.Assess`, so both are covered. No change in SAM or SAM_Tas.
+4. **Equipment evidence scoped.** `Modify.OptimisePartOTM59.UnitStates` reported every AHU in the model,
+   including the fixture's authored legacy `AHU1 | MV 1` system (NaN/NaN, no product). New
+   `Query.PartOIterationAirHandlingUnits` scopes by RELATION, never name: a unit is in scope iff a system
+   bound to it (`SupplyUnitName`, the standard binding) is connected to at least one design
+   `VentilationTerminal` (a relation only the Part O preparation creates) AND serves a space of the run's
+   dwelling zones (by guid). The model is not edited; the report is scoped.
+
+### Files
+
+| File | Change |
+| --- | --- |
+| `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartODwellingSelection.cs` | New - the selection model. |
+| `WPF/SAM.Analytical.UI.WPF/Windows/PartOIterationWindow.xaml{,.cs}` | Selector UI + layout rebuild. |
+| `WPF/SAM.Analytical.UI.WPF/Query/PartOPlantZoneSpaces.cs` | New - positive plant-zone identification. |
+| `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartOTM59Assessment.cs` | Exclusion seam (one map, built once). |
+| `WPF/SAM.Analytical.UI.WPF/Query/PartOIterationAirHandlingUnits.cs` | New - relational equipment scope. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` | `UnitStates` scoped. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartODwellingSelectionTests.cs` | New - 11 tests. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartOPlantZoneTests.cs` | New - 8 tests. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartOIterationEquipmentTests.cs` | New - 4 tests. |
+
+### Validation
+
+- `SAM.Analytical.UI.WPF.Tests`: **348 passed, 0 failed** (was 325; +23 new). No TAS licence needed.
+- Full `SAM_UI.sln` Debug build: 0 errors.
+- Environment note: the SAM and SAM_Tas `build/` DLLs were stale against their sources (post-merge);
+  rebuilt SAM.Analytical with `dotnet build` and SAM_Tas.sln with Framework MSBuild (COM refs). No source
+  changes in either repo; both working trees remain clean.
+- The licensed 10-round future-weather acceptance was NOT re-run: no engineering semantics changed, and the
+  new seams are pinned by the regression tests above.
+
+### Not done / watch items
+
+- The preparation summary window's space table still lists every space of the prepared model (including
+  unselected dwellings' rooms, whose terminals are realized whole-model and stay inert). Display scope only;
+  the engineering scope is the selected dwellings. Deliberately left as-is.
+- Manual UI check of the dialog at 125%/150% DPI is worth one look on the real model before sign-off.
+
+## Previous: warm starting each round from the canonical TBD (2026-09-02, merged)
 
 **Status: implemented, tested, and proven equivalent to the full path on the licensed model.**
 
