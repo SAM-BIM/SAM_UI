@@ -100,5 +100,25 @@ namespace SAM.Analytical.UI
         /// </para>
         /// </summary>
         public PartOOptimisationSettings OptimisationSettings { get; set; }
+
+        /// <summary>
+        /// Whether this run's thermal model is the <b>isolated</b> derived model of the dwellings in scope
+        /// rather than the whole building.
+        /// <para>
+        /// <b>Recorded, not re-applied.</b> An Iteration 2B round re-prepares the model the previous round
+        /// left behind, and that model is already isolated - so a round must NOT isolate again. Doing so
+        /// would rebuild the cut and the shading context on a model that already has them, and the geometry
+        /// would no longer be bit-for-bit what the canonical TBD was converted from, turning the warm start
+        /// off for every round. This says what the run is, so a report can state its scope; the isolated
+        /// geometry itself is carried forward by the model.
+        /// </para>
+        /// <para>
+        /// The authority for whether a given MODEL is isolated remains
+        /// <c>AnalyticalModelParameter.PartOIsolationContext</c> stamped on the model, which is what
+        /// survives into the run's <c>.sam</c> and back out of it in a later session. This is the session's
+        /// record of what was asked for.
+        /// </para>
+        /// </summary>
+        public bool Isolated { get; set; }
     }
 }

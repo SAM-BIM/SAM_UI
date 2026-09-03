@@ -1,22 +1,115 @@
 # Project Progress
 
 ## Branch
-`feature/parto-result-review-and-persistence`, branched from `sow/2026-Q3` at **`f8eb4ec`**
-(the merge of PR #80).
+`feature/parto-isolated-dwellings`, branched from `sow/2026-Q3` at **`bf48c53`**
+(the merge of PR #81).
 
-**Pairs with, and must merge alongside:** `SAM` `feature/parto-result-review-and-persistence`. This branch
-does not compile without its `SimulationResultProvenance` class and the two new
-`AnalyticalModelParameter` entries.
+**Pairs with, and must merge alongside:** `SAM` `feature/parto-isolated-dwellings`. This branch does not
+compile without its `PartOIsolationContext` class, the new `AnalyticalModelParameter` entry, the
+`PreparePartOIteration(..., isolate)` parameter and `TM59AssessmentReport.ThermalModelScope`.
+**Merge `SAM` first.**
 
 `SAM_Tas` and `SAM_Systems` untouched; both working trees clean.
 
 ## Last updated
-2026-09-03 - Part O result review and persistence: reopen a saved `.sam` run and review its TM59
-assessment without re-simulating, provenance bound to the overheating scenarios as well as the design, a
-durable TM59 report per run, explicit Results-tab command enablement, and one persisted run model per run
-- the TAS workflow's redundant `<run>.json` is removed once the authoritative `.sam` is safely written.
+2026-09-03 - Running selected dwellings in isolation: the dwelling-scope tick that simulates only the
+selected dwellings as an isolated thermal model, its own project name so its evidence cannot overwrite a
+full run's, the warm start taught to tell isolation scopes apart, and the scope stated in the
+preparation summary and the TM59 report.
 
-## Latest (2026-09-03): result reopening, report persistence, command enablement
+## Latest (2026-09-03): running selected dwellings in isolation
+
+**Status: implemented and tested. Iteration 2B engineering/orchestration unchanged.**
+
+The engineering - the extraction, the adiabatic cut, the shading context, the plant refusals and the
+persisted isolation record - is `SAM`'s; see that repository's `PROJECT_PROGRESS.md`. What changed here
+is the workflow around it.
+
+### 1. The control
+
+`PartOIterationWindow` gains **"Run selected dwellings in isolation (thermal model scope only)"**, with
+the dwelling scope controls, **off by default**. The whole-building simulation is the reference case;
+trading it for speed is a deliberate act.
+
+The note under it states the assumption where the choice is actually made: interfaces to excluded spaces
+become adiabatic, surrounding external geometry is retained as shading context, results may therefore
+differ from a whole-building simulation, and none of it changes the Part O criteria or the Part F
+requirements.
+
+**Offered, not disabled, when every dwelling is ticked.** A large building is not only its dwellings -
+selecting all of them still excludes corridors, cores, plant and commercial areas, which on a 5,000-space
+model is a real reduction, so disabling the tick would refuse a genuine saving on a false premise. The
+note says where the remaining saving would come from instead.
+
+Selection stays guid-based and there is still exactly one row per dwelling, never one per space.
+
+### 2. Orchestration
+
+`Modify.PreparePartOIteration` passes the tick straight through to
+`Analytical.Modify.PreparePartOIteration`, which is where all the engineering happens. It chooses nothing
+of its own. A refusal - shared system, shared unit, cross-cut air movement - comes back as the
+preparation's `Refusal` and is shown, and the run dropped, **before** any conversion starts.
+
+`PartOPreparationContext.Isolated` records that the run was asked to isolate. It is deliberately
+*recorded and not re-applied*: an Iteration 2B round re-prepares the model the previous round left
+behind, and that model is already isolated. Re-isolating would rebuild the cut and the shading context on
+a model that already has them, the geometry would no longer be what the canonical TBD was converted from,
+and the warm start would switch off for every round.
+
+### 3. Artifact naming
+
+`Query.ProjectName_Isolated` (new) - `<project>-ISO-<token>` - is the one naming authority. Every Part O
+artifact derives from the project name, which the Simulate dialog defaults from the model's name, so
+applying the suffix to the prepared model's name carries the isolated identity to the TBD, the TSD, the
+`.sam` and the TM59 report through the path that already existed.
+
+The token is the scope token from `PartOIsolationContext`, a function of the selected space guids, so a
+full run and an isolated run cannot overwrite one another, two different selections cannot either, and
+two dwellings sharing a display name are still told apart. Applied once, so a 2B round's name does not
+grow a suffix per round.
+
+**Naming only.** Nothing reads isolation state back out of a path; the stamped context is the authority.
+
+### 4. Warm start
+
+Already correct by construction, and now proven. A canonical TBD is created by run 0 of one optimisation
+and used only by that optimisation's own rounds - it is never written to disk as reusable state - so a
+full-building canonical can never reach an isolated run, and one isolated scope's canonical can never
+reach another's. `PartOCanonicalTBD`'s fingerprint independently catches it: it enumerates every space,
+zone, panel and aperture identity, and those differ between scopes.
+
+One real gap closed: the fingerprint did **not** cover `PanelParameter.Adiabatic`, which the conversion
+*does* read (`SAM_Tas Modify.UpdateAdiabatic` nulls the matching TBD surface link). Two models identical
+but for that flag convert to different TBDs, and the isolation cut is expressed entirely through it. It
+is now in the fingerprint. An isolated baseline is still reused by its own rounds, because design airflow
+remains deliberately absent from it.
+
+### 5. Reporting and persistence
+
+`PartOTM59Assessment` reads the isolation context off the design model and sets
+`TM59AssessmentReport.ThermalModelScope`, so the report header states
+`Thermal model scope: ISOLATED. Selected dwellings: ...` together with the adiabatic caveat - and a
+restored review states the same scope as the run that produced it, without either consulting a filename.
+A whole-building run prints `WHOLE BUILDING`.
+
+The preparation summary states the scope first, before the route and the duty, so it is read before a
+long run is started rather than after.
+
+The evidence family is unchanged: `<run>.sam`, `<run>.tbd`, `<run>.tsd`, `<run>-TM59.txt`, no redundant
+workflow JSON. The isolation context rides in the `.sam` with the provenance and the scenarios, so
+Results -> Overheating on a reopened isolated run works without a TAS rerun under exactly the same
+provenance rule as before, shows only the dwellings that were simulated, and remains review-only.
+
+### Tests
+
+`PartOIsolationScopeTests` - 14 tests: the tick's default and its wording, the naming authority
+(full vs isolated, scope A vs scope B, idempotence, untouched full-run name), the three warm-start rules
+plus the adiabatic-flag gap, the isolation context surviving a real `.sam` archive written under a
+deliberately unrelated filename, a full run carrying no context at all, and the preparation context flag.
+
+Full `SAM.Analytical.UI.WPF.Tests`: **392 passed, 0 failed**. `SAM_UI.sln` MSBuild (VS 18): **0 errors**.
+
+## Previous: result reopening, report persistence, command enablement
 
 **Status: implemented and tested. Core Iteration 2B engineering/orchestration unchanged (accepted).**
 

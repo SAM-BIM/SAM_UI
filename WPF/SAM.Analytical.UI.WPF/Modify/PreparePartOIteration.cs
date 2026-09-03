@@ -102,9 +102,10 @@ namespace SAM.Analytical.UI.WPF
             PartOPreparationContext partOPreparationContext = new(option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors)
             {
                 OptimisationSettings = partOIterationWindow.OptimisationSettings,
+                Isolated = partOIterationWindow.Isolate,
             };
 
-            PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel, option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors);
+            PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel, option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors, partOIterationWindow.Isolate);
 
             //A refusal returns no model at all, by contract. Nothing is adopted and the run is dropped with
             //the reason, so the ribbon can say why an assessment is unavailable.
@@ -117,9 +118,19 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
+            //An isolated run gets its own project name, so its TBD, TSD, .sam and TM59 report cannot land
+            //on a full run's or on another selection's. Naming only - see Query.ProjectName_Isolated; the
+            //context stamped on the model remains the authority for what this run actually was.
+            PartOIsolationContext? partOIsolationContext = partOIterationPreparation.AnalyticalModel?.GetValue<PartOIsolationContext>(Analytical.AnalyticalModelParameter.PartOIsolationContext);
+
+            if (partOIsolationContext is not null && partOIsolationContext.IsValid)
+            {
+                partOIterationPreparation.AnalyticalModel!.Name = Query.ProjectName_Isolated(analyticalModel.Name, partOIsolationContext.ScopeToken);
+            }
+
             PartOPreparationWindow partOPreparationWindow = new()
             {
-                Summary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOIterationWindow.SelectVentilationUnit),
+                Summary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOIterationWindow.SelectVentilationUnit, partOIsolationContext),
                 EquipmentRows = EquipmentRows(partOIterationPreparation, ventilationUnitCapacityDescriptors),
                 SpaceRows = (partOIterationPreparation.AnalyticalModel.GetSpaces() ?? []).ConvertAll(x => new PartOSpaceRow(x)),
             };
@@ -213,8 +224,18 @@ namespace SAM.Analytical.UI.WPF
             return result;
         }
 
-        private static string Summary(PartOIterationPreparation partOIterationPreparation, PartOVentilationStrategyOption option, VentilationUnitCatalogue ventilationUnitCatalogue, bool selectVentilationUnit)
+        private static string Summary(PartOIterationPreparation partOIterationPreparation, PartOVentilationStrategyOption option, VentilationUnitCatalogue ventilationUnitCatalogue, bool selectVentilationUnit, PartOIsolationContext? partOIsolationContext)
         {
+            //Said FIRST, and said as a scope rather than as a setting. An isolated run is a different
+            //thermal model from the whole building - the interfaces to the dwellings left out are simulated
+            //as adiabatic - and a person reading these results later has to be told that without having to
+            //go looking for it.
+            string scope = partOIsolationContext is not null && partOIsolationContext.IsValid
+                ? string.Format(
+                    "Thermal model scope: ISOLATED. Selected dwellings: {0}. Interfaces to excluded spaces are simulated as adiabatic and surrounding external geometry is retained as shading context, so these results may differ from a whole-building simulation of the same dwellings. The Part O criteria and the Part F requirements are unchanged.\n",
+                    string.Join(", ", partOIsolationContext.Names_Dwelling))
+                : "Thermal model scope: WHOLE BUILDING.\n";
+
             //The whole-run totals, which are sums across every dwelling this run built - NOT any one
             //dwelling's duty. Said so explicitly, because a three-flat model summing to 156 l/s beside a
             //150 l/s product would otherwise read as an exceeded unit.
@@ -226,13 +247,14 @@ namespace SAM.Analytical.UI.WPF
                 ? string.Format("Equipment selection ran against {0} selectable product(s). A selected product's Maximum is its capability ceiling and is never a design airflow.", ventilationUnitCatalogue.CapacityDescriptors.Count)
                 : string.Format("No equipment selection ran, so no product is selected. {0}", ventilationUnitCatalogue.Description);
 
-            return string.Format("{0}. Route stated: {1} ({2}). {3} {4}\n{5} overheating scenario(s) stated. Simulate this model to produce results the TM59 assessment can read.",
+            return string.Format("{6}{0}. Route stated: {1} ({2}). {3} {4}\n{5} overheating scenario(s) stated. Simulate this model to produce results the TM59 assessment can read.",
                 option.Text,
                 partOIterationPreparation.VentilationMode,
                 option.VentilationStrategy,
                 duty,
                 equipment,
-                partOIterationPreparation.OverheatingScenarios.Count);
+                partOIterationPreparation.OverheatingScenarios.Count,
+                scope);
         }
     }
 }
