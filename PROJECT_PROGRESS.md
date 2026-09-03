@@ -11,8 +11,9 @@ does not compile without its `SimulationResultProvenance` class and the two new
 `SAM_Tas` and `SAM_Systems` untouched; both working trees clean.
 
 ## Last updated
-2026-09-03 - Part O result review and persistence: reopen a saved run and review its TM59 assessment
-without re-simulating, a durable TM59 report per run, and explicit Results-tab command enablement.
+2026-09-03 - Part O result review and persistence: reopen a saved `.sam` run and review its TM59
+assessment without re-simulating, provenance bound to the overheating scenarios as well as the design, a
+durable TM59 report per run, and explicit Results-tab command enablement.
 
 ## Latest (2026-09-03): result reopening, report persistence, command enablement
 
@@ -23,14 +24,34 @@ not here - see that repository's `PROJECT_PROGRESS.md`. What changed here is the
 
 ### 1. Reviewing a saved run without re-simulating
 
-`Modify.RunPartOSimulation` now stamps the model the workflow returns with the results it was produced
-from (`SimulationResultProvenance`) and the overheating scenarios it was prepared with, and rewrites the
-run's own JSON beside the TBD so the saved copy carries them too. Only the full-year path stamps: a
-partial or sizing-only run writes nothing, exactly as it cannot complete a Part O run.
+`Modify.RunPartOSimulation` now stamps the model the workflow returns with the overheating scenarios it
+was prepared with and with the results it was produced from (`SimulationResultProvenance`, constructed
+*after* the scenarios so it fingerprints both), and writes that model beside the TBD as the run's own
+`<project>.sam`. Only the full-year path stamps: a partial or sizing-only run writes nothing, exactly as
+it cannot complete a Part O run.
+
+**The per-run model artifact is `.sam`, not `.json`.** `Query.Path_PartORunModel` (new) is the one naming
+authority - `<the run's own TSD>` -> `<same name>.sam`, beside it - and `RunPartOSimulation` writes
+through it with `Core.Convert.ToFile(..., SAMFileType.SAM)`, SAM's **native** model writer (a compressed
+archive), the same one Save As uses. Not JSON text under a `.sam` name: the test asserts the file's `PK`
+archive signature. It reads back through `Core.Convert.ToSAM`, which the Open command already uses and
+which already offers `*.sam` first, so nothing in the reopen path needed a special case. The TAS
+workflow's own general `<project>.json` (`WorkflowCalculator`, written for every TAS run in SAM) is
+deliberately untouched - only the file at `Path_PartORunModel` carries the provenance a review validates
+against. Run evidence is now `<run>.sam` / `<run>.tbd` / `<run>.tsd` / `<run>-TM59.txt` plus the timings,
+for the baseline, each `-OptNN` round and `-OptMax` alike.
 
 `PartORun.Restore` (new) is the second way into `WorkflowCompleted`, and deliberately narrower than
 `Complete`. It reconnects a reopened model to the results it records, validated by the provenance rule -
-never by filename. `AnalyticalWindow.UIAnalyticalModel_Opened` calls it once, after `Reload`.
+never by filename, never by an `Opt01`/`OptMax` pattern, never by a nearby TSD.
+`AnalyticalWindow.UIAnalyticalModel_Opened` calls it once, after `Reload`.
+
+**The scenarios are read, never regenerated.** What `Restore` loads is exactly the collection persisted
+with that run, and `SimulationResultProvenance.Fingerprint_OverheatingScenarios` is what proves it is the
+collection the results were assessed under - the final-review blocker. Nothing infers a scenario from a
+room name, a zone layout or anything else on the reopened model. An incomplete record - missing the TSD
+length, the write time, the design fingerprint or the scenario fingerprint - is refused wholesale rather
+than validated on the fields it happens to carry.
 
 **Review, never resume.** A restored run holds no `PreparationContext` and no `SimulationContext` - those
 describe how *this session* prepared and ran the case, and a file cannot reproduce them. `IsRestored`
@@ -73,19 +94,29 @@ without constructing a `TM59AssessmentResult`.
 | File | Change |
 | --- | --- |
 | `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartORun.cs` | `Restore`, `IsRestored`. |
-| `WPF/SAM.Analytical.UI.WPF/Modify/RunPartOSimulation.cs` | Stamps provenance + scenarios; rewrites the run JSON. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/RunPartOSimulation.cs` | Stamps scenarios + provenance; writes the run model as `.sam` via `Path_PartORunModel`. |
+| `WPF/SAM.Analytical.UI.WPF/Query/Path_PartORunModel.cs` | New - the one run-model naming authority; states the `.sam` extension. |
 | `WPF/SAM.Analytical.UI.WPF/Query/Path_TM59Report.cs` | New - the one report-naming authority. |
 | `WPF/SAM.Analytical.UI.WPF/Modify/SavePartOTM59Report.cs` | New - best-effort persistence. |
 | `WPF/SAM.Analytical.UI.WPF/Modify/AssessPartOTM59.cs` | Saves the report; processed/assessed wording. |
 | `WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` | `Record` saves each step's report; `UnitStates` scoped. |
 | `WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs` | Restore on open; enablement tooltips. |
-| `WPF/SAM.Analytical.UI.WPF.Tests/PartOResultReopenTests.cs` | New - 13 tests. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartOResultReopenTests.cs` | New - 17 tests. |
 
 ### Validation
 
-- `SAM.Analytical.UI.WPF.Tests`: **361 passed, 0 failed** (was 348; +13). Run four times, stable.
+- `SAM.Analytical.UI.WPF.Tests`: **365 passed, 0 failed** (`PartOResultReopenTests`: 17 of them).
 - Full `SAM_UI.sln` Debug build: 0 errors.
-- `SAM.Tests`: 1746 passed, 0 failed.
+- `SAM.Tests`: 1750 passed, 0 failed; `SAM.sln` Debug: 0 errors.
+
+Tests added in the final-review round: `ScenariosSwappedUnderUnchangedResults_IsRefused` (the blocker -
+the design fingerprint and the results file are assertion-checked as *unchanged*, so the refusal is
+attributable to the scenario half alone), `AnIncompleteRecord_IsRefused` (each required field removed in
+turn, at the `Restore` seam), `EachRun_ModelIsItsOwnSamFile` and
+`EachRun_ResolvesItsOwnCompleteArtifactSet` (baseline / `Opt01` / `Opt02` / `OptMax` each resolve their
+own `.sam`, `.tsd` and `-TM59.txt`), and `TheRecord_SurvivesTheModelBeingSavedAndReopened` reworked to
+round-trip a real `.sam` archive and assert both fingerprints deterministic across it. The folder-move
+and lookalike tests now open `.sam` models.
 - One pre-existing flake fixed: `ARewrittenResultsFile_IsRefused` simulated a rewrite by writing twice in
   quick succession, and the two writes can land in one filesystem timestamp tick with the same length -
   indistinguishable to the rule under test. The rewrite is now stated explicitly (different length, later

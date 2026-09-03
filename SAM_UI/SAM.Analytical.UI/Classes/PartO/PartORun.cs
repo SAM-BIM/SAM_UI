@@ -462,10 +462,18 @@ namespace SAM.Analytical.UI
         /// than <see cref="Complete"/>.</b> Complete pairs a run with the workflow this session just watched
         /// write the results. Restore pairs it with the model's own persisted statement of the same fact:
         /// the <c>SimulationResultProvenance</c> and the overheating scenarios stamped onto the model when it
-        /// was produced (see <c>Modify.RunPartOSimulation</c>). The results file is then validated against
-        /// the recorded fingerprint - path, length and write time - by
-        /// <c>SimulationResultProvenance.TryResolvePath_TSD</c>; a file that fails is refused, never adopted
-        /// on its name alone.
+        /// was produced - the run's own <c>&lt;project&gt;.sam</c>, or the user's own save of the same model
+        /// (see <c>Modify.RunPartOSimulation</c>). <c>SimulationResultProvenance.TryResolvePath_TSD</c> then
+        /// validates the whole rule: the record is complete, the results file matches the recorded path,
+        /// length and write time, the design state matches its fingerprint, and the scenarios about to be
+        /// read below match theirs. Anything that fails is refused; nothing is adopted on its name alone.
+        /// </para>
+        /// <para>
+        /// <b>The scenarios are read, never inferred.</b> What is loaded below is exactly the collection
+        /// persisted with this run, and the fingerprint above is what proves it is the collection the results
+        /// were assessed under. They are never rebuilt from room names, zone layout or anything else on the
+        /// reopened model: a regenerated scenario set would be a new assessment authority wearing an old
+        /// run's results.
         /// </para>
         /// <para>
         /// <b>Review, never resume.</b> A restored run holds no <see cref="PreparationContext"/> and no
@@ -519,6 +527,9 @@ namespace SAM.Analytical.UI
                 return false;
             }
 
+            //Exactly the scenarios persisted with this run, which the fingerprint check above has already
+            //proved are the ones its results were assessed under. Read, never derived: nothing here looks at
+            //a room name, a zone or the design to decide what was assessed.
             List<OverheatingScenario> overheatingScenarios_Temp = [];
             if (analyticalModel.TryGetValue(Analytical.AnalyticalModelParameter.OverheatingScenarios, out SAM.Core.SAMCollection<OverheatingScenario> collection) && collection is not null)
             {
@@ -533,9 +544,10 @@ namespace SAM.Analytical.UI
 
             if (overheatingScenarios_Temp.Count == 0)
             {
-                //Without the scenarios there is no authoritative ventilation strategy for any space, and the
-                //assessment refuses rather than defaults. A model saved before they were recorded is the one
-                //this sentence is for.
+                //Belt and braces behind the scenario fingerprint: a complete record is never taken over an
+                //empty scenario set, so reaching here means the record is stating something the model does
+                //not carry. Without the scenarios there is no authoritative ventilation strategy for any
+                //space, and the assessment refuses rather than defaults.
                 refusal = "This model records the simulation results it was produced from, but not the overheating scenarios they were assessed against, so its TM59 assessment cannot be reviewed. Prepare the iteration again and re-run the simulation.";
 
                 InvalidationReason = refusal;
