@@ -40,9 +40,14 @@ namespace SAM.Analytical.UI.WPF
         /// </para>
         /// <para>
         /// <b>Not the TAS workflow's own <c>&lt;project&gt;.json</c>.</b> <c>WorkflowCalculator</c> writes one
-        /// of those for every TAS run in SAM, Part O or not; that is a general export and is deliberately
-        /// left exactly as it is. This is the Part O run's own evidence, and only the file at this path
-        /// carries the provenance a later session reviews from.
+        /// of those for every TAS run in SAM, Part O or not, and that behaviour is unchanged. This is the
+        /// Part O run's own evidence, and only the file at this path carries the provenance a later session
+        /// reviews from - which is why, on a Part O run and only there, the workflow's copy is removed once
+        /// the file named here has been written: see <see cref="Modify.PersistPartORunModel"/> for the
+        /// ordering that keeps that safe, and <see cref="Path_PartOWorkflowJson(string)"/> for exactly which
+        /// file is removed. So a completed Part O run leaves <c>&lt;run&gt;.sam</c>, <c>&lt;run&gt;.tbd</c>,
+        /// <c>&lt;run&gt;.tsd</c> and <c>&lt;run&gt;-TM59.txt</c> - and no second copy of the model as plain
+        /// text.
         /// </para>
         /// </summary>
         /// <param name="path_TSD">The run's own results file.</param>

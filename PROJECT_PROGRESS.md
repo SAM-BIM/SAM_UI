@@ -13,7 +13,8 @@ does not compile without its `SimulationResultProvenance` class and the two new
 ## Last updated
 2026-09-03 - Part O result review and persistence: reopen a saved `.sam` run and review its TM59
 assessment without re-simulating, provenance bound to the overheating scenarios as well as the design, a
-durable TM59 report per run, and explicit Results-tab command enablement.
+durable TM59 report per run, explicit Results-tab command enablement, and one persisted run model per run
+- the TAS workflow's redundant `<run>.json` is removed once the authoritative `.sam` is safely written.
 
 ## Latest (2026-09-03): result reopening, report persistence, command enablement
 
@@ -35,11 +36,11 @@ authority - `<the run's own TSD>` -> `<same name>.sam`, beside it - and `RunPart
 through it with `Core.Convert.ToFile(..., SAMFileType.SAM)`, SAM's **native** model writer (a compressed
 archive), the same one Save As uses. Not JSON text under a `.sam` name: the test asserts the file's `PK`
 archive signature. It reads back through `Core.Convert.ToSAM`, which the Open command already uses and
-which already offers `*.sam` first, so nothing in the reopen path needed a special case. The TAS
-workflow's own general `<project>.json` (`WorkflowCalculator`, written for every TAS run in SAM) is
-deliberately untouched - only the file at `Path_PartORunModel` carries the provenance a review validates
-against. Run evidence is now `<run>.sam` / `<run>.tbd` / `<run>.tsd` / `<run>-TM59.txt` plus the timings,
-for the baseline, each `-OptNN` round and `-OptMax` alike.
+which already offers `*.sam` first, so nothing in the reopen path needed a special case. Only the file at
+`Path_PartORunModel` carries the provenance a review validates against; the TAS workflow's own
+`<project>.json` is now removed on the Part O path once that file is written - see section 5. Run evidence
+is `<run>.sam` / `<run>.tbd` / `<run>.tsd` / `<run>-TM59.txt` plus the timings, for the baseline, each
+`-OptNN` round and `-OptMax` alike, and no second copy of the model as plain text.
 
 `PartORun.Restore` (new) is the second way into `WorkflowCompleted`, and deliberately narrower than
 `Complete`. It reconnects a reopened model to the results it records, validated by the provenance rule -
@@ -89,25 +90,67 @@ space(s) ... 8 assessed (...), 1 not assessed", counting the assessed by distinc
 than assuming one result per space. Extracted to an internal overload so the wording is pinned by test
 without constructing a `TM59AssessmentResult`.
 
+### 5. One persisted run model per run - the redundant TAS JSON is removed
+
+The `.sam` change above was made to stop keeping the run model twice, but on its own it did not: TAS's
+`WorkflowCalculator` ends **every** run with a "Saving Model" step that writes the returned model as plain
+JSON at its `Path_TBD`'s directory and base name, so a Part O run was producing both `<run>.json` and
+`<run>.sam` - the same model, once as a compressed archive carrying the provenance a review is validated
+against, once as a very large text file carrying it too but never read, for the baseline and for every
+optimisation round.
+
+`Modify.PersistPartORunModel` (new) is the Part O seam that fixes it, and it owns the whole rule rather
+than half of it, because **the ordering is the safety property**:
+
+1. write the stamped model to `Query.Path_PartORunModel` through `Core.Convert.ToFile(..., SAMFileType.SAM)`;
+2. **if that fails, delete nothing** - the workflow's JSON stays as the only remaining copy of the model,
+   and the failure is a note. A persistence failure must never become the loss of the run model;
+3. only then remove `Query.Path_PartOWorkflowJson` (new) - the one exactly-known file, derived from *this
+   run's own TBD* exactly as `WorkflowCalculator` derives it. No directory sweep, no filename scanning, so
+   a baseline's cleanup cannot touch `-Opt01`'s file;
+4. **if that removal fails** - the file is locked, read-only - the run is still a success. The `.sam` is
+   written and authoritative; the leftover is reported as a note and nothing else changes. Failing a
+   completed simulation and its assessment over a locked leftover would be the far worse answer.
+
+`WorkflowCalculator` itself is **not modified**. Ordinary non-Part-O TAS runs in SAM write and keep their
+`<project>.json` exactly as before; the removal happens only in the Part O orchestration, only after the
+native write has succeeded, and only to that run's own file.
+
+Artifact set for a successful Part O run, baseline and each `OptNN` / `OptMax` independently:
+`<run>.sam`, `<run>.tbd`, `<run>.tsd`, `<run>-TM59.txt`, timings - and **no** `<run>.json`.
+
 ### Files
 
 | File | Change |
 | --- | --- |
 | `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartORun.cs` | `Restore`, `IsRestored`. |
-| `WPF/SAM.Analytical.UI.WPF/Modify/RunPartOSimulation.cs` | Stamps scenarios + provenance; writes the run model as `.sam` via `Path_PartORunModel`. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/RunPartOSimulation.cs` | Stamps scenarios + provenance; persists the run model through `PersistPartORunModel`. |
+| `WPF/SAM.Analytical.UI.WPF/Modify/PersistPartORunModel.cs` | New - writes the native `.sam`, then removes the redundant TAS JSON; owns the fail-safe ordering. |
 | `WPF/SAM.Analytical.UI.WPF/Query/Path_PartORunModel.cs` | New - the one run-model naming authority; states the `.sam` extension. |
+| `WPF/SAM.Analytical.UI.WPF/Query/Path_PartOWorkflowJson.cs` | New - the one authority for the TAS workflow's own `<run>.json`, derived from the run's TBD. |
 | `WPF/SAM.Analytical.UI.WPF/Query/Path_TM59Report.cs` | New - the one report-naming authority. |
 | `WPF/SAM.Analytical.UI.WPF/Modify/SavePartOTM59Report.cs` | New - best-effort persistence. |
 | `WPF/SAM.Analytical.UI.WPF/Modify/AssessPartOTM59.cs` | Saves the report; processed/assessed wording. |
 | `WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` | `Record` saves each step's report; `UnitStates` scoped. |
 | `WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs` | Restore on open; enablement tooltips. |
 | `WPF/SAM.Analytical.UI.WPF.Tests/PartOResultReopenTests.cs` | New - 17 tests. |
+| `WPF/SAM.Analytical.UI.WPF.Tests/PartORunModelPersistenceTests.cs` | New - 8 tests, pinned at the Part O orchestration seam rather than over TAS internals. |
 
 ### Validation
 
-- `SAM.Analytical.UI.WPF.Tests`: **365 passed, 0 failed** (`PartOResultReopenTests`: 17 of them).
+- `SAM.Analytical.UI.WPF.Tests`: **373 passed, 0 failed** (`PartOResultReopenTests`: 17;
+  `PartORunModelPersistenceTests`: 8).
 - Full `SAM_UI.sln` Debug build: 0 errors.
-- `SAM.Tests`: 1750 passed, 0 failed; `SAM.sln` Debug: 0 errors.
+- `SAM.Tests`: 1750 passed, 0 failed; `SAM.sln` Debug: 0 errors. **`SAM` is unchanged by the JSON-cleanup
+  round** - the seam is entirely in `SAM_UI`.
+
+`PartORunModelPersistenceTests` pins: the successful run leaves a real `.sam` archive (`PK` signature) and
+no `.json`, with the TBD and TSD untouched and nothing else swept up; baseline / `Opt01` / `Opt02` /
+`OptMax` each name their own JSON, sibling of their own model; a baseline's cleanup leaves `Opt01`'s file
+alone; with the JSON gone the model still reopens, restores, validates both fingerprints, reaches Results
+-> Overheating and resolves after a folder move; a `.sam` write that fails keeps the JSON and reports;
+a JSON that cannot be deleted (held with `FileShare.None`) still returns success with the `.sam`
+authoritative and a note; no JSON and no model are each handled without a spurious complaint.
 
 Tests added in the final-review round: `ScenariosSwappedUnderUnchangedResults_IsRefused` (the blocker -
 the design fingerprint and the results file are assertion-checked as *unchanged*, so the refusal is

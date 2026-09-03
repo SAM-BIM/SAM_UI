@@ -399,22 +399,18 @@ namespace SAM.Analytical.UI.WPF
                     //the one Save As uses, so this file reopens through the ordinary Open path with no
                     //special case anywhere.
                     //
-                    //Distinct from the workflow's own "Saving Model" step, which writes a general
-                    //<project>.json for every TAS run in SAM and is deliberately left alone. Only the file
-                    //written here carries the provenance and the scenarios a later review is validated
-                    //against.
-                    string path_Model = Query.Path_PartORunModel(path_TSD);
+                    //And then, ONLY once that has succeeded, the workflow's own "Saving Model" export for
+                    //this run - the plain-text <run>.json beside the TBD - is removed, so a Part O run
+                    //leaves one reviewable model artifact rather than the same model twice. The ordering is
+                    //the safety property and lives in Modify.PersistPartORunModel: a failed .sam write
+                    //deletes nothing and leaves the JSON as the fallback copy, and a JSON that could not be
+                    //removed is a note, never a failed run. WorkflowCalculator itself is untouched - every
+                    //ordinary non-Part-O TAS run in SAM still writes and keeps its <project>.json.
+                    Modify.PersistPartORunModel(result, path_TSD, path_TBD, out string note_Persistence);
 
-                    try
+                    if (!string.IsNullOrWhiteSpace(note_Persistence))
                     {
-                        if (!Core.Convert.ToFile(result, path_Model, SAMFileType.SAM))
-                        {
-                            notes.Add(string.Format("The analytical model with its simulation-result provenance could not be written to '{0}', so reopening that file later will not offer a review of these results. This session is unaffected.", path_Model));
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        notes.Add(string.Format("The analytical model with its simulation-result provenance could not be written to '{0}', so reopening that file later will not offer a review of these results. This session is unaffected. ({1})", path_Model, exception.Message));
+                        notes.Add(note_Persistence);
                     }
                 }
             }
