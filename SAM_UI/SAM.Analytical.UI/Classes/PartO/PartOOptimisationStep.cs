@@ -133,6 +133,18 @@ namespace SAM.Analytical.UI
         public List<PartOOptimisationUnitState> UnitStates { get; } = [];
 
         /// <summary>
+        /// <b>The complete design ventilation vector after this iteration</b> - every space and direction
+        /// this run's equipment serves, whether or not anything moved it.
+        /// <para>
+        /// The adjustments above say what CHANGED; this says what EXISTS. Both are needed, and recording
+        /// only the first is what made the airflow history read as though an untouched direction had been
+        /// removed: a room-direction no round moved contributed no adjustment, so it appeared in no step and
+        /// the report could not print it. See <see cref="PartODesignAirFlowState"/>.
+        /// </para>
+        /// </summary>
+        public List<PartODesignAirFlowState> DesignAirFlowStates { get; } = [];
+
+        /// <summary>
         /// Every adjustment this iteration made, <b>targeted first</b> and derived after - the order the
         /// round itself settled on. Each one still carries <see cref="DesignAirFlowAdjustment.IsDerived"/>,
         /// so nothing about which were engineering decisions is lost by reading them together.

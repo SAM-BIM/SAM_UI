@@ -622,6 +622,12 @@ namespace SAM.Analytical.UI.WPF
         {
             partOOptimisationStep.UnitStates.AddRange(UnitStates(analyticalModel, partOPreparationContext.VentilationUnitCapacityDescriptors, partOPreparationContext.Zones));
 
+            //The COMPLETE design vector of this iteration, beside the adjustments that say what moved. Every
+            //step records it - baseline, round and envelope alike - because a room-direction no round touched
+            //has no adjustment anywhere, and without this the history could not print it at all. Read off the
+            //model this step was assessed on, so it states that step's design and not a later one's.
+            partOOptimisationStep.DesignAirFlowStates.AddRange(DesignAirFlowStates(analyticalModel, partOPreparationContext.Zones));
+
             if (!partOTM59Assessment.IsAssessed)
             {
                 return;
@@ -635,6 +641,94 @@ namespace SAM.Analytical.UI.WPF
             {
                 partOOptimisationStep.Warnings.Add(refusal_Report);
             }
+        }
+
+        /// <summary>
+        /// <b>The complete design ventilation vector of one iteration</b> - every space and direction this
+        /// run's equipment serves, at the design that iteration carried, whether or not anything moved it.
+        /// <para>
+        /// Recorded beside the adjustments because the two answer different questions. An adjustment exists
+        /// only where something CHANGED, so a room-direction a round left alone was previously absent from
+        /// the run altogether and the airflow history could not print it - which read as though the
+        /// direction had been removed, when the ventilation network still carries it. See
+        /// <see cref="PartODesignAirFlowState"/>.
+        /// </para>
+        /// <para>
+        /// <b>Scoped exactly as the unit table is</b>, through the same
+        /// <see cref="Query.PartOIterationAirHandlingUnits"/>: this iteration's own units and the systems
+        /// they supply. A legacy mechanical ventilation system the building was drawn with is not this run's
+        /// equipment and contributes nothing here either.
+        /// </para>
+        /// <para>
+        /// A room-direction with no terminal has no design airflow to state and is not part of the vector -
+        /// printing a zero would invent one. A room reached through two of a unit's systems in the same
+        /// direction appears once: the history is at room grain, and both contributions are that room's air.
+        /// </para>
+        /// <para>
+        /// <b>Read only.</b> Every figure comes from the authority that owns it - the design from the room's
+        /// terminals, the requirement from Approved Document F - and nothing is written back to the model.
+        /// </para>
+        /// </summary>
+        private static List<PartODesignAirFlowState> DesignAirFlowStates(AnalyticalModel? analyticalModel, IEnumerable<Zone>? zones_Dwelling)
+        {
+            List<PartODesignAirFlowState> result = [];
+
+            AdjacencyCluster? adjacencyCluster = analyticalModel?.AdjacencyCluster;
+            if (adjacencyCluster is null)
+            {
+                return result;
+            }
+
+            List<AirHandlingUnit> airHandlingUnits = Query.PartOIterationAirHandlingUnits(adjacencyCluster, zones_Dwelling);
+
+            airHandlingUnits.Sort((x, y) => string.CompareOrdinal(x?.Name, y?.Name));
+
+            HashSet<string> keys = [];
+
+            foreach (AirHandlingUnit airHandlingUnit in airHandlingUnits)
+            {
+                if (airHandlingUnit is null)
+                {
+                    continue;
+                }
+
+                foreach (VentilationSystem ventilationSystem in Analytical.Query.VentilationSystems(adjacencyCluster, airHandlingUnit) ?? [])
+                {
+                    List<Space> spaces = adjacencyCluster.GetRelatedObjects<Space>(ventilationSystem) ?? [];
+
+                    spaces.RemoveAll(x => x is null);
+                    spaces.Sort((x, y) => string.CompareOrdinal(x.Name, y.Name));
+
+                    foreach (Space space in spaces)
+                    {
+                        foreach (FlowClassification flowClassification in new[] { FlowClassification.Supply, FlowClassification.Extract })
+                        {
+                            List<VentilationTerminal> ventilationTerminals = Analytical.Query.VentilationTerminals(
+                                adjacencyCluster.VentilationTerminals(space) ?? [],
+                                flowClassification);
+
+                            if (ventilationTerminals is null || ventilationTerminals.Count == 0)
+                            {
+                                continue;
+                            }
+
+                            if (!keys.Add(string.Format("{0}|{1}", space.Guid, flowClassification)))
+                            {
+                                continue;
+                            }
+
+                            result.Add(new PartODesignAirFlowState(
+                                space.Guid,
+                                space.Name,
+                                flowClassification,
+                                ventilationTerminals.VentilationTerminalDesignDuty_Lps(flowClassification) ?? 0,
+                                adjacencyCluster.PartFRequiredFlowRate_Lps(space, flowClassification) ?? 0));
+                        }
+                    }
+                }
+            }
+
+            return result;
         }
 
         /// <summary>
