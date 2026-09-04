@@ -253,14 +253,55 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
-        /// Whether the dwellings in scope carry internal conditions a TM59 assessment can classify.
+        /// Whether the dwellings in scope carry what a TM59 assessment needs: an internal condition on at
+        /// least one of them, and at least one room the assessment will classify.
+        ///
+        /// <para><b>Two prerequisites, and only one of them is about classification</b></para>
         /// <para>
-        /// <b>Asked exactly the way the assessment asks it.</b>
+        /// Read as one question they look self-contradictory: the classification below deliberately falls
+        /// back to the space name, so a room with no internal condition can still be classified - yet a
+        /// scope in which NOTHING has an internal condition is refused anyway. Both are correct, because the
+        /// second refusal is not a classification refusal. It is stated in full here so it is not mistaken
+        /// for one again.
+        /// </para>
+        ///
+        /// <para><b>1. An internal condition is what states how a room is OCCUPIED</b></para>
+        /// <para>
+        /// It is not a label the assessment reads. It is the runtime the simulation is driven by, and every
+        /// TM59 criterion is a comparison over the occupied hours that runtime produces:
+        /// </para>
+        /// <list type="bullet">
+        /// <item><c>SAM.Analytical.Tas.Modify.UpdateInternalCondition</c> returns false the moment
+        /// <c>space.InternalCondition</c> is null, so the TBD internal condition <c>AddInternalCondition</c>
+        /// has just created is left exactly as <c>Building.AddIC(null)</c> made it - no occupancy profile,
+        /// no gains, no setpoints - and <c>UpdateZone</c> assigns that to the zone regardless. Nothing on
+        /// the conversion path refuses it.</item>
+        /// <item><c>TMOverheatingCalculator.Collect</c> counts an hour as occupied only where the simulated
+        /// occupancy sensible gain is above zero. A room simulated from a blank internal condition therefore
+        /// has NO occupied hours, and each criterion is then judged over an empty set:
+        /// <c>TM59NaturalVentilationBedroomExtendedResult.Criterion2</c> becomes <c>0 &gt;= 0</c> and
+        /// PASSES. A verdict manufactured from an empty occupied set is worse than a refusal - it looks
+        /// like an answer.</item>
+        /// <item><c>SAM.Analytical.Tas.TM59.Convert.ToTM59(Space, TM59Manager, SystemType)</c> returns null
+        /// for a space with no internal condition <i>before</i> it ever asks <c>RoomUse</c>, so the name
+        /// fallback is not reached there at all; the building overload turns that into a refusal of the
+        /// whole DomOv document.</item>
+        /// </list>
+        /// <para>
+        /// <b>And nothing downstream stops it.</b> <c>Create.Log</c> - the authority
+        /// <c>PartOPreSimulationCheck</c> is - records a space with no internal condition as a
+        /// <c>Warning</c>, and that check stops only on <c>Error</c>. So this is the one place on the Part O
+        /// path that can refuse it, which is why it does.
+        /// </para>
+        ///
+        /// <para><b>2. Classification, asked exactly the way the assessment asks it</b></para>
+        /// <para>
         /// <c>TMOverheatingCalculator</c> classifies a simulated space with
         /// <c>TM59Manager.TM59SpaceApplications(space.InternalCondition)</c> and falls back to the space name
         /// when that yields nothing; the same pair is used here, over the same default TM59 text map. So a
         /// space this counts as mapped is a space the assessment will produce a sleeping, living or cooking
-        /// result for - not a guess about a name.
+        /// result for - not a guess about a name. That fallback is genuine and is counted, which is exactly
+        /// why <c>count_Classified</c> and <c>count_InternalCondition</c> are two separate counts.
         /// </para>
         /// <para>
         /// <b>Blocked only where NOTHING classifies.</b> A model with some unclassified rooms is a normal
@@ -309,9 +350,13 @@ namespace SAM.Analytical.UI
                 }
             }
 
+            //NOT a classification refusal, and it is deliberately reported before the classification one -
+            //count_Classified above may well be non-zero here, from the space-name fallback. What is missing
+            //is the OCCUPANCY: see the "1." section of this method's summary for the three production
+            //authorities. The message says that, rather than implying the rooms are unrecognised.
             if (count_InternalCondition == 0)
             {
-                return new PartOWorkflowStageState(PartOWorkflowStage.InternalConditions, PartOWorkflowStageStatus.Blocked, string.Format("None of the {0} space(s) in scope has an internal condition, so nothing states how they are occupied. Run Map IC (TM59) first.", spaces_Scope.Count));
+                return new PartOWorkflowStageState(PartOWorkflowStage.InternalConditions, PartOWorkflowStageStatus.Blocked, string.Format("None of the {0} space(s) in scope has an internal condition, so nothing states how they are occupied. A TM59 room name selects which criterion applies but supplies no occupancy: these spaces would simulate unoccupied, and their TM59 verdicts would be judged over an empty set of occupied hours rather than refused. Run Map IC (TM59) first.", spaces_Scope.Count));
             }
 
             if (count_Classified == 0)

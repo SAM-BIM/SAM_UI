@@ -121,6 +121,121 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
+        /// <b>The TM59 space-name fallback is real, and it is not what the internal-condition blocker is
+        /// about.</b> Pinned because reading those two facts as one question makes the blocker look
+        /// self-contradictory: rooms named "Bedroom" and "Kitchen" classify with no internal condition at
+        /// all, exactly as <c>TMOverheatingCalculator</c> classifies them, and the scope is refused anyway.
+        /// <para>
+        /// What is missing is the OCCUPANCY, not the classification.
+        /// <c>SAM.Analytical.Tas.Modify.UpdateInternalCondition</c> writes nothing to the TBD internal
+        /// condition for a space that has none, and <c>TMOverheatingCalculator.Collect</c> counts an hour as
+        /// occupied only where the simulated occupancy gain is above zero - so these rooms would simulate
+        /// unoccupied and their criteria would be judged over an empty set rather than refused. The
+        /// downstream refusal that proves it without a TAS run is pinned by
+        /// <see cref="TheTM59ExporterRefusesASpaceWithNoInternalCondition_EvenWhenItsNameClassifies"/>.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void RoomsTM59ClassifiesByNameAlone_AreStillRefusedForTheirMissingOccupancy()
+        {
+            TextMap textMap = Analytical.Query.DefaultInternalConditionTextMap_TM59();
+
+            //Same guard as AMissingTM59Resource_IsReportedAndDoesNotBlock: with no resource the stage is
+            //Pending by design and there is nothing about classification to assert.
+            if (textMap is null)
+            {
+                return;
+            }
+
+            AnalyticalModel analyticalModel = Model(internalConditions: false);
+
+            //The premise, from the production classifier rather than from an assumption about it.
+            Space space_Bedroom = analyticalModel.AdjacencyCluster.GetSpaces().Find(x => x.Name.StartsWith("Bedroom", StringComparison.Ordinal));
+
+            Assert.Null(space_Bedroom.InternalCondition);
+            Assert.Null(TM59Manager.TM59SpaceApplications(space_Bedroom.InternalCondition, textMap));
+            Assert.Contains(TM59SpaceApplication.Sleeping, TM59Manager.TM59SpaceApplications(space_Bedroom, textMap));
+
+            PartOWorkflowInspection partOWorkflowInspection = Inspect(analyticalModel, Request(Scenario_1a(), analyticalModel));
+
+            Assert.False(partOWorkflowInspection.CanRun);
+
+            PartOWorkflowStageState partOWorkflowStageState = Stage(partOWorkflowInspection, PartOWorkflowStage.InternalConditions);
+
+            Assert.Equal(PartOWorkflowStageStatus.Blocked, partOWorkflowStageState.Status);
+
+            //Refused as missing occupancy, and NOT in the words of the classification blocker - which would
+            //be untrue here, because these rooms do classify.
+            Assert.Contains("occupied", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+            Assert.DoesNotContain("is recognised as a TM59", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// <b>The production authority behind that blocker, asked directly.</b>
+        /// <c>Tas.TM59.Convert.ToTM59(Space, TM59Manager, SystemType)</c> returns null for a space with no
+        /// internal condition, and it does so <i>before</i> it reaches <c>RoomUse</c> - so the space-name
+        /// fallback never runs there. <c>Convert.ToTM59(AnalyticalModel, ...)</c> turns one such space into
+        /// a refusal of the whole DomOv document, by its own documented contract.
+        /// <para>
+        /// This is why the zero-internal-condition scope cannot proceed, established statically rather than
+        /// by a licensed TAS run. The same room exports as soon as it carries one.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TheTM59ExporterRefusesASpaceWithNoInternalCondition_EvenWhenItsNameClassifies()
+        {
+            TM59Manager tM59Manager = new();
+
+            Space space = new(new Guid("cccccccc-0000-0000-0000-000000000001"), "Bedroom 1.1", null);
+
+            Assert.Null(space.InternalCondition);
+            Assert.Null(SAM.Analytical.Tas.TM59.Convert.ToTM59(space, tM59Manager, SAM.Analytical.Tas.SystemType.NaturalVentilation));
+
+            //The one difference, and it is the whole difference.
+            Space space_Mapped = new(space)
+            {
+                InternalCondition = new InternalCondition("TM59_Double Bedroom"),
+            };
+
+            Assert.NotNull(SAM.Analytical.Tas.TM59.Convert.ToTM59(space_Mapped, tM59Manager, SAM.Analytical.Tas.SystemType.NaturalVentilation));
+        }
+
+        /// <summary>
+        /// The <i>other</i> blocker still exists and is still distinct: rooms that DO carry internal
+        /// conditions but that nothing TM59 recognises - neither the condition name nor the room name - are
+        /// refused in the words of the classification refusal, not the occupancy one. Narrowing the
+        /// occupancy blocker must never be able to let this case through.
+        /// </summary>
+        [Fact]
+        public void RoomsThatCarryInternalConditionsNothingTM59Classifies_AreRefusedAsUnclassified()
+        {
+            AnalyticalModel analyticalModel = Model(tM59: false);
+
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
+
+            //tM59: false already gives every room a name TM59 does not know ("Area 1.1"). Adding a condition
+            //TM59 does not know either leaves the occupancy present and the classification absent.
+            foreach (Space space in adjacencyCluster.GetSpaces())
+            {
+                adjacencyCluster.AddObject(new Space(space)
+                {
+                    InternalCondition = new InternalCondition("Generic Area"),
+                });
+            }
+
+            analyticalModel = new AnalyticalModel(analyticalModel, adjacencyCluster);
+
+            PartOWorkflowInspection partOWorkflowInspection = Inspect(analyticalModel, Request(Scenario_1a(), analyticalModel));
+
+            Assert.False(partOWorkflowInspection.CanRun);
+
+            PartOWorkflowStageState partOWorkflowStageState = Stage(partOWorkflowInspection, PartOWorkflowStage.InternalConditions);
+
+            Assert.Equal(PartOWorkflowStageStatus.Blocked, partOWorkflowStageState.Status);
+            Assert.Contains("is recognised as a TM59", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+        }
+
+        /// <summary>
         /// The mechanical route with no continuous Approved Document F requirement anywhere in scope is
         /// exactly what <c>PrepareBaseMVHR</c> refuses. Saying so here costs nothing.
         /// </summary>
@@ -1389,7 +1504,13 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// <param name="dwelling">False marks both zones explicitly as not dwellings.</param>
         /// <param name="tM59">False leaves every room without an internal condition and with a name TM59 does not know.</param>
         /// <param name="partF">False omits the Approved Document F requirements.</param>
-        private static AnalyticalModel Model(bool zoned = true, bool dwelling = true, bool tM59 = true, bool partF = true)
+        /// <param name="internalConditions">
+        /// False leaves every room without an internal condition while keeping its TM59 room NAME - the one
+        /// case that separates the two prerequisites <c>PartOWorkflowInspection.InternalConditions</c>
+        /// checks, because the name still classifies and the occupancy is still absent. <c>tM59: false</c>
+        /// removes both at once and so cannot tell them apart.
+        /// </param>
+        private static AnalyticalModel Model(bool zoned = true, bool dwelling = true, bool tM59 = true, bool partF = true, bool internalConditions = true)
         {
             AdjacencyCluster adjacencyCluster = new();
 
@@ -1404,9 +1525,9 @@ namespace SAM.Analytical.UI.WPF.Tests
                     adjacencyCluster.AddObject(zone);
                 }
 
-                Room(adjacencyCluster, zoned ? zone : null, i, 1, tM59 ? "Bedroom" : "Area", tM59 ? "TM59_Double Bedroom" : null, partF, PartFTerminalRole.Supply);
-                Room(adjacencyCluster, zoned ? zone : null, i, 2, tM59 ? "Kitchen" : "Area", tM59 ? "TM59_Kitchen" : null, partF, PartFTerminalRole.LocalKitchenExtract);
-                Room(adjacencyCluster, zoned ? zone : null, i, 3, "Store", tM59 ? "TM59_Store" : null, false, PartFTerminalRole.Supply);
+                Room(adjacencyCluster, zoned ? zone : null, i, 1, tM59 ? "Bedroom" : "Area", tM59 && internalConditions ? "TM59_Double Bedroom" : null, partF, PartFTerminalRole.Supply);
+                Room(adjacencyCluster, zoned ? zone : null, i, 2, tM59 ? "Kitchen" : "Area", tM59 && internalConditions ? "TM59_Kitchen" : null, partF, PartFTerminalRole.LocalKitchenExtract);
+                Room(adjacencyCluster, zoned ? zone : null, i, 3, "Store", tM59 && internalConditions ? "TM59_Store" : null, false, PartFTerminalRole.Supply);
             }
 
             return new AnalyticalModel(
