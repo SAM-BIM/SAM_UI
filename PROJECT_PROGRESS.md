@@ -1,18 +1,89 @@
 # Project Progress
 
 ## Branch
-`feature/parto-prepare-and-run`, branched from `sow/2026-Q3` at **`ef31a3c`**
-(the merge of PR #84).
+`perf/partf-bulk-context`, branched from `sow/2026-Q3` at **`75237eb9`** (the merge of PR #85).
 
-**Stands alone.** `SAM`, `SAM_Systems` and `SAM_Tas` are all untouched by this branch: everything it needs
-is already on `sow/2026-Q3` in each of them.
+**DOES NOT stand alone.** It requires **`SAM` branch `perf/partf-bulk-context` (SAM-BIM/SAM#99)**, which
+adds `SAM.Analytical.PartFIndex`. This branch will not compile against `SAM` `sow/2026-Q3` as it stands.
+
+**Merge order: SAM#99 first, then SAM_UI#86.** `SAM_Systems` and `SAM_Tas` are untouched.
+
+Everything below "Previous (2026-09-04): the Part O workflow, as one command" is the record of PR #85, which
+is merged. Its "Stands alone" note described that branch and does not apply to this one.
 
 ## Last updated
-2026-09-04 - one high-level **Part O - Prepare & Run** command that inspects the model, says what is
-already valid, and orchestrates the existing authorities from preparation to a reviewed TM59 result.
+2026-09-04 (later) - the Part O inspection resolves the model through one SAM-owned `PartFIndex` snapshot
+per call instead of re-resolving every room against the whole model, and the dwelling scope resolution moved
+into SAM.
 
+## Latest (2026-09-04, later): Part F large-model scaling - the SAM_UI half
 
-## Latest (2026-09-04): the Part O workflow, as one command
+**Status: implemented, tested and measured. Not merged. Blocked on SAM-BIM/SAM#99.**
+
+### What was slow
+
+A Part O inspection reads every room of the dwelling scope **three** times - once to place it, and once for
+each of the two Approved Document F directions - and every one of those reads re-resolved the room against
+the model's whole space list. `AdjacencyCluster.GetSpaces()` rebuilds that list on every call, so inspecting
+a five thousand space project was quadratic in the model. `OptimisePartOTM59.DesignAirFlowStates` did the
+same, once per room-direction of the run.
+
+**The cost was never in SAM_UI's own code.** The PR #85 scalability fixes stand and were not reopened:
+restoring a dwelling selection is batched, search does not inspect the model, UI-only optimisation inputs do
+not inspect the model, genuine model/scope/scenario changes still do, and no engineering calculation is
+cached or duplicated in WPF.
+
+### What changed here
+
+The fix is entirely SAM's. `PartFIndex` is one request-scoped snapshot of the model's space identities that
+holds **no rate** and lives for one call. `PartOWorkflowInspection.Inspect` builds one at the top and
+threads it through the two stages that need it.
+
+`Spaces_Scope` used to build its own `Guid -> Space` dictionary over the model. That is now
+`PartFIndex.Spaces_Zones` - one place, in SAM, that turns dwelling zones into the space instances the model
+currently carries - so this file keeps no lookup of its own that could drift from the model. Behaviour is
+identical: first occurrence wins, zone order then relation order, and a related space the model no longer
+carries is dropped.
+
+`Inspect` gains an optional trailing `PartFIndex partFIndex_Scope = null`. Production passes null and gets a
+snapshot built for the call; the tests pass a counting subclass. No existing call site changed.
+
+**No cache was added to `PartOWorkflowWindow`, to `PartOWorkflowInspection`, or anywhere in WPF**, and the
+workflow state semantics PR #85 established are untouched. `TwoInspections_CostExactlyTwiceOne` pins that: a
+cache appearing in the dialog would show up as the second inspection asking less.
+
+### Files changed
+
+`SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOWorkflowInspection.cs`,
+`WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs`, new test
+`WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowInspectionScalingTests.cs`, and this file.
+
+### Validation
+
+`SAM_UI.sln` builds against the `SAM.Analytical.dll` rebuilt from SAM `perf/partf-bulk-context` - 0 errors.
+`SAM.Analytical.UI.WPF.Tests` **498 passed / 0 failed** (491 pre-existing all passing, + 7 new).
+`git diff --check` clean.
+
+Counts asserted exactly at 60 / 300 / 1200 spaces: one snapshot, `2n` requirement calls and `3n` identity
+resolutions for `n` rooms in scope. **No test here has a time limit** - those counts are properties of the
+algorithm and are the same on every machine, which a duration is not. The measured effect is recorded in
+SAM's own `PROJECT_PROGRESS.md`: at 5000 spaces the aggregation goes from 2221 ms to 46 ms locally, and
+allocated bytes per doubling of the model from x3.8 to x2.0.
+
+Licensed TAS was not run: the results are bit-identical to `Query.PartFRequiredFlowRate_Lps`, so there is no
+engineering change for a simulation to validate.
+
+### Unresolved / risks
+
+The project reference is the built `..\..\..\SAM\build\SAM.Analytical.dll`, so a machine that has not built
+SAM `perf/partf-bulk-context` will fail to compile this branch with "PartFIndex could not be found". That is
+the dependency, not a defect.
+
+### Recommended next step
+
+Merge SAM-BIM/SAM#99, then review and merge SAM_UI#86. Do not merge this one first.
+
+## Previous (2026-09-04): the Part O workflow, as one command
 
 **Status: implemented, tested, and accepted against three licensed TAS runs of the real fixture.**
 
