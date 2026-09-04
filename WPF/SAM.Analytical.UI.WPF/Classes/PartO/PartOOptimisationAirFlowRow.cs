@@ -152,6 +152,11 @@ namespace SAM.Analytical.UI.WPF
 
             foreach (PartOOptimisationStep partOOptimisationStep in partOOptimisationRun.Steps)
             {
+                if (partOOptimisationStep.IsBaseline)
+                {
+                    continue;
+                }
+
                 //A deliberate adjustment of the CAPACITY ENVELOPE is SCALED and not TARGETED. Both were
                 //chosen, but by different authorities answering different questions: an optimisation round
                 //asked this room for one +5 l/s step because it failed TM59, and the envelope grew the whole
@@ -159,36 +164,79 @@ namespace SAM.Analytical.UI.WPF
                 //second as the first would claim the optimisation had requested figures it never did.
                 string type = partOOptimisationStep.IsCapacityEnvelope ? "SCALED" : "TARGETED";
 
-                foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.TargetedAdjustments)
+                Dictionary<string, DesignAirFlowAdjustment> dictionary = [];
+
+                foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.Adjustments())
                 {
-                    result.Add(new PartOOptimisationAirFlowRow(
-                        partOOptimisationStep,
-                        designAirFlowAdjustment.SpaceName,
-                        type,
-                        Core.Query.Description(designAirFlowAdjustment.FlowClassification),
-                        designAirFlowAdjustment.Before_Lps,
-                        designAirFlowAdjustment.After_Lps,
-                        designAirFlowAdjustment.After_Lps,
-                        designAirFlowAdjustment.Requirement_Lps,
-                        Status(partOOptimisationStep, designAirFlowAdjustment.SpaceGuid)));
+                    dictionary[Key(designAirFlowAdjustment.SpaceGuid, designAirFlowAdjustment.FlowClassification)] = designAirFlowAdjustment;
                 }
 
-                foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.DerivedAdjustments)
+                //Every space and direction this run's equipment serves, moved or not - see the class summary.
+                foreach (PartODesignAirFlowState partODesignAirFlowState in partOOptimisationStep.DesignAirFlowStates)
                 {
+                    string key = Key(partODesignAirFlowState.SpaceGuid, partODesignAirFlowState.FlowClassification);
+
+                    if (dictionary.TryGetValue(key, out DesignAirFlowAdjustment designAirFlowAdjustment))
+                    {
+                        result.Add(Row(partOOptimisationStep, designAirFlowAdjustment, type));
+
+                        dictionary.Remove(key);
+
+                        continue;
+                    }
+
+                    //Present in the design and untouched by this step. It is stated rather than omitted:
+                    //leaving it out reads as though the direction had been removed, when the ventilation
+                    //network still carries it and the dwelling is balanced around it. Design before and
+                    //achieved are the same figure because nothing moved, and nothing was requested of it.
                     result.Add(new PartOOptimisationAirFlowRow(
                         partOOptimisationStep,
-                        designAirFlowAdjustment.SpaceName,
-                        "DERIVED",
-                        Core.Query.Description(designAirFlowAdjustment.FlowClassification),
-                        designAirFlowAdjustment.Before_Lps,
+                        partODesignAirFlowState.SpaceName,
+                        "UNCHANGED",
+                        Core.Query.Description(partODesignAirFlowState.FlowClassification),
+                        partODesignAirFlowState.Design_Lps,
                         null,
-                        designAirFlowAdjustment.After_Lps,
-                        designAirFlowAdjustment.Requirement_Lps,
-                        Status(partOOptimisationStep, designAirFlowAdjustment.SpaceGuid)));
+                        partODesignAirFlowState.Design_Lps,
+                        partODesignAirFlowState.Requirement_Lps,
+                        Status(partOOptimisationStep, partODesignAirFlowState.SpaceGuid)));
+                }
+
+                //Anything adjusted that the recorded vector does not account for is still printed. A step
+                //recorded before the vector existed has none, which is what keeps such a run readable; and
+                //an adjustment to a room the vector could not read must not vanish from the evidence.
+                foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.Adjustments())
+                {
+                    if (!dictionary.ContainsKey(Key(designAirFlowAdjustment.SpaceGuid, designAirFlowAdjustment.FlowClassification)))
+                    {
+                        continue;
+                    }
+
+                    result.Add(Row(partOOptimisationStep, designAirFlowAdjustment, type));
                 }
             }
 
             return result;
+        }
+
+        /// <summary>One adjusted row, TARGETED/SCALED or DERIVED according to which authority moved it.</summary>
+        private static PartOOptimisationAirFlowRow Row(PartOOptimisationStep partOOptimisationStep, DesignAirFlowAdjustment designAirFlowAdjustment, string type_Targeted)
+        {
+            return new PartOOptimisationAirFlowRow(
+                partOOptimisationStep,
+                designAirFlowAdjustment.SpaceName,
+                designAirFlowAdjustment.IsDerived ? "DERIVED" : type_Targeted,
+                Core.Query.Description(designAirFlowAdjustment.FlowClassification),
+                designAirFlowAdjustment.Before_Lps,
+                designAirFlowAdjustment.IsDerived ? null : designAirFlowAdjustment.After_Lps,
+                designAirFlowAdjustment.After_Lps,
+                designAirFlowAdjustment.Requirement_Lps,
+                Status(partOOptimisationStep, designAirFlowAdjustment.SpaceGuid));
+        }
+
+        /// <summary>One room and one direction, matched on identity rather than on the printed name.</summary>
+        private static string Key(System.Guid spaceGuid, FlowClassification flowClassification)
+        {
+            return string.Format("{0}|{1}", spaceGuid, flowClassification);
         }
 
         /// <summary>
@@ -225,6 +273,29 @@ namespace SAM.Analytical.UI.WPF
 
             HashSet<string> keys = [];
 
+            //The baseline's OWN recorded vector, where the run has one: every space and direction the
+            //equipment serves, at the design the baseline actually carried. Read directly rather than
+            //reconstructed from later rounds, so a direction no round ever moved is present too - which is
+            //the whole complaint the synthesis below could not answer.
+            foreach (PartODesignAirFlowState partODesignAirFlowState in partOOptimisationStep_Baseline.DesignAirFlowStates)
+            {
+                if (!keys.Add(Key(partODesignAirFlowState.SpaceGuid, partODesignAirFlowState.FlowClassification)))
+                {
+                    continue;
+                }
+
+                result.Add(new PartOOptimisationAirFlowRow(
+                    partOOptimisationStep_Baseline,
+                    partODesignAirFlowState.SpaceName,
+                    "BASELINE",
+                    Core.Query.Description(partODesignAirFlowState.FlowClassification),
+                    partODesignAirFlowState.Design_Lps,
+                    null,
+                    partODesignAirFlowState.Design_Lps,
+                    partODesignAirFlowState.Requirement_Lps,
+                    Status(partOOptimisationStep_Baseline, partODesignAirFlowState.SpaceGuid)));
+            }
+
             foreach (PartOOptimisationStep partOOptimisationStep in partOOptimisationRun.Steps)
             {
                 //The ENVELOPE is excluded as well as the baseline. Its Before_Lps is the last ACCEPTED
@@ -240,7 +311,7 @@ namespace SAM.Analytical.UI.WPF
                 //block reads in the same order as the rounds beneath it.
                 foreach (DesignAirFlowAdjustment designAirFlowAdjustment in partOOptimisationStep.Adjustments())
                 {
-                    if (!keys.Add(string.Format("{0}|{1}", designAirFlowAdjustment.SpaceGuid, designAirFlowAdjustment.FlowClassification)))
+                    if (!keys.Add(Key(designAirFlowAdjustment.SpaceGuid, designAirFlowAdjustment.FlowClassification)))
                     {
                         continue;
                     }

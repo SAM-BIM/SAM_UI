@@ -1,17 +1,118 @@
 # Project Progress
 
 ## Branch
-`fix/wpf-test-collection-serialization`, branched from `sow/2026-Q3` at **`2084768`**
-(the merge of PR #82, the Part O isolation work).
+Two branches merged into `sow/2026-Q3` in sequence, both branched from it at **`2084768`**
+(the merge of PR #82):
 
-Test-project change only. **No companion branch in any other repository** and no dependency on one -
-this does not touch `SAM`, `SAM_Tas` or any production assembly, and can merge on its own.
+- `fix/wpf-test-collection-serialization` (PR #83) - test project only.
+- `fix/parto-results-complete-vector` (PR #84) - the Part O run summary.
+
+**No companion branch in any other repository** for either. Both are self-contained in `SAM_UI`;
+neither touches `SAM` or `SAM_Tas`, and no production ventilation behaviour is changed.
 
 ## Last updated
+2026-09-03 (later still) - every Part O run summary states the complete design ventilation vector, so a
+direction no round moved is shown as UNCHANGED instead of vanishing from the table.
+
 2026-09-03 (later still) - the intermittent `PackagePart.IsStreamClosed` failures in the WPF test host are
 reproduced, root-caused to xUnit's default per-class parallelism, and fixed by one shared test collection.
 
-## Latest (2026-09-03, later still): the intermittent WPF test-host failures
+## Latest (2026-09-03, later still): the run summary states what EXISTS, not only what changed
+
+**Status: root-caused, fixed and tested.** Reported from isolated-mode testing of Flat 1: the simulation
+and the ventilation network were right, but the Results table was misleading.
+
+### What was reported
+
+Flat 1 has `Studio 1_0` at 30 l/s supply and 22 l/s extract, and `Bathroom_2` at 8 l/s extract. An
+ordinary Iteration 2B round targets the studio's supply and the bathroom's extract. The detailed run
+report confirmed the studio's 22 l/s extract was still present and the network balanced - but the Results
+table for BASELINE and for the ordinary rounds listed only
+
+```
+Studio 1_0  | Supply
+Bathroom_2  | Extract
+```
+
+so the studio's extract appeared to have disappeared. At MAX the table was already complete.
+
+### Root cause
+
+`PartOOptimisationAirFlowRow.Rows` built its rows from `TargetedAdjustments` and `DerivedAdjustments`
+alone, and **an adjustment exists only where something changed.** A space and direction no round moved
+contributed no adjustment, so it was absent from the step - and from the run - entirely. The reporting
+layer could not print it because the run had never recorded it.
+
+MAX was complete only incidentally: the capacity envelope grows the *whole* design vector proportionally,
+so every space and direction gets an adjustment there. That is why the same table was right at MAX and
+wrong everywhere else.
+
+The baseline block had the same cause at one remove: it was synthesised from the union of every later
+round's adjustments, so it could only ever show rooms some round eventually touched.
+
+### The fix - the run records the vector, and the table prints it
+
+`PartODesignAirFlowState` (new) is one space, one direction, its design airflow and its Approved Document
+F requirement. `PartOOptimisationStep.DesignAirFlowStates` carries the complete set for that iteration,
+and `Modify.Record` - the single place every step's evidence is written, for the baseline, every round and
+the envelope alike - fills it from the model that step was assessed on.
+
+It is scoped exactly as the unit table is, through the same `Query.PartOIterationAirHandlingUnits`: this
+iteration's own units and the systems they supply. A room-direction with no terminal has no design airflow
+to state and contributes no row - printing a zero would invent one.
+
+`Rows` now walks that vector and classifies each entry against the step's adjustments:
+
+| state | meaning |
+|---|---|
+| `TARGETED` | the round asked this room for a step |
+| `DERIVED` | it moved to keep its dwelling balanced |
+| `SCALED` | capacity envelope only - the whole vector grown proportionally |
+| **`UNCHANGED`** | **it exists in the design and this step did not move it** |
+| `BASELINE` | the baseline's own recorded vector |
+
+On an `UNCHANGED` row Design before and Achieved are the same figure and Requested is a dash - nobody
+asked. **An unchanged direction is never labelled TARGETED**, which would claim an engineering decision
+that was never made.
+
+### One representation, not two
+
+The Results grid and its "Copy all" export read the same list - the export iterates
+`dataGrid_AirFlow.ItemsSource`, which is `PartOOptimisationAirFlowRow.Rows(...)`. There was never a second
+airflow representation to reconcile. The per-run file `Record` also saves is a `TM59AssessmentReport` - the
+overheating compliance artifact - which is a different thing and carries no airflow vector.
+
+### Backward safe
+
+A step with no recorded vector - a run from before this existed, or one whose model could not be read -
+still prints its adjustments exactly as before. Completing the table can never empty it. Pinned by
+`ARunWithNoRecordedVector_StillPrintsItsAdjustments`, which also documents the old behaviour permanently:
+in that run the studio's extract row is genuinely absent, and in the new one it is present.
+
+### Not changed
+
+Part F requirements, `DesignAirFlow`, equipment selection, `OperatingAirFlow`, the optimisation targeting
+logic and the TAS air movements. This adds a read-only record and a presentation rule; it decides nothing.
+
+### Files changed
+
+- `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartODesignAirFlowState.cs` - **new.**
+- `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOOptimisationStep.cs` - `DesignAirFlowStates`.
+- `WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` - `DesignAirFlowStates(...)`, called from `Record`.
+- `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartOOptimisationAirFlowRow.cs` - the vector-driven rows.
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOResultsVectorTests.cs` - **new**, 11 tests.
+
+### Validation
+
+- `dotnet test WPF/SAM.Analytical.UI.WPF.Tests` - **421 passed** (410 baseline + 11).
+- `dotnet build SAM_UI.sln -c Debug` - **0 errors**.
+
+### Not performed
+
+No licensed TAS run and no run on the real Flat 1 model. The fixture reproduces the reported figures
+exactly, but the acceptance check on the real project is still worth doing.
+
+## Previous (2026-09-03, later still): the intermittent WPF test-host failures
 
 **Status: reproduced, root-caused, fixed and validated over 200 repeated suite runs.** Test infrastructure
 only - no production code changed, and nothing about the Part O isolation workflow is touched.
