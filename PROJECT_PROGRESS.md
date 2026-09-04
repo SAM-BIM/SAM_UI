@@ -1,22 +1,121 @@
 # Project Progress
 
 ## Branch
-`feature/parto-isolated-dwellings`, branched from `sow/2026-Q3` at **`bf48c53`**
-(the merge of PR #81).
+`fix/wpf-test-collection-serialization`, branched from `sow/2026-Q3` at **`2084768`**
+(the merge of PR #82, the Part O isolation work).
 
-**Pairs with, and must merge alongside:** `SAM` `feature/parto-isolated-dwellings`. This branch does not
-compile without its `PartOIsolationContext` class, the new `AnalyticalModelParameter` entry, the
-`PreparePartOIteration(..., isolate)` parameter and `TM59AssessmentReport.ThermalModelScope`.
-**Merge `SAM` first.**
-
-`SAM_Systems` untouched. `SAM_Tas` gained one behaviour-neutral companion PR with the later Part O
-correction - **SAM-BIM/SAM_Tas#46**, `feature/parto-plant-zone-daytypes` - whose merge order is free.
+Test-project change only. **No companion branch in any other repository** and no dependency on one -
+this does not touch `SAM`, `SAM_Tas` or any production assembly, and can merge on its own.
 
 ## Last updated
-2026-09-03 (later) - SAMAnalytical.Check runs over a prepared Part O model before TAS converts it:
-Errors stop the run, warnings do not, and the model checked is the normalized one actually handed to TAS.
+2026-09-03 (later still) - the intermittent `PackagePart.IsStreamClosed` failures in the WPF test host are
+reproduced, root-caused to xUnit's default per-class parallelism, and fixed by one shared test collection.
 
-## Latest (2026-09-03, later): SAM Check as a mandatory Part O pre-simulation gate
+## Latest (2026-09-03, later still): the intermittent WPF test-host failures
+
+**Status: reproduced, root-caused, fixed and validated over 200 repeated suite runs.** Test infrastructure
+only - no production code changed, and nothing about the Part O isolation workflow is touched.
+
+### What was happening
+
+Repeated runs of the SAM_UI suite failed intermittently - roughly one run in six - always with the same
+exception and never on a rerun of the same test:
+
+```
+System.NullReferenceException
+  at System.IO.Packaging.PackagePart.IsStreamClosed(Stream s)
+  at System.IO.Packaging.PackagePart.CleanUpRequestedStreamsList()
+  at System.IO.Packaging.PackagePart.GetStream(FileMode mode, FileAccess access)
+  at System.Windows.Application.LoadComponent(Object component, Uri resourceLocator)
+  at SAM.Analytical.UI.WPF.PartOIterationWindow.InitializeComponent()
+```
+
+The failing tests spanned `PartOIsolationScopeTests`, `PartODwellingSelectionTests` and
+`PartOPresentationTests`, in varying combinations of one to seven tests per bad run.
+
+### Root cause
+
+The exception is thrown inside WPF's own component loader, before any SAM code on the stack runs.
+
+`Application.LoadComponent` reads the compiled XAML through one `System.IO.Packaging.PackagePart` **per
+resource URI**. That part records the streams it has handed out in a plain `List<Stream>`, and both
+`GetStream` and the `CleanUpRequestedStreamsList` it calls mutate and enumerate that list with no lock.
+Two threads inside it at once leave one of them reading a slot the other has already removed, so
+`IsStreamClosed` is handed a null and dereferences it.
+
+Two threads get in there because of xUnit's default: **one collection per test class, and collections run
+in parallel** - on this 16-core machine, up to 16 at a time. Nothing in the repository overrode it; there
+was no `xunit.runner.json`, no assembly-level `CollectionBehavior`, and no `[Collection]` attribute
+anywhere in the suite.
+
+Three separate test classes each construct a `PartOIterationWindow`, so three collections could call
+`LoadComponent` for **the same** compiled XAML - therefore the same `PackagePart` - simultaneously.
+
+The distribution of failures is the confirmation. Every single failure across every reproduction was
+`PartOIterationWindow`; `ZoneControl` - loaded by `ZoneDwellingTests`, and by no other class - never
+failed once. A control shared by three collections races; a control owned by one class cannot, because
+tests within a class already run sequentially.
+
+### It is a test-host defect, not a product one
+
+Production loads each component once, from the single STA thread that owns the UI:
+`Modify.PreparePartOIteration` is the only construction site of `PartOIterationWindow` in the codebase.
+The one piece of production parallelism nearby, the `Parallel.For` in `Modify.RunWorkflow`, runs
+calculations and marshals progress text; it loads no components. There is no production path on which two
+threads load one component, so nothing here needed fixing outside the test project.
+
+### The fix
+
+`WPF/SAM.Analytical.UI.WPF.Tests/WpfCollection.cs` declares one xUnit collection,
+`"WPF component loading"`, and the four classes that instantiate a WPF component join it:
+`PartOIsolationScopeTests`, `PartODwellingSelectionTests`, `PartOPresentationTests` and
+`ZoneDwellingTests`.
+
+Tests in one collection never run concurrently with each other, so no two component loads can overlap.
+Every other class in the assembly keeps running in parallel exactly as before - the suite is ~0.15 s
+slower. `ZoneDwellingTests` joins although it has never failed: it is immune only by the accident of
+being the sole loader of its control, which is not a property worth relying on.
+
+Rejected alternatives: assembly-wide `CollectionBehavior` parallelism control (serialises 27 unrelated
+classes to fix 4), and any form of retry, sleep or delay (would hide the race rather than remove it).
+
+`WpfCollectionTests.EveryClassWithStaTests_IsInTheWpfCollection` keeps the membership honest. A class
+that instantiates a WPF component must carry a StaFact-family attribute to get an STA thread, so that
+attribute is a sound marker for "this class loads BAML"; the test reflects over the assembly and fails,
+naming the class, if such a class is not in the collection. It was confirmed to fail by removing the
+attribute from `ZoneDwellingTests`, and the guard named exactly that class.
+
+### Evidence
+
+The smallest useful group - the four WPF classes alone - **passed 40/40** and did not reproduce it: with
+only four collections they reach their WPF tests at different moments. The race needs the scheduling of
+the full suite.
+
+| Configuration | Failed runs |
+|---|---|
+| Full suite, default parallelism, **before** the fix | **5 / 60** (bad runs failed 1, 1, 1, 7 and 7 tests) |
+| Full suite, `xUnit.ParallelizeTestCollections=false`, before the fix | **0 / 60** |
+| Full suite, default parallelism, **after** the fix | **0 / 200** |
+
+The serialised control run is what proves parallel execution is necessary to the failure rather than
+merely correlated with it. 200 clean runs at the observed 8.3% per-run rate is not a proof of zero
+flakiness, but it is a ~4e-8 outcome if the race were still present at its previous rate.
+
+### Files changed
+
+- `WPF/SAM.Analytical.UI.WPF.Tests/WpfCollection.cs` - **new.** The collection definition and its guard test.
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOIsolationScopeTests.cs` - `[Collection(WpfCollection.Name)]`.
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartODwellingSelectionTests.cs` - `[Collection(WpfCollection.Name)]`.
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOPresentationTests.cs` - `[Collection(WpfCollection.Name)]`.
+- `WPF/SAM.Analytical.UI.WPF.Tests/ZoneDwellingTests.cs` - `[Collection(WpfCollection.Name)]`.
+
+### Validation
+
+- `dotnet test WPF/SAM.Analytical.UI.WPF.Tests` - **Passed 411, Failed 0, Skipped 0** (410 + the guard).
+- The 200-run repetition above, all green.
+- `dotnet build SAM_UI.sln -c Debug` - **0 errors**.
+
+## Previous (2026-09-03, later): SAM Check as a mandatory Part O pre-simulation gate
 
 **Status: implemented, tested, and validated on the licensed acceptance model.** The intended order is
 now **prepared model → `SAMAnalytical.Check` → TAS conversion → TAS simulation**; this is the Check step.
@@ -128,7 +227,7 @@ Wait for the re-requested Codex review on **SAM-BIM/SAM_UI#82**, then decide on 
 
 ---
 
-## Latest (2026-09-03): running selected dwellings in isolation
+## Previous (2026-09-03): running selected dwellings in isolation
 
 **Status: implemented and tested. Iteration 2B engineering/orchestration unchanged.**
 
