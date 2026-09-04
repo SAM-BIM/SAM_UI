@@ -34,10 +34,23 @@ namespace SAM.Analytical.UI.WPF
     /// <para>
     /// The dwelling list is one row per DWELLING ZONE and never one per space, over the same
     /// <see cref="PartODwellingSelection"/> the Prepare Iteration picker uses - virtualized, filtered in
-    /// place, selection held on the record. The status list is rebuilt on a change of scenario, scope or
-    /// selection, which costs one pass over the spaces in scope; nothing here touches the filesystem or the
-    /// catalogue, both of which the caller reads once and hands in through
+    /// place, selection held on the record. A Select All, a None or a restored scope is ONE selection change
+    /// however many dwellings it moves, never one per row.
+    /// </para>
+    /// <para>
+    /// <b>The analytical model is inspected only when an inspection input moved.</b> A change of scenario,
+    /// scope, dwelling selection, model, run, catalogue or session capability rebuilds the status list
+    /// (<see cref="Refresh"/>); the Iteration 2B step, the iteration limit, the follow-on tick and the search
+    /// text cannot move a single stage, so they re-derive only this dialog's own state
+    /// (<see cref="RefreshWorkflowInput"/>) over the inspection already built. Nothing here touches the
+    /// filesystem or the catalogue, both of which the caller reads once and hands in through
     /// <see cref="Capabilities"/>.
+    /// </para>
+    /// <para>
+    /// What ONE rebuild costs is the authorities' own cost - <c>Query.PartFRequiredFlowRate_Lps</c> resolves
+    /// a space through the cluster per call, and this window does not second-guess it or cache its answers.
+    /// So the guarantee this window makes is not that an inspection is a single pass; it is that a UI-only
+    /// interaction does not ask for one at all.
     /// </para>
     /// </summary>
     public partial class PartOWorkflowWindow : System.Windows.Window
@@ -59,8 +72,8 @@ namespace SAM.Analytical.UI.WPF
         /// <para>
         /// <c>Query.DefaultInternalConditionTextMap_TM59</c> falls back to reading and parsing a resource
         /// file where the session's settings do not carry the map, and the status list is rebuilt on every
-        /// change of scenario, scope or selection - so asking it per rebuild would put a file read behind a
-        /// checkbox. Null is a valid value and the inspection reports it as such.
+        /// change of scenario, scope or dwelling selection - so asking it per rebuild would put a file read
+        /// behind a checkbox. Null is a valid value and the inspection reports it as such.
         /// </para>
         /// </summary>
         private readonly TextMap textMap_TM59 = Analytical.Query.DefaultInternalConditionTextMap_TM59();
@@ -91,10 +104,14 @@ namespace SAM.Analytical.UI.WPF
             checkBox_CapacityEnvelope.IsChecked = new PartOOptimisationSettings().CapacityEnvelope;
             checkBox_WarmStart.IsChecked = new PartOOptimisationSettings().WarmStart;
 
-            checkBox_Optimise.Checked += (s, e) => Refresh();
-            checkBox_Optimise.Unchecked += (s, e) => Refresh();
-            textBox_AirFlowStep.TextChanged += (s, e) => Refresh();
-            textBox_MaximumIterations.TextChanged += (s, e) => Refresh();
+            //Workflow input, not model input. None of these four can move a single stage of the inspection:
+            //the Iteration 2B step, the iteration limit and the follow-on tick are deliberately outside the
+            //engineering-preparation match, and no authority the inspection asks looks at them. They are
+            //answered by the lightweight refresh, which reuses the inspection already built.
+            checkBox_Optimise.Checked += (s, e) => RefreshWorkflowInput();
+            checkBox_Optimise.Unchecked += (s, e) => RefreshWorkflowInput();
+            textBox_AirFlowStep.TextChanged += (s, e) => RefreshWorkflowInput();
+            textBox_MaximumIterations.TextChanged += (s, e) => RefreshWorkflowInput();
 
             //The search narrows the VIEW, never the selection: a dwelling filtered out of sight keeps its
             //state and reappears with it intact.
@@ -106,7 +123,9 @@ namespace SAM.Analytical.UI.WPF
 
                 //Deliberately NOT a full Refresh: the search changes what is visible, never what is
                 //selected, so no stage's status can have moved. On a block with thousands of dwellings a
-                //per-keystroke re-inspection would be a pass over every space in scope for nothing.
+                //per-keystroke re-inspection would be a pass over every space in scope for nothing - which
+                //is why setting SearchText raises PartODwellingSelection.SearchTextChanged and not its
+                //SelectionChanged, the event this window answers with a full inspection.
                 UpdateSelectionText();
             };
 
@@ -133,7 +152,11 @@ namespace SAM.Analytical.UI.WPF
                 zones_Eligible = Analytical.Query.PartFDwellingZones(value?.GetZones() ?? []) ?? [];
 
                 dwellingSelection = new PartODwellingSelection(zones_Eligible);
-                dwellingSelection.Changed += (s, e) => Refresh();
+
+                //The SCOPE moving is a genuine inspection input - different dwellings are different spaces,
+                //different Part F requirements and a different preparation match - so this one is answered
+                //with the full refresh. It is raised once per gesture, never once per row.
+                dwellingSelection.SelectionChanged += (s, e) => Refresh();
 
                 ICollectionView view = CollectionViewSource.GetDefaultView(dwellingSelection.Items);
                 view.Filter = item => dwellingSelection.IsVisible((PartODwellingSelection.Item)item);
@@ -157,7 +180,7 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>
         /// The catalogue this session read. Read once by the caller, because reading it touches a file and
-        /// this window rebuilds its status on every keystroke.
+        /// this window rebuilds its status whenever the requested scenario or scope moves.
         /// </summary>
         public VentilationUnitCatalogue? VentilationUnitCatalogue
         {
@@ -219,12 +242,10 @@ namespace SAM.Analytical.UI.WPF
 
             if (guids_Dwelling is not null)
             {
-                HashSet<Guid> guids = [.. guids_Dwelling];
-
-                foreach (PartODwellingSelection.Item item in dwellingSelection.Items)
-                {
-                    item.IsSelected = guids.Contains(item.Guid);
-                }
+                //One batched selection change, not one per flipped dwelling. Restoring a narrowed scope on a
+                //block-scale model flips hundreds of rows, and this window answers a selection change with a
+                //full inspection - so a row-by-row restore ran that inspection hundreds of times.
+                dwellingSelection.RestoreSelection(guids_Dwelling);
             }
 
             if (partOOptimisationSettings is not null && checkBox_Optimise.IsEnabled)
@@ -277,6 +298,42 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>The selection model behind the dwelling list. Exposed for tests.</summary>
         internal PartODwellingSelection DwellingSelection => dwellingSelection;
+
+        /// <summary>
+        /// The dwelling search exactly as typed. Exposed for tests, which have to reach the real
+        /// <c>TextChanged</c> handler rather than the selection model behind it - the whole point of the
+        /// search is what that handler does and does not do.
+        /// </summary>
+        internal string SearchText
+        {
+            get => textBox_Search.Text;
+            set => textBox_Search.Text = value;
+        }
+
+        /// <summary>
+        /// How many dwellings the bound list currently shows - the filtered view itself, not the predicate.
+        /// Exposed so a test can assert that a search really narrowed what a person sees.
+        /// </summary>
+        internal int VisibleDwellingCount
+        {
+            get
+            {
+                int result = 0;
+
+                if (listBox_Dwellings.ItemsSource is ICollectionView view)
+                {
+                    foreach (object item in view)
+                    {
+                        result++;
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        /// <summary>What the window says about the current selection and search. Exposed for tests.</summary>
+        internal string SelectionDescription => textBlock_Selection.Text;
 
         /// <summary>
         /// The Iteration 2B airflow step exactly as typed. Exposed for tests, which have to state text a
@@ -445,8 +502,11 @@ namespace SAM.Analytical.UI.WPF
         /// Rebuilds every derived part of the window from the current controls: the scenario and scope notes,
         /// which controls apply, the status list, and which actions are offered.
         /// <para>
-        /// One method rather than a handler per control, because every one of those inputs feeds the same
-        /// inspection. Cheap by construction - one pass over the spaces in scope, no file access.
+        /// <b>This is the expensive one, and it is called only when an INSPECTION input moved</b> - the
+        /// scenario, the scope, the selected dwellings, the model, the run, the catalogue or the session
+        /// capabilities. What it costs is whatever the authorities it asks cost over the spaces in scope; it
+        /// reads no file and remembers nothing. Anything that changes only this dialog's own workflow input
+        /// goes to <see cref="RefreshWorkflowInput"/> instead.
         /// </para>
         /// </summary>
         private void Refresh()
@@ -486,6 +546,54 @@ namespace SAM.Analytical.UI.WPF
 
             itemsControl_Status.ItemsSource = rows;
 
+            UpdateActions(partOWorkflowInspection);
+        }
+
+        /// <summary>
+        /// Re-derives only what this dialog's own workflow input can change: the Iteration 2B note, the
+        /// combined Run blocker line and which actions are offered.
+        /// <para>
+        /// <b>It reuses the inspection already built and never asks for another one.</b> The Iteration 2B
+        /// step, the iteration limit and the follow-on tick cannot move the dwelling scope, the TM59
+        /// mapping, the Approved Document F requirements, the prepared ventilation design, the equipment
+        /// availability, the model-check state, the simulation or results state, or the
+        /// engineering-preparation reuse match - the settings are deliberately excluded from that match, and
+        /// nothing <see cref="PartOWorkflowInspection.Inspect"/> asks reads them. Re-inspecting on a
+        /// keystroke re-asked every authority over every space in scope to re-read two numbers none of them
+        /// looks at.
+        /// </para>
+        /// <para>
+        /// Falls back to the full <see cref="Refresh"/> only where there is no inspection to reuse yet, so
+        /// the window is never left showing actions derived from nothing.
+        /// </para>
+        /// </summary>
+        private void RefreshWorkflowInput()
+        {
+            if (!loaded)
+            {
+                return;
+            }
+
+            PartOWorkflowInspection? partOWorkflowInspection = Inspection;
+            if (partOWorkflowInspection is null)
+            {
+                Refresh();
+
+                return;
+            }
+
+            UpdateOptimiseControls(Scenario);
+
+            UpdateActions(partOWorkflowInspection);
+        }
+
+        /// <summary>
+        /// Which actions are offered, and why not - from the supplied inspection plus this dialog's own
+        /// workflow-input refusal. Shared by the full and the lightweight refresh so both state exactly the
+        /// same rule.
+        /// </summary>
+        private void UpdateActions(PartOWorkflowInspection partOWorkflowInspection)
+        {
             //Two kinds of reason, kept apart on purpose. The inspection's blockers are what the MODEL and the
             //run do not provide; the optimisation refusal is what was typed into THIS dialog and cannot be
             //used. Both stop Run, and the text says which is which.

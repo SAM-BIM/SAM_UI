@@ -112,7 +112,12 @@ namespace SAM.Analytical.UI.WPF
                 List<Zone> zones_Dwelling = Analytical.Query.PartFDwellingZones(value) ?? [];
 
                 dwellingSelection = new PartODwellingSelection(zones_Dwelling);
-                dwellingSelection.Changed += (s, e) => UpdateSelectionText();
+
+                //Both, because the one line this window derives states the selected count AND whether a
+                //search is narrowing the list - so it moves on either. Neither costs more than a pass over
+                //the dwelling records: this window inspects nothing.
+                dwellingSelection.SelectionChanged += (s, e) => UpdateSelectionText();
+                dwellingSelection.SearchTextChanged += (s, e) => UpdateSelectionText();
 
                 ICollectionView view = CollectionViewSource.GetDefaultView(dwellingSelection.Items);
                 view.Filter = item => dwellingSelection.IsVisible((PartODwellingSelection.Item)item);

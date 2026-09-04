@@ -27,6 +27,13 @@ namespace SAM.Analytical.UI.WPF
     /// anything. The list is handed to the view once and filtered in place, so checking one dwelling or
     /// typing one character costs a pass over the dwelling records and nothing more.
     /// </para>
+    /// <para>
+    /// <b>Two notifications, because they mean two different things.</b>
+    /// <see cref="SelectionChanged"/> says the selected SCOPE moved and a listener may answer it with work
+    /// proportional to the model; <see cref="SearchTextChanged"/> says only what is VISIBLE moved. Neither
+    /// is raised per row - a Select All, a None or a <see cref="RestoreSelection(IEnumerable{Guid})"/> over
+    /// hundreds of dwellings is one notification.
+    /// </para>
     /// </summary>
     public class PartODwellingSelection
     {
@@ -80,7 +87,9 @@ namespace SAM.Analytical.UI.WPF
         private string searchText = string.Empty;
 
         //Raised once per user gesture, not once per row: a Select All over a large block flips every
-        //matching row's flag, and notifying per row would make one click cost a pass per row.
+        //matching row's flag, and notifying per row would make one click cost a pass per row. Every bulk
+        //operation on this class - Select All / None and the restore of a saved scope - mutates under this
+        //guard and raises exactly one notification afterwards.
         private bool changing = false;
 
         /// <param name="zones_Dwelling">
@@ -101,7 +110,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     if (!changing)
                     {
-                        Changed?.Invoke(this, EventArgs.Empty);
+                        SelectionChanged?.Invoke(this, EventArgs.Empty);
                     }
                 };
 
@@ -117,8 +126,33 @@ namespace SAM.Analytical.UI.WPF
             });
         }
 
-        /// <summary>Raised whenever the selection changes - one item, or many through Select All / None.</summary>
-        public event EventHandler Changed;
+        /// <summary>
+        /// Raised whenever the SELECTED SCOPE changes - one item, or many through Select All / None or
+        /// <see cref="RestoreSelection(IEnumerable{Guid})"/>.
+        /// <para>
+        /// <b>This means the scope changed, and nothing else.</b> A listener may legitimately answer it with
+        /// work proportional to the model - the Part O workflow dialog re-inspects the analytical model on
+        /// it - so nothing that leaves every dwelling's <see cref="Item.IsSelected"/> exactly as it was may
+        /// raise it. Search text in particular does not: it narrows the view, and it has
+        /// <see cref="SearchTextChanged"/> of its own.
+        /// </para>
+        /// <para>
+        /// Raised at most once per gesture. A bulk operation over hundreds of dwellings is one notification,
+        /// not one per row.
+        /// </para>
+        /// </summary>
+        public event EventHandler SelectionChanged;
+
+        /// <summary>
+        /// Raised when <see cref="SearchText"/> changes - what is VISIBLE moved, and no dwelling's selected
+        /// state did.
+        /// <para>
+        /// Kept apart from <see cref="SelectionChanged"/> on purpose. A listener answers this by refreshing
+        /// the filtered view and whatever line describes the search; answering it with work proportional to
+        /// the model would put that work behind every keystroke for a scope that did not change.
+        /// </para>
+        /// </summary>
+        public event EventHandler SearchTextChanged;
 
         /// <summary>Every eligible dwelling, in display order. The window's list binds to this once.</summary>
         public IReadOnlyList<Item> Items => items;
@@ -161,7 +195,10 @@ namespace SAM.Analytical.UI.WPF
 
                 searchText = text;
 
-                Changed?.Invoke(this, EventArgs.Empty);
+                //NOT a selection change: every dwelling keeps the state it had, and a dwelling filtered out
+                //of sight reappears with it intact. Announced as what it is, so a listener that re-inspects
+                //the analytical model on a scope change does not do it on a keystroke.
+                SearchTextChanged?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -214,7 +251,49 @@ namespace SAM.Analytical.UI.WPF
                 changing = false;
             }
 
-            Changed?.Invoke(this, EventArgs.Empty);
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Restores a previously recorded scope: every dwelling whose guid is in <paramref name="guids"/> is
+        /// selected and every other one is cleared, as ONE selection change.
+        /// <para>
+        /// <b>By guid, never by name</b>, exactly as every other selection on this class - two dwellings may
+        /// share a display name and restoring one must not restore the other. A guid that is no longer an
+        /// eligible dwelling is simply not found: the model may have been re-zoned since the scope was
+        /// recorded.
+        /// </para>
+        /// <para>
+        /// <b>Over every dwelling, not only the visible ones.</b> Unlike <see cref="SetSelected(bool)"/> -
+        /// which is a gesture on what the search matches - this states the whole scope, so a search left in
+        /// the box cannot silently narrow what a restore is allowed to touch.
+        /// </para>
+        /// <para>
+        /// <b>One notification.</b> The rows are mutated under the same guard Select All / None uses, so a
+        /// listener that answers <see cref="SelectionChanged"/> with a full inspection of the analytical
+        /// model does it once - not once per flipped dwelling. Each row still raises its own
+        /// <see cref="INotifyPropertyChanged"/>, so the bound checkboxes update.
+        /// </para>
+        /// </summary>
+        public void RestoreSelection(IEnumerable<Guid> guids)
+        {
+            HashSet<Guid> guids_Selected = [.. guids ?? []];
+
+            changing = true;
+
+            try
+            {
+                foreach (Item item in items)
+                {
+                    item.IsSelected = guids_Selected.Contains(item.Guid);
+                }
+            }
+            finally
+            {
+                changing = false;
+            }
+
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }
