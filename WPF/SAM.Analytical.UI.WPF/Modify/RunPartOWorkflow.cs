@@ -148,13 +148,21 @@ namespace SAM.Analytical.UI.WPF
         /// weather file, the output directory and the full-year range are the run's own inputs, and a
         /// high-level command that chose them silently would be choosing engineering inputs.
         /// </para>
+        /// <para>
+        /// <b>The reuse path records the current Iteration 2B choice.</b> A reused preparation is the same
+        /// ENGINEERING case, which is what <see cref="PartOWorkflowInspection.ReusePreparation"/> matches on;
+        /// the 2B step and limit are not engineering and were therefore not matched - but they are read off
+        /// the run afterwards by <c>Modify.CanOptimise</c>, so they have to be the ones this invocation asked
+        /// for. <see cref="PartORun.AdoptOptimisationSettings"/> is that record, and where the run will not
+        /// take it the preparation is rebuilt instead - correctness before saving a preparation.
+        /// </para>
         /// </summary>
         private static void PrepareAndRun(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, PartOWorkflowInspection? partOWorkflowInspection, VentilationUnitCatalogue ventilationUnitCatalogue, IWin32Window? owner)
         {
             //Reused only where the run's own record of what it was prepared with describes this request.
             //Otherwise prepared again - including where an iteration is prepared for something else, which
             //would otherwise be simulated as though it were this one.
-            if (!(partOWorkflowInspection?.ReusePreparation ?? false))
+            if (!ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, partOWorkflowInspection?.ReusePreparation ?? false))
             {
                 if (!PreparePartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner))
                 {
@@ -186,6 +194,52 @@ namespace SAM.Analytical.UI.WPF
             }
 
             AssessPartOTM59(partORun, owner);
+        }
+
+        /// <summary>
+        /// Settles the reuse decision for one invocation of Prepare &amp; Run - and, where the preparation is
+        /// reused, records on the run the Iteration 2B choice this invocation actually asked for.
+        ///
+        /// <para><b>Why the record has to be written here</b></para>
+        /// <para>
+        /// <see cref="PartOWorkflowInspection.ReusePreparation"/> matches the ENGINEERING case: the
+        /// iteration, the dwelling scope, the stated routes, the catalogue, the isolation - everything that
+        /// reached <c>SAM.Analytical.Modify.PreparePartOIteration</c> and therefore decides whether the
+        /// prepared model is the same model. The Iteration 2B step and limit are the one thing on the
+        /// preparation context that preparation neither reads nor is affected by, so they are deliberately
+        /// not matched - but <c>Modify.CanOptimise</c> reads them off the run afterwards. Skipping the
+        /// preparation therefore skipped the only thing that used to record them, and a user who ticked,
+        /// unticked or retuned 2B and pressed Run got the choice made at the earlier preparation.
+        /// </para>
+        ///
+        /// <para><b>Why not simply match on them and re-prepare</b></para>
+        /// <para>
+        /// Because it would rebuild an analytical preparation - and on an isolated run re-derive its
+        /// geometry and re-cut its adiabatic interfaces - to change two numbers nothing in that preparation
+        /// looks at. Correctness does not require it: the run's own record is what is wrong, and
+        /// <see cref="PartORun.AdoptOptimisationSettings"/> is the transition that fixes exactly that.
+        /// </para>
+        ///
+        /// <para><b>Correctness first where they disagree</b></para>
+        /// <para>
+        /// Where the run will not take the record it was not a reuse target after all, and this returns
+        /// false so the caller prepares again. A redundant preparation is always right; a run whose recorded
+        /// optimisation is not the one that was asked for is not.
+        /// </para>
+        ///
+        /// <para><b>Nothing is written unless the preparation is reused</b>, and nothing is written during
+        /// inspection: on the prepare-again path the new preparation records the choice itself, and a status
+        /// refresh must not change the run it is describing.</para>
+        /// </summary>
+        /// <returns>Whether the existing preparation may be reused. False means prepare it again.</returns>
+        internal static bool ReuseWithCurrentOptimisation(PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, bool reuse)
+        {
+            if (!reuse || partORun is null)
+            {
+                return false;
+            }
+
+            return partORun.AdoptOptimisationSettings(partOWorkflowRequest?.OptimisationSettings);
         }
 
         /// <summary>

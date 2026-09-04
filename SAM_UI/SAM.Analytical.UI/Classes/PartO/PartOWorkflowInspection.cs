@@ -485,6 +485,16 @@ namespace SAM.Analytical.UI
         /// is prepared again.
         /// </para>
         /// <para>
+        /// <b>The Iteration 2B settings are deliberately NOT compared</b>, and this is the one exclusion.
+        /// They are the only thing on the context the analytical preparation neither reads nor is affected
+        /// by, so a changed step or limit does not make the prepared model a different model - matching on
+        /// them would rebuild the whole engineering preparation, and on an isolated run re-derive its
+        /// geometry, to change two numbers nothing in that preparation looks at. What they DO affect is what
+        /// the run records for <c>Modify.CanOptimise</c> to read afterwards, so the orchestration writes the
+        /// current choice onto the reused run through <c>PartORun.AdoptOptimisationSettings</c> instead. This
+        /// method stays a pure question about the engineering case and changes nothing.
+        /// </para>
+        /// <para>
         /// <b>A restored run is never reusable</b>, and not because of a flag: a run reopened from its saved
         /// results carries no preparation context at all, which is exactly the distinction
         /// <c>Modify.CanOptimise</c> refuses on.

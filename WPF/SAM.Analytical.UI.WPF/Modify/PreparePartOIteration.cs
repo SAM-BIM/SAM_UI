@@ -136,6 +136,12 @@ namespace SAM.Analytical.UI.WPF
             //Null, not an empty list, where no selection is wanted: the preparation reads null as "no
             //catalogue was offered" and leaves AirHandlingUnitParameter.VentilationUnitReference untouched,
             //which is Iteration 1a. An empty list would be a catalogue that offers nothing.
+            //
+            //The request states the INTENT and this reads the capability, which is why the two are separate:
+            //an Iteration 2 request on a machine with no readable catalogue hands the preparation an EMPTY
+            //list, so it refuses per dwelling and says so, rather than silently becoming an Iteration 1a run.
+            //The Prepare & Run dialog blocks that combination before it gets here - see
+            //PartOWorkflowInspection's Equipment stage - and this is what happens if anything else reaches it.
             List<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors = partOWorkflowRequest.SelectVentilationUnit
                 ? ventilationUnitCatalogue.CapacityDescriptors
                 : null;

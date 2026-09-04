@@ -780,6 +780,285 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(partOWorkflowWindow.Inspection.Stages.Count, Enum.GetValues<PartOWorkflowStage>().Length);
         }
 
+        // ---- Intent is not capability -------------------------------------------------------------------
+
+        /// <summary>
+        /// <b>Iteration 2 stays Iteration 2 when no catalogue can be read.</b>
+        /// <para>
+        /// The scenario is what the user asked for; whether this machine has a readable product catalogue is
+        /// a capability. Folding the second into the first made the request an Iteration 1a request - a
+        /// different assessment, with no equipment selection and no Iteration 2B after it - and then reported
+        /// success. The request now keeps the intent and the missing catalogue is reported as the blocker it
+        /// is, in the catalogue reader's own words.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void TheDialog_KeepsIteration2WhenNoCatalogueCanBeRead()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), string.Format("SAM_NoCatalogue_{0}", Guid.NewGuid()));
+
+            //The production reader, over a directory with no catalogue in it - the Unavailable state.
+            VentilationUnitCatalogue ventilationUnitCatalogue = VentilationUnitCatalogue.Read(directory);
+
+            Assert.False(ventilationUnitCatalogue.HasSelectableProducts);
+
+            PartOWorkflowWindow partOWorkflowWindow = new()
+            {
+                AnalyticalModel = Model(),
+                VentilationUnitCatalogue = ventilationUnitCatalogue,
+            };
+
+            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null, null);
+
+            //THE INTENT. Not downgraded, not silently turned into Iteration 1a.
+            Assert.True(partOWorkflowWindow.Request.SelectVentilationUnit);
+
+            //THE CAPABILITY, reported as a blocker rather than acted on.
+            Assert.Equal(PartOWorkflowStageStatus.Blocked, Stage(partOWorkflowWindow.Inspection, PartOWorkflowStage.Equipment).Status);
+
+            Assert.False(partOWorkflowWindow.CanRun);
+
+            Assert.Contains("Run is unavailable", partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
+            Assert.Contains("Iteration 2 selects a real manufacturer unit", partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
+
+            //The reader's own account of which of its three states it landed in - never "no product can
+            //serve this dwelling", which is a different and false statement.
+            Assert.Contains(ventilationUnitCatalogue.Description, partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// The positive half of the same rule: with a real catalogue, Iteration 2 is an Iteration 2 request,
+        /// the equipment stage is READY and Run is offered.
+        /// </summary>
+        [WpfFact]
+        public void TheDialog_RunsIteration2WithARealCatalogue()
+        {
+            PartOWorkflowWindow partOWorkflowWindow = new()
+            {
+                AnalyticalModel = Model(),
+                VentilationUnitCatalogue = Catalogue(),
+            };
+
+            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null, null);
+
+            Assert.True(partOWorkflowWindow.Request.SelectVentilationUnit);
+
+            Assert.Equal(PartOWorkflowStageStatus.Ready, Stage(partOWorkflowWindow.Inspection, PartOWorkflowStage.Equipment).Status);
+
+            Assert.True(partOWorkflowWindow.CanRun);
+            Assert.Empty(partOWorkflowWindow.BlockerDescription);
+        }
+
+        /// <summary>
+        /// Iteration 1a is still not Iteration 2, catalogue or no catalogue: the intent that is preserved is
+        /// the one that was stated, and 1a states no equipment selection.
+        /// </summary>
+        [WpfFact]
+        public void TheDialog_KeepsIteration1aDistinctFromIteration2()
+        {
+            PartOWorkflowWindow partOWorkflowWindow = new()
+            {
+                AnalyticalModel = Model(),
+                VentilationUnitCatalogue = Catalogue(),
+            };
+
+            partOWorkflowWindow.Restore(Scenario_1a(), PartOWorkflowScope.AllDwellings, null, null);
+
+            Assert.False(partOWorkflowWindow.Request.SelectVentilationUnit);
+
+            Assert.Equal(PartOWorkflowStageStatus.NotApplicable, Stage(partOWorkflowWindow.Inspection, PartOWorkflowStage.Equipment).Status);
+
+            Assert.True(partOWorkflowWindow.CanRun);
+        }
+
+        // ---- The Iteration 2B record on a reused preparation ---------------------------------------------
+
+        /// <summary>
+        /// <b>A.</b> A run prepared with no Iteration 2B, reused after the user asks for one: the run records
+        /// the settings that were actually asked for, so the follow-on capability can expose 2B.
+        /// <para>
+        /// Without this the reuse path skipped the preparation that would have recorded them, and
+        /// <c>Modify.CanOptimise</c> went on reading the null the earlier preparation left behind - the
+        /// button stayed off for a run the user had just asked to optimise.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void AReusedPreparation_RecordsAnOptimisationTheEarlierPreparationDidNotHave()
+        {
+            AnalyticalModel analyticalModel = Model();
+
+            PartOWorkflowRequest partOWorkflowRequest = Request(Scenario_2(), analyticalModel);
+
+            PartORun partORun = Prepared(analyticalModel, partOWorkflowRequest);
+
+            Assert.Null(partORun.PreparationContext.OptimisationSettings);
+
+            //The same engineering case, so it is still reusable - only the follow-on choice moved.
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings { AirFlowStep_Lps = 7, MaximumIterations = 4 };
+
+            Assert.True(Inspect(analyticalModel, partOWorkflowRequest, partORun).ReusePreparation);
+
+            Assert.True(Modify.ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, true));
+
+            Assert.NotNull(partORun.PreparationContext.OptimisationSettings);
+            Assert.Equal(7, partORun.PreparationContext.OptimisationSettings.AirFlowStep_Lps);
+            Assert.Equal(4, partORun.PreparationContext.OptimisationSettings.MaximumIterations);
+        }
+
+        /// <summary>
+        /// <b>B.</b> Changed step and limit reach the run. The values the optimisation would run at are the
+        /// ones on screen, not the ones from an earlier preparation of the same design.
+        /// </summary>
+        [Fact]
+        public void AReusedPreparation_RecordsChangedOptimisationValuesRatherThanTheOldOnes()
+        {
+            AnalyticalModel analyticalModel = Model();
+
+            PartOWorkflowRequest partOWorkflowRequest = Request(Scenario_2(), analyticalModel);
+
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings { AirFlowStep_Lps = 5, MaximumIterations = 10, CapacityEnvelope = true, WarmStart = true };
+
+            PartORun partORun = Prepared(analyticalModel, partOWorkflowRequest);
+
+            Assert.Equal(5, partORun.PreparationContext.OptimisationSettings.AirFlowStep_Lps);
+
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings { AirFlowStep_Lps = 2.5, MaximumIterations = 3, CapacityEnvelope = false, WarmStart = false };
+
+            Assert.True(Inspect(analyticalModel, partOWorkflowRequest, partORun).ReusePreparation);
+
+            Assert.True(Modify.ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, true));
+
+            PartOOptimisationSettings partOOptimisationSettings = partORun.PreparationContext.OptimisationSettings;
+
+            Assert.Equal(2.5, partOOptimisationSettings.AirFlowStep_Lps);
+            Assert.Equal(3, partOOptimisationSettings.MaximumIterations);
+            Assert.False(partOOptimisationSettings.CapacityEnvelope);
+            Assert.False(partOOptimisationSettings.WarmStart);
+        }
+
+        /// <summary>
+        /// <b>C.</b> Unticking Iteration 2B leaves nothing active. A stale step and limit surviving on the
+        /// run would offer an optimisation the user had just declined.
+        /// </summary>
+        [Fact]
+        public void AReusedPreparation_ClearsTheOptimisationWhenItIsNoLongerAskedFor()
+        {
+            AnalyticalModel analyticalModel = Model();
+
+            PartOWorkflowRequest partOWorkflowRequest = Request(Scenario_2(), analyticalModel);
+
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings();
+
+            PartORun partORun = Prepared(analyticalModel, partOWorkflowRequest);
+
+            Assert.NotNull(partORun.PreparationContext.OptimisationSettings);
+
+            partOWorkflowRequest.OptimisationSettings = null;
+
+            Assert.True(Inspect(analyticalModel, partOWorkflowRequest, partORun).ReusePreparation);
+
+            Assert.True(Modify.ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, true));
+
+            Assert.Null(partORun.PreparationContext.OptimisationSettings);
+        }
+
+        /// <summary>
+        /// The 2B choice is <b>not</b> part of the engineering match, and that is deliberate: it is the one
+        /// thing on the preparation context the analytical preparation neither reads nor is affected by, so
+        /// matching on it would rebuild a model nothing about it changes.
+        /// </summary>
+        [Fact]
+        public void AChangedOptimisationChoice_DoesNotRebuildThePreparation()
+        {
+            AnalyticalModel analyticalModel = Model();
+
+            PartOWorkflowRequest partOWorkflowRequest = Request(Scenario_2(), analyticalModel);
+
+            PartORun partORun = Prepared(analyticalModel, partOWorkflowRequest);
+
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings { AirFlowStep_Lps = 9, MaximumIterations = 2 };
+
+            PartOWorkflowInspection partOWorkflowInspection = Inspect(analyticalModel, partOWorkflowRequest, partORun);
+
+            Assert.True(partOWorkflowInspection.ReusePreparation);
+            Assert.Equal(PartOWorkflowStageStatus.Reused, Stage(partOWorkflowInspection, PartOWorkflowStage.VentilationDesign).Status);
+        }
+
+        /// <summary>
+        /// <b>Inspecting changes nothing.</b> The status list reports what the run currently carries; the
+        /// user's new choice reaches the run only when they commit to it. A rebuild driven by a status
+        /// refresh would rewrite the record of a run nobody had asked to change.
+        /// </summary>
+        [Fact]
+        public void Inspecting_DoesNotWriteTheOptimisationChoiceOntoTheRun()
+        {
+            AnalyticalModel analyticalModel = Model();
+
+            PartOWorkflowRequest partOWorkflowRequest = Request(Scenario_2(), analyticalModel);
+
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings { AirFlowStep_Lps = 5, MaximumIterations = 10 };
+
+            PartORun partORun = Prepared(analyticalModel, partOWorkflowRequest);
+
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings { AirFlowStep_Lps = 1, MaximumIterations = 99 };
+
+            Inspect(analyticalModel, partOWorkflowRequest, partORun);
+            Inspect(analyticalModel, partOWorkflowRequest, partORun);
+
+            //Still the run's own record, untouched by having been looked at.
+            Assert.Equal(5, partORun.PreparationContext.OptimisationSettings.AirFlowStep_Lps);
+            Assert.Equal(10, partORun.PreparationContext.OptimisationSettings.MaximumIterations);
+        }
+
+        /// <summary>
+        /// The record is a transition on a <b>prepared</b> run and nothing else. A run that was never
+        /// prepared, and a restored run - which carries no preparation context by construction - both refuse
+        /// it, so the orchestration prepares again rather than writing into a record that is not there.
+        /// </summary>
+        [Fact]
+        public void OnlyAPreparedRunWithAContext_RecordsAnOptimisationChoice()
+        {
+            AnalyticalModel analyticalModel = Model();
+
+            Assert.False(new PartORun().AdoptOptimisationSettings(new PartOOptimisationSettings()));
+
+            //Prepared through the overload that states no context - live, but not automatically repeatable.
+            PartORun partORun_NoContext = new();
+            partORun_NoContext.Prepare(analyticalModel, Scenarios(analyticalModel));
+
+            Assert.Equal(PartORunState.Prepared, partORun_NoContext.State);
+            Assert.Null(partORun_NoContext.PreparationContext);
+            Assert.False(partORun_NoContext.AdoptOptimisationSettings(new PartOOptimisationSettings()));
+
+            //And the orchestration degrades to preparing again rather than running a reuse it cannot record
+            //the current choice on.
+            Assert.False(Modify.ReuseWithCurrentOptimisation(partORun_NoContext, Request(Scenario_2(), analyticalModel), true));
+        }
+
+        /// <summary>
+        /// Nothing is written where the preparation is <b>not</b> being reused: that path prepares again, and
+        /// the new preparation records the choice itself. A write here would change the record of a run that
+        /// is about to be replaced.
+        /// </summary>
+        [Fact]
+        public void APreparationThatIsNotReused_IsNotWrittenTo()
+        {
+            AnalyticalModel analyticalModel = Model();
+
+            PartOWorkflowRequest partOWorkflowRequest = Request(Scenario_2(), analyticalModel);
+
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings { AirFlowStep_Lps = 5, MaximumIterations = 10 };
+
+            PartORun partORun = Prepared(analyticalModel, partOWorkflowRequest);
+
+            partOWorkflowRequest.OptimisationSettings = new PartOOptimisationSettings { AirFlowStep_Lps = 8, MaximumIterations = 6 };
+
+            Assert.False(Modify.ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, false));
+
+            Assert.Equal(5, partORun.PreparationContext.OptimisationSettings.AirFlowStep_Lps);
+            Assert.Equal(10, partORun.PreparationContext.OptimisationSettings.MaximumIterations);
+        }
+
         // ---- Fixture ------------------------------------------------------------------------------------
 
         private static PartOWorkflowStageState Stage(PartOWorkflowInspection partOWorkflowInspection, PartOWorkflowStage partOWorkflowStage)
@@ -837,6 +1116,10 @@ namespace SAM.Analytical.UI.WPF.Tests
                 partOWorkflowRequest.SelectVentilationUnit ? Descriptors() : null)
             {
                 Isolated = partOWorkflowRequest.Isolate,
+
+                //As Modify.PreparePartOIteration records it, so a reused preparation starts from whatever
+                //the preparation that built it was actually asked for.
+                OptimisationSettings = partOWorkflowRequest.OptimisationSettings,
             };
 
             Assert.True(result.Prepare(analyticalModel, Scenarios(analyticalModel), partOPreparationContext));

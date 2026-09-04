@@ -117,12 +117,56 @@ Added - `WPF/SAM.Analytical.UI.WPF`:
 Modified:
 - `WPF/SAM.Analytical.UI.WPF/Modify/PreparePartOIteration.cs` (the request overload; picker delegates to it)
 - `WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml{,.cs}` (the ribbon button and its handler)
+- `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartORun.cs` (`AdoptOptimisationSettings` - the review round;
+  the only change to an existing merged class, and it adds a transition rather than altering one)
 
-Added - tests: `WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowTests.cs` (36).
+Added - tests: `WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowTests.cs` (46).
+
+### Review round on PR #85 - two correctness findings, both fixed
+
+**1. Iteration 2 silently became Iteration 1a where no catalogue could be read.**
+`PartOWorkflowWindow.Request` built `SelectVentilationUnit` as
+`scenario.SelectVentilationUnit && catalogue.HasSelectableProducts` - folding a **capability** into the
+**intent**. A user who chose Iteration 2 on a machine with no readable catalogue got an Iteration 1a
+request: no equipment selection, no Iteration 2B after it, and a run reported as successful. The request
+now states the scenario alone; the missing catalogue is reported by the Equipment stage as the blocker it
+already was, in the catalogue reader's own words, and Run is refused. The Prepare Iteration picker is
+unaffected and unchanged - its tick is disabled and cleared without a catalogue, so no intent exists there
+to lose.
+
+**2. The Iteration 2B choice did not reach a reused preparation.**
+`ReusePreparation` matches the ENGINEERING case and deliberately excludes
+`PartOPreparationContext.OptimisationSettings` - the one field the analytical preparation neither reads
+nor is affected by. But the reuse path skipped the preparation that used to record it, while
+`Modify.CanOptimise` still read it off the run afterwards: ticking, unticking or retuning 2B and pressing
+Run left the choice made at the earlier preparation.
+
+Fixed with the **smallest correct write**, not by widening the match:
+`PartORun.AdoptOptimisationSettings` (new) records the current choice on a `Prepared` run that has a
+context, and `Modify.ReuseWithCurrentOptimisation` calls it on the reuse path only. Null clears it, so an
+unticked 2B leaves nothing active. Widening `Reusable` to include the settings would rebuild the whole
+analytical preparation - and on an isolated run re-derive its geometry and re-cut its adiabatic interfaces
+- to change two numbers nothing in that preparation looks at. Where the run will not take the record it was
+not a reuse target after all and the caller prepares again: correctness before saving a preparation.
+
+**Nothing is written during inspection.** The status list reports what the run currently carries; the
+record is written at the point the user commits to the request.
+
+**Neither fix changes analytical preparation or simulation behaviour**, so the three licensed acceptance
+runs were not repeated. Fix 1 only alters a request that cannot reach a run (Run is blocked in exactly that
+state) and is identical on every path that could previously execute; fix 2 writes orchestration metadata
+that `PreparePartOIteration` does not read.
 
 ### Tests and build
 
-- `SAM.Analytical.UI.WPF.Tests`: **458 passed, 0 failed** (422 baseline + 36). The new class joins `WpfCollection`, as the guard test requires of any class with STA tests.
+- `SAM.Analytical.UI.WPF.Tests`: **468 passed, 0 failed** (422 baseline + 46). The new class joins
+  `WpfCollection`, as the guard test requires of any class with STA tests.
+- The review round added **10**: three through `PartOWorkflowWindow` for the intent/capability split
+  (Iteration 2 without a catalogue, Iteration 2 with one, 1a still distinct from 2), the three
+  reuse/2B cases A/B/C, and four invariants - a changed 2B choice does not rebuild the preparation,
+  inspecting writes nothing, only a prepared run with a context takes the record, and a preparation that is
+  not reused is not written to. Each was confirmed **red** against the original code before the fix: the
+  intent test on the folded expression, and A/B/C against a reuse path that records nothing.
 - `SAM_UI.sln` Debug (VS 18 MSBuild): **0 errors**, no new warnings in the changed files.
 - `SAM`, `SAM_Tas`, `SAM_Systems`: untouched, not rebuilt.
 

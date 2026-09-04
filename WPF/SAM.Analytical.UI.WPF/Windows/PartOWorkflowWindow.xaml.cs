@@ -315,14 +315,25 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>Whether a follow-on Iteration 2B was asked for and the scenario can carry one.</summary>
         public bool Optimise => (checkBox_Optimise.IsChecked ?? false) && checkBox_Optimise.IsEnabled;
 
-        /// <summary>Everything the run needs, in the shape the preparation seam takes.</summary>
+        /// <summary>
+        /// Everything the run needs, in the shape the preparation seam takes.
+        /// <para>
+        /// <b>The request is the user's INTENT, never what this machine happens to be able to do.</b>
+        /// <c>SelectVentilationUnit</c> is read off the chosen scenario alone: Iteration 2 stays an
+        /// Iteration 2 request when no catalogue can be read, and the missing catalogue is reported as the
+        /// blocker it is (<see cref="PartOWorkflowInspection"/>'s Equipment stage, from
+        /// <see cref="PartOWorkflowCapabilities.EquipmentAvailable"/>). Folding the capability into the
+        /// intent here silently downgraded the requested run to Iteration 1a - a different assessment,
+        /// with no equipment selection and no Iteration 2B after it - and reported success.
+        /// </para>
+        /// </summary>
         public PartOWorkflowRequest Request
         {
             get
             {
                 PartOWorkflowScenario? partOWorkflowScenario = Scenario;
 
-                return new PartOWorkflowRequest(partOWorkflowScenario?.Option, Scope, Zones_Dwelling, partOWorkflowScenario is not null && partOWorkflowScenario.SelectVentilationUnit && (ventilationUnitCatalogue?.HasSelectableProducts ?? false))
+                return new PartOWorkflowRequest(partOWorkflowScenario?.Option, Scope, Zones_Dwelling, partOWorkflowScenario is not null && partOWorkflowScenario.SelectVentilationUnit)
                 {
                     OptimisationSettings = OptimisationSettings,
                 };
