@@ -120,7 +120,7 @@ Modified:
 - `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartORun.cs` (`AdoptOptimisationSettings` - the review round;
   the only change to an existing merged class, and it adds a transition rather than altering one)
 
-Added - tests: `WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowTests.cs` (46).
+Added - tests: `WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowTests.cs` (52).
 
 ### Review round on PR #85 - two correctness findings, both fixed
 
@@ -152,14 +152,32 @@ not a reuse target after all and the caller prepares again: correctness before s
 **Nothing is written during inspection.** The status list reports what the run currently carries; the
 record is written at the point the user commits to the request.
 
-**Neither fix changes analytical preparation or simulation behaviour**, so the three licensed acceptance
-runs were not repeated. Fix 1 only alters a request that cannot reach a run (Run is blocked in exactly that
-state) and is identical on every path that could previously execute; fix 2 writes orchestration metadata
-that `PreparePartOIteration` does not read.
+**3. A ticked Iteration 2B with unusable settings silently became no 2B.**
+`PartOWorkflowWindow.OptimisationSettings` returns null for an unparseable step, an unparseable iteration
+limit, or a pair `PartOOptimisationSettings.IsValid` refuses - and a null there is indistinguishable from
+"the user did not ask for an optimisation". Nothing gated Run on it, so `Optimise == true` could coexist
+with `OptimisationSettings == null`: the baseline ran a full-year TAS simulation having discarded the 2B
+setup the user could still see ticked, and the follow-on was then unavailable on the run that had just paid
+for it.
+
+The window now carries `OptimisationRefusal` - the same property, with the same wording and the same
+authority (`PartOOptimisationSettings.IsValid`), that the Prepare Iteration picker has always used to
+refuse OK. It blocks Run in its own right and is stated twice: in the blocker line under the status list,
+and beside the 2B fields themselves. **It is kept distinct from the model blockers**: the inspection stages
+report what the model and the run provide, and a mistyped number in this dialog is neither, so the
+inspection is unchanged and still reports the model as runnable. Nothing is silently unticked and nothing
+invalid is silently converted to "no optimisation"; an unticked 2B is not validated at all and the baseline
+runs.
+
+**None of the three fixes changes analytical preparation or simulation behaviour**, so the three licensed
+acceptance runs were not repeated. Fix 1 only alters a request that cannot reach a run (Run is blocked in
+exactly that state) and is identical on every path that could previously execute; fix 2 writes
+orchestration metadata that `PreparePartOIteration` does not read; fix 3 only prevents an invalid UI
+request from starting a run at all.
 
 ### Tests and build
 
-- `SAM.Analytical.UI.WPF.Tests`: **468 passed, 0 failed** (422 baseline + 46). The new class joins
+- `SAM.Analytical.UI.WPF.Tests`: **474 passed, 0 failed** (422 baseline + 52). The new class joins
   `WpfCollection`, as the guard test requires of any class with STA tests.
 - The review round added **10**: three through `PartOWorkflowWindow` for the intent/capability split
   (Iteration 2 without a catalogue, Iteration 2 with one, 1a still distinct from 2), the three
@@ -167,6 +185,11 @@ that `PreparePartOIteration` does not read.
   inspecting writes nothing, only a prepared run with a context takes the record, and a preparation that is
   not reused is not written to. Each was confirmed **red** against the original code before the fix: the
   intent test on the folded expression, and A/B/C against a reuse path that records nothing.
+- The 2B-validation round added **6**, all through `PartOWorkflowWindow`: an unparseable step, an
+  unparseable iteration limit, a pair `IsValid` refuses (asserted against that authority's own sentence),
+  the unticked case that must not be validated, the valid case that must still run and carry its settings,
+  and the separation invariant - an unusable 2B leaves every model stage exactly as it was. Five of the six
+  were confirmed **red** against head `7fdde247`; the sixth is the valid case, which was never blocked.
 - `SAM_UI.sln` Debug (VS 18 MSBuild): **0 errors**, no new warnings in the changed files.
 - `SAM`, `SAM_Tas`, `SAM_Systems`: untouched, not rebuilt.
 

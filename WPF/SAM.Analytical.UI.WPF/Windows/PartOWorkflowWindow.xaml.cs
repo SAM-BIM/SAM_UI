@@ -279,6 +279,31 @@ namespace SAM.Analytical.UI.WPF
         internal PartODwellingSelection DwellingSelection => dwellingSelection;
 
         /// <summary>
+        /// The Iteration 2B airflow step exactly as typed. Exposed for tests, which have to state text a
+        /// <c>PartOOptimisationSettings</c> cannot represent - the unparseable case
+        /// <see cref="OptimisationRefusal"/> exists for.
+        /// </summary>
+        internal string AirFlowStepText
+        {
+            get => textBox_AirFlowStep.Text;
+            set => textBox_AirFlowStep.Text = value;
+        }
+
+        /// <summary>The Iteration 2B iteration limit exactly as typed. Exposed for tests, as above.</summary>
+        internal string MaximumIterationsText
+        {
+            get => textBox_MaximumIterations.Text;
+            set => textBox_MaximumIterations.Text = value;
+        }
+
+        /// <summary>Whether the Iteration 2B tick is on. Exposed for tests.</summary>
+        internal bool OptimiseChecked
+        {
+            get => checkBox_Optimise.IsChecked ?? false;
+            set => checkBox_Optimise.IsChecked = value;
+        }
+
+        /// <summary>
         /// The Iteration 2B optimisation this run is set up to allow afterwards, or null where none was asked
         /// for, the scenario cannot support one, or the numbers typed in are unusable.
         /// <para>
@@ -316,6 +341,58 @@ namespace SAM.Analytical.UI.WPF
         public bool Optimise => (checkBox_Optimise.IsChecked ?? false) && checkBox_Optimise.IsEnabled;
 
         /// <summary>
+        /// Why the Iteration 2B settings as typed cannot be used, or null where they can - or where no
+        /// optimisation was asked for at all.
+        /// <para>
+        /// <b>This is validation of an explicit workflow input, not a statement about the building.</b> It is
+        /// deliberately not a <see cref="PartOWorkflowInspection"/> stage: the stages report what the model
+        /// and the run provide, and a number somebody mistyped in this dialog is neither. It blocks Run in
+        /// its own right, beside them.
+        /// </para>
+        /// <para>
+        /// <b>Ticked 2B with unusable settings must never quietly become no 2B.</b>
+        /// <see cref="OptimisationSettings"/> returns null for an unparseable step, an unparseable limit or a
+        /// pair <c>PartOOptimisationSettings.IsValid</c> refuses - and a null there is indistinguishable from
+        /// "the user did not ask for an optimisation". Without this the baseline ran, discarded the 2B setup
+        /// the user could see was ticked, and the follow-on was then unavailable on a run that had already
+        /// cost a full-year TAS simulation.
+        /// </para>
+        /// <para>
+        /// <b>The rule is <c>PartOOptimisationSettings.IsValid</c>'s</b>, asked here rather than restated -
+        /// exactly as the Prepare Iteration picker asks it. Nothing about a step or an iteration limit is
+        /// decided in this window.
+        /// </para>
+        /// </summary>
+        public string? OptimisationRefusal
+        {
+            get
+            {
+                if (!Optimise)
+                {
+                    return null;
+                }
+
+                if (!double.TryParse(textBox_AirFlowStep.Text, out double airFlowStep_Lps))
+                {
+                    return string.Format("'{0}' is not an airflow step. Enter the number of litres per second each failing room's design airflow is raised by each round.", textBox_AirFlowStep.Text);
+                }
+
+                if (!int.TryParse(textBox_MaximumIterations.Text, out int maximumIterations))
+                {
+                    return string.Format("'{0}' is not a number of iterations. Enter the most optimisation rounds the run may take.", textBox_MaximumIterations.Text);
+                }
+
+                PartOOptimisationSettings partOOptimisationSettings = new()
+                {
+                    AirFlowStep_Lps = airFlowStep_Lps,
+                    MaximumIterations = maximumIterations,
+                };
+
+                return partOOptimisationSettings.IsValid(out string? refusal) ? null : refusal;
+            }
+        }
+
+        /// <summary>
         /// Everything the run needs, in the shape the preparation seam takes.
         /// <para>
         /// <b>The request is the user's INTENT, never what this machine happens to be able to do.</b>
@@ -351,6 +428,9 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>Why Run is unavailable, as one block of text. Empty where it is available. Exposed for tests.</summary>
         public string BlockerDescription => textBlock_Blockers.Text;
+
+        /// <summary>What the window says beside the Iteration 2B fields. Exposed so it is assertable.</summary>
+        public string OptimisationDescription => textBlock_Optimise.Text;
 
         /// <summary>Whether Prepare and Run is currently offered. Exposed for tests.</summary>
         public bool CanRun => button_Run.IsEnabled;
@@ -406,12 +486,25 @@ namespace SAM.Analytical.UI.WPF
 
             itemsControl_Status.ItemsSource = rows;
 
-            textBlock_Blockers.Text = partOWorkflowInspection.CanRun
-                ? string.Empty
-                : string.Format("Run is unavailable: {0}", string.Join(" ", partOWorkflowInspection.Blockers));
+            //Two kinds of reason, kept apart on purpose. The inspection's blockers are what the MODEL and the
+            //run do not provide; the optimisation refusal is what was typed into THIS dialog and cannot be
+            //used. Both stop Run, and the text says which is which.
+            List<string> reasons = [.. partOWorkflowInspection.Blockers];
 
-            button_Run.IsEnabled = partOWorkflowInspection.CanRun;
-            button_Run.ToolTip = partOWorkflowInspection.CanRun
+            string? refusal_Optimisation = OptimisationRefusal;
+            if (refusal_Optimisation is not null)
+            {
+                reasons.Add(string.Format("Iteration 2B is ticked, but its settings cannot be used: {0} Correct them, or untick Iteration 2B to run the baseline without it.", refusal_Optimisation));
+            }
+
+            bool canRun = reasons.Count == 0;
+
+            textBlock_Blockers.Text = canRun
+                ? string.Empty
+                : string.Format("Run is unavailable: {0}", string.Join(" ", reasons));
+
+            button_Run.IsEnabled = canRun;
+            button_Run.ToolTip = canRun
                 ? (partOWorkflowInspection.ReusePreparation
                     ? "Simulate the iteration already prepared for exactly this scenario and scope, then assess it against the CIBSE TM59 criteria."
                     : "Prepare the iteration, check the model, run the full-year TAS simulation and assess it against the CIBSE TM59 criteria.")
@@ -471,7 +564,7 @@ namespace SAM.Analytical.UI.WPF
 
             //What the loaded model already IS, from the context the preparation stamped on it - said beside
             //the scope choice, because "all dwellings" of an isolated extract is not the whole building.
-            PartOIsolationContext partOIsolationContext = analyticalModel?.GetValue<PartOIsolationContext>(Analytical.AnalyticalModelParameter.PartOIsolationContext);
+            PartOIsolationContext? partOIsolationContext = analyticalModel?.GetValue<PartOIsolationContext>(Analytical.AnalyticalModelParameter.PartOIsolationContext);
 
             if (partOIsolationContext is not null && partOIsolationContext.IsValid)
             {
@@ -522,6 +615,16 @@ namespace SAM.Analytical.UI.WPF
                 textBlock_Optimise.Text = (partOWorkflowScenario?.Option?.PartOVentilationMode) != PartOVentilationMode.MVHR
                     ? "Iteration 2B raises mechanical design airflow, and this scenario is not a mechanical route. Natural ventilation is not a mechanical airflow optimisation target."
                     : "Iteration 2B works within the capacity of a selected manufacturer unit, so it is available on Iteration 2 only.";
+
+                return;
+            }
+
+            //Said at the fields as well as in the blocker line below the status list: the blocker line is
+            //always visible and states that Run is stopped, and this states it where the numbers are typed.
+            string? refusal = OptimisationRefusal;
+            if (refusal is not null)
+            {
+                textBlock_Optimise.Text = string.Format("These settings cannot be used, so Prepare & Run is unavailable. {0}", refusal);
 
                 return;
             }
