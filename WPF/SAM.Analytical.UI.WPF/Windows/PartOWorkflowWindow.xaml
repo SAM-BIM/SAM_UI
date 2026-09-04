@@ -1,0 +1,147 @@
+<Window x:Class="SAM.Analytical.UI.WPF.PartOWorkflowWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
+        mc:Ignorable="d"
+        Title="Part O - Prepare &amp; Run" MinHeight="520" MinWidth="700" Width="760"
+        SizeToContent="Height" ResizeMode="CanResizeWithGrip" FontFamily="Roboto Light">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- The whole content scrolls where it cannot fit; the action row sits OUTSIDE the scroll region
+             and is always reachable. -->
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Label Grid.Row="0" Content="Scenario" Padding="0,0,0,2"/>
+                <ComboBox x:Name="comboBox_Scenario" Grid.Row="1" Height="22" HorizontalAlignment="Stretch"/>
+                <TextBlock x:Name="textBlock_Scenario" Grid.Row="2" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+
+                <Grid Grid.Row="3" Margin="0,12,0,0">
+                    <Label Content="Scope" Padding="0,0,0,2" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="comboBox_Scope" Width="240" Height="22" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+
+                <TextBlock x:Name="textBlock_Scope" Grid.Row="4" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+
+                <!-- DWELLINGS, one row per dwelling zone - never one per space. The list virtualizes and
+                     the selection lives on the record rather than the row container, so a model with
+                     thousands of spaces is still a list of its dwellings. Hidden entirely on the
+                     all-dwellings scope, where there is nothing to choose. -->
+                <Grid x:Name="grid_Dwellings" Grid.Row="5" Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Search" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="textBox_Search" Grid.Column="1" Height="20" VerticalContentAlignment="Center"
+                                 ToolTip="Narrow the list of dwellings by name. Selection is never lost by searching."/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0,0,0">
+                            <Button x:Name="button_SelectAll" Content="Select All" Width="70" Height="20" Margin="0,0,6,0"
+                                    ToolTip="Select every dwelling the search currently matches - all of them while the search is empty."/>
+                            <Button x:Name="button_SelectNone" Content="None" Width="50" Height="20"
+                                    ToolTip="Clear every dwelling the search currently matches - all of them while the search is empty."/>
+                        </StackPanel>
+                    </Grid>
+
+                    <ListBox x:Name="listBox_Dwellings" Grid.Row="1" MinHeight="88" MaxHeight="180" Margin="0,4,0,0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="{Binding Name}"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock x:Name="textBlock_Selection" Grid.Row="2" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+                </Grid>
+
+                <!-- Iteration 2B is NOT one of the scenarios above: it is an optimisation performed on a
+                     completed Iteration 2 run. It is set up here because the settings have to be recorded
+                     with the preparation for the run to be an optimisation starting point at all, and it
+                     is collapsed by default so a baseline run never has to read it. -->
+                <Expander x:Name="expander_Optimise" Grid.Row="6" Margin="0,12,0,0" Header="Follow-on optimisation (Iteration 2B)">
+                    <StackPanel Margin="0,6,0,0">
+                        <CheckBox x:Name="checkBox_Optimise" Content="Allow automatic TM59 optimisation after this run"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
+                            <TextBlock Text="Airflow step [l/s]" VerticalAlignment="Center" Width="120"/>
+                            <TextBox x:Name="textBox_AirFlowStep" Width="60" Height="20" VerticalContentAlignment="Center"/>
+                            <TextBlock Text="Maximum iterations" VerticalAlignment="Center" Width="130" Margin="20,0,0,0"/>
+                            <TextBox x:Name="textBox_MaximumIterations" Width="60" Height="20" VerticalContentAlignment="Center"/>
+                        </StackPanel>
+
+                        <CheckBox x:Name="checkBox_CapacityEnvelope" Content="Also report what the selected unit could deliver at its capacity ceiling (diagnostic)" Margin="20,8,0,0"/>
+                        <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted geometry between iterations (faster; no change to results)" Margin="20,6,0,0"/>
+
+                        <TextBlock x:Name="textBlock_Optimise" Margin="20,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+                    </StackPanel>
+                </Expander>
+
+                <Label Grid.Row="7" Content="Status" Padding="0,0,0,2" Margin="0,12,0,0"/>
+
+                <!-- WHAT EXISTS, WHAT WILL BE REUSED, WHAT WILL CHANGE, WHAT BLOCKS RUN - one line each,
+                     every one of them produced by PartOWorkflowInspection from an existing authority. -->
+                <ItemsControl x:Name="itemsControl_Status" Grid.Row="8">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Top"/>
+                                <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding Foreground}" FontWeight="SemiBold" VerticalAlignment="Top"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Detail}" TextWrapping="Wrap" Foreground="#555555"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock x:Name="textBlock_Blockers" Grid.Row="9" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
+
+                <TextBlock x:Name="textBlock_Advanced" Grid.Row="10" Margin="0,10,0,10" TextWrapping="Wrap" Foreground="#777777"
+                           Text="The individual Part O commands remain available: Edit - Map IC (TM59), AddVent PartF and Prepare Iteration, Simulate - Energy Simulation, and Results - Overheating (TM59) and Optimise (2B)."/>
+            </Grid>
+        </ScrollViewer>
+
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button x:Name="button_Run" Width="120" Height="24" Margin="0,0,8,0" IsEnabled="False" Click="button_Run_Click"
+                        ToolTipService.ShowOnDisabled="True">Prepare &amp; Run</Button>
+                <Button x:Name="button_Review" Width="120" Height="24" Margin="0,0,8,0" IsEnabled="False" Click="button_Review_Click"
+                        ToolTipService.ShowOnDisabled="True">Review Results</Button>
+                <Button x:Name="button_Optimise" Width="120" Height="24" IsEnabled="False" Click="button_Optimise_Click"
+                        ToolTipService.ShowOnDisabled="True">Optimise (2B)</Button>
+            </StackPanel>
+            <Button x:Name="button_Close" IsCancel="True" Width="70" Height="24" HorizontalAlignment="Right" Click="button_Close_Click">Close</Button>
+        </Grid>
+    </Grid>
+</Window>

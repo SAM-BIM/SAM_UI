@@ -187,7 +187,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartODwellingSelection selection = Selection(Dwelling("Flat 1"), Dwelling("Flat 2"), Dwelling("Flat 3"));
 
             int changes = 0;
-            selection.Changed += (s, e) => changes++;
+            selection.SelectionChanged += (s, e) => changes++;
 
             selection.SetSelected(false);
 

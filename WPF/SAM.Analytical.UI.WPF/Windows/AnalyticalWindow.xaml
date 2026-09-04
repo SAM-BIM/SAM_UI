@@ -474,6 +474,13 @@
                 </RibbonGroup>
             </RibbonTab>
             <RibbonTab x:Name="RibbonTab_Simulate" Header="Simulate">
+                <!-- The high-level Part O entry point, on the Simulate tab because that is what it does:
+                     one command that prepares, checks, simulates and assesses. The individual expert
+                     commands stay exactly where they were - Edit > Part O > Prepare Iteration, and
+                     Results > Part O - and this one neither replaces nor hides them. -->
+                <RibbonGroup x:Name="RibbonGroup_Simulate_PartO" Header="Part O">
+                    <RibbonButton x:Name="RibbonButton_PartOWorkflow" Label="Prepare &amp; Run" ToolTipService.ShowOnDisabled="True" />
+                </RibbonGroup>
                 <RibbonGroup x:Name="RibbonGroup_Simulate_Simulate" Header="Simulate">
                     <RibbonButton x:Name="RibbonButton_SolarSimulation" Label="Solar Simulation" />
                     <RibbonButton x:Name="RibbonButton_EnergySimulation" Label="Energy Simulation" />

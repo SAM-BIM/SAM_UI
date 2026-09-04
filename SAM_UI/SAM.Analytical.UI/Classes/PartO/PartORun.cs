@@ -280,6 +280,54 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
+        /// Records the Iteration 2B optimisation this prepared run should allow afterwards, <b>without
+        /// re-preparing it</b>.
+        /// <para>
+        /// <b>Why this is not a re-preparation.</b>
+        /// <see cref="PartOPreparationContext.OptimisationSettings"/> is not a preparation input:
+        /// <c>SAM.Analytical.Modify.PreparePartOIteration</c> neither reads it nor is affected by it, and it
+        /// rides on the context only because it is a choice made at the same moment about the same run.
+        /// Everything else on the context - the iteration, the dwelling scope, the stated routes, the
+        /// catalogue - DID reach the analytical preparation, and none of those can be changed here.
+        /// </para>
+        /// <para>
+        /// <b>What it exists for.</b> Where an orchestration reuses an already-prepared run rather than
+        /// preparing it again, the preparation that would have recorded the user's current 2B choice is
+        /// skipped - so without this the run would carry the choice made at the earlier preparation and
+        /// <c>Modify.CanOptimise</c> would read it. This is the transition that keeps the run's record equal
+        /// to what was actually asked for.
+        /// </para>
+        /// <para>
+        /// <b>Null clears it</b>, which is how "the user unticked Iteration 2B" is recorded. Stale settings
+        /// are never left active.
+        /// </para>
+        /// <para>
+        /// <b>Only a <see cref="PartORunState.Prepared"/> run with a preparation context takes it.</b> A
+        /// completed run's settings belong to the baseline its results were produced under and are refused
+        /// here; so is a restored run, which carries no preparation context at all. Neither is a reuse
+        /// target, so refusing costs nothing and stops this becoming a general back door into the record.
+        /// </para>
+        /// <para>
+        /// <b>The settings themselves are not validated here.</b> <c>PartOOptimisationSettings.IsValid</c> is
+        /// that authority and <c>Modify.CanOptimise</c> applies it before any optimisation runs; a second
+        /// opinion in this method would be a second rule to keep in step.
+        /// </para>
+        /// </summary>
+        /// <param name="partOOptimisationSettings">The optimisation to allow, or null for none.</param>
+        /// <returns>True where the run recorded it. False leaves the run exactly as it was.</returns>
+        public bool AdoptOptimisationSettings(PartOOptimisationSettings partOOptimisationSettings)
+        {
+            if (State != PartORunState.Prepared || partOPreparationContext is null)
+            {
+                return false;
+            }
+
+            partOPreparationContext.OptimisationSettings = partOOptimisationSettings;
+
+            return true;
+        }
+
+        /// <summary>
         /// The same transition, recording <b>how</b> the preparation was asked for so it can be repeated
         /// identically by an optimisation - see <see cref="PreparationContext"/>.
         /// </summary>

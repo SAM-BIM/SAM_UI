@@ -78,21 +78,71 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            //One canonical word for every zone in scope. There is no path by which anything else can be in
-            //this dictionary - the option carries the word and the window has no text field.
-            Dictionary<Guid, string> dictionary_VentilationStrategy = [];
-            foreach (Zone zone in zones_Dwelling)
+            //Everything the dialog collected, in the one shape the preparation seam takes. The picker and
+            //the high-level Prepare & Run dialog differ only in how a request is arrived at; from here on
+            //there is one path.
+            PartOWorkflowRequest partOWorkflowRequest = new(
+                option,
+                partOIterationWindow.Isolate ? PartOWorkflowScope.SelectedDwellingsIsolated : PartOWorkflowScope.SelectedDwellings,
+                zones_Dwelling,
+                partOIterationWindow.SelectVentilationUnit)
             {
-                if (zone is not null)
-                {
-                    dictionary_VentilationStrategy[zone.Guid] = option.VentilationStrategy;
-                }
+                OptimisationSettings = partOIterationWindow.OptimisationSettings,
+            };
+
+            PreparePartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner);
+        }
+
+        /// <summary>
+        /// The preparation itself, over a request that has already been made: prepare, show what it produced,
+        /// and - on OK - adopt the prepared model and start the session's Part O run.
+        /// <para>
+        /// <b>The one implementation.</b> The Prepare Iteration picker builds a request from its own controls
+        /// and calls this; so does <see cref="RunPartOWorkflow"/>. Neither has a preparation of its own, so
+        /// the two cannot drift, and the engineering below is still the single call
+        /// <c>SAM.Analytical.Modify.PreparePartOIteration</c>.
+        /// </para>
+        /// <para>
+        /// <b>The preparation summary is shown either way.</b> It states the thermal model scope, the route,
+        /// the duty and the equipment, and it is the last point at which a person can decline before a
+        /// full-year TAS run starts. A high-level workflow that skipped it would be hiding the one screen
+        /// that says what is about to be simulated.
+        /// </para>
+        /// </summary>
+        /// <returns>
+        /// True where the prepared model was adopted and <paramref name="partORun"/> is now
+        /// <see cref="PartORunState.Prepared"/>. False for a refusal, a decline, or a failed adoption - each
+        /// of which has already been reported to the user by the time this returns.
+        /// </returns>
+        public static bool PreparePartOIteration(this UIAnalyticalModel? uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, VentilationUnitCatalogue ventilationUnitCatalogue, IWin32Window? owner = null)
+        {
+            AnalyticalModel? analyticalModel = uIAnalyticalModel?.JSAMObject;
+
+            PartOVentilationStrategyOption? option = partOWorkflowRequest?.Option;
+
+            List<Zone> zones_Dwelling = partOWorkflowRequest?.Zones_Dwelling ?? [];
+
+            if (analyticalModel is null || partORun is null || option is null || zones_Dwelling.Count == 0)
+            {
+                return false;
             }
+
+            ventilationUnitCatalogue ??= VentilationUnitCatalogue.Read();
+
+            //One canonical word for every zone in scope. There is no path by which anything else can be in
+            //this dictionary - the option carries the word and neither dialog has a text field.
+            Dictionary<Guid, string> dictionary_VentilationStrategy = partOWorkflowRequest!.VentilationStrategies();
 
             //Null, not an empty list, where no selection is wanted: the preparation reads null as "no
             //catalogue was offered" and leaves AirHandlingUnitParameter.VentilationUnitReference untouched,
             //which is Iteration 1a. An empty list would be a catalogue that offers nothing.
-            List<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors = partOIterationWindow.SelectVentilationUnit
+            //
+            //The request states the INTENT and this reads the capability, which is why the two are separate:
+            //an Iteration 2 request on a machine with no readable catalogue hands the preparation an EMPTY
+            //list, so it refuses per dwelling and says so, rather than silently becoming an Iteration 1a run.
+            //The Prepare & Run dialog blocks that combination before it gets here - see
+            //PartOWorkflowInspection's Equipment stage - and this is what happens if anything else reaches it.
+            List<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors = partOWorkflowRequest.SelectVentilationUnit
                 ? ventilationUnitCatalogue.CapacityDescriptors
                 : null;
 
@@ -101,11 +151,11 @@ namespace SAM.Analytical.UI.WPF
             //not a preparation input and does not affect the call below - see PartOPreparationContext.
             PartOPreparationContext partOPreparationContext = new(option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors)
             {
-                OptimisationSettings = partOIterationWindow.OptimisationSettings,
-                Isolated = partOIterationWindow.Isolate,
+                OptimisationSettings = partOWorkflowRequest.OptimisationSettings,
+                Isolated = partOWorkflowRequest.Isolate,
             };
 
-            PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel, option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors, partOIterationWindow.Isolate);
+            PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel, option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors, partOWorkflowRequest.Isolate);
 
             //A refusal returns no model at all, by contract. Nothing is adopted and the run is dropped with
             //the reason, so the ribbon can say why an assessment is unavailable.
@@ -115,7 +165,7 @@ namespace SAM.Analytical.UI.WPF
 
                 MessageBox.Show(string.Format("The Part O iteration was not prepared.\n\n{0}", partOIterationPreparation.Refusal));
 
-                return;
+                return false;
             }
 
             //An isolated run gets its own project name, so its TBD, TSD, .sam and TM59 report cannot land
@@ -130,7 +180,7 @@ namespace SAM.Analytical.UI.WPF
 
             PartOPreparationWindow partOPreparationWindow = new()
             {
-                Summary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOIterationWindow.SelectVentilationUnit, partOIsolationContext),
+                Summary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOWorkflowRequest.SelectVentilationUnit, partOIsolationContext),
                 EquipmentRows = EquipmentRows(partOIterationPreparation, ventilationUnitCapacityDescriptors),
                 SpaceRows = (partOIterationPreparation.AnalyticalModel.GetSpaces() ?? []).ConvertAll(x => new PartOSpaceRow(x)),
             };
@@ -147,20 +197,22 @@ namespace SAM.Analytical.UI.WPF
             {
                 //Declined. The loaded model is untouched - the preparation worked on a copy - and no run is
                 //started, so nothing can later be simulated and assessed against scenarios nobody accepted.
-                return;
+                return false;
             }
 
             if (!partORun.Prepare(partOIterationPreparation, partOPreparationContext))
             {
                 MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason));
 
-                return;
+                return false;
             }
 
             //Armed immediately before the write, so this replacement is not read as an outside edit.
             partORun.ExpectModification();
 
             uIAnalyticalModel!.SetJSAMObject(partOIterationPreparation.AnalyticalModel, new FullModification());
+
+            return partORun.State == PartORunState.Prepared;
         }
 
         /// <summary>
