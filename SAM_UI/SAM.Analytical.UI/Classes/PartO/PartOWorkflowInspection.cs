@@ -31,9 +31,11 @@ namespace SAM.Analytical.UI
     /// <item><b>TM59 mapping</b> - <c>TM59Manager.TM59SpaceApplications(InternalCondition, TextMap)</c>
     /// falling back to the space name, which is exactly the pair <c>TMOverheatingCalculator</c> classifies a
     /// simulated space with. A space this reports as mapped is a space the assessment will classify.</item>
-    /// <item><b>Part F requirements</b> - <c>Query.PartFRequiredFlowRate_Lps(AdjacencyCluster, Space,
-    /// FlowClassification)</c>, which reads the space's own <c>PartFSpaceData</c>. No rate is re-derived and
-    /// none is compared against anything.</item>
+    /// <item><b>Part F requirements</b> - <c>PartFIndex.PartFRequiredFlowRate_Lps</c>, which is
+    /// <c>Query.PartFRequiredFlowRate_Lps(AdjacencyCluster, Space, FlowClassification)</c> reached through
+    /// one snapshot of the model space identities instead of re-resolving every room against the whole
+    /// model. It reads the space's own <c>PartFSpaceData</c> live on every call. No rate is re-derived, none
+    /// is cached here, and none is compared against anything.</item>
     /// <item><b>Which route needs Part F at all</b> - <c>Query.PartOIterationVentilationMode</c> and
     /// <c>Query.PartOPartFAirflowApplication</c>, so Iteration 1b is reported as N/A for the same reason the
     /// preparation skips it rather than because this file knows what "natural" means.</item>
@@ -109,7 +111,13 @@ namespace SAM.Analytical.UI
         /// explicitly only where the caller already holds one, so a machine without the installed resource
         /// does not silently change what this reports.
         /// </param>
-        public static PartOWorkflowInspection Inspect(AnalyticalModel analyticalModel, PartOWorkflowRequest partOWorkflowRequest, PartORun partORun, PartOWorkflowCapabilities partOWorkflowCapabilities, TextMap textMap_TM59 = null)
+        /// <param name="partFIndex_Scope">
+        /// The snapshot of the model space identities this inspection resolves through. Null - which is what
+        /// production passes - builds one from <paramref name="analyticalModel"/> for the duration of this
+        /// call and drops it. Supplied only by a caller that already holds one for exactly this model, and by
+        /// the tests that count what one inspection asks of it.
+        /// </param>
+        public static PartOWorkflowInspection Inspect(AnalyticalModel analyticalModel, PartOWorkflowRequest partOWorkflowRequest, PartORun partORun, PartOWorkflowCapabilities partOWorkflowCapabilities, TextMap textMap_TM59 = null, PartFIndex partFIndex_Scope = null)
         {
             PartOWorkflowInspection result = new();
 
@@ -122,11 +130,20 @@ namespace SAM.Analytical.UI
 
             AdjacencyCluster adjacencyCluster = analyticalModel?.AdjacencyCluster;
 
-            List<Space> spaces_Scope = Spaces_Scope(adjacencyCluster, partOWorkflowRequest);
+            //ONE snapshot of the model space identities for the whole inspection, built by SAM and asked of
+            //SAM. An inspection reads every space of the scope three times - the dwelling scope resolves
+            //them, and the Approved Document F stage asks a supply and an extract requirement of each - and
+            //every one of those reads used to re-resolve the space against the whole model, which made
+            //inspecting a five thousand space project quadratic. It is NOT a cache: it lives for this one
+            //call, it holds no rate, and it answers exactly what Query.PartFRequiredFlowRate_Lps answers,
+            //read from the model every time.
+            PartFIndex partFIndex = partFIndex_Scope ?? new PartFIndex(adjacencyCluster);
+
+            List<Space> spaces_Scope = Spaces_Scope(partFIndex, partOWorkflowRequest);
 
             result.Add(DwellingScope(analyticalModel, partOWorkflowRequest, spaces_Scope));
             result.Add(InternalConditions(adjacencyCluster, spaces_Scope, textMap_TM59 ?? Analytical.Query.DefaultInternalConditionTextMap_TM59()));
-            result.Add(PartFRequirements(adjacencyCluster, partOWorkflowRequest, spaces_Scope));
+            result.Add(PartFRequirements(partFIndex, partOWorkflowRequest, spaces_Scope));
 
             result.ReusePreparation = Reusable(partORun, partOWorkflowRequest);
 
@@ -165,43 +182,21 @@ namespace SAM.Analytical.UI
         /// reason.
         /// </para>
         /// <para>
-        /// One dictionary over the model's spaces and one pass over the zones in scope, so this stays
-        /// linear on a model with thousands of them.
+        /// <b>Resolved by SAM, not here.</b> <c>PartFIndex.Spaces_Zones</c> is the one place that turns a set
+        /// of dwelling zones into the space instances the model currently carries, and it does it against the
+        /// inspection's single snapshot - so this stays linear on a model with thousands of spaces, and this
+        /// file keeps no lookup of its own that could go stale against the model.
         /// </para>
         /// </summary>
-        private static List<Space> Spaces_Scope(AdjacencyCluster adjacencyCluster, PartOWorkflowRequest partOWorkflowRequest)
+        private static List<Space> Spaces_Scope(PartFIndex partFIndex, PartOWorkflowRequest partOWorkflowRequest)
         {
-            List<Space> result = [];
-
             List<Zone> zones = partOWorkflowRequest?.Zones_Dwelling;
-            if (adjacencyCluster is null || zones is null || zones.Count == 0)
+            if (zones is null || zones.Count == 0)
             {
-                return result;
+                return [];
             }
 
-            Dictionary<Guid, Space> dictionary = [];
-            foreach (Space space in adjacencyCluster.GetSpaces() ?? [])
-            {
-                if (space is not null)
-                {
-                    dictionary[space.Guid] = space;
-                }
-            }
-
-            HashSet<Guid> guids = [];
-
-            foreach (Zone zone in zones)
-            {
-                foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(zone) ?? [])
-                {
-                    if (space is not null && guids.Add(space.Guid) && dictionary.TryGetValue(space.Guid, out Space space_Current))
-                    {
-                        result.Add(space_Current);
-                    }
-                }
-            }
-
-            return result;
+            return partFIndex.Spaces_Zones(zones);
         }
 
         private static PartOWorkflowStageState DwellingScope(AnalyticalModel analyticalModel, PartOWorkflowRequest partOWorkflowRequest, List<Space> spaces_Scope)
@@ -390,7 +385,7 @@ namespace SAM.Analytical.UI
         /// nothing; discovering it after a preparation costs the user a dialog and a retry.
         /// </para>
         /// </summary>
-        private static PartOWorkflowStageState PartFRequirements(AdjacencyCluster adjacencyCluster, PartOWorkflowRequest partOWorkflowRequest, List<Space> spaces_Scope)
+        private static PartOWorkflowStageState PartFRequirements(PartFIndex partFIndex, PartOWorkflowRequest partOWorkflowRequest, List<Space> spaces_Scope)
         {
             if (partOWorkflowRequest?.Option is null)
             {
@@ -406,7 +401,7 @@ namespace SAM.Analytical.UI
                 return new PartOWorkflowStageState(PartOWorkflowStage.PartFRequirements, PartOWorkflowStageStatus.NotApplicable, diagnostic ?? "This route applies no continuous mechanical rate.");
             }
 
-            if (adjacencyCluster is null || spaces_Scope.Count == 0)
+            if (partFIndex.AdjacencyCluster is null || spaces_Scope.Count == 0)
             {
                 return new PartOWorkflowStageState(PartOWorkflowStage.PartFRequirements, PartOWorkflowStageStatus.Blocked, "There are no spaces in scope to carry an Approved Document F requirement.");
             }
@@ -415,8 +410,11 @@ namespace SAM.Analytical.UI
 
             foreach (Space space in spaces_Scope)
             {
-                double? supply = Analytical.Query.PartFRequiredFlowRate_Lps(adjacencyCluster, space, FlowClassification.Supply);
-                double? extract = Analytical.Query.PartFRequiredFlowRate_Lps(adjacencyCluster, space, FlowClassification.Extract);
+                //The same answer Query.PartFRequiredFlowRate_Lps gives, read from the model through the
+                //inspection's own snapshot rather than by re-resolving the room against the whole model
+                //twice over. No rate is held here, and none is compared against anything.
+                double? supply = partFIndex.PartFRequiredFlowRate_Lps(space, FlowClassification.Supply);
+                double? extract = partFIndex.PartFRequiredFlowRate_Lps(space, FlowClassification.Extract);
 
                 if ((supply.HasValue && supply.Value > 0) || (extract.HasValue && extract.Value > 0))
                 {

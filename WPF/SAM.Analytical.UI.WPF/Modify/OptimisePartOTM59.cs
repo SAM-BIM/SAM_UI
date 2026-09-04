@@ -683,6 +683,12 @@ namespace SAM.Analytical.UI.WPF
 
             airHandlingUnits.Sort((x, y) => string.CompareOrdinal(x?.Name, y?.Name));
 
+            //ONE snapshot for this read-only pass, built by SAM. Every room of the run used to re-resolve
+            //itself against the whole model to read its Approved Document F requirement, which made building
+            //the design vector quadratic in the model. Nothing is cached here: the snapshot lives for this
+            //one call, holds no rate, and answers exactly what Query.PartFRequiredFlowRate_Lps answers.
+            PartFIndex partFIndex = new(adjacencyCluster);
+
             HashSet<string> keys = [];
 
             foreach (AirHandlingUnit airHandlingUnit in airHandlingUnits)
@@ -722,7 +728,7 @@ namespace SAM.Analytical.UI.WPF
                                 space.Name,
                                 flowClassification,
                                 ventilationTerminals.VentilationTerminalDesignDuty_Lps(flowClassification) ?? 0,
-                                adjacencyCluster.PartFRequiredFlowRate_Lps(space, flowClassification) ?? 0));
+                                partFIndex.PartFRequiredFlowRate_Lps(space, flowClassification) ?? 0));
                         }
                     }
                 }
