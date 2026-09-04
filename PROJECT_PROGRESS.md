@@ -1,23 +1,184 @@
 # Project Progress
 
 ## Branch
-Two branches merged into `sow/2026-Q3` in sequence, both branched from it at **`2084768`**
-(the merge of PR #82):
+`feature/parto-prepare-and-run`, branched from `sow/2026-Q3` at **`ef31a3c`**
+(the merge of PR #84).
 
-- `fix/wpf-test-collection-serialization` (PR #83) - test project only.
-- `fix/parto-results-complete-vector` (PR #84) - the Part O run summary.
-
-**No companion branch in any other repository** for either. Both are self-contained in `SAM_UI`;
-neither touches `SAM` or `SAM_Tas`, and no production ventilation behaviour is changed.
+**Stands alone.** `SAM`, `SAM_Systems` and `SAM_Tas` are all untouched by this branch: everything it needs
+is already on `sow/2026-Q3` in each of them.
 
 ## Last updated
-2026-09-03 (later still) - every Part O run summary states the complete design ventilation vector, so a
-direction no round moved is shown as UNCHANGED instead of vanishing from the table.
+2026-09-04 - one high-level **Part O - Prepare & Run** command that inspects the model, says what is
+already valid, and orchestrates the existing authorities from preparation to a reviewed TM59 result.
 
-2026-09-03 (later still) - the intermittent `PackagePart.IsStreamClosed` failures in the WPF test host are
-reproduced, root-caused to xUnit's default per-class parallelism, and fixed by one shared test collection.
 
-## Latest (2026-09-03, later still): the run summary states what EXISTS, not only what changed
+## Latest (2026-09-04): the Part O workflow, as one command
+
+**Status: implemented, tested, and accepted against three licensed TAS runs of the real fixture.**
+
+### Why
+
+The normal Part O workflow required knowing eight expert commands and the order they go in - Open, Assign
+Zones, Map IC (TM59), AddVent PartF, Prepare Iteration, Energy Simulation, Overheating (TM59), Optimise
+(2B) - and the only way to find out which had already been run over a model was to run the next one and
+read its refusal. The commands are individually correct; collectively they were unusable by anyone who had
+not read them. This is the one command that answers all of it up front.
+
+**Nothing was removed.** Every expert command is exactly where it was, and the new dialog names them.
+
+### The orchestration chain, and who owns each stage
+
+The high-level command **calls existing methods and adds no engineering of its own**:
+
+| Stage | Authority | Layer |
+| --- | --- | --- |
+| What a dwelling is | `Query.PartFDwellingZones` | `SAM.Analytical` |
+| TM59 classification | `TM59Manager.TM59SpaceApplications(InternalCondition\|Space, TextMap)` - the pair `TMOverheatingCalculator` classifies a simulated space with | `SAM.Analytical` |
+| Part F requirement | `Query.PartFRequiredFlowRate_Lps(cluster, space, FlowClassification)` | `SAM.Analytical` |
+| Whether Part F applies to a route | `Query.PartOIterationVentilationMode` + `Query.PartOPartFAirflowApplication` | `SAM.Analytical` |
+| Preparation, isolation, scenarios | `Analytical.Modify.PreparePartOIteration` | `SAM.Analytical` |
+| Equipment catalogue | `VentilationUnitCatalogue.Read` | `SAM.Analytical.UI.WPF` |
+| Pre-simulation gate | `PartOPreSimulationCheck.Gate` inside `Modify.RunPartOSimulation` | `SAM.Analytical.UI(.WPF)` |
+| TAS case, run, persistence | `Modify.Simulate` -> `Modify.RunPartOSimulation` -> `PersistPartORunModel` | `SAM.Analytical.UI.WPF` |
+| Results availability | `PartORun.IsAssessable` | `SAM.Analytical.UI` |
+| Assessment | `Modify.AssessPartOTM59` -> `PartOTM59Assessment.Assess` | `SAM.Analytical.UI(.WPF)` |
+| Iteration 2B availability | `Modify.CanOptimise` | `SAM.Analytical.UI.WPF` |
+| Iteration 2B | `Modify.RunPartOOptimisation` | `SAM.Analytical.UI.WPF` |
+
+`Modify.RunPartOWorkflow` -> `PreparePartOIteration(request)` -> `Simulate` -> `AssessPartOTM59`, each step
+gated on the previous one's own outcome read off `PartORun`. There is no second Part O implementation, no
+calculation in WPF, and no giant replacement method.
+
+### The one new seam
+
+`Modify.PreparePartOIteration` gained a **request overload** -
+`PreparePartOIteration(uIAnalyticalModel, partORun, PartOWorkflowRequest, VentilationUnitCatalogue, owner)`
+- which is the whole of the old method from the point the picker dialog closed. The picker now builds a
+request from its own controls and calls it; so does the new command. **One implementation, two ways in.**
+It returns `bool` so the caller can tell an adopted preparation from a refusal or a decline.
+
+No `SAM` change was needed. No other production method changed behaviour.
+
+### State validity - a match against the model, never a UI cache
+
+`PartOWorkflowInspection.Inspect(model, request, run, capabilities, textMap)` reports eight stages, each
+`READY` / `REUSED` / `NEEDS PREPARATION` / `REQUIRED` / `N/A` / `PENDING` / `NOT RUN`, with one sentence
+each. **Only `REQUIRED` stops Run**, and it is used exactly where the production chain would refuse
+anyway: no dwelling zone, nothing TM59 can classify, no continuous Part F requirement on the mechanical
+route, a requested product selection with no catalogue. No warning is promoted - a Part O model carries
+intentional warnings on every run.
+
+**Reuse is a match, not a cache.** `ReusePreparation` compares the request against the run's own
+`PartOPreparationContext` - iteration, dwelling scope by guid, the route word per zone, whether a catalogue
+was offered, isolation - and skips the preparation only where all of them agree. A restored run is never
+reusable, because it carries no preparation context at all. Nothing is remembered between one showing of
+the dialog and the next.
+
+**A model that is already an isolated extract says so**, read from the `PartOIsolationContext` the
+preparation stamped on it and the `.sam` carries, in both the status line and the scope note.
+
+**The SAM Check gate is not duplicated.** It judges the normalized model TAS is given, which does not exist
+until the run builds it, so the stage reports `PENDING` and says where it runs.
+
+### The dialog
+
+One compact `PartOWorkflowWindow`: scenario, scope, dwelling selection, a collapsed 2B block, the status
+list, the blocker line, and three actions.
+
+- **Scenario** - Iteration 1a (mechanical / design MVHR), 1b (natural ventilation), 2 (1a + a selected
+  manufacturer unit). `PartOWorkflowScenario` states the 1a/2 relationship once; **2B is deliberately not a
+  scenario** and is offered as a follow-on only, on Iteration 2 only, cleared rather than greyed elsewhere.
+- **Scope** - all dwellings / selected dwellings / selected dwellings in isolation. On "all dwellings" the
+  request is SAM's own answer unmodified and the dwelling list is hidden.
+- **Scalable selection** - the existing `PartODwellingSelection`: one row per DWELLING ZONE, never one per
+  space, virtualized, searched in place, selection held on the record. Typing in the search box updates the
+  selection line only - it changes no stage - so a 5,000-space model does not re-inspect per keystroke. The
+  TM59 text map is read once per dialog rather than per rebuild.
+- **Actions** - Prepare & Run, Review Results, Optimise (2B), each enabled by its own authority with that
+  authority's refusal as the disabled tooltip. The dialog reopens after each action with its status
+  rebuilt, so it is a hub rather than a wizard; the choices carry across, the state does not.
+
+Ribbon: **Simulate > Part O > Prepare & Run** (`RibbonButton_PartOWorkflow`). Edit > Part O > Prepare
+Iteration and Results > Part O are untouched, and share the same `partORun`.
+
+### Files
+
+Added - `SAM_UI/SAM.Analytical.UI`:
+- `Enums/PartOWorkflowScope.cs`, `Enums/PartOWorkflowStage.cs`, `Enums/PartOWorkflowStageStatus.cs`,
+  `Enums/PartOWorkflowAction.cs`
+- `Classes/PartO/PartOWorkflowRequest.cs`, `PartOWorkflowScenario.cs`, `PartOWorkflowCapabilities.cs`,
+  `PartOWorkflowStageState.cs`, `PartOWorkflowInspection.cs`
+
+Added - `WPF/SAM.Analytical.UI.WPF`:
+- `Classes/PartO/PartOWorkflowStatusRow.cs`
+- `Modify/RunPartOWorkflow.cs`
+- `Windows/PartOWorkflowWindow.xaml{,.cs}`
+
+Modified:
+- `WPF/SAM.Analytical.UI.WPF/Modify/PreparePartOIteration.cs` (the request overload; picker delegates to it)
+- `WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml{,.cs}` (the ribbon button and its handler)
+
+Added - tests: `WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowTests.cs` (36).
+
+### Tests and build
+
+- `SAM.Analytical.UI.WPF.Tests`: **458 passed, 0 failed** (422 baseline + 36). The new class joins `WpfCollection`, as the guard test requires of any class with STA tests.
+- `SAM_UI.sln` Debug (VS 18 MSBuild): **0 errors**, no new warnings in the changed files.
+- `SAM`, `SAM_Tas`, `SAM_Systems`: untouched, not rebuilt.
+
+### Licensed acceptance (2026-09-04) - PASSED
+
+The named fixture `.../2026-07-15 PartO/000000_SAM_AnalyticalModel-It1a-futureZ1.sam` is on another
+machine. The same model is present here as
+`Documents/SAM_daily/2026-08-05-PartO/SAM_zoningAM-CIBSEfutureZ1.sam` - it loads with
+`Name = 000000_SAM_AnalyticalModel-It1a-futureZ1`, 4 zones, 3 dwellings (Flat 1/2/3), 9 spaces, weather
+`Z1_DSY1_2050s_HIGH90_CIBSE_v1.1`. Driven by a throwaway console harness (not in the repository) that calls
+the production seams the command orchestrates, in the same order; the three modal dialogs were not clicked
+by mouse, and `PartOWorkflowWindow` was instantiated and its reported state read.
+
+| Run | Scenario / scope | TAS | TSD | TM59 | Optimise 2B after |
+| --- | --- | --- | --- | --- | --- |
+| A | 1a / all dwellings | full year, **1min56** | 18,356,724 B | assessed, 9 processed, 8 mechanical, **Fail** (future weather) | no (1a records no settings) |
+| B | 1a / **Flat 1 in isolation** | full year, **1min13** | 4,884,006 B | assessed, **2 spaces** | no |
+| C | **Iteration 2** + 2B ticked / all dwellings | full year, **1min44** | 18,361,878 B | assessed, 9 processed, 8 mechanical | **yes - `CanOptimise` becomes true** |
+
+- **Status before the run**, run A: dwelling scope / TM59 mapping / Part F requirements all `READY`
+  (8 of 8 spaces classify, 8 of 8 carry a continuous requirement), ventilation design
+  `NEEDS PREPARATION`, model check `PENDING`, simulation and results `NOT RUN`, `CanRun=True`.
+- **Reuse**: with the run prepared for the same request, ventilation design reports `REUSED` and
+  `ReusePreparation=True`; after the workflow completes it is `NEEDS PREPARATION` again.
+- **Isolation**: the prepared model is 2 spaces, one system, 30 l/s, named
+  `...-ISO-8239b328`, with `PartOIsolationContext` naming Flat 1. Reopened, that `.sam` reports
+  "This model is ALREADY the isolated thermal model of Flat 1".
+- **Reopen without rerun**: each run's `<run>.sam` restored (`PartORun.Restore` = true) and reported
+  simulation and results `READY` with "No new simulation is needed to review it". The redundant TAS
+  `<run>.json` was removed on all three, as before.
+- **Source model**: byte-identical afterwards on all three runs (length and last-write time), and the
+  in-memory source model unchanged - checked for the isolated run in particular.
+- **Restored runs correctly report `Optimise=False`**: reviewing is enough, resuming 2B is not.
+
+### Issues, risks and remaining gaps
+
+- **The three modal dialogs were not clicked by hand.** The workflow window, the preparation summary and
+  the Simulate window are shown by the command; the harness drove the seams beneath them. Clicking the new
+  ribbon button once by hand, at 100% and at 150% DPI, is worth doing before sign-off.
+- **The 2B rounds themselves were not re-run** on this branch (10 full-year TAS runs). Nothing in the
+  optimisation changed; `CanOptimise` becoming true after an Iteration 2 baseline was verified live.
+- **Re-isolating an already-isolated model.** The hub loop makes it one click easier to reach the open
+  Copilot comment from PR #82 (a duplicate isolation suffix when re-preparing an adopted result). Not
+  fixed here - it is SAM's rule - but the dialog and the status line now say the loaded model is already an
+  isolated extract, which is the warning that was missing.
+- Out of scope by instruction and untouched: roof Adiabatic provenance (#95), `PanelType.Air` as an
+  isolation cut, TAS HVAC ZoneGroup authority, historical duplicate TAS plant-zone cleanup.
+
+### Exact recommended next step
+
+Review the PR, then click **Simulate > Part O > Prepare & Run** by hand once on the acceptance fixture.
+**Do not merge unattended.**
+
+---
+
+## Previous (2026-09-03, later still): the run summary states what EXISTS, not only what changed
 
 **Status: root-caused, fixed and tested.** Reported from isolated-mode testing of Flat 1: the simulation
 and the ventilation network were right, but the Results table was misleading.
@@ -215,6 +376,9 @@ flakiness, but it is a ~4e-8 outcome if the race were still present at its previ
 - `dotnet test WPF/SAM.Analytical.UI.WPF.Tests` - **Passed 411, Failed 0, Skipped 0** (410 + the guard).
 - The 200-run repetition above, all green.
 - `dotnet build SAM_UI.sln -c Debug` - **0 errors**.
+
+---
+
 
 ## Previous (2026-09-03, later): SAM Check as a mandatory Part O pre-simulation gate
 

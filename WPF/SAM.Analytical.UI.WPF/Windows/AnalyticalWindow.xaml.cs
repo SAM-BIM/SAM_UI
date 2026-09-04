@@ -787,6 +787,11 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_AddVentilationPartF.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_AddVentilationPartF.Click += RibbonButton_AddVentilationPartF_Click;
 
+            RibbonButton_PartOWorkflow.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EnergySimulation);
+            RibbonButton_PartOWorkflow.Click += RibbonButton_PartOWorkflow_Click;
+            RibbonButton_PartOWorkflow.ToolTipTitle = "Part O - Prepare & Run";
+            RibbonButton_PartOWorkflow.ToolTipDescription = "Inspect what this model already provides for an Approved Document O run, then prepare, check, simulate and assess it in one command. Existing results are reviewed without simulating again.";
+
             RibbonButton_PreparePartOIteration.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_PreparePartOIteration.Click += RibbonButton_PreparePartOIteration_Click;
 
@@ -1955,6 +1960,21 @@ namespace SAM.Analytical.UI.WPF.Windows
             Modify.AddVentilationByPartF(uIAnalyticalModel, windowHandle);
         }
 
+        /// <summary>
+        /// The high-level Part O command. It owns no state of its own: the same <see cref="partORun"/> the
+        /// expert commands use is handed to it, so a run prepared through the picker is visible here and a
+        /// run produced here is assessable from the Results tab.
+        /// </summary>
+        private void RibbonButton_PartOWorkflow_Click(object sender, RoutedEventArgs e)
+        {
+            Modify.RunPartOWorkflow(uIAnalyticalModel, partORun, windowHandle);
+
+            //The workflow can leave the run in any of its states - prepared, completed, or dropped - and a
+            //cancelled dialog raises no modification, so the Results-tab gates are refreshed here for the
+            //same reason the preparation command refreshes them.
+            RefreshPartOButtons();
+        }
+
         private void RibbonButton_PreparePartOIteration_Click(object sender, RoutedEventArgs e)
         {
             Modify.PreparePartOIteration(uIAnalyticalModel, partORun, windowHandle);
@@ -3055,6 +3075,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_EditInternalConditions.IsEnabled = false;
             RibbonButton_AssignMechanicalSystems.IsEnabled = false;
             RibbonButton_RemoveAirMovementObjects.IsEnabled = false;
+            RibbonButton_PartOWorkflow.IsEnabled = false;
             RibbonButton_PreparePartOIteration.IsEnabled = false;
             RibbonButton_AssessPartOTM59.IsEnabled = false;
             RibbonButton_OptimisePartOTM59.IsEnabled = false;
@@ -3105,6 +3126,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
                 //Preparing needs only a model; assessing needs a completed run, which is a fact about the
                 //session rather than about the model, so it is gated separately.
+                RibbonButton_PartOWorkflow.IsEnabled = true;
                 RibbonButton_PreparePartOIteration.IsEnabled = true;
                 RefreshPartOButtons();
 
