@@ -90,6 +90,13 @@ namespace SAM.Analytical.UI.WPF
 
                 partOWorkflowWindow.Restore(partOWorkflowScenario, partOWorkflowScope, guids_Dwelling, partOOptimisationSettings);
 
+                //Setting up is finished, so the ONE inspection this whole gesture owes is paid here - over
+                //the fully restored state, which is the only one anybody will ever see. Every line above
+                //moves an inspection input, and each used to be answered with an inspection of its own: nine
+                //passes over the dwelling scope to show one window, on a model that may carry five thousand
+                //spaces. Nothing is skipped and nothing is remembered; see CompleteInitialisation.
+                partOWorkflowWindow.CompleteInitialisation();
+
                 if (owner is not null)
                 {
                     new System.Windows.Interop.WindowInteropHelper(partOWorkflowWindow).Owner = owner.Handle;

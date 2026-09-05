@@ -549,8 +549,6 @@ namespace SAM.Analytical.UI.WPF
 
             HashSet<Guid> guids_Scope = Query.PartODwellingSpaceGuids(adjacencyCluster, partOPreparationContext.Zones);
 
-            List<Space> spaces = adjacencyCluster.GetSpaces() ?? [];
-
             List<string> names = [];
 
             foreach (Guid guid in partOTM59Assessment.SpaceGuids_Unassessed)
@@ -560,7 +558,10 @@ namespace SAM.Analytical.UI.WPF
                     continue;
                 }
 
-                names.Add(spaces.Find(x => x is not null && x.Guid == guid)?.Name ?? guid.ToString());
+                //The cluster's own O(1) authority, in place of a linear walk of the model's space list per
+                //unassessed room. Same answer - that list is this object dictionary flattened - and the
+                //fallback to the guid where the room is not in the model at all is unchanged.
+                names.Add(adjacencyCluster.GetObject<Space>(guid)?.Name ?? guid.ToString());
             }
 
             if (names.Count == 0)
