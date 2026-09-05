@@ -52,10 +52,20 @@ carries them, `RunPartOSimulation` still runs them. The preset only decides what
 | `Sizing` | **on**, locked | see below |
 | `UnmetHours`, `UseWidths`, `UpdateConstructionLayersByPanelType` | fixed, locked | part of the case `PartOCanonicalTBD` fingerprints |
 | RDS / SAP / Part L / TPD / Domestic Overheating XML | **off**, locked | other workflows' deliverables |
-| project name | from the model, every time | carries the isolation scope token |
+| project name | **derived from the model**, locked | it is the run's identity, not a label - see below |
 | weather | project's own; previous run's only where the model states none | genuine input |
 | output directory | previous run's while it still exists; else the model's | genuine input |
 | solar calculation method | carried | genuine input |
+
+**The project name is derived and locked, not prepopulated.** Every artifact a Part O run is judged by
+derives from it - `<project>.tbd`, `.tsd`, the per-run `.sam` and `<project>-TM59.txt`. On an isolated run it
+carries the scope token `Query.ProjectName_Isolated` put there so that run's evidence cannot land on a full
+run's or on another selection's, and `PartOSimulationContext.Iteration_ProjectName` reads the optimisation
+round back out of it - so a hand-edited name can restart Iteration 2B's numbering at `-Opt01` and overwrite a
+previous optimisation's evidence. Nothing downstream refuses an edited name; it is simply believed. It is
+therefore a **deterministic, derived Part O input and not a user decision**. This costs nobody anything:
+*where* the evidence is written is still theirs to redirect, because moving a run's files changes nothing
+about what the run is.
 
 **Sizing stays on, deliberately.** Nothing in the assessment or in Iteration 2B reads a design load, so it is
 not a Part O deliverable - but it is not free to turn off either. `Tas.Query.Sizing` runs `sizing(0)` over
@@ -129,7 +139,7 @@ established.
 
 ### Tests
 
-**552 passing, 528 before** (+24). New: `PartOSimulateDefaultsTests` (23). Updated:
+**554 passing, 528 before** (+26). New: `PartOSimulateDefaultsTests` (25). Updated:
 `PartOResultReopenTests.ARestoredRun_CanBeReviewed_ButNotResumed` now pins the restored-run reason rather
 than the generic one.
 

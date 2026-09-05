@@ -48,13 +48,27 @@ namespace SAM.Analytical.UI.WPF
         /// started from.</item>
         /// </list>
         ///
-        /// <para><b>What is derived from the project</b></para>
+        /// <para><b>The project name: derived, and not a user decision</b></para>
         /// <para>
-        /// The project name is <b>always</b> taken from the model and never from the remembered options. It
-        /// is what names the TBD, the TSD, the per-run <c>.sam</c> and the TM59 report, and on an isolated
-        /// run it already carries the scope token <c>Query.ProjectName_Isolated</c> put there to keep that
-        /// run's files off a full run's. A name remembered from an earlier run would be the previous scope's,
-        /// which is exactly the collision that token exists to prevent.
+        /// <b>Always</b> taken from the prepared model, never from the remembered options - and locked in the
+        /// dialog by <c>SimulateControl.LockPartOSettings</c>. It is the run's <i>identity</i> rather than a
+        /// label on it:
+        /// </para>
+        /// <list type="bullet">
+        /// <item>Every artifact a Part O run is judged by derives from it - <c>&lt;project&gt;.tbd</c>,
+        /// <c>.tsd</c>, the per-run <c>.sam</c> and <c>&lt;project&gt;-TM59.txt</c>.</item>
+        /// <item>On an isolated run it already carries the scope token <c>Query.ProjectName_Isolated</c> put
+        /// there so that run's evidence cannot land on a full run's or on another selection's. A name
+        /// remembered from an earlier run, or typed over by hand, is exactly the collision that token exists
+        /// to prevent.</item>
+        /// <item><see cref="PartOSimulationContext.Iteration_ProjectName"/> reads the optimisation round back
+        /// out of it, so an edited name can restart Iteration 2B's numbering at <c>-Opt01</c> and overwrite a
+        /// previous optimisation's evidence.</item>
+        /// </list>
+        /// <para>
+        /// Nothing downstream refuses a hand-edited name - it is simply believed - so a person could destroy
+        /// the provenance of a run by retyping one field. Deriving it and locking it is what removes that,
+        /// and it costs nobody anything: <b>where</b> the evidence is written is still theirs to redirect.
         /// </para>
         ///
         /// <para><b>What a person still owns</b></para>
@@ -118,7 +132,8 @@ namespace SAM.Analytical.UI.WPF
                 CreateTPD = false,
                 CreateTM59 = false,
 
-                // ---- B: derived from the project, every time.
+                // ---- A: the run's identity, derived from the prepared model every time and locked in the
+                // dialog. Not a user decision - see the summary for what an edited name destroys.
                 ProjectName = analyticalModel.Name,
 
                 // Deliberately NOT populated, and this is the only line where that is a decision rather than

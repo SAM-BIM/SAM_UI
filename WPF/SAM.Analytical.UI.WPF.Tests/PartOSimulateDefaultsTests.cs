@@ -437,9 +437,15 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         /// <summary>
         /// <b>What stays a person's.</b> Locking the deterministic settings must not lock the run's actual
-        /// engineering inputs with them: the weather file, the output directory, the project name and the
-        /// solar calculation method are all still open. A dialog with nothing left to change would be a
-        /// dialog worth removing, and these four are the reason it stays.
+        /// engineering inputs with them: the weather file, the output directory and the solar calculation
+        /// method are all still open. A dialog with nothing left to change would be a dialog worth removing,
+        /// and these three are the reason it stays.
+        /// <para>
+        /// The output directory in particular: <b>where</b> the evidence is written is a person's to
+        /// redirect, because moving a run's files changes nothing about what the run is. That is exactly the
+        /// line that separates it from the project name - see
+        /// <see cref="PartO_ProjectName_IsDerivedAndLocked"/>.
+        /// </para>
         /// </summary>
         [WpfFact]
         public void PartO_TheGenuineChoicesStayOpen()
@@ -456,7 +462,6 @@ namespace SAM.Analytical.UI.WPF.Tests
                 "selectSAMObjectComboBoxControl_WeatherData",
                 "textBox_OutputDirectory",
                 "button_OutputDirectory",
-                "textBox_ProjectName",
                 "comboBox_SolarCalculationMethod",
             })
             {
@@ -464,6 +469,83 @@ namespace SAM.Analytical.UI.WPF.Tests
                     (simulateControl.FindName(name) as System.Windows.UIElement)?.IsEnabled,
                     string.Format("{0} is a Part O run's own input and should stay open.", name));
             }
+        }
+
+        /// <summary>
+        /// <b>The project name is the run's identity, so a Part O user cannot retype it.</b>
+        ///
+        /// <para><b>Why this is not merely tidiness</b></para>
+        /// <para>
+        /// Every artifact a Part O run is judged by derives from the name - <c>&lt;project&gt;.tbd</c>,
+        /// <c>.tsd</c>, the per-run <c>.sam</c> and <c>&lt;project&gt;-TM59.txt</c>. On an isolated run it
+        /// carries the scope token <c>Query.ProjectName_Isolated</c> put there so that run's evidence cannot
+        /// land on a full run's or on another selection's, and
+        /// <see cref="PartOSimulationContext.Iteration_ProjectName"/> reads the optimisation round back out of
+        /// it - so a hand-edited name can restart Iteration 2B's numbering at <c>-Opt01</c> and overwrite a
+        /// previous optimisation's evidence. Nothing downstream refuses an edited name; it is simply believed.
+        /// </para>
+        /// <para>
+        /// So the value is derived from the prepared model, the control is locked, and locking does not move
+        /// the value. All three are asserted here, including over an isolated run's name - the case where the
+        /// token being removed would actually cost somebody their evidence.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void PartO_ProjectName_IsDerivedAndLocked()
+        {
+            //An isolated run: the name carries the scope token that keeps this run's files off a full run's.
+            AnalyticalModel analyticalModel = Model("Flat1-Isolated-3f2a", Weather("LondonHeathrowDSY1"));
+
+            SimulateControl simulateControl = new()
+            {
+                //Handed a remembered state naming a DIFFERENT project, to prove the value is derived rather
+                //than restored.
+                SimulateOptions = Create.SimulateOptions_PartO(analyticalModel, null, Remembered_AllWrong()),
+            };
+
+            //Derived from the model, before anything is locked.
+            Assert.Equal(analyticalModel.Name, simulateControl.ProjectName);
+
+            simulateControl.LockPartOSettings();
+
+            //Locked - both the way WPF disables a control and the way a TextBox refuses typing, so the answer
+            //is the same whichever one is asked.
+            System.Windows.Controls.TextBox textBox_ProjectName = simulateControl.FindName("textBox_ProjectName") as System.Windows.Controls.TextBox;
+
+            Assert.NotNull(textBox_ProjectName);
+            Assert.False(textBox_ProjectName.IsEnabled);
+            Assert.True(textBox_ProjectName.IsReadOnly);
+
+            //And locking moved nothing: the name the run will be written under is still the model's, and it
+            //still carries the scope token.
+            Assert.Equal(analyticalModel.Name, simulateControl.ProjectName);
+            Assert.Equal(analyticalModel.Name, simulateControl.SimulateOptions.ProjectName);
+        }
+
+        /// <summary>
+        /// <b>And the manual dialog's project name is untouched.</b> Renaming the output of an ordinary
+        /// simulation is an ordinary thing to want; nothing there derives an identity from it. The lock exists
+        /// only on the guided Part O path, which is what <c>LockPartOSettings</c> being a call rather than a
+        /// constructor makes true - this asserts it of a control nobody has locked.
+        /// </summary>
+        [WpfFact]
+        public void TheManualDialog_ProjectName_StaysEditable()
+        {
+            SimulateControl simulateControl = new()
+            {
+                SimulateOptions = new SimulateOptions { ProjectName = "SomeProject" },
+            };
+
+            System.Windows.Controls.TextBox textBox_ProjectName = simulateControl.FindName("textBox_ProjectName") as System.Windows.Controls.TextBox;
+
+            Assert.NotNull(textBox_ProjectName);
+            Assert.True(textBox_ProjectName.IsEnabled);
+            Assert.False(textBox_ProjectName.IsReadOnly);
+
+            //Editable in the sense that matters: a typed name is what the command then runs under.
+            simulateControl.ProjectName = "RenamedByHand";
+
+            Assert.Equal("RenamedByHand", simulateControl.SimulateOptions.ProjectName);
         }
 
         /// <summary>

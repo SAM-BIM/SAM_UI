@@ -515,12 +515,23 @@ namespace SAM.Analytical.UI.WPF
         /// XML. None is a Part O deliverable - the overheating assessment Part O produces is
         /// <c>Modify.AssessPartOTM59</c>, which reads the TSD directly.
         /// </para>
+        /// <para>
+        /// <b>The project name</b>: it is the run's <i>identity</i>, not a label on it. Every artifact a Part O
+        /// run is judged by derives from it - <c>&lt;project&gt;.tbd</c>, <c>.tsd</c>, <c>.sam</c> and
+        /// <c>&lt;project&gt;-TM59.txt</c> - and on an isolated run it already carries the scope token
+        /// <c>Query.ProjectName_Isolated</c> put there so that run's evidence cannot land on a full run's or on
+        /// another selection's. <c>PartOSimulationContext.Iteration_ProjectName</c> also reads the optimisation
+        /// round back out of it, so an edited name can restart Iteration 2B's numbering at <c>-Opt01</c> and
+        /// overwrite a previous optimisation's evidence. A person typing over it can therefore destroy the
+        /// provenance of a run without anything refusing them, which is why it is derived and locked rather
+        /// than prepopulated. See <c>Create.SimulateOptions_PartO</c>.
+        /// </para>
         ///
         /// <para><b>What is deliberately left alone</b></para>
         /// <para>
-        /// The project name, the output directory, the weather and the solar calculation method. The first
-        /// two are prepopulated and still a person's to redirect; the last two are engineering inputs to the
-        /// run, and Part O has no business choosing them silently.
+        /// The output directory, the weather and the solar calculation method. <b>Where</b> the evidence is
+        /// written stays a person's to redirect, because moving a run's files changes nothing about what the
+        /// run is; the other two are engineering inputs, and Part O has no business choosing them silently.
         /// </para>
         ///
         /// <para>
@@ -543,6 +554,13 @@ namespace SAM.Analytical.UI.WPF
             checkBox_CreatePartL.IsEnabled = false;
             checkBox_CreateTPD.IsEnabled = false;
             checkBox_CreateTM59.IsEnabled = false;
+
+            //The run's identity, derived from the prepared model. Read-only rather than merely disabled so the
+            //name is still selectable and copyable - somebody looking for this run's TBD needs to be able to
+            //take it - while remaining unchangeable. IsEnabled is set too, so "is it locked?" has one answer
+            //whichever property a caller or a test asks.
+            textBox_ProjectName.IsReadOnly = true;
+            textBox_ProjectName.IsEnabled = false;
 
             //The From/To boxes follow the full-year box, and its own rule already disables them while it is
             //ticked. Asked again here rather than assumed, so this method states the whole locked state.
