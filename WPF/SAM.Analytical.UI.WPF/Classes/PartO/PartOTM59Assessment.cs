@@ -175,16 +175,14 @@ namespace SAM.Analytical.UI.WPF
             //fullYear flag RunPartOSimulation hands back), which says what was asked of TAS and not what
             //the results file actually contains.
             //
-            //Counted from the WEATHER YEAR the results were produced against, which is the same authority
-            //the comfort band the criteria are measured against is derived from - not a literal 8760, so a
-            //year is however many hours its own weather data holds. Where the TSD carried no weather data
-            //there is nothing to count and the requirement is left unstated rather than guessed: the
-            //assessment then refuses only mismatched and empty series, as it does everywhere else.
-            int hourCount_Expected = HourCount_WeatherYear(analyticalModel_TSD);
-            if (hourCount_Expected > 0)
-            {
-                tM59AssessmentCalculator.HourCount_Expected = hourCount_Expected;
-            }
+            //Taken from the REQUESTED day range that defines a Part O full year, and deliberately not from
+            //anything inside the file being validated. Counting it from the weather year the TSD carries -
+            //which is what this did at first - defeats the check entirely: a damaged file that lost two
+            //thirds of its weather lost two thirds of its results with it, so the requirement fell to match
+            //and the partial year passed. A results file may not decide how much of a year it was supposed
+            //to contain. See PartOSimulationContext.HourCount_FullYear, including why it is the static
+            //1-to-365 authority rather than an instance - a RESTORED run carries no context at all.
+            tM59AssessmentCalculator.HourCount_Expected = PartOSimulationContext.HourCount_FullYear;
 
             OverheatingScenarioMap overheatingScenarioMap = new(overheatingScenarios, analyticalModel_Workflow, tM59AssessmentCalculator.SimulationSpaceMap);
             tM59AssessmentCalculator.VentilationStrategyMap = overheatingScenarioMap.VentilationStrategyMap;
@@ -253,34 +251,6 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return new PartOTM59Assessment(tM59AssessmentResult, tM59AssessmentReport, spaceResults, associationRefusals, spaceGuids_Unassessed, null);
-        }
-
-        /// <summary>
-        /// How many hourly values one year of this model's weather data holds - the count a full annual
-        /// series must reach - or <b>0</b> where the model carries no weather year to count.
-        /// <para>
-        /// The weather year is the authority rather than a literal 8760 because it is already the authority
-        /// for the comfort band the TM59 criteria are measured against: <c>TMOverheatingCalculator</c>
-        /// derives both from the same <c>WeatherYear</c>, and a requirement taken from anywhere else could
-        /// disagree with the band the same run is judged by.
-        /// </para>
-        /// <para>
-        /// 0 rather than a fallback where there is no weather data: a guessed requirement would refuse
-        /// rooms on the strength of a number nothing in the run stated. A TSD with no weather year cannot
-        /// be assessed at all - the comfort lookup needs one - so this is not the case that decides
-        /// anything.
-        /// </para>
-        /// </summary>
-        internal static int HourCount_WeatherYear(AnalyticalModel? analyticalModel)
-        {
-            if (analyticalModel is null || !analyticalModel.TryGetValue(Analytical.AnalyticalModelParameter.WeatherData, out WeatherData weatherData) || weatherData is null)
-            {
-                return 0;
-            }
-
-            WeatherYear? weatherYear = weatherData.WeatherYears?.FirstOrDefault();
-
-            return weatherYear?.GetWeatherHours()?.Count ?? 0;
         }
 
         /// <summary>

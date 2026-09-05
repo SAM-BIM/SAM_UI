@@ -84,7 +84,48 @@ namespace SAM.Analytical.UI
         /// Whether this is the full annual hourly series a TM59 assessment can read. Anything less cannot
         /// complete a Part O run, so an optimisation cannot be started from it either.
         /// </summary>
-        public bool IsFullYear => SimulateFrom == 1 && SimulateTo == 365;
+        public bool IsFullYear => SimulateFrom == Day_First_FullYear && SimulateTo == Day_Last_FullYear;
+
+        /// <summary>The first day of an Approved Document O full-year simulation.</summary>
+        public const int Day_First_FullYear = 1;
+
+        /// <summary>The last day of an Approved Document O full-year simulation.</summary>
+        public const int Day_Last_FullYear = 365;
+
+        /// <summary>
+        /// How many hourly values a full-year Approved Document O results series must contain -
+        /// <b>the requested day range, not anything read back out of a results file</b>.
+        ///
+        /// <para><b>Why this cannot come from the TSD</b></para>
+        /// <para>
+        /// It was, briefly, counted from the weather year the TSD carries. That defeats the check it exists
+        /// for: a damaged file that lost two thirds of its weather also lost two thirds of its results, so
+        /// the requirement fell to 2400 hours, the 2400-hour series met it, and the partial year was
+        /// assessed and reported. A results file may not decide how much of a year it was supposed to
+        /// contain. The authority has to be independent of the payload being validated, and this is.
+        /// </para>
+        ///
+        /// <para><b>Why a constant is the honest form of it</b></para>
+        /// <para>
+        /// It is derived from the two days that DEFINE a Part O full year - the same pair
+        /// <see cref="IsFullYear"/> and <c>Query.IsPartOFullYearSimulation</c> test against, which is why
+        /// they are named here rather than written out at each site. Approved Document O's criteria are
+        /// defined over days 1 to 365; <c>IsPartOFullYearSimulation</c> already refuses anything else
+        /// outright, including 2-366 and 1-364, so there is no other range a completable Part O run can
+        /// have.
+        /// </para>
+        /// <para>
+        /// It is therefore <b>static rather than read off an instance</b>, and deliberately: a
+        /// <b>restored</b> run - one reopened from disk to review its results - carries no
+        /// <see cref="PartOSimulationContext"/> at all (<c>PartORun.Restore</c> nulls it on purpose, which
+        /// is what keeps a restored run out of Iteration 2B). Asking the instance would leave exactly the
+        /// reopened-results path, the one most likely to meet an old or damaged file, with no requirement
+        /// stated. It does not need one: a run can only have completed - and so only be restorable - if it
+        /// was a full-year simulation, so 1 to 365 is already established for every model that can reach an
+        /// assessment.
+        /// </para>
+        /// </summary>
+        public static int HourCount_FullYear => (Day_Last_FullYear - Day_First_FullYear + 1) * 24;
 
         /// <summary>
         /// The project name for one optimisation iteration - <c>&lt;project&gt;-Opt00</c> for the baseline,

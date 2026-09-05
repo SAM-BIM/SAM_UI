@@ -8,7 +8,8 @@ using Xunit;
 namespace SAM.Analytical.UI.WPF.Tests
 {
     /// <summary>
-    /// <b>The hour count a Part O assessment requires a room's hourly series to reach.</b>
+    /// <b>The hour count a Part O assessment requires a room's hourly series to reach, and where that
+    /// number is allowed to come from.</b>
     ///
     /// <para><b>The gap this closes</b></para>
     /// <para>
@@ -20,26 +21,180 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// the assessment, where <c>TMOverheatingCalculator</c> walked whatever hours the two series had and
     /// reported the answer as the room's.
     /// </para>
-    /// <para>
-    /// The calculator now refuses a room whose series are absent, empty or of unequal length on its own
-    /// account, because none of those is assessable at any length. Whether an equal-length pair is long
-    /// enough to be a YEAR is a question about the run rather than the calculation, so the calculator asks
-    /// it only where a caller states the answer - and this is the number Part O states.
-    /// </para>
     ///
-    /// <para><b>Why the weather year</b></para>
+    /// <para><b>And the mistake made closing it, which is what most of this fixture is for</b></para>
     /// <para>
-    /// It is already the authority for the comfort band the TM59 criteria are measured against:
-    /// <c>TMOverheatingCalculator</c> derives that band from the same <c>WeatherYear</c>, and
-    /// <c>Collect</c> refuses any hour the band does not cover. A requirement taken from anywhere else -
-    /// a literal 8760, say - could disagree with the band the same run is judged by, and a year is however
-    /// many hours its own weather data holds.
+    /// The requirement was first counted from the weather year the TSD itself carries. That reads well -
+    /// the weather year is already the authority for the comfort band the criteria are measured against -
+    /// and it defeats the check completely. A file damaged to a third of its length loses its weather and
+    /// its results together, so the requirement falls to match the truncated series, and the partial year
+    /// is assessed and reported as an ordinary verdict.
+    /// </para>
+    /// <para>
+    /// <b>A results file may not decide how much of a year it was supposed to contain.</b> The authority
+    /// has to be independent of the payload being validated, so it is
+    /// <c>PartOSimulationContext.HourCount_FullYear</c> - the requested day range that defines a Part O
+    /// full year.
     /// </para>
     /// </summary>
     public class PartOFullYearSeriesTests
     {
-        /// <summary>A populated year of flat hourly dry-bulb values - 365 days of 24.</summary>
-        private static WeatherYear WeatherYear(int days = 365)
+        // -----------------------------------------------------------------------------------------------
+        // The authority
+        // -----------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// The requirement is the requested year - days 1 to 365 - derived from the same two days
+        /// <c>IsFullYear</c> tests against rather than written down a second time.
+        /// </summary>
+        [Fact]
+        public void TheRequirement_IsTheRequestedFullYear()
+        {
+            Assert.Equal(8760, PartOSimulationContext.HourCount_FullYear);
+
+            Assert.Equal(
+                (PartOSimulationContext.Day_Last_FullYear - PartOSimulationContext.Day_First_FullYear + 1) * 24,
+                PartOSimulationContext.HourCount_FullYear);
+
+            //And those are the days IsFullYear accepts, so the requirement and the gate cannot drift apart.
+            Assert.True(Context(PartOSimulationContext.Day_First_FullYear, PartOSimulationContext.Day_Last_FullYear).IsFullYear);
+            Assert.False(Context(1, 100).IsFullYear);
+        }
+
+        /// <summary>
+        /// <b>The defect, stated as the thing that must not happen.</b> A TSD whose weather record is
+        /// damaged to a third of a year does not get to lower the bar to a third of a year: the requirement
+        /// is unmoved by anything the file says about itself.
+        /// </summary>
+        [Fact]
+        public void ADamagedWeatherYear_DoesNotRedefineTheRequirement()
+        {
+            WeatherYear weatherYear_Damaged = WeatherYear(100);
+
+            //What the file would have been believed to require, had it been asked.
+            Assert.Equal(2400, weatherYear_Damaged.GetWeatherHours().Count);
+
+            Assert.Equal(8760, PartOSimulationContext.HourCount_FullYear);
+            Assert.NotEqual(weatherYear_Damaged.GetWeatherHours().Count, PartOSimulationContext.HourCount_FullYear);
+        }
+
+        /// <summary>
+        /// The requirement is stated for a <b>restored</b> run too - the reopened-results path, which is the
+        /// one most likely to meet an old or damaged file, and which deliberately carries no
+        /// <c>PartOSimulationContext</c> instance at all (<c>PartORun.Restore</c> nulls it, which is what
+        /// keeps a restored run out of Iteration 2B). A requirement read off an instance would be absent
+        /// exactly there.
+        /// </summary>
+        [Fact]
+        public void TheRequirement_NeedsNoContextInstance()
+        {
+            Assert.True(PartOSimulationContext.HourCount_FullYear > 0);
+        }
+
+        // -----------------------------------------------------------------------------------------------
+        // What the requirement then does
+        // -----------------------------------------------------------------------------------------------
+
+        /// <summary>Requested full year, both series the full length: assessed.</summary>
+        [Fact]
+        public void AFullLengthSeries_IsAssessed()
+        {
+            AnalyticalModel analyticalModel = SeriesModel(WeatherData(365), 8760, 8760);
+
+            TMOverheatingCalculator tMOverheatingCalculator = Calculator(analyticalModel);
+
+            Assert.Single(tMOverheatingCalculator.Calculate_TM59(analyticalModel.GetSpaces()));
+            Assert.Empty(tMOverheatingCalculator.HourlySeriesRefusals);
+        }
+
+        /// <summary>
+        /// <b>The case the weather-derived requirement passed.</b> A results file 2400 hours long - the
+        /// length a TSD damaged to 100 days carries - is refused, because the bar is the requested year and
+        /// not anything the file says about itself. Under the weather-derived requirement this same series
+        /// met a 2400-hour bar and was assessed.
+        /// <para>
+        /// The weather year here is intact, and deliberately: see
+        /// <see cref="ATruncatedWeatherYear_CannotReachTheCalculationAtAll"/> for why the fully damaged file
+        /// cannot be driven through the calculator, and why that does not weaken this. What is being pinned
+        /// is that the RESULTS length does not set the requirement - which
+        /// <see cref="ADamagedWeatherYear_DoesNotRedefineTheRequirement"/> establishes for the weather side.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void AResultsFileTruncatedToItsDamagedLength_IsRefused()
+        {
+            AnalyticalModel analyticalModel = SeriesModel(WeatherData(365), 2400, 2400);
+
+            TMOverheatingCalculator tMOverheatingCalculator = Calculator(analyticalModel);
+
+            Assert.Empty(tMOverheatingCalculator.Calculate_TM59(analyticalModel.GetSpaces()));
+
+            string refusal = Assert.Single(tMOverheatingCalculator.HourlySeriesRefusals);
+            Assert.Contains("Bedroom 1", refusal);
+            Assert.Contains("only 2400 of the 8760", refusal);
+        }
+
+        /// <summary>
+        /// <b>Characterization.</b> A TSD whose weather record is itself truncated cannot reach the
+        /// assessment at all: the comfort band the criteria are measured against is a running mean over the
+        /// year, and <c>SAM.Weather.Query.RunningMeanDryBulbTemperatures</c> throws on a short one.
+        /// <para>
+        /// Pre-existing behaviour in the weather layer, already characterised by
+        /// <c>TMOverheatingCalculatorTests.NoWeatherData_ThrowsToday_PreExistingBehaviourNotAContract</c>,
+        /// and recorded here because it is what closes the remaining half of this case: a fully damaged file
+        /// cannot produce a partial verdict either, it simply cannot be assessed. Throwing is not a good way
+        /// to say so and fixing it reaches wider than Part O, which is why it is recorded rather than
+        /// asserted as a contract.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void ATruncatedWeatherYear_CannotReachTheCalculationAtAll()
+        {
+            AnalyticalModel analyticalModel = SeriesModel(WeatherData(100), 2400, 2400);
+
+            TMOverheatingCalculator tMOverheatingCalculator = Calculator(analyticalModel);
+
+            Assert.ThrowsAny<System.Exception>(() => tMOverheatingCalculator.Calculate_TM59(analyticalModel.GetSpaces()));
+        }
+
+        /// <summary>Requested full year, weather intact, results truncated: refused.</summary>
+        [Fact]
+        public void AFullWeatherYearWithTruncatedResults_IsRefused()
+        {
+            AnalyticalModel analyticalModel = SeriesModel(WeatherData(365), 5000, 5000);
+
+            TMOverheatingCalculator tMOverheatingCalculator = Calculator(analyticalModel);
+
+            Assert.Empty(tMOverheatingCalculator.Calculate_TM59(analyticalModel.GetSpaces()));
+
+            Assert.Contains("only 5000 of the 8760", Assert.Single(tMOverheatingCalculator.HourlySeriesRefusals));
+        }
+
+        /// <summary>
+        /// Two series of different lengths are refused whatever the requested year is - the mismatch rule,
+        /// which the calculator applies on its own account.
+        /// </summary>
+        [Fact]
+        public void MismatchedSeries_AreRefused()
+        {
+            AnalyticalModel analyticalModel = SeriesModel(WeatherData(365), 8760, 5000);
+
+            TMOverheatingCalculator tMOverheatingCalculator = Calculator(analyticalModel);
+
+            Assert.Empty(tMOverheatingCalculator.Calculate_TM59(analyticalModel.GetSpaces()));
+
+            Assert.Contains("different lengths", Assert.Single(tMOverheatingCalculator.HourlySeriesRefusals));
+        }
+
+        // -----------------------------------------------------------------------------------------------
+
+        private static PartOSimulationContext Context(int simulateFrom, int simulateTo)
+        {
+            return new PartOSimulationContext("C:\\Temp", "Flat1", null, SolarCalculationMethod.TAS, simulateFrom, simulateTo);
+        }
+
+        /// <summary>A populated weather year of the stated number of days.</summary>
+        private static WeatherYear WeatherYear(int days)
         {
             WeatherYear result = new(2018);
 
@@ -54,130 +209,19 @@ namespace SAM.Analytical.UI.WPF.Tests
             return result;
         }
 
-        private static AnalyticalModel Model(WeatherData weatherData)
+        private static WeatherData WeatherData(int days)
         {
-            AdjacencyCluster adjacencyCluster = new();
-            adjacencyCluster.AddObject(new Space("Bedroom 1"));
-
-            AnalyticalModel result = new("Flat1", null, null, null, adjacencyCluster);
-
-            if (weatherData is not null)
-            {
-                result.SetValue(SAM.Analytical.AnalyticalModelParameter.WeatherData, weatherData);
-            }
-
-            return result;
+            return new WeatherData("Test", "Test", 51.5, -0.1, 0, WeatherYear(days));
         }
 
-        /// <summary>
-        /// A populated 365-day weather year requires 8760 hourly values - the count a complete annual TSD
-        /// series carries, derived rather than written down.
-        /// </summary>
-        [Fact]
-        public void AFullWeatherYear_RequiresItsOwnHourCount()
-        {
-            AnalyticalModel analyticalModel = Model(new WeatherData("Test", "Test", 51.5, -0.1, 0, WeatherYear()));
-
-            Assert.Equal(8760, PartOTM59Assessment.HourCount_WeatherYear(analyticalModel));
-        }
-
-        /// <summary>
-        /// The count is <b>read off the year</b> rather than written down, so it is the same number the
-        /// comfort band the criteria are measured against is derived from and the two cannot disagree.
-        /// <para>
-        /// Shown with a year the fixture only partly populates: the requirement follows what the data
-        /// actually holds. A <c>WeatherYear</c> is 365 days by construction - a 366th day is not carried,
-        /// which is why the full case above is 8760 - so the leap-year surplus arrives as a longer SERIES
-        /// against this shorter band, and that direction is handled where it belongs, by
-        /// <c>TMOverheatingCalculator</c> excluding any hour the band does not cover.
-        /// </para>
-        /// </summary>
-        [Fact]
-        public void TheRequirement_IsReadOffTheYearRatherThanWrittenDown()
-        {
-            WeatherYear weatherYear = WeatherYear(100);
-
-            AnalyticalModel analyticalModel = Model(new WeatherData("Test", "Test", 51.5, -0.1, 0, weatherYear));
-
-            Assert.Equal(2400, PartOTM59Assessment.HourCount_WeatherYear(analyticalModel));
-
-            //And it IS the year's own hour count, not a formula that happens to agree with it.
-            Assert.Equal(weatherYear.GetWeatherHours().Count, PartOTM59Assessment.HourCount_WeatherYear(analyticalModel));
-        }
-
-        /// <summary>
-        /// <b>0 - enforce nothing - where there is no weather year to count, rather than a guess.</b>
-        /// <para>
-        /// A guessed requirement would refuse rooms on the strength of a number nothing in the run stated.
-        /// It is not the case that decides anything either way: the comfort lookup needs a weather year, so
-        /// a TSD carrying none cannot be assessed at all - and the mismatched and empty series the
-        /// calculator refuses on its own account are still refused here.
-        /// </para>
-        /// </summary>
-        [Fact]
-        public void NoWeatherYear_StatesNoRequirementRatherThanGuessingOne()
-        {
-            Assert.Equal(0, PartOTM59Assessment.HourCount_WeatherYear(Model(null)));
-
-            //A model carrying weather data with no years in it is the same case. This one used to throw a
-            //NullReferenceException out of WeatherData.WeatherYears, which every caller in the repository
-            //already reads as `WeatherYears?.FirstOrDefault()` and so was written expecting null from.
-            Assert.Equal(0, PartOTM59Assessment.HourCount_WeatherYear(Model(new WeatherData("Test", "Test", 51.5, -0.1, 0))));
-
-            Assert.Equal(0, PartOTM59Assessment.HourCount_WeatherYear(null));
-        }
-
-        /// <summary>
-        /// The requirement, once stated, is what the calculation actually refuses on - the two halves joined
-        /// up. A full-year pair proceeds; an equal-length pair short of the year does not, and says so.
-        /// </summary>
-        [Fact]
-        public void TheStatedRequirement_IsWhatTheCalculationRefusesOn()
-        {
-            WeatherData weatherData = new("Test", "Test", 51.5, -0.1, 0, WeatherYear());
-
-            int hourCount_Expected = PartOTM59Assessment.HourCount_WeatherYear(Model(weatherData));
-
-            Assert.Equal(8760, hourCount_Expected);
-
-            //A room whose series are a full year of paired values.
-            AnalyticalModel analyticalModel_Full = SeriesModel(weatherData, hourCount_Expected);
-
-            TMOverheatingCalculator tMOverheatingCalculator_Full = Calculator(analyticalModel_Full, hourCount_Expected);
-
-            Assert.Single(tMOverheatingCalculator_Full.Calculate_TM59(analyticalModel_Full.GetSpaces()));
-            Assert.Empty(tMOverheatingCalculator_Full.HourlySeriesRefusals);
-
-            //And the same room with a results file that stops short of the year - both series equally, so
-            //nothing here is a mismatch.
-            AnalyticalModel analyticalModel_Partial = SeriesModel(weatherData, 5000);
-
-            TMOverheatingCalculator tMOverheatingCalculator_Partial = Calculator(analyticalModel_Partial, hourCount_Expected);
-
-            Assert.Empty(tMOverheatingCalculator_Partial.Calculate_TM59(analyticalModel_Partial.GetSpaces()));
-
-            string refusal = Assert.Single(tMOverheatingCalculator_Partial.HourlySeriesRefusals);
-            Assert.Contains("Bedroom 1", refusal);
-            Assert.Contains("only 5000 of the 8760", refusal);
-        }
-
-        /// <summary>One space carrying <paramref name="count"/> paired hourly values.</summary>
-        private static AnalyticalModel SeriesModel(WeatherData weatherData, int count)
+        /// <summary>One space carrying the two hourly series at the stated lengths.</summary>
+        private static AnalyticalModel SeriesModel(WeatherData weatherData, int count_ResultantTemperature, int count_OccupancySensibleGain)
         {
             Space space = new("Bedroom 1");
 
-            System.Text.Json.Nodes.JsonArray jsonArray_ResultantTemperature = [];
-            System.Text.Json.Nodes.JsonArray jsonArray_OccupancySensibleGain = [];
-
-            for (int i = 0; i < count; i++)
-            {
-                jsonArray_ResultantTemperature.Add(24.0);
-                jsonArray_OccupancySensibleGain.Add(80.0);
-            }
-
             Core.ParameterSet parameterSet = new("SAM.Analytical.Tas.dll");
-            parameterSet.Add(Core.Query.Name(SpaceSimulationResultParameter.ResultantTemperature), jsonArray_ResultantTemperature);
-            parameterSet.Add(Core.Query.Name(SpaceSimulationResultParameter.OccupancySensibleGain), jsonArray_OccupancySensibleGain);
+            parameterSet.Add(Core.Query.Name(SpaceSimulationResultParameter.ResultantTemperature), Values(count_ResultantTemperature, 24.0));
+            parameterSet.Add(Core.Query.Name(SpaceSimulationResultParameter.OccupancySensibleGain), Values(count_OccupancySensibleGain, 80.0));
             space.Add(parameterSet);
 
             AdjacencyCluster adjacencyCluster = new();
@@ -189,17 +233,30 @@ namespace SAM.Analytical.UI.WPF.Tests
             return result;
         }
 
+        private static System.Text.Json.Nodes.JsonArray Values(int count, double value)
+        {
+            System.Text.Json.Nodes.JsonArray result = [];
+
+            for (int i = 0; i < count; i++)
+            {
+                result.Add(value);
+            }
+
+            return result;
+        }
+
         /// <summary>
-        /// A calculator with an explicit empty <c>TextMap</c>, so the space resolves to no TM59 application
-        /// and the criterion selection is deterministic without depending on a shipped resource file being
-        /// installed on the machine running the tests.
+        /// A calculator carrying the PRODUCTION requirement - the same value
+        /// <c>PartOTM59Assessment.Assess</c> states on it - with an explicit empty <c>TextMap</c>, so the
+        /// space resolves to no TM59 application and the criterion selection is deterministic without
+        /// depending on a shipped resource file being installed on the machine running the tests.
         /// </summary>
-        private static TMOverheatingCalculator Calculator(AnalyticalModel analyticalModel, int hourCount_Expected)
+        private static TMOverheatingCalculator Calculator(AnalyticalModel analyticalModel)
         {
             return new TMOverheatingCalculator(analyticalModel)
             {
                 TextMap = Core.Create.TextMap("TM59"),
-                HourCount_Expected = hourCount_Expected
+                HourCount_Expected = PartOSimulationContext.HourCount_FullYear,
             };
         }
     }
