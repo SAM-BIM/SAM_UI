@@ -133,9 +133,18 @@ namespace SAM.Analytical.UI.WPF
             WeatherData weatherData = partOSimulationContext.WeatherData;
             SolarCalculationMethod solarCalculationMethod = partOSimulationContext.SolarCalculationMethod;
 
-            //A copy, for the same reason Simulate takes one: everything below mutates in place - the name
-            //here, the materials at "Update Materials" - and a cancelled run must leave the caller's model
-            //exactly as it was rather than renamed and re-materialled behind its back.
+            //THE ownership boundary of an Approved Document O TAS run, and the only deep copy on it.
+            //
+            //Everything below mutates in place - the name here, the materials at "Update Materials" - and a
+            //cancelled run must leave the caller's model exactly as it was rather than renamed and
+            //re-materialled behind its back.
+            //
+            //This copy is what every step from here to WorkflowCalculator then works on, which is why the
+            //workflow is TOLD the model is already owned rather than copying it again. The two callers of
+            //this method are Simulate, which hands over a model it has not yet mutated, and the Iteration
+            //2B optimiser, whose model is derived from the retained last-valid design through SHALLOW
+            //copies and so shares its objects - the case that makes this copy load-bearing rather than
+            //merely tidy.
             //
             //DEEP, which is what makes that true. The ordinary copy constructor rebuilds the cluster's
             //dictionaries but SHARES the objects inside it, and the writes below are in-place mutations
@@ -436,7 +445,11 @@ namespace SAM.Analytical.UI.WPF
                     partORun.ExpectResults(path_TSD);
                 }
 
-                result = Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled);
+                // OWNED: the copy taken at the top of this method is this run's alone, and everything
+                // between there and here has worked on it. Without saying so the workflow took a SECOND
+                // deep copy of the same model for the same guarantee - and Simulate, which calls this
+                // method, had taken a third. See WorkflowCalculator.Calculate(AnalyticalModel, bool).
+                result = Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled, true);
             }
 
             if (cancelled || result is null)

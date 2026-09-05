@@ -103,21 +103,32 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            // The model is renamed here and, on the export-only path below, converted in place. Those writes
-            // would land on the instance the user still has open, so a cancelled or failed run would change
-            // it behind the UI's back. Work on a copy instead; the copy constructor carries the Guid over, so
-            // identity does not change. RunPartOSimulation takes a copy of its own for the same reason, which
-            // is what leaves THIS one untouched by a run that failed.
+            // The model is renamed here, and a cancelled or failed run must not leave the instance the user
+            // still has open renamed behind its back. SHALLOW is enough for that: Name is a field of
+            // AnalyticalModel itself, so a new wrapper isolates it, and the copy constructor carries the
+            // Guid over so identity does not change.
             //
-            // DEEP, and that is the load-bearing part. The ordinary copy constructor rebuilds the cluster's
-            // dictionaries but SHARES its spaces, panels and apertures, and the TAS conversion below stamps
-            // zone and building-element identity straight onto them in place - so a shallow copy left every
-            // one of those writes visible on the instance the user still has open, which is the very thing
-            // this copy exists to prevent. See AnalyticalModel(AnalyticalModel, bool) for the ownership rule.
-            analyticalModel = new AnalyticalModel(analyticalModel, true)
+            // Deliberately NOT deep here, and that is the point of the seam. The in-place writes that need
+            // real ownership - the materials, the construction layers, and every TAS identity stamp - all
+            // happen inside RunPartOSimulation, which takes the deep working copy itself and hands the
+            // result back for this method to adopt. Cloning here as well meant the normal Part O run cloned
+            // the same model three times over (here, there, and again inside WorkflowCalculator) to
+            // establish one guarantee, and then threw this one away on adoption.
+            //
+            // The one path where THIS method mutates a model of its own is the export block below, which
+            // converts in place when the workflow did not run or did not produce a model. It takes its own
+            // deep copy at that point - see analyticalModel_Owned - so the guarantee is unchanged and is
+            // paid for exactly once, on whichever path actually needs it.
+            analyticalModel = new AnalyticalModel(analyticalModel)
             {
                 Name = projectName,
             };
+
+            // Whether `analyticalModel` is a working copy this method may mutate freely. False while it is
+            // the shallow copy taken above, which still shares its spaces, panels and apertures with the
+            // model the user has open; true once a deep copy has been adopted or taken. See
+            // AnalyticalModel(AnalyticalModel, bool) for the ownership rule this tracks.
+            bool analyticalModel_Owned = false;
 
             // Everything the TAS case needs, in one object - so this run and any Iteration 2B optimisation
             // that later repeats it are provably the same case. See PartOSimulationContext.
@@ -186,7 +197,11 @@ namespace SAM.Analytical.UI.WPF
                     // as one.
                     workflowCompleted = true;
 
+                    // Adopted - and with it, its ownership. RunPartOSimulation took the deep working copy
+                    // and nothing else holds what it hands back, so the export block below may mutate this
+                    // model in place without taking another.
                     analyticalModel = analyticalModel_Workflow;
+                    analyticalModel_Owned = true;
 
                     if (printRoomDataSheets)
                     {
@@ -211,6 +226,22 @@ namespace SAM.Analytical.UI.WPF
             // writing, and a partial file converts into a model that looks complete but is not.
             if(!cancelled && (createSAP || createTM59 || createPartL))
             {
+                // Ownership, taken HERE and only where it is needed. This block mutates the model in place:
+                // Tas.Convert.ToTBD is called with updateGuids, and Modify.RestampSimulationZoneIdentity
+                // writes SpaceParameter.ZoneGuid straight onto the live spaces (its own summary says the
+                // caller must put the returned spaces back). Against the shallow copy taken at the top of
+                // this method those writes would reach the model the user still has open.
+                //
+                // On the ordinary path this costs nothing: the workflow ran, its model was adopted above,
+                // and it is already owned. The copy is taken only where the workflow was not run at all -
+                // an export-only run - or ran and produced nothing, which are exactly the cases where no
+                // deep copy has been made for this model yet.
+                if (!analyticalModel_Owned && analyticalModel != null)
+                {
+                    analyticalModel = new AnalyticalModel(analyticalModel, true);
+                    analyticalModel_Owned = true;
+                }
+
                 using (ProgressBarWindowManager progressBarWindowManager = new ProgressBarWindowManager("Convert to TBD", "Converting..."))
                 {
                     if (!converted)
@@ -481,12 +512,17 @@ namespace SAM.Analytical.UI.WPF
 
             string path_TBD = System.IO.Path.Combine(outputDirectory, projectName + ".tbd");
 
-            // Same reason as the overload above: "Update Materials" writes into the model, and this method
-            // signals cancellation by returning null. Mutating the caller's instance and then handing back
-            // null would change it while telling the caller nothing came of the run. The copy keeps the Guid.
+            // THE ownership boundary of this overload, and its only deep copy. "Update Materials" writes
+            // into the model, Tas.Convert.ToTBD below converts it in place with updateGuids, and this method
+            // signals cancellation by returning null - so mutating the caller's instance and then handing
+            // back null would change it while telling the caller nothing came of the run. The copy keeps the
+            // Guid.
             //
-            // Deep for the same reason the overload above is: the conversion below stamps TAS identity onto
-            // the spaces and panels in place, and a shallow copy shares them with the caller.
+            // Deep because those writes are in-place mutations of the shared spaces and panels rather than
+            // same-guid replacements. Unlike the UIAnalyticalModel overload, this method converts the model
+            // ITSELF before running the workflow, so the copy cannot be deferred to RunPartOSimulation -
+            // there is no call to it on this path. The workflow is told the model is already owned, so the
+            // copy is still taken exactly once.
             analyticalModel = new AnalyticalModel(analyticalModel, true);
 
             bool shadingUpdated = false;
@@ -676,7 +712,9 @@ namespace SAM.Analytical.UI.WPF
                     SimulateTo = simulate_To
                 };
 
-                analyticalModel = Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled);
+                // OWNED: the deep copy taken at the top of this method, which everything since has worked
+                // on. Without saying so the workflow took a second one for the same guarantee.
+                analyticalModel = Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled, true);
 
                 // A cancelled workflow returns null; returning null rather than a half-populated model is what
                 // tells the caller nothing usable came back.
