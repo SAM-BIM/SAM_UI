@@ -29,13 +29,29 @@ namespace SAM.Analytical.UI.WPF
         /// <item><see cref="SimulateOptions.Simulate"/> and <see cref="SimulateOptions.FullYearSimulation"/>:
         /// without both, no TSD carrying an annual hourly series exists, and a TM59 assessment has nothing to
         /// read.</item>
-        /// <item><see cref="SimulateOptions.Sizing"/>: <b>on</b>, which is what every Part O run to date has
-        /// been produced with. It is not a Part O deliverable - nothing in the assessment or in Iteration 2B
-        /// reads a design load - but it is not free to turn off either: <c>Tas.Query.Sizing</c> runs
-        /// <c>sizing(0)</c> over the TBD that is about to be simulated and writes the sized plant capacities
-        /// into it, so the annual run that follows is a different thermal case with it off. Changing that is
-        /// Part O engineering, not this. Fixing it here is what makes it the same case for the baseline and
-        /// every Iteration 2B round that repeats it - see <c>PartOCanonicalTBD</c>, which fingerprints it.
+        /// <item><see cref="SimulateOptions.Sizing"/>: <b>off</b>. Approved Document O asks for a full year
+        /// of the building as designed, not a plant sizing exercise, and <b>nothing in the assessment or in
+        /// Iteration 2B reads a design load</b> - the only consumer of <c>DesignHeatingLoad</c>,
+        /// <c>DesignCoolingLoad</c> or <c>SpaceSimulationResultParameter.DesignLoad</c> anywhere is
+        /// <c>Modify.PrintRoomDataSheets</c>, and room data sheets are fixed off below.
+        /// <para>
+        /// It was on until this, because every Part O run to date had been produced that way. That is not a
+        /// reason: <c>Tas.Query.Sizing</c> is not a read-only step. It opens the very TBD that is about to be
+        /// simulated and re-saves it several times - zeroing and recomputing every zone's
+        /// <c>maxHeatingLoad</c> and <c>maxCoolingLoad</c>, changing every zone's <c>sizeHeating</c> and
+        /// <c>sizeCooling</c>, adding an <c>Air_Glass</c> construction, and applying the model's oversizing
+        /// factors. The annual run then simulates that plant-sized file. It also writes
+        /// <c>&lt;project&gt;_Uncapped.tbd</c> and <c>&lt;project&gt;_HDDCDD.tbd</c> beside the run's own
+        /// outputs, because <c>SizingSettings.GenerateUncappedFile</c> and <c>GenerateHDDCDDFile</c> both
+        /// default to true and the workflow's call site overrides neither - two extra files for the baseline
+        /// and for every Iteration 2B round.
+        /// </para>
+        /// <para>
+        /// So the choice is not "sized or unsized results", it is <b>which file the year is run against</b>.
+        /// Part O wants the prepared model as converted. Turning it off is deliberate and it invalidates
+        /// canonical baselines taken before it - <c>PartOCanonicalTBD</c> fingerprints <c>sizing=</c>, so a
+        /// warm start correctly rebuilds rather than reusing a TBD produced under the old case.
+        /// </para>
         /// </item>
         /// <item>The export tick boxes - room data sheets, SAP, Part L, TPD and the TAS domestic-overheating
         /// XML: all <b>off</b>. Each is a deliverable of a run somebody asked for. Part O has its own
@@ -120,7 +136,7 @@ namespace SAM.Analytical.UI.WPF
                 // run that can be assessed.
                 Simulate = true,
                 FullYearSimulation = true,
-                Sizing = true,
+                Sizing = false,
                 UnmetHours = false,
                 UseWidths = false,
                 UpdateConstructionLayersByPanelType = true,
