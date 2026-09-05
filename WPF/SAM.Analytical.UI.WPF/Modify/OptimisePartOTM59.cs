@@ -414,22 +414,45 @@ namespace SAM.Analytical.UI.WPF
             //those describe a run that was never recorded, and this one was. Saying WHY a valid saved result
             //cannot be continued is the difference between a rule and a glitch.
             //
-            //-- Why a restored run cannot resume into Iteration 2B, concretely --
+            //-- Why a restored run cannot resume into Iteration 2B --
+            //
+            //SETTLED, and settled as intentional. This is the record of that decision, so it does not come
+            //back as an open question.
             //
             //It is not the results and it is not the design: PartORun.Restore validates both against
             //SimulationResultProvenance, and 2B does not re-simulate the baseline anyway (see Optimise, run
-            //0). It is the PREPARATION. Every 2B round re-prepares the design it just changed, and
-            //Analytical.Modify.PreparePartOIteration is handed
-            //PartOPreparationContext.VentilationUnitCapacityDescriptors - the manufacturer catalogue AS IT
-            //WAS when the baseline selected its units, carried rather than re-read precisely so nothing can
-            //change what a selected unit is understood to be rated at part-way through a run.
+            //0). It is the PREPARATION, in whole - not the catalogue alone.
             //
-            //That snapshot is the one thing a file cannot hand back. VentilationUnitCapacityDescriptor is
-            //deliberately not an IJSAMObject - SAM.Analytical owns the selection rule and not the product
-            //list - so persisting it onto the model would mean fingerprinting a catalogue into the model
-            //file, and re-reading the catalogue instead would let a round be checked against capacities the
-            //baseline was never selected under. The dwellings 2B stops at (guids_AtCapacity) are exactly the
-            //ones sitting on their unit's ceiling, so a moved ceiling silently moves the answer.
+            //Every 2B round re-prepares the design it just changed, and Analytical.Modify.PreparePartOIteration
+            //is given the run's route, its assessed zones and its per-zone ventilation strategies. A restored
+            //run holds NONE of them: PartOPreparationContext is a statement about how this session prepared
+            //the case, and Restore clears it. Rebuilding it from the reopened model would be a regenerated
+            //preparation authority wearing an old run's results - the same failure Restore refuses for the
+            //overheating scenarios, and for the same reason.
+            //
+            //The catalogue is the part where drift is SILENT, which is why it is the part the message names.
+            //Note precisely what it is and is not used for here: the re-preparation is offered NO catalogue
+            //(see this method's own documentation - null, so the product selected at Iteration 2 survives
+            //every round). PartOPreparationContext.VentilationUnitCapacityDescriptors is read only by the
+            //design airflow round and the capacity envelope, through
+            //Analytical.Query.SelectedVentilationUnitCapacityDescriptor, to find what the ALREADY SELECTED
+            //product is rated at. The model stores that product's identity and never its capability -
+            //VentilationUnitReference says why - so the rating has to come from a catalogue handed in, and
+            //the dwellings 2B stops at (guids_AtCapacity) are exactly the ones sitting on that rating.
+            //A catalogue corrected between the baseline and a resumed run therefore moves where the
+            //optimisation stops while nothing in the model has changed, and it does so without failing:
+            //SAM.Tests.PartOCatalogueDriftTests measures exactly that, one rating adopting a round the next
+            //refuses.
+            //
+            //-- Why this is not fixed by persisting the catalogue --
+            //
+            //Because the catalogue is not the binding constraint. Persisting the capacities of the selected
+            //products would be small and stable, and would unblock nothing on its own: the route, the scope
+            //and the strategies are equally absent, and 2B needs all of them every round. Persisting the
+            //whole preparation context is a new serialisable contract with its own versioning, validation
+            //and restore path - a new supported capability rather than a correction - and it would put an
+            //equipment capability number into a saved file beside numbers meaning design duty and
+            //regulatory requirement, which is the confusion VentilationUnitReference exists to prevent.
             //
             //Re-preparing is therefore the honest route back in, and it is one dialog: the reopened model is
             //the prepared design, and Prepare & Run over the same scenario and scope reaches a run that
