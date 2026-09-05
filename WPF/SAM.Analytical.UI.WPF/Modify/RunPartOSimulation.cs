@@ -136,7 +136,22 @@ namespace SAM.Analytical.UI.WPF
             //A copy, for the same reason Simulate takes one: everything below mutates in place - the name
             //here, the materials at "Update Materials" - and a cancelled run must leave the caller's model
             //exactly as it was rather than renamed and re-materialled behind its back.
-            analyticalModel = new AnalyticalModel(analyticalModel)
+            //
+            //DEEP, which is what makes that true. The ordinary copy constructor rebuilds the cluster's
+            //dictionaries but SHARES the objects inside it, and the writes below are in-place mutations
+            //rather than same-guid replacements - UpdateConstructionLayersByPanelType re-materials the
+            //shared panels, and the TAS conversion stamps zone and building-element identity onto the
+            //shared spaces, panels and apertures - so a shallow copy isolated the model's name and its
+            //libraries and nothing else.
+            //
+            //On the optimisation path the caller IS the retained last-valid design of the previous round.
+            //A shallow copy let a later round's conversion stamp new TAS identities onto it, so a round
+            //that then failed or was cancelled handed back a last-valid model whose
+            //SimulationResultProvenance.Fingerprint_Model no longer matched the results it was produced
+            //from - a false "the model has changed since the simulation results were produced from it" on
+            //reopening, and a forced re-simulation. See AnalyticalModel(AnalyticalModel, bool) for the
+            //ownership rule this establishes.
+            analyticalModel = new AnalyticalModel(analyticalModel, true)
             {
                 Name = projectName,
             };

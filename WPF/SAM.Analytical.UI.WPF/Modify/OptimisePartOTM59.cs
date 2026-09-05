@@ -1000,11 +1000,21 @@ namespace SAM.Analytical.UI.WPF
             }
 
             //Its own step, its own kind and its own project name. The iteration number continues the run's
-            //sequence so the step reads in order; the FILE name is -OptMax, which is what keeps the
+            //sequence so the step reads in order; the FILE name carries Max, which is what keeps the
             //diagnostic out of the rounds' numbering - see PartOSimulationContext.ProjectName_CapacityEnvelope.
+            //
+            //The file name is also qualified by THIS SESSION'S baseline, read off the run's own step 0 -
+            //the same iteration baseline its rounds are numbered from. Without it the envelope was the one
+            //piece of an optimisation's evidence a second optimisation destroyed: the rounds of a run
+            //started from -Opt05 number from -Opt06 and collide with nothing, while its envelope was
+            //-OptMax both times and overwrote the first session's TBD, TSD, run model and TM59 report.
+            //Step_Baseline is the run's own record of what it started from, so this cannot disagree with
+            //the numbering the rounds actually used.
+            int iteration_Baseline = PartOSimulationContext.Iteration_ProjectName(partOOptimisationRun.Step_Baseline?.ProjectName);
+
             PartOOptimisationStep partOOptimisationStep = new(PartOSimulationContext.Iteration_ProjectName(partOOptimisationStep_LastValid.ProjectName) + 1, PartOOptimisationStepKind.CapacityEnvelope)
             {
-                ProjectName = partOSimulationContext.ProjectName_CapacityEnvelope(),
+                ProjectName = partOSimulationContext.ProjectName_CapacityEnvelope(iteration_Baseline),
                 WeatherData = partOSimulationContext.WeatherData?.Name,
             };
 

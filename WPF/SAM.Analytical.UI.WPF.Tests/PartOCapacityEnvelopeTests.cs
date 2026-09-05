@@ -182,6 +182,123 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(0, PartOSimulationContext.Iteration_ProjectName(partOSimulationContext.ProjectName_CapacityEnvelope()));
         }
 
+        /// <summary>
+        /// <b>A second optimisation's envelope does not overwrite the first's evidence.</b>
+        /// <para>
+        /// The envelope used to be <c>&lt;project&gt;-OptMax</c> unconditionally, which made it the one
+        /// piece of an optimisation's output that running the optimisation again destroyed. The rounds never
+        /// had this problem: they are numbered from the iteration baseline the run started from, so a second
+        /// run continues at <c>-Opt06</c> instead of overwriting <c>-Opt01</c>. The envelope simply ignored
+        /// that baseline.
+        /// </para>
+        /// <para>
+        /// Optimise, then optimise again from the result, and the two envelopes are now distinct - while a
+        /// first optimisation keeps the spelling every already-saved run uses.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TheEnvelopeOfARepeatedOptimisation_DoesNotOverwriteTheFirstOnes()
+        {
+            PartOSimulationContext partOSimulationContext = new(Path.GetTempPath(), "Flat1", null, SolarCalculationMethod.SAM, 1, 365);
+
+            //First optimisation: started from the Iteration 2 design, whose results file carries no -Opt
+            //suffix, so the baseline reads as 0.
+            string projectName_Envelope_1 = partOSimulationContext.ProjectName_CapacityEnvelope(PartOSimulationContext.Iteration_ProjectName("Flat1"));
+
+            //Second optimisation: started from the design the first left behind, five rounds in.
+            string projectName_Envelope_2 = partOSimulationContext.ProjectName_CapacityEnvelope(PartOSimulationContext.Iteration_ProjectName("Flat1-Opt05"));
+
+            Assert.NotEqual(projectName_Envelope_1, projectName_Envelope_2);
+
+            //Backward compatible: the ordinary first optimisation still writes and reopens the name every
+            //historic run was saved under.
+            Assert.Equal("Flat1-OptMax", projectName_Envelope_1);
+
+            //And the second names the lineage it was measured from.
+            Assert.Equal("Flat1-Opt05-Max", projectName_Envelope_2);
+        }
+
+        /// <summary>
+        /// The qualified envelope name still is not a round, and still reads back as no iteration - the two
+        /// properties the unqualified <c>-OptMax</c> had and had to keep. Reading back as 0 is what stops an
+        /// optimisation started from an envelope design renumbering from <c>-Opt01</c> and landing on a
+        /// round's files.
+        /// </summary>
+        [Fact]
+        public void TheQualifiedEnvelopeName_IsStillNotARoundAndStillReadsBackAsNoIteration()
+        {
+            PartOSimulationContext partOSimulationContext = new(Path.GetTempPath(), "Flat1", null, SolarCalculationMethod.SAM, 1, 365);
+
+            for (int iteration_Baseline = 0; iteration_Baseline <= 20; iteration_Baseline++)
+            {
+                string projectName_Envelope = partOSimulationContext.ProjectName_CapacityEnvelope(iteration_Baseline);
+
+                for (int i = 0; i <= 40; i++)
+                {
+                    Assert.NotEqual(partOSimulationContext.ProjectName_Iteration(i), projectName_Envelope);
+                }
+
+                Assert.Equal(0, PartOSimulationContext.Iteration_ProjectName(projectName_Envelope));
+            }
+        }
+
+        /// <summary>
+        /// Two envelopes from different baselines are distinct from each other and from every round of
+        /// either session - the actual no-collision claim, over the whole space of baselines rather than
+        /// one example.
+        /// </summary>
+        [Fact]
+        public void EveryBaselinesEnvelopeName_IsUnique()
+        {
+            PartOSimulationContext partOSimulationContext = new(Path.GetTempPath(), "Flat1", null, SolarCalculationMethod.SAM, 1, 365);
+
+            HashSet<string> projectNames = [];
+
+            for (int iteration_Baseline = 0; iteration_Baseline <= 30; iteration_Baseline++)
+            {
+                Assert.True(projectNames.Add(partOSimulationContext.ProjectName_CapacityEnvelope(iteration_Baseline)),
+                    string.Format("Two baselines produced the same envelope name at iteration {0}.", iteration_Baseline));
+            }
+        }
+
+        /// <summary>
+        /// <b>Every envelope artefact shares the one case identity.</b>
+        /// <para>
+        /// The TBD and TSD are named from the step's project name by <c>RunPartOSimulation</c>, and the run
+        /// model and the TM59 report are then derived from the TSD by <c>Query.Path_PartORunModel</c> and
+        /// <c>Query.Path_TM59Report</c> - the single naming authority each. So qualifying the project name
+        /// moves the whole set together, and this asserts it does rather than leaving one file behind under
+        /// the old name where it would be read as belonging to this run.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void EveryEnvelopeArtefact_SharesTheSameUniqueCaseIdentity()
+        {
+            string directory = Path.GetTempPath();
+
+            PartOSimulationContext partOSimulationContext = new(directory, "Flat1", null, SolarCalculationMethod.SAM, 1, 365);
+
+            string projectName = partOSimulationContext.ProjectName_CapacityEnvelope(PartOSimulationContext.Iteration_ProjectName("Flat1-Opt05"));
+
+            Assert.Equal("Flat1-Opt05-Max", projectName);
+
+            //The pair RunPartOSimulation writes, from the project name.
+            string path_TBD = Path.Combine(directory, projectName + ".tbd");
+            string path_TSD = Path.ChangeExtension(path_TBD, "tsd");
+
+            //And the pair every reader and writer of a run's own evidence derives from the results file.
+            Assert.Equal(Path.Combine(directory, "Flat1-Opt05-Max.sam"), Query.Path_PartORunModel(path_TSD));
+            Assert.Equal(Path.Combine(directory, "Flat1-Opt05-Max-TM59.txt"), Query.Path_TM59Report(path_TSD));
+
+            //None of them is the previous session's, which is the collision this closes.
+            string projectName_Previous = partOSimulationContext.ProjectName_CapacityEnvelope();
+            string path_TSD_Previous = Path.Combine(directory, projectName_Previous + ".tsd");
+
+            Assert.NotEqual(path_TSD_Previous, path_TSD);
+            Assert.NotEqual(Query.Path_PartORunModel(path_TSD_Previous), Query.Path_PartORunModel(path_TSD));
+            Assert.NotEqual(Query.Path_TM59Report(path_TSD_Previous), Query.Path_TM59Report(path_TSD));
+        }
+
         // ---- Presentation: the three stages are told apart ------------------------------------------------
 
         /// <summary>

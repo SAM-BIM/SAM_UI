@@ -101,25 +101,62 @@ namespace SAM.Analytical.UI
 
         /// <summary>
         /// The project name for the diagnostic selected-equipment capacity envelope -
-        /// <c>&lt;project&gt;-OptMax</c>.
+        /// <c>&lt;project&gt;-OptMax</c> for a first optimisation, and
+        /// <c>&lt;project&gt;-Opt</c><i>nn</i><c>-Max</c> for one continuing from the design a previous
+        /// optimisation left behind.
         /// <para>
-        /// <b>Named, not numbered, deliberately.</b> A numbered <c>-Opt</c><i>nn</i> suffix would put the
+        /// <b>Named, not numbered, deliberately.</b> A bare <c>-Opt</c><i>nn</i> suffix would put the
         /// diagnostic in the same sequence as the rounds, where a reader sorting the output directory would
-        /// find it beside them and read it as the last and best of them. <c>-OptMax</c> is its own identity,
-        /// so its TBD and TSD sit beside the rounds' without overwriting any of them and without pretending
-        /// to be one.
+        /// find it beside them and read it as the last and best of them. The <c>Max</c> is what keeps it out
+        /// of that sequence, so its TBD and TSD sit beside the rounds' without overwriting any of them and
+        /// without pretending to be one.
+        /// </para>
+        ///
+        /// <para><b>Why the iteration baseline is part of it</b></para>
+        /// <para>
+        /// It used to be <c>&lt;project&gt;-OptMax</c> unconditionally, which made the envelope the one
+        /// piece of an optimisation's evidence that a SECOND optimisation destroyed. Every round already
+        /// carries the baseline it continues from - <see cref="ProjectName_Iteration(int)"/> is given
+        /// <c>iteration_Baseline + iteration</c>, so a second run numbers from <c>-Opt06</c> rather than
+        /// starting again at <c>-Opt01</c> - and the envelope was the only case that ignored it. Optimise
+        /// <c>Flat1</c>, then optimise again from its result, and the second envelope overwrote the first's
+        /// <c>Flat1-OptMax.tbd</c>, <c>.tsd</c>, <c>.sam</c> and <c>-TM59.txt</c>, because every one of
+        /// those derives from this name. Now the second is <c>Flat1-Opt05-Max</c>, beside the round it was
+        /// measured from rather than on top of the previous session's.
         /// </para>
         /// <para>
-        /// <see cref="Iteration_ProjectName(string)"/> reads this name back as 0, so an optimisation
-        /// started from an envelope design - which is not a supported thing to do, but is a thing a person
-        /// could reach - would number from <c>-Opt01</c> and could overwrite a round's evidence. The
-        /// envelope is therefore never handed back as a design to continue from; see
+        /// <b>The same authority the rounds use, not a second counter.</b> The baseline is whatever
+        /// <see cref="Iteration_ProjectName(string)"/> reads off the run being optimised, so the envelope's
+        /// identity and its rounds' identities come from one place and cannot drift apart. It follows that
+        /// two optimisations started from the SAME round collide here exactly as their rounds already do -
+        /// that is a property of the iteration baseline itself, not of this name, and it is the reason a
+        /// repeated optimisation continues the numbering rather than restarting it.
+        /// </para>
+        /// <para>
+        /// <b>Iteration 0 keeps the old spelling</b>, so a first optimisation - the ordinary case, and every
+        /// run already saved - still writes and reopens <c>&lt;project&gt;-OptMax</c>. Qualifying that name
+        /// too would have gained nothing and orphaned the evidence of every historic run.
+        /// </para>
+        /// <para>
+        /// <see cref="Iteration_ProjectName(string)"/> reads either spelling back as 0 - neither
+        /// <c>Max</c> nor <c>05-Max</c> parses as a number - so an optimisation started from an envelope
+        /// design, which is not a supported thing to do but is a thing a person could reach, would number
+        /// from <c>-Opt01</c> and could overwrite a round's evidence. The envelope is therefore never handed
+        /// back as a design to continue from; see
         /// <see cref="PartOOptimisationRun.AnalyticalModel_CapacityEnvelope"/>.
         /// </para>
         /// </summary>
-        public string ProjectName_CapacityEnvelope()
+        /// <param name="iteration_Baseline">
+        /// The optimisation iteration this session started from, as
+        /// <see cref="Iteration_ProjectName(string)"/> read it off the baseline run's own results file.
+        /// <b>0</b> - the default, and a first optimisation - gives the unqualified
+        /// <c>&lt;project&gt;-OptMax</c>.
+        /// </param>
+        public string ProjectName_CapacityEnvelope(int iteration_Baseline = 0)
         {
-            return string.Format("{0}-OptMax", ProjectName);
+            return iteration_Baseline <= 0
+                ? string.Format("{0}-OptMax", ProjectName)
+                : string.Format("{0}-Opt{1:00}-Max", ProjectName, iteration_Baseline);
         }
 
         /// <summary>

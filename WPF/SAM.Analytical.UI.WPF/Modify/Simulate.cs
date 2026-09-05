@@ -108,7 +108,13 @@ namespace SAM.Analytical.UI.WPF
             // it behind the UI's back. Work on a copy instead; the copy constructor carries the Guid over, so
             // identity does not change. RunPartOSimulation takes a copy of its own for the same reason, which
             // is what leaves THIS one untouched by a run that failed.
-            analyticalModel = new AnalyticalModel(analyticalModel)
+            //
+            // DEEP, and that is the load-bearing part. The ordinary copy constructor rebuilds the cluster's
+            // dictionaries but SHARES its spaces, panels and apertures, and the TAS conversion below stamps
+            // zone and building-element identity straight onto them in place - so a shallow copy left every
+            // one of those writes visible on the instance the user still has open, which is the very thing
+            // this copy exists to prevent. See AnalyticalModel(AnalyticalModel, bool) for the ownership rule.
+            analyticalModel = new AnalyticalModel(analyticalModel, true)
             {
                 Name = projectName,
             };
@@ -478,7 +484,10 @@ namespace SAM.Analytical.UI.WPF
             // Same reason as the overload above: "Update Materials" writes into the model, and this method
             // signals cancellation by returning null. Mutating the caller's instance and then handing back
             // null would change it while telling the caller nothing came of the run. The copy keeps the Guid.
-            analyticalModel = new AnalyticalModel(analyticalModel);
+            //
+            // Deep for the same reason the overload above is: the conversion below stamps TAS identity onto
+            // the spaces and panels in place, and a shallow copy shares them with the caller.
+            analyticalModel = new AnalyticalModel(analyticalModel, true);
 
             bool shadingUpdated = false;
 
