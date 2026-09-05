@@ -22,7 +22,7 @@ namespace SAM.Analytical.UI.WPF
         /// <item><see cref="PreparePartOIteration(UIAnalyticalModel, PartORun, PartOWorkflowRequest, VentilationUnitCatalogue, IWin32Window)"/>
         /// - which is <c>SAM.Analytical.Modify.PreparePartOIteration</c> plus the summary a person accepts it
         /// on, and which the Prepare Iteration picker also calls.</item>
-        /// <item><see cref="Simulate(UIAnalyticalModel, PartORun)"/> - the Simulate dialog, and beneath it
+        /// <item><see cref="Simulate(UIAnalyticalModel, PartORun, bool)"/> - the Simulate dialog, and beneath it
         /// <see cref="RunPartOSimulation"/>, which is where <c>SAMAnalytical.Check</c> gates the normalized
         /// model before TAS converts it and where the run is completed.</item>
         /// <item><see cref="AssessPartOTM59(PartORun, IWin32Window)"/> - the production TM59 assessment over
@@ -191,7 +191,13 @@ namespace SAM.Analytical.UI.WPF
 
             //The Simulate dialog, the SAM Check gate, the TAS workflow, the run completion and the run's own
             //persisted evidence - all of it already lives here.
-            Simulate(uIAnalyticalModel, partORun);
+            //
+            //The third argument is what makes the dialog a PART O dialog: the annual full-year case chosen
+            //rather than inherited from whatever the manual command last ran, and the settings that are not
+            //Part O decisions locked so an accepted dialog cannot produce a run that is refused after the
+            //TAS time has been spent. The weather, the output directory, the project name and the solar
+            //method stay open, because those are the run's own inputs. See Create.SimulateOptions_PartO.
+            Simulate(uIAnalyticalModel, partORun, true);
 
             if (!partORun.CanAssess)
             {

@@ -491,6 +491,67 @@ namespace SAM.Analytical.UI.WPF
             EnableSimulate();
         }
 
+        /// <summary>
+        /// Locks the settings an Approved Document O run does not leave open, so what remains on screen is
+        /// only what a person actually decides.
+        ///
+        /// <para><b>Which ones, and why they are locked rather than merely preselected</b></para>
+        /// <para>
+        /// <b>Simulate</b> and <b>Full Year Simulation</b>: unticking either produces a workflow that returns
+        /// a model with no annual hourly series, which <c>Query.IsPartOFullYearSimulation</c> then correctly
+        /// refuses to complete the run from - after the TAS run has already been paid for. There is no such
+        /// thing as a Part O run over any other range, so offering the choice only offers the chance to waste
+        /// an hour of somebody's afternoon.
+        /// </para>
+        /// <para>
+        /// <b>Sizing</b>, <b>Unmet Hours</b>, <b>Use Widths</b> and <b>Update Construction Layers</b>: these
+        /// are the TAS case, and the case has to be identical for the baseline and every Iteration 2B round
+        /// that repeats it - <c>PartOCanonicalTBD</c> fingerprints all four. They are settled by
+        /// <c>Create.SimulateOptions_PartO</c>, which is also where the reasoning for each value is written
+        /// down.
+        /// </para>
+        /// <para>
+        /// <b>The five export boxes</b>: room data sheets, SAP, Part L, TPD and the TAS domestic-overheating
+        /// XML. None is a Part O deliverable - the overheating assessment Part O produces is
+        /// <c>Modify.AssessPartOTM59</c>, which reads the TSD directly.
+        /// </para>
+        ///
+        /// <para><b>What is deliberately left alone</b></para>
+        /// <para>
+        /// The project name, the output directory, the weather and the solar calculation method. The first
+        /// two are prepopulated and still a person's to redirect; the last two are engineering inputs to the
+        /// run, and Part O has no business choosing them silently.
+        /// </para>
+        ///
+        /// <para>
+        /// <b>Call this after <see cref="SimulateOptions"/> has been set</b>, never before: the
+        /// <see cref="Simulate"/> setter runs <c>EnableSimulate</c>, which re-enables the sizing and
+        /// full-year boxes as a group, and would undo this.
+        /// </para>
+        /// </summary>
+        public void LockPartOSettings()
+        {
+            checkBox_Simulate.IsEnabled = false;
+            checkBox_FullYearSimulation.IsEnabled = false;
+            checkBox_Sizing.IsEnabled = false;
+            checkBox_UnmetHours.IsEnabled = false;
+            checkBox_UseWidths.IsEnabled = false;
+            checkBox_UpdateConstructionLayersByPanelType.IsEnabled = false;
+
+            checkBox_RoomDataSheets.IsEnabled = false;
+            checkBox_CreateSAP.IsEnabled = false;
+            checkBox_CreatePartL.IsEnabled = false;
+            checkBox_CreateTPD.IsEnabled = false;
+            checkBox_CreateTM59.IsEnabled = false;
+
+            //The From/To boxes follow the full-year box, and its own rule already disables them while it is
+            //ticked. Asked again here rather than assumed, so this method states the whole locked state.
+            EnableFullYearSimulation();
+
+            //Both are driven by the SAP and domestic-overheating boxes, which are now off and locked.
+            EnableTextMap();
+        }
+
         private void button_OutputDirectory_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             using (FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog())
