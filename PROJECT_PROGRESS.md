@@ -1,20 +1,168 @@
 # Project Progress
 
 ## Branch
-`perf/large-model-lookup-closeout`, branched from `sow/2026-Q3` at **`60c2eff`** (the merge of PR #87).
+`feature/parto-defaults-closeout`, branched from `perf/large-model-lookup-closeout` (SAM-BIM/SAM_UI#88).
 
-This branch is **SAM-BIM/SAM_UI#88**.
+**DOES NOT stand alone.** It is stacked on **SAM_UI#88**, which is in turn compiled against **`SAM` branch
+`perf/large-model-lookup-closeout` (SAM-BIM/SAM#101)**. **Merge order: SAM#101, then SAM_UI#88, then this.**
+`SAM_Tas` carries a documentation-only branch (SAM-BIM/SAM_Tas#49) and `SAM_Systems` is untouched. This
+branch needs no change in `SAM` or `SAM_Tas`.
 
-**DOES NOT stand alone.** It is compiled against **`SAM` branch `perf/large-model-lookup-closeout`
-(SAM-BIM/SAM#101)**. **Merge order: SAM#101 first.** `SAM_Tas` carries a documentation-only branch
-(SAM-BIM/SAM_Tas#49) and `SAM_Systems` is untouched.
-
-Everything below the entry dated 2026-09-05 (large-model lookups) is superseded history retained for
-context.
+Everything below the entry dated 2026-09-05 (Part O defaults) is superseded history retained for context.
 
 ## Last updated
-2026-09-05 (later) - the failing-space and dwelling-zone lookups ask the cluster's own O(1) authority, and
-opening the Part O hub inspects the model once instead of nine times.
+2026-09-05 (latest) - a Part O run states its own TAS case instead of inheriting the manual Simulate
+command's, and a reopened run says why it cannot be continued into Iteration 2B.
+
+## Latest (2026-09-05, latest): the Part O defaults closeout
+
+**Status: root-caused, implemented, tested, and accepted against a real completed run. Not merged.**
+
+Nothing here changes Part O engineering. It changes what a person is asked, and what they are asked to
+confirm twice.
+
+### The defect: the one setting a Part O run cannot do without was off by default
+
+`Prepare & Run` reaches the Simulate dialog through the ordinary `Modify.Simulate`, which seeds itself from
+the manual command's remembered `SimulateOptions` and, failing those, from `UI.Create.SimulateOptions`.
+`SimulateOptions.FullYearSimulation` is **`false`**. So the normal path was: prepare the iteration, press
+Run, accept a dialog that looked reasonable, wait out a TAS run, and be told the run could not be completed
+because it was not a full year.
+
+Days 1 to 365 is not a preference. `Query.IsPartOFullYearSimulation` refuses every other range outright, so
+there is no completable Part O run with any other value - the range was a **deterministic Part O value**
+being presented as an unticked box.
+
+The observed "Sizing on, Simulation off" is exactly this: sizing is on by default, the **annual** simulation
+box is off by default.
+
+### The fix: a Part O preset feeding the existing authority
+
+`Create.SimulateOptions_PartO` builds the dialog's state for a Part O run. `Modify.Simulate` takes a new
+`partOWorkflow` flag - **passed by `RunPartOWorkflow`, defaulted false for everybody else** - and on that
+path seeds from the preset and locks what a Part O run does not leave open.
+
+The authority is unchanged: `SimulateWindow` still collects the settings, `PartOSimulationContext` still
+carries them, `RunPartOSimulation` still runs them. The preset only decides what the dialog opens with.
+
+| setting | value | why |
+|---|---|---|
+| `Simulate` | **on**, locked | no TSD without it |
+| `FullYearSimulation` (days 1-365) | **on**, locked | `IsPartOFullYearSimulation` refuses anything else |
+| `Sizing` | **on**, locked | see below |
+| `UnmetHours`, `UseWidths`, `UpdateConstructionLayersByPanelType` | fixed, locked | part of the case `PartOCanonicalTBD` fingerprints |
+| RDS / SAP / Part L / TPD / Domestic Overheating XML | **off**, locked | other workflows' deliverables |
+| project name | from the model, every time | carries the isolation scope token |
+| weather | project's own; previous run's only where the model states none | genuine input |
+| output directory | previous run's while it still exists; else the model's | genuine input |
+| solar calculation method | carried | genuine input |
+
+**Sizing stays on, deliberately.** Nothing in the assessment or in Iteration 2B reads a design load, so it is
+not a Part O deliverable - but it is not free to turn off either. `Tas.Query.Sizing` runs `sizing(0)` over
+the TBD that is about to be simulated and writes the sized plant capacities into it, so the annual run is a
+**different thermal case** with it off. On is what every Part O run to date was produced with. Changing it is
+Part O engineering, which this pass was told not to do.
+
+### The manual Simulate command is untouched
+
+Two things guarantee it, neither of which is a convention somebody has to remember:
+
+- **A settings key of its own.** `AnalyticalSettingParameter.SimulateOptions_PartO` sits beside
+  `SimulateOptions`, so the manual command's remembered options cannot decide a Part O run's case, and a
+  Part O run cannot retune the expert dialog behind an engineer's back.
+- **Opt-in, defaulted off.** The ribbon's own Simulate button hands `Modify.Simulate` the session's Part O
+  run - it has to, so a workflow over a prepared model can complete it - so "a run is prepared" is *not*
+  enough to mean "this is the Part O command". Only `RunPartOWorkflow` passes `partOWorkflow: true`.
+
+`TheManualSimulateDefaults_AreUnchanged` and `TheManualSimulateCommand_IsNotOptedIn` pin both.
+
+### Staleness is a property, not a rule
+
+Only the weather, the output directory and the solar method are read back out of the remembered Part O state,
+and the first two are re-validated against the model and the filesystem. Everything else is re-derived. So a
+change of scenario, of dwelling scope, of model or of machine cannot carry a stale setting into the next run,
+because there is no path by which one could. `PartO_ReadsNoFixedSettingOutOfTheRememberedState` pins it.
+
+### A reopened run now says why it cannot continue into Iteration 2B
+
+**The restriction is kept.** The investigation is recorded because the reason is not the obvious one.
+
+It is not the results and it is not the design: `PartORun.Restore` validates both against
+`SimulationResultProvenance`, and an optimisation **never re-simulates its baseline** anyway
+(`Modify.OptimisePartOTM59`, run 0, starts from `AnalyticalModel_Assessment` and `Path_TSD` - both of which a
+restored run has). The blocker is the **preparation**. Every 2B round re-prepares the design it has just
+changed, and is handed `PartOPreparationContext.VentilationUnitCapacityDescriptors` - the manufacturer
+catalogue *as it was* when the baseline selected its units, carried rather than re-read precisely so nothing
+can change what a selected unit is rated at part-way through a run.
+
+That snapshot is the one thing a file cannot hand back:
+
+- `VentilationUnitCapacityDescriptor` is deliberately **not** an `IJSAMObject` - `SAM.Analytical` owns the
+  selection rule and not the product list - so persisting it would mean fingerprinting a catalogue into the
+  model file, which this SOW **excludes from scope**.
+- Re-reading today's catalogue instead would let a round be checked against capacities the baseline was never
+  selected under. `guids_AtCapacity` - the dwellings 2B stops at because they sit on their unit's ceiling -
+  is computed from exactly those capacities, so a moved ceiling silently moves the answer.
+
+Re-preparing is therefore the honest route back in, and it is one gesture: the reopened model **is** the
+prepared design, so `Prepare & Run` over the same scenario and scope reaches a run carrying both contexts
+again. `Modify.CanOptimise` now refuses a restored run with that reason ahead of the two generic null checks,
+instead of reporting it as a run that was never recorded.
+
+### Performance
+
+No new model inspection. The Part O preset deliberately does **not** read the zone category list: that list
+feeds one combo box, and the combo is enabled only while the SAP or domestic-overheating export is ticked,
+both of which are now fixed off and locked. The ordinary Simulate command still reads it, because there those
+boxes are a person's to tick. Opening the Part O hub is untouched and remains the one inspection SAM_UI#88
+established.
+
+### Click path
+
+| step | before | after |
+|---|---|---|
+| Part O -> Prepare & Run | hub: scenario, scope, dwellings, 2B | unchanged |
+| | preparation summary -> OK | unchanged |
+| | Simulate dialog: **tick Full Year Simulation**, check Sizing, untick whatever the last manual run left on, pick weather, check output directory -> OK | Simulate dialog: **weather and output directory only** -> OK |
+| | full-year TAS run *(or a wasted run, and "not a full year")* | full-year TAS run |
+| | TM59 result | unchanged |
+
+### Tests
+
+**552 passing, 528 before** (+24). New: `PartOSimulateDefaultsTests` (23). Updated:
+`PartOResultReopenTests.ARestoredRun_CanBeReviewed_ButNotResumed` now pins the restored-run reason rather
+than the generic one.
+
+### Manual acceptance
+
+Against a real completed run - `000000_SAM_AnalyticalModel-It1a-futureZ1-ISO-e77fa00a-Opt02.sam` from
+`SAM_daily/2026-07-15 PartO`, a 5-space / 2-zone isolated Iteration 1a:
+
+- reopen -> `Restore` = true, `WorkflowCompleted`, `IsRestored`, `IsAssessable` = true, 2 scenarios, the real
+  `.tsd` resolved;
+- review -> `CanOptimise` = false with the **new** restored-run reason;
+- the Part O Simulate preset over the same model opens with the project's own weather
+  (`Z1_DSY1_2050s_HIGH90_CIBSE_v1.1`), the run's own output directory, full year on, sizing on, every export
+  off, zone categories not read.
+
+No TAS run was repeated: the existing results were sufficient to exercise the seam. The dialog itself was
+not clicked through in a live SAM_UI session in this pass - the seam was driven through the same public API
+the dialog uses.
+
+### Unrelated findings (recorded, not acted on)
+
+- **`SimulateControl.SetSimulateOptions` self-assigns `CreatePartL`** (`CreatePartL = CreatePartL;`), so a
+  remembered "Create Part L" tick is never restored into the manual dialog. Left alone: fixing it changes the
+  manual command's behaviour, which this pass was told to preserve.
+- **The From/To day boxes are editable exactly when they are ignored.** `EnableFullYearSimulation` enables
+  them while "Full Year Simulation" is *un*ticked, and `Modify.Simulate` passes `-1` for the range in that
+  case - so a partial-range run cannot be asked for through this dialog at all. Irrelevant to Part O, which
+  is always 1-365.
+- **Runs saved before the 2026-09-03 provenance work cannot be restored.** A pre-`b4420960` `.sam` records a
+  digest computed by the older fingerprint, so `Restore` refuses it as "the model has changed since the
+  simulation results were produced from it". Confirmed on
+  `000000_SAM_AnalyticalModel-It1a-futureZ1-Opt06.sam`. Correct behaviour for a fingerprint change, but the
+  message names the wrong cause. Not fixed here: the invalidation rules are not to be weakened.
 
 ## Latest (2026-09-05, later): large-model lookup closeout - the SAM_UI half
 
