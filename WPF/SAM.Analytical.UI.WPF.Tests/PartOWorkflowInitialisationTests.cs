@@ -36,6 +36,12 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// superseded before anybody could see it. Each one walks the dwelling scope, so on a five thousand space
     /// project the whole cost was paid nine times over.
     /// </para>
+    /// <para>
+    /// <b>Nine is measured, not counted off the source.</b> <see cref="Constructed"/> deliberately exercises
+    /// all nine triggers - which is why it restores the LAST scenario rather than the first; see there - and
+    /// removing the deferral from <c>PartOWorkflowWindow</c> makes
+    /// <see cref="OpeningTheHubOnABlock_IsStillOneInspection"/> report exactly nine on this fixture.
+    /// </para>
     ///
     /// <para><b>What these assert, and what they must not let slip</b></para>
     /// <para>
@@ -307,7 +313,13 @@ namespace SAM.Analytical.UI.WPF.Tests
                 guids_Restored.Add(result.DwellingSelection.Items[i].Guid);
             }
 
-            result.Restore(PartOWorkflowScenario.Scenarios[0], PartOWorkflowScope.SelectedDwellings, guids_Restored, new PartOOptimisationSettings());
+            //The LAST scenario, not the first. The combo already sits on the first, so restoring that one
+            //writes nothing and raises no SelectionChanged - and a fixture that quietly skipped one of the
+            //nine triggers would be measuring an easier case than the one production takes. A person who ran
+            //Iteration 2 and reopened the hub is restoring a scenario that really moves.
+            List<PartOWorkflowScenario> scenarios = PartOWorkflowScenario.Scenarios;
+
+            result.Restore(scenarios[scenarios.Count - 1], PartOWorkflowScope.SelectedDwellings, guids_Restored, new PartOOptimisationSettings());
 
             return result;
         }

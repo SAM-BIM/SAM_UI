@@ -88,7 +88,9 @@ Doubling ratios from `GC.GetAllocatedBytesForCurrentThread`; the test asserts on
 Local wall clock, from a `[Trait("Category", "Benchmark")]` test that asserts nothing about time: target
 selection over **5,000 rooms** is **32.5 ms**, against **1,529.6 ms** for the resolutions it replaced.
 
-The hub count is asserted directly at **500 dwellings**: `OpeningTheHubOnABlock_IsStillOneInspection`.
+The hub count is asserted directly at **500 dwellings**: `OpeningTheHubOnABlock_IsStillOneInspection`. The
+**nine** is measured rather than counted off the source - the fixture exercises all nine triggers, and
+removing the deferral makes that same test report exactly nine.
 
 ### Files changed
 
