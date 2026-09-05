@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Enums;
@@ -52,6 +52,13 @@ namespace SAM.Analytical.UI.WPF
     /// So the guarantee this window makes is not that an inspection is a single pass; it is that a UI-only
     /// interaction does not ask for one at all.
     /// </para>
+    /// <para>
+    /// <b>And that opening the window is one interaction.</b> Setting the dialog up moves seven inspection
+    /// inputs - the model, the run, the catalogue, the capabilities, then the restored scenario, scope and
+    /// dwelling scope - and answering each of them separately inspected an initial state nobody would ever
+    /// see. Those are deferred and paid once, over the fully restored state; see <see cref="initialising"/>.
+    /// After that the window is eager again, and every genuine change inspects when it happens.
+    /// </para>
     /// </summary>
     public partial class PartOWorkflowWindow : System.Windows.Window
     {
@@ -79,6 +86,66 @@ namespace SAM.Analytical.UI.WPF
         private readonly TextMap textMap_TM59 = Analytical.Query.DefaultInternalConditionTextMap_TM59();
 
         private bool loaded;
+
+        /// <summary>
+        /// Whether the dialog is still being set up, and therefore whether an inspection input moving should
+        /// inspect now or be answered once at the end.
+        ///
+        /// <para><b>The problem this exists for</b></para>
+        /// <para>
+        /// Opening the hub is one gesture, and it moved seven inspection inputs one at a time. The
+        /// constructor settled the controls; the caller then set the model, the run, the catalogue and the
+        /// session capabilities; and <see cref="Restore"/> then put back the scenario, the scope and the
+        /// saved dwelling scope, each through the very control events the window answers with a full
+        /// inspection. Every one of those was a correct response to a genuine change, and all but the last
+        /// was a response to a state nobody would ever see - <b>nine inspections of a model to show one
+        /// window</b>, eight of them of an initial state that had already been superseded before it was
+        /// drawn. On a five thousand space project every one of them walks the dwelling scope.
+        /// </para>
+        ///
+        /// <para><b>It is a deferral, not a cache</b></para>
+        /// <para>
+        /// Nothing is remembered, compared or reused: the pending flag says an inspection is owed, and when
+        /// it is paid it is a full inspection of whatever the window then holds, asking every authority
+        /// exactly what it asked before. There is no stored engineering answer here and no attempt to decide
+        /// whether an input "really" changed - that would be a second opinion about the model, which is the
+        /// thing this window is not allowed to have.
+        /// </para>
+        ///
+        /// <para><b>It ends by itself, and after it ends the window is eager again</b></para>
+        /// <para>
+        /// Initialisation ends at the first moment the answer is actually needed - the window being shown,
+        /// or any derived state being read - as well as at <see cref="CompleteInitialisation"/>, which the
+        /// caller calls when it has finished setting the dialog up. From that point every genuine change of
+        /// scenario, scope, dwelling selection, model, run, catalogue or capability inspects immediately, as
+        /// it always did: a status list that updated only when somebody happened to read it would be a
+        /// window showing the scope the user came from.
+        /// </para>
+        /// </summary>
+        private bool initialising = true;
+
+        private bool refresh_Pending;
+
+        /// <summary>
+        /// Whether a rebuild is already running, so that a control this window writes <b>during</b> one is not
+        /// mistaken for a person moving an inspection input.
+        ///
+        /// <para><b>The re-entrancy this closes, which predates the deferral above</b></para>
+        /// <para>
+        /// <see cref="UpdateOptimiseControls"/> clears the Iteration 2B tick where the chosen scenario cannot
+        /// carry one - and clearing it raises <c>Unchecked</c>, which this window answers with
+        /// <see cref="RefreshWorkflowInput"/>. That reuses the inspection already built, except that on the
+        /// FIRST rebuild there is not one yet, so it fell back to a full <see cref="Refresh"/> - from inside
+        /// the rebuild that was about to produce the very inspection it was missing. One rebuild therefore
+        /// inspected the model twice, every time the tick had to be cleared.
+        /// </para>
+        /// <para>
+        /// Suppressing the nested rebuild loses nothing. The outer one has not reached
+        /// <c>PartOWorkflowInspection.Inspect</c> yet, and it derives the actions and the Iteration 2B note
+        /// afterwards, from the inspection it then produces and over the controls as the clearing left them.
+        /// </para>
+        /// </summary>
+        private bool refreshing;
 
         public PartOWorkflowWindow()
         {
@@ -333,7 +400,10 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>What the window says about the current selection and search. Exposed for tests.</summary>
-        internal string SelectionDescription => textBlock_Selection.Text;
+        internal string SelectionDescription
+        {
+            get { EnsureInspected(); return textBlock_Selection.Text; }
+        }
 
         /// <summary>
         /// The Iteration 2B airflow step exactly as typed. Exposed for tests, which have to state text a
@@ -395,7 +465,13 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>Whether a follow-on Iteration 2B was asked for and the scenario can carry one.</summary>
-        public bool Optimise => (checkBox_Optimise.IsChecked ?? false) && checkBox_Optimise.IsEnabled;
+        public bool Optimise
+        {
+            //IsEnabled is written by UpdateOptimiseControls, so this is derived state - and it is what
+            //OptimisationSettings, OptimisationRefusal and Request all read, which is why they need no
+            //EnsureInspected of their own.
+            get { EnsureInspected(); return (checkBox_Optimise.IsChecked ?? false) && checkBox_Optimise.IsEnabled; }
+        }
 
         /// <summary>
         /// Why the Iteration 2B settings as typed cannot be used, or null where they can - or where no
@@ -475,28 +551,56 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>The status the window is currently showing. Exposed so what the user is told is assertable.</summary>
-        public PartOWorkflowInspection? Inspection { get; private set; }
+        public PartOWorkflowInspection? Inspection
+        {
+            get { EnsureInspected(); return inspection; }
+
+            private set { inspection = value; }
+        }
+
+        private PartOWorkflowInspection? inspection;
 
         /// <summary>What the window says about the chosen scenario. Exposed for tests.</summary>
-        public string ScenarioDescription => textBlock_Scenario.Text;
+        public string ScenarioDescription
+        {
+            get { EnsureInspected(); return textBlock_Scenario.Text; }
+        }
 
         /// <summary>What the window says about the chosen scope. Exposed for tests.</summary>
-        public string ScopeDescription => textBlock_Scope.Text;
+        public string ScopeDescription
+        {
+            get { EnsureInspected(); return textBlock_Scope.Text; }
+        }
 
         /// <summary>Why Run is unavailable, as one block of text. Empty where it is available. Exposed for tests.</summary>
-        public string BlockerDescription => textBlock_Blockers.Text;
+        public string BlockerDescription
+        {
+            get { EnsureInspected(); return textBlock_Blockers.Text; }
+        }
 
         /// <summary>What the window says beside the Iteration 2B fields. Exposed so it is assertable.</summary>
-        public string OptimisationDescription => textBlock_Optimise.Text;
+        public string OptimisationDescription
+        {
+            get { EnsureInspected(); return textBlock_Optimise.Text; }
+        }
 
         /// <summary>Whether Prepare and Run is currently offered. Exposed for tests.</summary>
-        public bool CanRun => button_Run.IsEnabled;
+        public bool CanRun
+        {
+            get { EnsureInspected(); return button_Run.IsEnabled; }
+        }
 
         /// <summary>Whether Review Results is currently offered. Exposed for tests.</summary>
-        public bool CanReviewResults => button_Review.IsEnabled;
+        public bool CanReviewResults
+        {
+            get { EnsureInspected(); return button_Review.IsEnabled; }
+        }
 
         /// <summary>Whether Optimise (2B) is currently offered. Exposed for tests.</summary>
-        public bool CanOptimise => button_Optimise.IsEnabled;
+        public bool CanOptimise
+        {
+            get { EnsureInspected(); return button_Optimise.IsEnabled; }
+        }
 
         /// <summary>
         /// Rebuilds every derived part of the window from the current controls: the scenario and scope notes,
@@ -515,6 +619,99 @@ namespace SAM.Analytical.UI.WPF
             {
                 return;
             }
+
+            //Still being set up: record that an inspection is owed and pay it once, over the final restored
+            //state, rather than once per input the setup moves. See the field.
+            if (initialising)
+            {
+                refresh_Pending = true;
+
+                return;
+            }
+
+            //Already rebuilding: a control this window wrote is not a person moving an input. See the field.
+            if (refreshing)
+            {
+                return;
+            }
+
+            refreshing = true;
+
+            try
+            {
+                RefreshCore();
+            }
+            finally
+            {
+                refreshing = false;
+            }
+        }
+
+        /// <summary>
+        /// Ends the deferred-initialisation window: <b>one</b> inspection, of the state the dialog was set up
+        /// into, and eager refreshing from then on.
+        /// <para>
+        /// Called by the caller once it has finished setting the dialog up, and by the window itself the
+        /// moment the answer is needed - it is shown, or something derived from an inspection is read - so a
+        /// caller that never calls it is never left looking at a window derived from nothing. Calling it
+        /// twice does nothing the second time.
+        /// </para>
+        /// <para>
+        /// It inspects only where an inspection is actually owed. Ending initialisation on a dialog nothing
+        /// was set on does not manufacture one.
+        /// </para>
+        /// </summary>
+        public void CompleteInitialisation()
+        {
+            if (!initialising)
+            {
+                return;
+            }
+
+            initialising = false;
+
+            if (!refresh_Pending)
+            {
+                return;
+            }
+
+            refresh_Pending = false;
+
+            Refresh();
+        }
+
+        /// <summary>
+        /// Called from every member whose value a <see cref="RefreshCore"/> writes, so reading the window's
+        /// derived state always ends initialisation first and reads the real answer rather than a blank one.
+        /// </summary>
+        private void EnsureInspected()
+        {
+            CompleteInitialisation();
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            //Showing the window is the last possible moment: whatever else the caller did or did not do, what
+            //a person is about to look at is inspected before they look at it.
+            CompleteInitialisation();
+
+            base.OnSourceInitialized(e);
+        }
+
+        /// <summary>
+        /// How many times this window has inspected the analytical model since it was constructed.
+        /// <para>
+        /// <b>Exposed for tests, and it is the only honest way to assert the claim.</b> Object identity says
+        /// an inspection did or did not happen between two reads; it cannot say that opening the dialog ran
+        /// one rather than nine, which is exactly what the deferral above is for. A count is exact and the
+        /// same on every machine; a stopwatch is neither.
+        /// </para>
+        /// </summary>
+        internal int InspectionCount { get; private set; }
+
+        private void RefreshCore()
+        {
+            InspectionCount++;
 
             PartOWorkflowScenario? partOWorkflowScenario = Scenario;
 
@@ -566,15 +763,25 @@ namespace SAM.Analytical.UI.WPF
         /// Falls back to the full <see cref="Refresh"/> only where there is no inspection to reuse yet, so
         /// the window is never left showing actions derived from nothing.
         /// </para>
+        /// <para>
+        /// <b>It does nothing at all while the dialog is still being set up</b>, and it reads the inspection
+        /// off the field rather than the property. Restoring the saved optimisation settings writes four of
+        /// these controls, and each write lands here; going through the property would have ended the
+        /// deferral - and inspected - on the first of them, over a state the restore had not finished
+        /// building. There is nothing to lose by returning: a full refresh is already owed, and it derives
+        /// everything this does.
+        /// </para>
         /// </summary>
         private void RefreshWorkflowInput()
         {
-            if (!loaded)
+            //`refreshing` for the same reason Refresh checks it: the rebuild already running writes these
+            //very controls and derives everything below afterwards.
+            if (!loaded || initialising || refreshing)
             {
                 return;
             }
 
-            PartOWorkflowInspection? partOWorkflowInspection = Inspection;
+            PartOWorkflowInspection? partOWorkflowInspection = inspection;
             if (partOWorkflowInspection is null)
             {
                 Refresh();

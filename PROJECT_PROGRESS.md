@@ -1,25 +1,137 @@
 # Project Progress
 
 ## Branch
-`fix/2b-correctness-closeout`, branched from `sow/2026-Q3` at **`a4624d34`** (the merge of PR #86).
+`perf/large-model-lookup-closeout`, branched from `sow/2026-Q3` at **`60c2eff`** (the merge of PR #87).
 
-This branch is **SAM-BIM/SAM_UI#87**.
+This branch is **SAM-BIM/SAM_UI#88**.
 
-**DOES NOT stand alone.** It requires **`SAM` branch `fix/2b-correctness-closeout` (SAM-BIM/SAM#100)** for
-`AnalyticalModel(AnalyticalModel, bool)`, `TM59AssessmentCalculator.HourCount_Expected` and
-`TM59AssessmentResult.HourlySeriesRefusals`.
+**DOES NOT stand alone.** It is compiled against **`SAM` branch `perf/large-model-lookup-closeout`
+(SAM-BIM/SAM#101)**. **Merge order: SAM#101 first.** `SAM_Tas` carries a documentation-only branch
+(SAM-BIM/SAM_Tas#49) and `SAM_Systems` is untouched.
 
-**Merge order: SAM#100, then SAM_Tas#48, then SAM_UI#87.** This branch is independent of SAM_Tas#48 to
-compile; both are needed for the F1/F3 ownership invariant to hold end to end. `SAM_Systems` is untouched.
-
-Everything below the entry dated 2026-09-05 is superseded history retained for context.
+Everything below the entry dated 2026-09-05 (large-model lookups) is superseded history retained for
+context.
 
 ## Last updated
-2026-09-05 - the Part O simulation boundaries isolate the working model and take exactly one copy of it,
-the capacity envelope carries its own lineage in its name, and a full year is required of a results file by
-an authority the file cannot move.
+2026-09-05 (later) - the failing-space and dwelling-zone lookups ask the cluster's own O(1) authority, and
+opening the Part O hub inspects the model once instead of nine times.
 
-## Latest (2026-09-05): Iteration 2B correctness closeout - the Part O half
+## Latest (2026-09-05, later): large-model lookup closeout - the SAM_UI half
+
+**Status: root-caused, implemented, tested and measured. Not merged.**
+
+Two things, neither of which changes what anything reports. The lookups find the same objects a cheaper way;
+the hub asks for the same inspection, once instead of nine times.
+
+### PF3 and PF4 - the failing-space and dwelling-zone lookups
+
+`AdjacencyCluster.GetSpaces()` and `GetZones()` **rebuild** their whole list from the relation cluster on
+every call. Three sites did that inside a loop:
+
+- `Query.PartOOptimisationTargets` resolved each **failing** room with
+  `(adjacencyCluster.GetSpaces() ?? []).Find(...)`, so a round that failed widely on a block rebuilt the
+  model's space list once per failure.
+- `Query.PartODwellingSpaceGuids` walked the whole zone list once per **requested dwelling** - quadratic on a
+  block, where the dwelling count grows with the room count.
+- `Modify.PartialAssessment` named each unassessed in-scope room with a linear `Find`.
+
+All three now ask `AdjacencyCluster.GetObject<Space>(guid)` / `GetObject<Zone>(guid)`, which is a lookup in
+the cluster's live object dictionary. **Nothing is snapshotted**, so there is no picture of the model being
+optimised that could go stale, and no parallel lookup system beside the cluster's own.
+
+Equivalence is asserted **by reference** over every space and every zone of models of 100 / 500 / 1,000 /
+5,000 rooms, plus an unknown guid, `Guid.Empty` and a guid belonging to an object of the other type. What
+the round *decides* with those rooms is unchanged and stays pinned in `PartOOptimisationTests`.
+
+### The Part O hub inspected the model nine times to open once
+
+Opening the hub is one gesture, and it moved seven inspection inputs one at a time - the constructor, then
+the model, the run, the catalogue and the session capabilities, then `Restore` putting back the scenario, the
+scope and the saved dwelling scope, then `Restore`'s own closing refresh. Every one was a correct response to
+a genuine change; all but the last were responses to a state nobody would ever see. On a five thousand space
+project each of them walks the dwelling scope.
+
+A ninth came from re-entrancy that predates all of this: `UpdateOptimiseControls` clears the Iteration 2B
+tick where the scenario cannot carry one, clearing it raises `Unchecked`, and the lightweight
+`RefreshWorkflowInput` that answers it fell back to a **full** refresh whenever there was no inspection to
+reuse yet - from inside the refresh that was about to produce one.
+
+**The fix is a deferral, not a cache.** Nothing is remembered, compared or reused: while the dialog is being
+set up a refresh records that an inspection is *owed*, and when it is paid it is a full inspection of
+whatever the window then holds, asking every authority exactly what it asked before. There is no stored
+engineering answer anywhere in WPF and no attempt to decide whether an input "really" moved - that would be a
+second opinion about the model, which this window is not allowed to have.
+
+Initialisation ends at `PartOWorkflowWindow.CompleteInitialisation()` - which `Modify.RunPartOWorkflow` calls
+once it has finished setting the dialog up - and, as a safety net, at the first moment the answer is actually
+needed: the window being shown (`OnSourceInitialized`), or any derived state being read. **After it ends the
+window is eager again**, and every genuine change of scenario, scope, dwelling selection, model, run,
+catalogue or capability inspects immediately, as it always did. A status list that updated only when somebody
+happened to read it would be a window showing the scope the user came from.
+
+### Operation counts, before and after
+
+| operation | before | after |
+|---|---|---|
+| opening the hub (any model size) | **9 inspections** | **1** |
+| `PartOOptimisationTargets`, f failures over n rooms, d requested dwellings over z zones | f space-list rebuilds + d x z zone comparisons | f + d hash lookups |
+| `PartialAssessment`, u unassessed rooms | 1 rebuild + u x n comparisons | u hash lookups |
+
+### Scaling evidence (structural; allocated bytes, no timing thresholds)
+
+Doubling ratios from `GC.GetAllocatedBytesForCurrentThread`; the test asserts only `< 2.6`.
+
+| measurement | after | the code it replaced |
+|---|---|---|
+| Iteration 2B target selection | x2.02, x2.02 | x3.81, x3.90 |
+
+Local wall clock, from a `[Trait("Category", "Benchmark")]` test that asserts nothing about time: target
+selection over **5,000 rooms** is **32.5 ms**, against **1,529.6 ms** for the resolutions it replaced.
+
+The hub count is asserted directly at **500 dwellings**: `OpeningTheHubOnABlock_IsStillOneInspection`.
+
+### Files changed
+
+`WPF/SAM.Analytical.UI.WPF/Query/PartOOptimisationTargets.cs` (the failing-space and dwelling-zone lookups),
+`WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` (the subset-pass guard's name lookup),
+`WPF/SAM.Analytical.UI.WPF/Windows/PartOWorkflowWindow.xaml.cs` (the deferral, the re-entrancy guard and an
+`InspectionCount` exposed for tests), `WPF/SAM.Analytical.UI.WPF/Modify/RunPartOWorkflow.cs` (one
+`CompleteInitialisation()` after the restore).
+
+New tests: `WPF/SAM.Analytical.UI.WPF.Tests/PartOFailingSpaceLookupScalingTests.cs`,
+`WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowInitialisationTests.cs`.
+
+**No engineering cache was added to `PartOWorkflowWindow`, `PartOWorkflowInspection` or anywhere else in
+WPF**, and the workflow state semantics from PR #85 and the refresh split from PR #86 are untouched -
+`PartOWorkflowRefreshTests` passes unchanged.
+
+### Validation
+
+| suite | result |
+| --- | --- |
+| `SAM.Analytical.UI.WPF.Tests` | **528 passed, 0 failed** (510 pre-existing, all passing, + 18 new) |
+| `SAM.Tests` | **1974 passed, 0 failed** |
+| `SAM.Analytical.Tas.TM59.Tests` | **690 passed, 0 failed** |
+
+`SAM_UI.sln` builds against the rebuilt `SAM.Analytical.dll` with 0 errors. `SAM.sln` builds with 0 errors.
+`git diff --check` clean in both.
+
+No licensed TAS run was made and none is owed: nothing here changes an engineering result.
+
+### Remaining risks
+
+- The deferral is safe only because nothing external reads the window's derived state without going through
+  a property. Every member a `RefreshCore` writes now ends initialisation before answering, and
+  `ReadingTheStatusWithoutCompletingInitialisation_PaysTheDeferredInspection` pins that a caller which never
+  calls `CompleteInitialisation` still sees a real status list.
+
+### Remaining pre-Iteration-3 list
+
+Part O Sizing / Simulation defaults and the minimum-click workflow; weather / range / output restoration UX;
+resume 2B from a restored run; re-isolation and re-cutting; the Grasshopper variable-output updater;
+catalogue identity drift; final UI acceptance; then freeze Iterations 1-2.
+
+## Previous (2026-09-05): Iteration 2B correctness closeout - the Part O half
 
 **Status: implemented and tested. Not merged. Blocked on SAM-BIM/SAM#100.**
 

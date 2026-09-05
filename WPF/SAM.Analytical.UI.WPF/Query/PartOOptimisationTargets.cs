@@ -79,7 +79,13 @@ namespace SAM.Analytical.UI.WPF
 
             foreach (Guid guid in guids_Failing)
             {
-                Space? space = (adjacencyCluster.GetSpaces() ?? []).Find(x => x is not null && x.Guid == guid);
+                //The cluster's own O(1) authority. This was GetSpaces().Find - which rebuilds the model's
+                //whole space list and then walks it - taken once per failing room, so a round that failed
+                //widely on a block-scale model rebuilt that list once per failure. GetObject<Space> answers
+                //exactly what that Find answered: GetSpaces() is the same object dictionary flattened into a
+                //list, and the guid a space is stored under is the guid the Find compared. Nothing is
+                //snapshotted, so nothing can go stale against the model being optimised.
+                Space? space = adjacencyCluster.GetObject<Space>(guid);
                 if (space is null)
                 {
                     result.NotOptimisable.Add(string.Format("A failing TM59 result resolved to a design space ({0}) that is not in the model being optimised, so it could not be targeted.", guid));
@@ -162,11 +168,13 @@ namespace SAM.Analytical.UI.WPF
         {
             HashSet<Guid> result = [];
 
-            List<Zone> zones = adjacencyCluster.GetZones() ?? [];
-
             foreach (Zone zone_Dwelling in zones_Dwelling ?? [])
             {
-                Zone? zone = zone_Dwelling is null ? null : zones.Find(x => x is not null && x.Guid == zone_Dwelling.Guid);
+                //The cluster's own O(1) authority, in place of a linear walk of its whole zone list per
+                //requested dwelling - which on a block whose dwelling count grows with its room count was
+                //quadratic in the zones. Same answer: the zone list is that object dictionary flattened, and
+                //the guid a zone is stored under is the guid the Find compared.
+                Zone? zone = zone_Dwelling is null ? null : adjacencyCluster.GetObject<Zone>(zone_Dwelling.Guid);
                 if (zone is null)
                 {
                     continue;
