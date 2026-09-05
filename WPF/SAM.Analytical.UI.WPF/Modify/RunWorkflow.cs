@@ -38,7 +38,15 @@ namespace SAM.Analytical.UI.WPF
         /// Lets the caller share one cancel across its own COM pre-step and this one, so a single Cancel click
         /// aborts either.
         /// </param>
-        public static AnalyticalModel? RunWorkflow(this AnalyticalModel analyticalModel, WorkflowSettings workflowSettings, CancellationToken externalCancellationToken, out bool cancelled)
+        /// <param name="analyticalModel_Owned">
+        /// True only where the caller has already taken a deep working copy that nothing else holds, so the
+        /// workflow may mutate it directly instead of taking a second one. Threaded straight to
+        /// <c>WorkflowCalculator.Calculate(AnalyticalModel, bool)</c> - see there for what the promise means
+        /// and what breaks if it is made falsely. False, the default, keeps every existing caller's
+        /// behaviour: the workflow takes its own copy and a failed or cancelled run leaves the caller's
+        /// model untouched.
+        /// </param>
+        public static AnalyticalModel? RunWorkflow(this AnalyticalModel analyticalModel, WorkflowSettings workflowSettings, CancellationToken externalCancellationToken, out bool cancelled, bool analyticalModel_Owned = false)
         {
             cancelled = false;
 
@@ -84,7 +92,7 @@ namespace SAM.Analytical.UI.WPF
                         progressWindowHost.Update(e.Description);
                     };
 
-                    result = workflowCalculator.Calculate(analyticalModel);
+                    result = workflowCalculator.Calculate(analyticalModel, analyticalModel_Owned);
                 }
                 catch (OperationCanceledException)
                 {

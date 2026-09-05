@@ -2,8 +2,10 @@
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Tas;
+using SAM.Weather;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SAM.Analytical.UI.WPF
 {
@@ -163,6 +165,25 @@ namespace SAM.Analytical.UI.WPF
             //stamped on the round trip, which is what the map matches on.
             TM59AssessmentCalculator tM59AssessmentCalculator = analyticalModel_TSD.TM59AssessmentCalculator(analyticalModel_Workflow, simulationSpaceMap);
 
+            //A FULL YEAR, or the space is refused rather than assessed over part of one.
+            //
+            //Approved Document O's dynamic method assesses annual and summer criteria, so a verdict from a
+            //partial series is not the verdict the document asks for - and until this was stated, a damaged
+            //or partially written TSD produced one silently: TMOverheatingCalculator walked whatever hours
+            //the two series shared and reported the result as the room's. Part O's own full-year check is
+            //over the simulation's nominal DATE RANGE (PartOSimulationContext.IsFullYear, and the
+            //fullYear flag RunPartOSimulation hands back), which says what was asked of TAS and not what
+            //the results file actually contains.
+            //
+            //Taken from the REQUESTED day range that defines a Part O full year, and deliberately not from
+            //anything inside the file being validated. Counting it from the weather year the TSD carries -
+            //which is what this did at first - defeats the check entirely: a damaged file that lost two
+            //thirds of its weather lost two thirds of its results with it, so the requirement fell to match
+            //and the partial year passed. A results file may not decide how much of a year it was supposed
+            //to contain. See PartOSimulationContext.HourCount_FullYear, including why it is the static
+            //1-to-365 authority rather than an instance - a RESTORED run carries no context at all.
+            tM59AssessmentCalculator.HourCount_Expected = PartOSimulationContext.HourCount_FullYear;
+
             OverheatingScenarioMap overheatingScenarioMap = new(overheatingScenarios, analyticalModel_Workflow, tM59AssessmentCalculator.SimulationSpaceMap);
             tM59AssessmentCalculator.VentilationStrategyMap = overheatingScenarioMap.VentilationStrategyMap;
 
@@ -200,12 +221,30 @@ namespace SAM.Analytical.UI.WPF
 
             List<PartOTM59SpaceResult> spaceResults = ResolvedSpaceResults(tM59AssessmentReport, tM59AssessmentCalculator.SimulationSpaceMap, spaces, associationRefusals);
 
+            //The hourly-series refusals reach the run's diagnostics like any other reason a room went
+            //unassessed, so the notes on the step say which rooms had unusable results and why.
+            associationRefusals.AddRange(tM59AssessmentResult.HourlySeriesRefusals);
+
             //Design side, not simulation side: which rooms of the model being assessed produced nothing.
             List<Guid> spaceGuids_Unassessed = [];
 
+            //A room whose series were refused produced no result either, and it has to count as unassessed
+            //for the same reason an unresolved one does: PartialAssessment refuses a PASS that has a hole in
+            //the dwelling scope, and without this a truncated room simply vanished from the verdict and the
+            //rooms whose data happened to survive were reported as a pass over all of them. Mapped back to
+            //the DESIGN space, because that is the side the scope is expressed in.
+            HashSet<Guid> guids_Simulation_Refused = [.. tM59AssessmentResult.SpaceGuids_HourlySeriesRefused];
+
             foreach (Space space_Design in analyticalModel_Workflow.GetSpaces() ?? [])
             {
-                if (space_Design is not null && tM59AssessmentCalculator.SimulationSpaceMap?.Simulation(space_Design) is null)
+                if (space_Design is null)
+                {
+                    continue;
+                }
+
+                Space? space_Simulation = tM59AssessmentCalculator.SimulationSpaceMap?.Simulation(space_Design);
+
+                if (space_Simulation is null || guids_Simulation_Refused.Contains(space_Simulation.Guid))
                 {
                     spaceGuids_Unassessed.Add(space_Design.Guid);
                 }

@@ -1,22 +1,165 @@
 # Project Progress
 
 ## Branch
-`perf/partf-bulk-context`, branched from `sow/2026-Q3` at **`75237eb9`** (the merge of PR #85).
+`fix/2b-correctness-closeout`, branched from `sow/2026-Q3` at **`a4624d34`** (the merge of PR #86).
 
-**DOES NOT stand alone.** It requires **`SAM` branch `perf/partf-bulk-context` (SAM-BIM/SAM#99)**, which
-adds `SAM.Analytical.PartFIndex`. This branch will not compile against `SAM` `sow/2026-Q3` as it stands.
+This branch is **SAM-BIM/SAM_UI#87**.
 
-**Merge order: SAM#99 first, then SAM_UI#86.** `SAM_Systems` and `SAM_Tas` are untouched.
+**DOES NOT stand alone.** It requires **`SAM` branch `fix/2b-correctness-closeout` (SAM-BIM/SAM#100)** for
+`AnalyticalModel(AnalyticalModel, bool)`, `TM59AssessmentCalculator.HourCount_Expected` and
+`TM59AssessmentResult.HourlySeriesRefusals`.
 
-Everything below "Previous (2026-09-04): the Part O workflow, as one command" is the record of PR #85, which
-is merged. Its "Stands alone" note described that branch and does not apply to this one.
+**Merge order: SAM#100, then SAM_Tas#48, then SAM_UI#87.** This branch is independent of SAM_Tas#48 to
+compile; both are needed for the F1/F3 ownership invariant to hold end to end. `SAM_Systems` is untouched.
+
+Everything below the entry dated 2026-09-05 is superseded history retained for context.
 
 ## Last updated
-2026-09-04 (later) - the Part O inspection resolves the model through one SAM-owned `PartFIndex` snapshot
-per call instead of re-resolving every room against the whole model, and the dwelling scope resolution moved
-into SAM.
+2026-09-05 - the Part O simulation boundaries isolate the working model and take exactly one copy of it,
+the capacity envelope carries its own lineage in its name, and a full year is required of a results file by
+an authority the file cannot move.
 
-## Latest (2026-09-04, later): Part F large-model scaling - the SAM_UI half
+## Latest (2026-09-05): Iteration 2B correctness closeout - the Part O half
+
+**Status: implemented and tested. Not merged. Blocked on SAM-BIM/SAM#100.**
+
+### F1 / F3 - the two boundaries that already promised isolation
+
+`Simulate` (both overloads) and `RunPartOSimulation` each take a copy and each say why: the model is renamed
+and re-materialled in place, and a cancelled or failed run must leave the instance the user still has open
+exactly as it was.
+
+The copy was shallow, so it isolated the model's **name** and its **libraries** and nothing else. The
+cluster objects were shared, and the writes below are in-place mutations rather than same-guid replacements
+- `UpdateConstructionLayersByPanelType` re-materials the shared panels, and the TAS conversion stamps
+identity onto the shared spaces, panels and apertures.
+
+On the optimisation path the caller is the retained last-valid design of the previous round, so this is what
+stops a round that later failed or was cancelled handing back a design whose persisted
+`SimulationResultProvenance` no longer matches the results it was produced from.
+
+### One deep copy per run, not three
+
+`Modify.RunPartOSimulation` is now stated as **the** ownership boundary of a Part O TAS run and is the only
+place on that path that clones.
+
+`Simulate(UIAnalyticalModel, PartORun)` takes a **shallow** copy for the rename - `Name` is a field of
+`AnalyticalModel` itself, so a new instance isolates it - and tracks `analyticalModel_Owned`. Adopting the
+workflow's model adopts its ownership. The export block, which is the one place this method mutates a model
+itself (`Tas.Convert.ToTBD` with `updateGuids`, and `RestampSimulationZoneIdentity` writing `ZoneGuid` onto
+the live spaces), takes the deep copy there and only where no deep copy has been made yet - an export-only
+run, or a workflow that produced nothing.
+
+`Simulate(AnalyticalModel, string, IWin32Window)` converts the model itself before running the workflow, so
+its copy cannot be deferred; it keeps its deep copy and tells the workflow the model is already owned.
+`RunWorkflow` threads `analyticalModel_Owned` through, defaulting to false so every other caller is
+unchanged.
+
+Clone count per entry path, before -> after:
+
+| Entry path | Before | After |
+| --- | --- | --- |
+| Part O run via `Simulate`, workflow succeeds | 3 | **1** |
+| Export-only run (Simulate unticked) | 1 | 1 |
+| Simulate ticked, run cancelled | 2 | 1 |
+| Simulate ticked, workflow returned nothing | 2 | 2 (two independent mutable phases) |
+| `Simulate(AnalyticalModel, path)` overload | 2 | 1 |
+| Optimisation round / capacity envelope | 2 | 1 |
+| `RunWorkflow` / Grasshopper / benchmark CLI | 1 | 1 |
+
+### F2 - the envelope a second optimisation overwrote
+
+Rounds already carry the iteration baseline the session started from -
+`ProjectName_Iteration(iteration_Baseline + iteration)`, so a second optimisation numbers from `-Opt06`
+rather than restarting at `-Opt01`. The capacity envelope was the one case that ignored it:
+`{ProjectName}-OptMax`, unconditionally. Optimise `Flat1`, optimise again from its result, and the second
+envelope overwrote the first's `.tbd`, `.tsd`, `.sam` and `-TM59.txt` - every one of which derives from this
+one name.
+
+Now `Flat1-Opt05-Max`, read off the run's own `Step_Baseline` - **the same iteration-baseline authority the
+rounds use, not a second counter**. Iteration 0 keeps `-OptMax`, so a first optimisation and every
+already-saved run still write and reopen the historic name. Either spelling still reads back as no
+iteration, so an optimisation started from an envelope design still cannot renumber onto a round's files.
+Two optimisations started from the *same* round collide here exactly as their rounds already do - a property
+of the iteration baseline itself, documented rather than papered over.
+
+### F4 - Part O states the full year, and the file does not get a vote
+
+Traced `TSD -> Convert.ToSAM -> zoneData.ToSAM -> Query.AnnualZoneResult -> TM59AssessmentCalculator ->
+TMOverheatingCalculator`: `AnnualZoneResult` returns whatever TAS hands over, with no length guard anywhere
+on the path. Part O's own check (`PartOSimulationContext.IsFullYear`, and the `fullYear` flag
+`RunPartOSimulation` returns) is over the simulation's **nominal date range** - what was asked of TAS, not
+what the results file contains.
+
+The first fix counted the requirement from the weather year the **TSD itself** carries. Codex was right to
+refuse that: a file damaged to a third of its length loses its weather and its results together, so the
+requirement falls to match the truncated series and the partial year is assessed and reported as an ordinary
+verdict. **A results file may not decide how much of a year it was supposed to contain.**
+
+The requirement is now `PartOSimulationContext.HourCount_FullYear` - derived from `Day_First_FullYear` and
+`Day_Last_FullYear`, the same two days `IsFullYear` and `Query.IsPartOFullYearSimulation` test against, and
+entirely independent of the payload being validated. It is **static** deliberately: a restored run - the
+reopened-results path, the one most likely to meet a damaged file - carries no `PartOSimulationContext` at
+all, because `PartORun.Restore` nulls it to keep a restored run out of Iteration 2B. It does not need one,
+since a run can only have completed, and so only be restorable, if it was a full-year simulation.
+
+A refused room now counts as **unassessed**, mapped back to its design space. Without that it simply
+vanished from the verdict and `PartialAssessment` - which exists to refuse a pass whose dwelling scope has a
+hole in it - never saw the hole, so the rooms whose data happened to survive were reported as a pass over
+all of them.
+
+### Invariants preserved
+
+`PartFRequiredAirFlow` / `DesignAirFlow` / `SelectedEquipmentCapacity` / `OperatingAirFlow` remain distinct;
+no Part F calculation, TM59 criterion or catalogue selection is touched; no round reselects equipment.
+
+### Changed files
+
+- `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOSimulationContext.cs` - the envelope name and the full-year
+  hour authority
+- `WPF/SAM.Analytical.UI.WPF/Modify/Simulate.cs`, `RunPartOSimulation.cs`, `RunWorkflow.cs` - ownership and
+  the one copy
+- `WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs` - the envelope's lineage
+- `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartOTM59Assessment.cs` - the full-year requirement and refused
+  rooms counting as unassessed
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOCapacityEnvelopeTests.cs`, `PartOFullYearSeriesTests.cs`
+
+### Merge order
+
+1. **SAM-BIM/SAM#100** - the ownership constructor, the deep-clone completeness fix, and the TM59 series
+   rules. Nothing else compiles without it.
+2. **SAM-BIM/SAM_Tas#48** - the workflow's owned-model overload. Needs #100.
+3. **SAM-BIM/SAM_UI#87** - the Part O boundaries, the capacity-envelope name, and the full-year authority.
+   Needs #100. Independent of #48 to compile; both are needed for the F1/F3 invariant to hold end to end.
+
+`SAM_Systems` is untouched.
+
+### Validation
+
+| Suite | Result |
+| --- | --- |
+| `SAM.Tests` | 1934 passed, 0 failed |
+| `SAM.Analytical.Tas.TM59.Tests` | 690 passed, 0 failed |
+| `SAM.Analytical.UI.WPF.Tests` | 510 passed, 0 failed |
+
+`SAM.sln`, `SAM_Tas.sln` (MSBuild - COM references) and `SAM_UI.sln` all build with 0 errors.
+`git diff --check` is clean in all three repositories.
+
+Deep-clone cost, measured Release on 5,000 spaces / 30,000 panels: **250.7 ms, 136.8 MB**, against
+36.5 ms / 13.8 MB for the shallow copy. Paid **once** per Part O TAS run.
+
+### Remaining risks and next task
+
+- No licensed TAS run was made. Every invariant here is established by deterministic tests over production
+  code; what is not covered is TAS's own behaviour, which none of these changes touch.
+- `SAM.Weather.Query.RunningMeanDryBulbTemperatures` still throws on a weather year shorter than the one the
+  running mean needs, so a TSD with a damaged weather record fails loudly rather than being refused with a
+  diagnostic. Pre-existing, characterised by test, and a fix reaches wider than Part O.
+- Next: the pre-Iteration-3 list is unchanged - PF3-PF7 and `SetSpaceDesignFlowRate` indexing, the Part O
+  defaults / minimum-click audit, re-isolation, the Grasshopper variable-output updater, catalogue identity
+  drift, final UI acceptance, then freeze Iterations 1-2.
+
+## Previous (2026-09-04, later): Part F large-model scaling - the SAM_UI half
 
 **Status: implemented, tested and measured. Not merged. Blocked on SAM-BIM/SAM#99.**
 
