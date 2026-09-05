@@ -19,7 +19,7 @@ namespace SAM.Analytical.UI.WPF
         /// Runs <b>one</b> stated TAS case over one model, start to finish, and hands back the model the
         /// workflow returned and the results it wrote.
         ///
-        /// <para><b>Why this is a method and not a second copy of <see cref="Simulate(UIAnalyticalModel, PartORun)"/></b></para>
+        /// <para><b>Why this is a method and not a second copy of <see cref="Simulate(UIAnalyticalModel, PartORun, bool)"/></b></para>
         /// <para>
         /// An Iteration 2B optimisation runs the same thermal case ten times over ten designs. It cannot ask
         /// a person for the settings ten times, and it must not run a case that differs in any respect from
@@ -36,7 +36,7 @@ namespace SAM.Analytical.UI.WPF
         /// workflow - the whole path to a TSD. It does <b>not</b> print room data sheets or write the SAP,
         /// Part L, domestic-overheating or TPD exports: those are deliverables of a run somebody asked for,
         /// not part of the thermal case, and producing a dozen copies of each during an optimisation would
-        /// be noise. <see cref="Simulate(UIAnalyticalModel, PartORun)"/> still does all of them, after this
+        /// be noise. <see cref="Simulate(UIAnalyticalModel, PartORun, bool)"/> still does all of them, after this
         /// returns.
         /// </para>
         ///

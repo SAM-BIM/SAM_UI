@@ -36,7 +36,23 @@ namespace SAM.Analytical.UI.WPF
         /// with the earlier preparation's overheating scenarios.
         /// </para>
         /// </summary>
-        public static void Simulate(this UIAnalyticalModel uIAnalyticalModel, PartORun partORun)
+        /// <param name="partOWorkflow">
+        /// Whether this call comes from the guided Approved Document O command, <c>RunPartOWorkflow</c>.
+        ///
+        /// <para><b>Why the intent is passed rather than inferred from <paramref name="partORun"/></b></para>
+        /// <para>
+        /// The ribbon's own Simulate button also hands over the session's run - it has to, so that a workflow
+        /// over a prepared model can complete it - and that button is the ordinary expert command. Inferring
+        /// "this is a Part O run" from a prepared run alone would therefore have retuned and locked the
+        /// expert dialog whenever a Part O iteration happened to be prepared, taking away the sizing-only and
+        /// export runs an engineer may legitimately want over that same model.
+        /// </para>
+        /// <para>
+        /// So the guided command says so and gets the Part O case chosen for it; every other caller reaches
+        /// exactly the dialog it reached before, whatever state the run is in.
+        /// </para>
+        /// </param>
+        public static void Simulate(this UIAnalyticalModel uIAnalyticalModel, PartORun partORun, bool partOWorkflow = false)
         {
             AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
             if(analyticalModel == null)
@@ -44,11 +60,35 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
+            // Whether this invocation is the guided command simulating a PREPARED Approved Document O
+            // iteration - the one case with a TAS case of its own. See Create.SimulateOptions_PartO.
+            //
+            // The run state is the same condition RunPartOSimulation's pre-simulation gate is scoped to: a
+            // run in any other state is one this method's own model replacement is about to drop, so it is
+            // not a Part O run and does not get the Part O preset or the locked dialog.
+            bool partO = partOWorkflow && partORun is not null && partORun.State == PartORunState.Prepared;
+
             SimulateWindow simulateWindow = new SimulateWindow();
-            ActiveSetting.Setting.TryGetValue(AnalyticalSettingParameter.SimulateOptions, out SimulateOptions simulateOptions);
-            if(simulateOptions == null)
+
+            SimulateOptions simulateOptions;
+
+            if (partO)
             {
-                simulateOptions = UI.Create.SimulateOptions(uIAnalyticalModel);
+                // A key of its own, so the two directions of contamination are both impossible: the manual
+                // command's remembered options cannot decide a Part O run's TAS case - which is how a run
+                // came to be started with Full Year Simulation unticked - and a Part O run cannot retune the
+                // manual command behind an expert's back.
+                ActiveSetting.Setting.TryGetValue(AnalyticalSettingParameter.SimulateOptions_PartO, out SimulateOptions simulateOptions_PartO);
+
+                simulateOptions = Create.SimulateOptions_PartO(analyticalModel, uIAnalyticalModel.Path, simulateOptions_PartO);
+            }
+            else
+            {
+                ActiveSetting.Setting.TryGetValue(AnalyticalSettingParameter.SimulateOptions, out simulateOptions);
+                if (simulateOptions == null)
+                {
+                    simulateOptions = UI.Create.SimulateOptions(uIAnalyticalModel);
+                }
             }
 
             simulateWindow.ProjectName = analyticalModel.Name;
@@ -65,13 +105,20 @@ namespace SAM.Analytical.UI.WPF
                 simulateWindow.WeatherData = weatherData;
             }
 
+            // AFTER the options are set, and after the weather: the Simulate setter re-enables the sizing
+            // and full-year boxes as a group, so locking before this would be undone by it.
+            if (partO)
+            {
+                simulateWindow.LockPartOSettings();
+            }
+
             bool? showdialog = simulateWindow.ShowDialog();
             if(showdialog == null || !showdialog.HasValue || !showdialog.Value)
             {
                 return;
             }
 
-            ActiveSetting.Setting.SetValue(AnalyticalSettingParameter.SimulateOptions, simulateWindow.SimulateOptions);
+            ActiveSetting.Setting.SetValue(partO ? AnalyticalSettingParameter.SimulateOptions_PartO : AnalyticalSettingParameter.SimulateOptions, simulateWindow.SimulateOptions);
 
             string projectName = simulateWindow.ProjectName;
             string outputDirectory = simulateWindow.OutputDirectory;

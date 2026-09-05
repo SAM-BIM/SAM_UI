@@ -410,6 +410,37 @@ namespace SAM.Analytical.UI.WPF
                 return false;
             }
 
+            //A run reopened from disk, ahead of the two null checks it would otherwise fall into - because
+            //those describe a run that was never recorded, and this one was. Saying WHY a valid saved result
+            //cannot be continued is the difference between a rule and a glitch.
+            //
+            //-- Why a restored run cannot resume into Iteration 2B, concretely --
+            //
+            //It is not the results and it is not the design: PartORun.Restore validates both against
+            //SimulationResultProvenance, and 2B does not re-simulate the baseline anyway (see Optimise, run
+            //0). It is the PREPARATION. Every 2B round re-prepares the design it just changed, and
+            //Analytical.Modify.PreparePartOIteration is handed
+            //PartOPreparationContext.VentilationUnitCapacityDescriptors - the manufacturer catalogue AS IT
+            //WAS when the baseline selected its units, carried rather than re-read precisely so nothing can
+            //change what a selected unit is understood to be rated at part-way through a run.
+            //
+            //That snapshot is the one thing a file cannot hand back. VentilationUnitCapacityDescriptor is
+            //deliberately not an IJSAMObject - SAM.Analytical owns the selection rule and not the product
+            //list - so persisting it onto the model would mean fingerprinting a catalogue into the model
+            //file, and re-reading the catalogue instead would let a round be checked against capacities the
+            //baseline was never selected under. The dwellings 2B stops at (guids_AtCapacity) are exactly the
+            //ones sitting on their unit's ceiling, so a moved ceiling silently moves the answer.
+            //
+            //Re-preparing is therefore the honest route back in, and it is one dialog: the reopened model is
+            //the prepared design, and Prepare & Run over the same scenario and scope reaches a run that
+            //carries both contexts again.
+            if (partORun.IsRestored)
+            {
+                refusal = "This Part O run was reopened from a saved model, so its results can be reviewed but not continued. Iteration 2B re-prepares the design at every round against the ventilation unit catalogue the baseline selected from, and a saved model does not carry that catalogue - repeating the optimisation from today's catalogue could check a round against a capacity the baseline was never selected under. Run Prepare & Run again over the same scenario and dwellings to optimise from a live run.";
+
+                return false;
+            }
+
             PartOPreparationContext? partOPreparationContext = partORun.PreparationContext;
             if (partOPreparationContext is null)
             {

@@ -285,6 +285,18 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>
+        /// Locks the settings an Approved Document O run does not leave open - see
+        /// <see cref="SimulateControl.LockPartOSettings"/> for which, and why each one.
+        /// <para>
+        /// <b>Call it after <see cref="SimulateOptions"/> has been set</b>, not before.
+        /// </para>
+        /// </summary>
+        public void LockPartOSettings()
+        {
+            simulateControl.LockPartOSettings();
+        }
+
         private void button_OK_Click(object sender, RoutedEventArgs e)
         {
             if(string.IsNullOrWhiteSpace(SelectedZoneCategory) && CreateSAP)
