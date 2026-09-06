@@ -46,12 +46,23 @@ namespace SAM.Analytical.UI.WPF
 
         private readonly FloorPlan2DControl floorPlan2DControl;
 
+        /// <summary>
+        /// This renderer's OWN child of <see cref="FloorPlan2DControl.Overlay"/>. <see cref="Draw"/> clears
+        /// and rebuilds only this container's children, never <c>Overlay.Children</c> itself - that surface
+        /// is shared with <see cref="PartFAirflowRenderer"/> (and any future overlay), and clearing it wipes
+        /// whatever another renderer drew. Displaying the Part F requirement and the current design airflow
+        /// at once is a normal, intended combination - the comparison between them is one of the reasons
+        /// this overlay exists - so it must never be able to blank the other.
+        /// </summary>
+        private readonly ContainerVisual ownVisual = new();
+
         private AdjacencyCluster adjacencyCluster;
         private DesignAirFlowFloorPlanOverlay overlay = DesignAirFlowFloorPlanOverlay.Build(null, null);
 
         /// <summary>
-        /// Attaches to a 2D floor plan. The control's own <c>ViewChanged</c> only ever triggers a redraw -
-        /// see <see cref="Draw"/>.
+        /// Attaches to a 2D floor plan, adding this renderer's own container to its shared
+        /// <see cref="FloorPlan2DControl.Overlay"/>. The control's own <c>ViewChanged</c> only ever
+        /// triggers a redraw - see <see cref="Draw"/>.
         /// </summary>
         public DesignAirFlowRenderer(FloorPlan2DControl floorPlan2DControl)
         {
@@ -60,6 +71,7 @@ namespace SAM.Analytical.UI.WPF
             if (this.floorPlan2DControl is not null)
             {
                 this.floorPlan2DControl.ViewChanged += FloorPlan2DControl_ViewChanged;
+                this.floorPlan2DControl.Overlay.Children.Add(ownVisual);
             }
         }
 
@@ -119,13 +131,13 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public void Draw()
         {
-            System.Windows.Media.ContainerVisual containerVisual = floorPlan2DControl?.Overlay;
-            if (containerVisual is null)
+            if (floorPlan2DControl is null)
             {
                 return;
             }
 
-            containerVisual.Children.Clear();
+            //Only this renderer's own container, never Overlay itself - see ownVisual.
+            ownVisual.Children.Clear();
 
             if (!ViewSettings.Enabled || overlay.Marks.Count == 0)
             {
@@ -148,7 +160,7 @@ namespace SAM.Analytical.UI.WPF
                     DrawTag(drawingContext, mark, matrix);
                 }
 
-                containerVisual.Children.Add(drawingVisual);
+                ownVisual.Children.Add(drawingVisual);
             }
         }
 
@@ -161,12 +173,16 @@ namespace SAM.Analytical.UI.WPF
             Draw();
         }
 
-        /// <summary>Stops listening to the control. Call when the view it draws on goes away.</summary>
+        /// <summary>
+        /// Stops listening to the control and removes this renderer's own container from its Overlay.
+        /// Call when the view it draws on goes away.
+        /// </summary>
         public void Detach()
         {
             if (floorPlan2DControl is not null)
             {
                 floorPlan2DControl.ViewChanged -= FloorPlan2DControl_ViewChanged;
+                floorPlan2DControl.Overlay.Children.Remove(ownVisual);
             }
         }
 

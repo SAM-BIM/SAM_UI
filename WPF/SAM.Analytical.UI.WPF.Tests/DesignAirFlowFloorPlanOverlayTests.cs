@@ -28,6 +28,13 @@ namespace SAM.Analytical.UI.WPF.Tests
     {
         private static readonly Plane plane = Geometry.Spatial.Create.Plane(1.2);
 
+        private readonly Xunit.Abstractions.ITestOutputHelper output;
+
+        public DesignAirFlowFloorPlanOverlayTests(Xunit.Abstractions.ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         private static VentilationTerminal AddTerminal(PartFPlanModel model, string spaceName, FlowClassification flowClassification, double? designFlowRate_Lps, string name = null)
         {
             Space space = model.Space(spaceName);
@@ -216,50 +223,190 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.NotEqual(mark_1.SpaceGuid, mark_2.SpaceGuid);
         }
 
+        // -------------------------------------------------------------------------------------------------
+        // Scale - the work is linear in the model, not a wall-clock bound
+        // -------------------------------------------------------------------------------------------------
+
         /// <summary>
-        /// Building the overlay for a large model stays practical: it sections each space once, not
-        /// repeatedly, so a five-figure space count still builds in a few seconds rather than blowing up
-        /// quadratically. A loose bound - this is a smoke test against an accidental O(n^2), not a
-        /// performance benchmark.
+        /// Doubling the model roughly doubles what building the overlay allocates, up to and including a
+        /// 2,000-space model. Measured as a growth RATIO rather than an absolute time, matching the
+        /// convention in <c>PartOFailingSpaceLookupScalingTests.SelectingTheRoundsTargets_AllocatesLinearlyWithTheBlock</c>:
+        /// a machine-dependent wall-clock assertion is fragile in CI, where the same code can take
+        /// different absolute time on different hardware, but a ratio close to the input's own growth
+        /// factor is not - quadratic work would show up as roughly the SQUARE of that factor regardless of
+        /// how fast or slow the machine is.
         /// </summary>
         [Fact]
-        public void LargeModel_BuildCompletesWithoutQuadraticBlowup()
+        public void Build_AllocatesLinearlyWithTheModel_UpToTwoThousandSpaces()
         {
-            const int roomCount = 600;
+            int[] counts = [500, 1000, 2000];
 
-            PartFPlanModel model = new();
+            List<long> allocated = [];
 
-            string name_Previous = null;
+            foreach (int count in counts)
+            {
+                AdjacencyCluster adjacencyCluster = LargeModel(count);
+
+                //Warmed, so the first size measured is not paying for the JIT of every method below it.
+                DesignAirFlowFloorPlanOverlay.Build(adjacencyCluster, plane);
+
+                allocated.Add(Allocated(() => DesignAirFlowFloorPlanOverlay.Build(adjacencyCluster, plane)));
+            }
+
+            for (int i = 1; i < counts.Length; i++)
+            {
+                double ratio = (double)allocated[i] / allocated[i - 1];
+
+                Assert.True(
+                    ratio < 2.6,
+                    string.Format("Doubling the model from {0} to {1} spaces multiplied Build's allocation by {2:0.00}. Linear work sits near 2 and quadratic work near 4, so something is scanning the whole model per space again.", counts[i - 1], counts[i], ratio));
+            }
+        }
+
+        /// <summary>
+        /// Confirms the shape of the model above is actually exercising the overlay: every space in a
+        /// 2,000-space model produces its own mark, none unplaced.
+        /// </summary>
+        [Fact]
+        public void Build_TwoThousandSpaces_EveryOneProducesAMark()
+        {
+            const int roomCount = 2000;
+
+            AdjacencyCluster adjacencyCluster = LargeModel(roomCount);
+
+            DesignAirFlowFloorPlanOverlay overlay = DesignAirFlowFloorPlanOverlay.Build(adjacencyCluster, plane);
+
+            Assert.Equal(roomCount, overlay.Marks.Count);
+            Assert.Empty(overlay.Unplaced);
+        }
+
+        /// <summary>
+        /// Local wall clock at 2,000 and 5,000 spaces, for the report. Asserts nothing about time - see
+        /// <see cref="Build_AllocatesLinearlyWithTheModel_UpToTwoThousandSpaces"/> for the CI-safe version
+        /// of this measurement.
+        /// </summary>
+        [Fact]
+        [Trait("Category", "Benchmark")]
+        public void Benchmark()
+        {
+            output.WriteLine("{0,6} {1,14} {2,10}", "spaces", "Build (ms)", "marks");
+
+            foreach (int count in new[] { 2000, 5000 })
+            {
+                AdjacencyCluster adjacencyCluster = LargeModel(count);
+
+                //Warmed, so the first size measured is not paying for the JIT.
+                DesignAirFlowFloorPlanOverlay.Build(adjacencyCluster, plane);
+
+                Stopwatch stopwatch = Stopwatch.StartNew();
+                DesignAirFlowFloorPlanOverlay overlay = DesignAirFlowFloorPlanOverlay.Build(adjacencyCluster, plane);
+                stopwatch.Stop();
+
+                output.WriteLine("{0,6} {1,14:0.0} {2,10}", count, stopwatch.Elapsed.TotalMilliseconds, overlay.Marks.Count);
+            }
+        }
+
+        private static long Allocated(Action action)
+        {
+            //Warmed first, so the measurement is the work and not the JIT.
+            action();
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+
+            action();
+
+            return GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+
+        /// <summary>
+        /// <paramref name="roomCount"/> fully independent closed rooms, spread out along X so none adjoin -
+        /// each with its own floor, roof and four walls, and its own single design supply terminal. Built
+        /// directly (not through <see cref="PartFPlanModel"/>, whose <c>Room</c>/<c>Partition</c> pair is
+        /// for a shared-wall block and carries its own O(n) fixture-side list scan) so the only thing this
+        /// measurement times is <see cref="DesignAirFlowFloorPlanOverlay.Build"/> itself.
+        /// </summary>
+        private static AdjacencyCluster LargeModel(int roomCount)
+        {
+            const double width_M = 3;
+            const double depth_M = 5;
+            const double height_M = 3;
+            const double gap_M = 1;
+
+            AdjacencyCluster adjacencyCluster = new();
 
             for (int i = 0; i < roomCount; i++)
             {
-                string name = string.Format("Room {0}", i);
+                double x0 = i * (width_M + gap_M);
+                double x1 = x0 + width_M;
 
-                model.Room(name, 3);
+                string name = string.Format("Room {0:00000}", i);
 
-                //Closes the shared wall with the previous room, so every room's own outline is a closed
-                //loop on the plan - Room() alone leaves the far side of each interior room open, and an
-                //open outline sections to nothing.
-                if (name_Previous is not null)
-                {
-                    model.Partition(name_Previous, name);
-                }
+                Space space = new(name, new Point3D((x0 + x1) / 2, depth_M / 2, height_M / 2));
 
-                AddTerminal(model, name, FlowClassification.Supply, 10 + i);
+                space.SetValue(SpaceParameter.Area, width_M * depth_M);
+                space.SetValue(SpaceParameter.Volume, width_M * depth_M * height_M);
 
-                name_Previous = name;
+                adjacencyCluster.AddObject(space);
+
+                AddBoxPanel(adjacencyCluster, space, Horizontal(x0, x1, depth_M, 0));
+                AddBoxPanel(adjacencyCluster, space, Horizontal(x0, x1, depth_M, height_M));
+                AddBoxPanel(adjacencyCluster, space, WallY(x0, x1, 0, height_M));
+                AddBoxPanel(adjacencyCluster, space, WallY(x0, x1, depth_M, height_M));
+                AddBoxPanel(adjacencyCluster, space, WallX(x0, depth_M, height_M));
+                AddBoxPanel(adjacencyCluster, space, WallX(x1, depth_M, height_M));
+
+                VentilationTerminal ventilationTerminal = new(name + " Supply", FlowClassification.Supply, 10 + (i % 50));
+
+                adjacencyCluster.AddObject(ventilationTerminal);
+                adjacencyCluster.AddRelation(ventilationTerminal, space);
             }
 
-            model.Close();
+            return adjacencyCluster;
+        }
 
-            Stopwatch stopwatch = Stopwatch.StartNew();
+        private static void AddBoxPanel(AdjacencyCluster adjacencyCluster, Space space, Face3D face3D)
+        {
+            Panel panel = Analytical.Create.Panel(new Construction(Guid.NewGuid(), "External Wall"), PanelType.WallExternal, face3D);
 
-            DesignAirFlowFloorPlanOverlay overlay = DesignAirFlowFloorPlanOverlay.Build(model.AdjacencyCluster, plane);
+            adjacencyCluster.AddObject(panel);
+            adjacencyCluster.AddRelation(space, panel);
+        }
 
-            stopwatch.Stop();
+        private static Face3D Horizontal(double x0, double x1, double depth_M, double z)
+        {
+            return new Face3D(new Polygon3D(
+            [
+                new Point3D(x0, 0, z),
+                new Point3D(x1, 0, z),
+                new Point3D(x1, depth_M, z),
+                new Point3D(x0, depth_M, z),
+            ]));
+        }
 
-            Assert.Equal(roomCount, overlay.Marks.Count);
-            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(20), string.Format("Build of {0} spaces took {1}, which suggests a non-linear regression.", roomCount, stopwatch.Elapsed));
+        private static Face3D WallY(double x0, double x1, double y, double height_M)
+        {
+            return new Face3D(new Polygon3D(
+            [
+                new Point3D(x0, y, 0),
+                new Point3D(x1, y, 0),
+                new Point3D(x1, y, height_M),
+                new Point3D(x0, y, height_M),
+            ]));
+        }
+
+        private static Face3D WallX(double x, double depth_M, double height_M)
+        {
+            return new Face3D(new Polygon3D(
+            [
+                new Point3D(x, 0, 0),
+                new Point3D(x, depth_M, 0),
+                new Point3D(x, depth_M, height_M),
+                new Point3D(x, 0, height_M),
+            ]));
         }
     }
 }
