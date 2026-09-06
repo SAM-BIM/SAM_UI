@@ -166,5 +166,95 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Empty(designContainer.Children);
             Assert.NotEmpty(partFContainer.Children);
         }
+
+        /// <summary>
+        /// <b>The third-party-parent-clear failure path</b> - distinct from every test above, which only ever
+        /// exercises one renderer clearing another's content through a supported API. This reproduces what
+        /// <c>PartFAssessmentWindow.Load</c> used to do directly: reach past both renderers and call
+        /// <c>FloorPlan2DControl.Overlay.Children.Clear()</c> itself, the whole shared surface neither
+        /// renderer is allowed to touch.
+        /// <para>
+        /// <see cref="PartFAirflowRenderer"/> attaches its <c>ContainerVisual</c> to <c>Overlay</c> exactly
+        /// once, in its constructor - it is never re-attached by <see cref="PartFAirflowRenderer.Clear"/>,
+        /// <see cref="PartFAirflowRenderer.Load"/> or <see cref="PartFAirflowRenderer.Draw"/>, all of which
+        /// only ever touch the container's OWN children. So a third party that clears <c>Overlay.Children</c>
+        /// directly detaches that container from the plan PERMANENTLY: every mark drawn afterwards is real
+        /// work landing in a visual nothing on screen is parented to any more. This is exactly the
+        /// architecture the ownership model above 3aec9fe accepted in exchange for renderers never blanking
+        /// each other - it depends on nobody outside a renderer ever reaching into <c>Overlay.Children</c>,
+        /// which is the rule <c>PartFAssessmentWindow</c> broke.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void ThirdPartyClearingOverlayChildrenDirectly_PermanentlyDetachesTheRenderersContainer()
+        {
+            (FloorPlan2DControl control, PartFAirflowRenderer partFRenderer, _, ContainerVisual partFContainer, _) = Build();
+
+            Assert.Equal(2, control.Overlay.Children.Count);
+            Assert.NotEmpty(partFContainer.Children);
+
+            //The bug, reproduced exactly: not the renderer's own Clear(), but the parent surface's own
+            //Children collection, cleared by something that does not own it.
+            control.Overlay.Children.Clear();
+
+            Assert.Empty(control.Overlay.Children);
+
+            //The renderer has no idea this happened - it still thinks its container is attached - so asking
+            //it to draw again does real work...
+            partFRenderer.Draw();
+            Assert.NotEmpty(partFContainer.Children);
+
+            //...that lands nowhere: the container drawn into is no longer a child of Overlay, so nothing the
+            //renderer does from here ever reaches the screen again.
+            Assert.False(control.Overlay.Children.Contains(partFContainer));
+            Assert.Empty(control.Overlay.Children);
+        }
+
+        /// <summary>
+        /// The fix for the failure path above: clearing a dwelling/result state through the renderer's OWN
+        /// <see cref="PartFAirflowRenderer.Clear"/> - never through <c>Overlay.Children.Clear()</c> - leaves
+        /// the container attached, so a later <see cref="PartFAirflowRenderer.Load"/> keeps drawing into a
+        /// visual the plan still shows. Exercises the same result -&gt; null result -&gt; result cycle
+        /// <c>PartFAssessmentWindow</c> drives when the selected dwelling changes.
+        /// </summary>
+        [WpfFact]
+        public void ClearingThroughTheRendererThenReloading_RestoresVisualsWithoutReattaching()
+        {
+            (FloorPlan2DControl control, PartFAirflowRenderer partFRenderer, _, ContainerVisual partFContainer, _) = Build();
+
+            Assert.NotEmpty(partFContainer.Children);
+
+            //A null result: PartFAssessmentWindow.Load's early-return branch.
+            partFRenderer.Clear();
+
+            Assert.Empty(partFContainer.Children);
+            Assert.True(control.Overlay.Children.Contains(partFContainer));
+
+            //Back to a real result: the container was never detached, so the SAME container fills again.
+            PartFPlanModel model = new PartFPlanModel().Room("Studio", 8).Close();
+            Space space = model.Space("Studio");
+
+            PartFComplianceResult complianceResult = new("Flat 1")
+            {
+                Terminals =
+                [
+                    new PartFVentilationTerminalRequirement("Studio Supply", space.Guid, PartFTerminalRole.Supply)
+                    {
+                        SpaceName = space.Name,
+                        ContinuousDesignFlowRate_Lps = 30,
+                        IsRequired = true,
+                    },
+                ],
+            };
+
+            partFRenderer.Load(model.AdjacencyCluster, [complianceResult]);
+
+            Assert.NotEmpty(partFContainer.Children);
+            Assert.True(control.Overlay.Children.Contains(partFContainer));
+
+            //Still exactly the two containers Build() attached - Clear() and Load() neither dropped the
+            //Part F container nor added a second one of its own.
+            Assert.Equal(2, control.Overlay.Children.Count);
+        }
     }
 }

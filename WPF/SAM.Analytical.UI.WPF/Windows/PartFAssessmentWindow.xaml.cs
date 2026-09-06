@@ -124,7 +124,14 @@ namespace SAM.Analytical.UI.WPF
             {
                 DataGrid_Terminals.ItemsSource = null;
                 TextBlock_Status.Text = string.Empty;
-                FloorPlan.Overlay.Children.Clear();
+
+                //Through the renderer's own Clear(), never Overlay.Children.Clear() - the renderer attaches
+                //its own ContainerVisual to the shared Overlay once, in its constructor, and Overlay is
+                //shared with other floor-plan overlays (the Ventilation Design renderer among them).
+                //Clearing Overlay.Children here would detach the renderer's container permanently, so a
+                //later Draw() would write into a visual no longer attached to the plan.
+                renderer?.Clear();
+
                 TextBox_Schematic.Text = string.Empty;
                 return;
             }

@@ -224,7 +224,7 @@ namespace SAM.Analytical.UI
         /// </summary>
         private void BuildTransferMarks(AdjacencyCluster adjacencyCluster, Plane plane, Dictionary<Guid, Point2D> dictionary_Anchor)
         {
-            Dictionary<(Guid, Guid), SpaceAirMovement> dictionary_SpaceAirMovement = adjacencyCluster.DesignTransferSpaceAirMovements();
+            Dictionary<(Guid, Guid), Analytical.Query.DesignTransferAirMovement> dictionary_SpaceAirMovement = adjacencyCluster.DesignTransferSpaceAirMovements();
             if (dictionary_SpaceAirMovement.Count == 0)
             {
                 return;
@@ -344,14 +344,14 @@ namespace SAM.Analytical.UI
             //A design air movement between two spaces the model does not show as adjoining - hand-authored,
             //or left behind by an edit that removed the partition. It cannot be drawn, because there is no
             //route to draw it on, and saying nothing would hide air the simulation will still move.
-            foreach (KeyValuePair<(Guid, Guid), SpaceAirMovement> keyValuePair in dictionary_SpaceAirMovement)
+            foreach (KeyValuePair<(Guid, Guid), Analytical.Query.DesignTransferAirMovement> keyValuePair in dictionary_SpaceAirMovement)
             {
                 if (drawn.Contains(keyValuePair.Key))
                 {
                     continue;
                 }
 
-                Unplaced.Add(string.Format("The design air movement '{0}' was not drawn: the two spaces it connects do not adjoin through any partition in the model, so there is nowhere on the plan for it to cross.", keyValuePair.Value.Name));
+                Unplaced.Add(string.Format("The design air movement '{0}' was not drawn: the two spaces it connects do not adjoin through any partition in the model, so there is nowhere on the plan for it to cross.", keyValuePair.Value.SpaceAirMovement.Name));
             }
         }
 
