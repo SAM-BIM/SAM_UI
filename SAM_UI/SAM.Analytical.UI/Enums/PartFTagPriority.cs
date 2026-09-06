@@ -29,8 +29,10 @@ namespace SAM.Analytical.UI
     /// <item><b>Supply</b>. Sized from the whole dwelling rather than the room, so a supply figure read
     /// against a neighbouring room misleads less than an extract figure does.</item>
     /// <item><b>Net airflow</b> per space, which is derived from the terminals above it.</item>
-    /// <item><b>Diagnostics</b> last. They qualify a mark that is already on the drawing, so where the plan
-    /// runs out of room these are the ones that should be displaced or left out.</item>
+    /// <item><b>Diagnostics</b> last, among Part F's own tags. They qualify a mark that is already on the
+    /// drawing, so where the plan runs out of room these are the ones that should be displaced or left
+    /// out.</item>
+    /// <item><b>Ventilation Design tags</b> last of all - see <see cref="DesignSupply"/>.</item>
     /// </list>
     /// </summary>
     public enum PartFTagPriority
@@ -62,9 +64,26 @@ namespace SAM.Analytical.UI
         [Description("Net Airflow")] NetAirflow = 5,
 
         /// <summary>
-        /// A caption or warning qualifying a mark that is already drawn. Placed last, so it is what gives
-        /// way when the plan is crowded.
+        /// A caption or warning qualifying a mark that is already drawn. Placed last among Part F's own
+        /// tags, so it is what gives way when the plan is crowded.
         /// </summary>
         [Description("Diagnostic")] Diagnostic = 6,
+
+        /// <summary>
+        /// The Ventilation Design overlay's design supply mark - "SUP 150.0 l/s" - sharing this same
+        /// placement policy, and so the same shared <see cref="PartFTagPlacement"/> solve, as Part F's own
+        /// tags. Placed AFTER every Part F priority, including <see cref="Diagnostic"/>: Part F carries a
+        /// regulatory figure and must keep the position it would have on its own regardless of which other
+        /// overlays happen to be switched on, so nothing here is allowed to outrank it. The design value is
+        /// still solved clear of every Part F tag and of every other design tag - see the tests in
+        /// <c>DesignAirFlowRenderer</c> - it simply never wins a contested first-choice position over Part F.
+        /// </summary>
+        [Description("Design Supply")] DesignSupply = 7,
+
+        /// <summary>The design overlay's design extract mark. See <see cref="DesignSupply"/>.</summary>
+        [Description("Design Extract")] DesignExtract = 8,
+
+        /// <summary>The design overlay's net (supply minus extract) mark. See <see cref="DesignSupply"/>.</summary>
+        [Description("Design Net")] DesignNet = 9,
     }
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Geometry.Object;
+using SAM.Geometry.Planar;
 using SAM.Geometry.Spatial;
 using SAM.Geometry.UI.WPF;
 using System;
@@ -23,23 +25,31 @@ namespace SAM.Analytical.UI.WPF
     /// the point, not a bug, and is why they stay two renderers rather than one with a mode switch.
     /// </para>
     /// <para>
-    /// <b>Load is the expensive call</b> - it sections every space on the plan - so it runs only when the
-    /// model, the plan or the view's visibility settings change. <see cref="Draw"/> is cheap and is what
-    /// every pan, zoom and resize calls; it never re-reads the model. On a five-thousand-space model this is
-    /// the difference between one section pass and one per frame.
+    /// <b>Positioned through the same shared adapter Part F uses</b> - <see cref="PartFTagPlacement"/>, and
+    /// so the same <c>Solver2D</c> - rather than a second, hand-made collision solver. Every tag this
+    /// renderer draws is treated as an obstacle by every other tag it solves alongside, so a studio's SUP,
+    /// EXT and NET marks come apart from one another exactly as Part F's own tags do; and where a
+    /// <see cref="PartFAirflowRenderer"/> is also drawing on the SAME plan, its already-solved tag
+    /// rectangles are read (never written to - see <see cref="PartFAirflowRenderer.PlacedRectangle2Ds"/>)
+    /// and entered as obstacles here too, so a design tag is never solved on top of a Part F one.
+    /// </para>
+    /// <para>
+    /// <b>Deliberately one-directional.</b> Part F never reads this overlay, and its own layout never
+    /// changes because this overlay was switched on, off, or moved - it is the regulatory figure and keeps
+    /// exactly the position it would have on its own. This overlay is the one that gives way, which is why
+    /// combining the two into a single solve (rather than this one-directional obstacle relationship) was
+    /// not done: it would make Part F's own tags depend on whether Ventilation Design happened to be
+    /// switched on, which nothing before this overlay existed ever did and nothing should start doing.
+    /// </para>
+    /// <para>
+    /// <b>Load is the expensive call</b> - it sections every space on the plan and solves every visible tag
+    /// - so it runs only when the model, the plan or the view's visibility settings change.
+    /// <see cref="Draw"/> is cheap and is what every pan, zoom and resize calls; it never re-reads the model
+    /// and never re-solves - see <see cref="Place"/>.
     /// </para>
     /// </summary>
     public class DesignAirFlowRenderer
     {
-        /// <summary>Tag text size [px], drawn at a fixed screen size so it stays legible at every zoom.</summary>
-        private const double labelSize_Px = 11.5;
-
-        /// <summary>Padding [px] inside a tag.</summary>
-        private const double tagPadding_Px = 3;
-
-        private static readonly Brush plateBrush = Plate();
-        private static readonly Brush tagBorderBrush = TagBorder();
-
         private static readonly Color supplyColor = Color.FromRgb(0x1B, 0x6E, 0xC2);
         private static readonly Color extractColor = Color.FromRgb(0xC2, 0x5B, 0x1B);
         private static readonly Color netColor = Color.FromRgb(0x4A, 0x4A, 0x4A);
@@ -58,6 +68,29 @@ namespace SAM.Analytical.UI.WPF
 
         private AdjacencyCluster adjacencyCluster;
         private DesignAirFlowFloorPlanOverlay overlay = DesignAirFlowFloorPlanOverlay.Build(null, null);
+        private Dictionary<DesignAirFlowOverlayMark, PartFTagPlacementResult> placements = [];
+
+        /// <summary>
+        /// Geometry already on the drawing that a tag must not cover - the space and room text the plan
+        /// itself draws. Kept across a camera-only reload exactly as <see cref="PartFAirflowRenderer"/>
+        /// keeps its own - see <see cref="PartFAirflowRenderer.ResolveTextObstacles"/>.
+        /// </summary>
+        private List<IClosed2D> textObstacle2Ds = [];
+
+        /// <summary>
+        /// Part F's own currently-solved tag rectangles on this same plan, or empty where there is none.
+        /// Read-only: nothing here is ever written back to a <see cref="PartFAirflowRenderer"/>.
+        /// </summary>
+        private List<IClosed2D> partFObstacle2Ds = [];
+
+        /// <summary>
+        /// The drawing scale this overlay's tags are sized and solved at - the SAME convention Part F uses,
+        /// see <see cref="PartFTagPlacement.PixelsPerMetre"/>. Matches the Part F view's own annotation
+        /// scale where a <see cref="PartFAirflowRenderer"/> is also drawing on this plan, so the two read as
+        /// one drawing annotation family rather than two systems with different proportions; otherwise the
+        /// shared default.
+        /// </summary>
+        private double annotationScale = PartFTagPlacement.DefaultAnnotationScale;
 
         /// <summary>
         /// Attaches to a 2D floor plan, adding this renderer's own container to its shared
@@ -76,8 +109,9 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// How the overlay is presented. Never null; assigning replaces it and redraws - visibility is the
-        /// only thing a settings change can affect, since positions and rates come from <see cref="Load"/>.
+        /// How the overlay is presented. Never null; assigning replaces it and lays the tags out again,
+        /// because visibility decides which marks enter the shared solve - a hidden mark must not claim
+        /// space, or act as an obstacle, for the ones that are shown.
         /// </summary>
         public DesignAirFlowViewSettings ViewSettings
         {
@@ -90,6 +124,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 designAirFlowViewSettings = value ?? new DesignAirFlowViewSettings();
 
+                Place();
                 Draw();
             }
         }
@@ -108,26 +143,114 @@ namespace SAM.Analytical.UI.WPF
             get { return overlay.Unplaced; }
         }
 
+        /// <summary>Where one mark's tag ended up, or null where it is not currently placed.</summary>
+        public PartFTagPlacementResult Placement(DesignAirFlowOverlayMark mark)
+        {
+            return mark is not null && placements.TryGetValue(mark, out PartFTagPlacementResult result) ? result : null;
+        }
+
         /// <summary>
         /// Reads every space's design duty and works out where its marks go. The expensive call: it
-        /// sections every space, so it is made when the model or the plan changes - not when the view moves
-        /// and not when a visibility checkbox is toggled.
+        /// sections every space and solves every visible tag, so it is made when the model, the plan or the
+        /// visibility settings change - not when the view moves.
         /// </summary>
         /// <param name="adjacencyCluster">The model the plan is drawn from.</param>
-        public void Load(AdjacencyCluster adjacencyCluster)
+        /// <param name="geometryObjectModel">
+        /// The geometry the plan was loaded from, read for the text it has already drawn - room names,
+        /// door labels - so the tags can be kept off it. Optional; where none is supplied, the previous
+        /// load's obstacles are kept, matching <see cref="PartFAirflowRenderer.ResolveTextObstacles"/>.
+        /// </param>
+        /// <param name="partFObstacle2Ds">
+        /// A <see cref="PartFAirflowRenderer"/> drawing on the SAME plan's currently solved tag rectangles,
+        /// so this overlay's tags are placed clear of Part F's. Null or empty where there is none, or where
+        /// it is not enabled - read-only, and never fed back to Part F.
+        /// </param>
+        /// <param name="annotationScale">
+        /// The drawing scale to size and solve this overlay's tags at - <see cref="PartFAirflowViewSettings.AnnotationScale"/>
+        /// of the Part F view on this same plan, where there is one, so the two overlays' tags read as one
+        /// family; otherwise <see cref="PartFTagPlacement.DefaultAnnotationScale"/>.
+        /// </param>
+        public void Load(AdjacencyCluster adjacencyCluster, GeometryObjectModel geometryObjectModel = null, IEnumerable<IClosed2D> partFObstacle2Ds = null, double annotationScale = PartFTagPlacement.DefaultAnnotationScale)
         {
             this.adjacencyCluster = adjacencyCluster;
+            this.annotationScale = annotationScale > 0 ? annotationScale : PartFTagPlacement.DefaultAnnotationScale;
+            this.partFObstacle2Ds = [.. (partFObstacle2Ds ?? []).Where(x => x is not null)];
 
             Plane plane = floorPlan2DControl?.Plane;
 
+            //Same resilience rule as PartFAirflowRenderer.Load: a camera-only or attribute-only update
+            //regenerates no geometry, so the previous load's text obstacles are kept rather than cleared.
+            textObstacle2Ds = PartFAirflowRenderer.ResolveTextObstacles(geometryObjectModel, plane, textObstacle2Ds);
+
             overlay = DesignAirFlowFloorPlanOverlay.Build(adjacencyCluster, plane, ViewSettings.ShowNet);
 
+            Place();
             Draw();
         }
 
         /// <summary>
+        /// Lays every visible tag out, by handing them all to the shared engine through
+        /// <see cref="PartFTagPlacement"/> - the same adapter, and so the same <c>Solver2D</c>, Part F's own
+        /// tags are placed through. No second placement algorithm exists for this overlay.
+        /// </summary>
+        public void Place()
+        {
+            placements = [];
+
+            if (adjacencyCluster is null || floorPlan2DControl?.Plane is null || overlay.Marks.Count == 0)
+            {
+                return;
+            }
+
+            //The ANNOTATION scale, never the view transform - see PartFAirflowRenderer.Place for why.
+            double scale = PartFTagPlacement.PixelsPerMetre(annotationScale);
+
+            Dictionary<Guid, IClosed2D> dictionary_LimitArea = [];
+
+            List<PartFTagPlacementItem> items = [];
+
+            foreach (DesignAirFlowOverlayMark mark in overlay.Marks)
+            {
+                if (!Visible(mark))
+                {
+                    continue;
+                }
+
+                Size(mark, out double width_Px, out double height_Px);
+
+                items.Add(new PartFTagPlacementItem()
+                {
+                    ObjectGuid = mark.SpaceGuid,
+                    AnnotationType = PartFTagPlacement.AnnotationType(mark.MarkType),
+                    Priority = PartFTagPlacement.Priority(mark.MarkType),
+                    Anchor2D = mark.Position,
+                    Width = width_Px / scale,
+                    Height = height_Px / scale,
+
+                    //A design tag's centre stays in its own room, matching Part F's own terminal tags.
+                    LimitArea = LimitArea(dictionary_LimitArea, mark.SpaceGuid),
+
+                    Tag = mark,
+                });
+            }
+
+            //Part F's own tags are read-only obstacles here - see partFObstacle2Ds - never manual overrides
+            //of this overlay's own, which does not have any.
+            List<IClosed2D> obstacles = [.. textObstacle2Ds, .. partFObstacle2Ds];
+
+            foreach (PartFTagPlacementResult result in PartFTagPlacement.Solve(items, null, obstacles))
+            {
+                if (result.Tag is DesignAirFlowOverlayMark mark)
+                {
+                    placements[mark] = result;
+                }
+            }
+        }
+
+        /// <summary>
         /// Redraws the overlay against the current view transform. Cheap and called often - on every pan,
-        /// zoom, resize and visibility toggle. Nothing here re-reads the model or moves an anchor.
+        /// zoom, resize and visibility toggle. Nothing here re-reads the model, re-sections a space, or
+        /// re-solves a placement.
         /// </summary>
         public void Draw()
         {
@@ -157,7 +280,8 @@ namespace SAM.Analytical.UI.WPF
 
                 using (DrawingContext drawingContext = drawingVisual.RenderOpen())
                 {
-                    DrawTag(drawingContext, mark, matrix);
+                    //The layout was solved in the plane, on a change of input; this only transforms it.
+                    DrawTag(drawingContext, mark, matrix, Placement(mark));
                 }
 
                 ownVisual.Children.Add(drawingVisual);
@@ -169,6 +293,9 @@ namespace SAM.Analytical.UI.WPF
         {
             adjacencyCluster = null;
             overlay = DesignAirFlowFloorPlanOverlay.Build(null, null);
+            placements = [];
+            textObstacle2Ds = [];
+            partFObstacle2Ds = [];
 
             Draw();
         }
@@ -186,6 +313,12 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>
+        /// The camera moved - a pan, a zoom, a resize. <b>Redraw only</b>, matching
+        /// <c>PartFAirflowRenderer.FloorPlan2DControl_ViewChanged</c>: the tags are placed for the
+        /// view's annotation scale in the plane's own coordinates, so moving the camera cannot change where
+        /// any of them belongs - only where that is on screen.
+        /// </summary>
         private void FloorPlan2DControl_ViewChanged(object sender, EventArgs e)
         {
             Draw();
@@ -202,7 +335,18 @@ namespace SAM.Analytical.UI.WPF
             };
         }
 
-        private static void DrawTag(DrawingContext drawingContext, DesignAirFlowOverlayMark mark, System.Windows.Media.Matrix matrix)
+        /// <summary>
+        /// Draws one tag where the placement engine put it, at the same padding, border and text size
+        /// convention Part F's own tags use - see <see cref="PartFAirflowRenderer.tagPadding_Px"/> - so the
+        /// two overlays read as one drawing annotation family.
+        /// <para>
+        /// A design mark's <see cref="DesignAirFlowOverlayMark.Position"/> is a synthetic room-level point,
+        /// exactly as a Part F terminal's anchor is - see <c>PartFAirflowRenderer.HasPhysicalAnchor</c>
+        /// - so no leader is drawn back to it: a leader from one synthetic point to another would assert a
+        /// precision neither position has.
+        /// </para>
+        /// </summary>
+        private void DrawTag(DrawingContext drawingContext, DesignAirFlowOverlayMark mark, System.Windows.Media.Matrix matrix, PartFTagPlacementResult partFTagPlacementResult)
         {
             Color color = mark.MarkType switch
             {
@@ -214,54 +358,71 @@ namespace SAM.Analytical.UI.WPF
             Brush brush = new SolidColorBrush(color);
             brush.Freeze();
 
-            FormattedText formattedText = Text(mark.Label, brush);
+            //The tag was laid out for the annotation scale, so it is drawn at the size that scale implies at
+            //the current zoom - see PartFAirflowRenderer.Factor.
+            double factor = Factor(matrix);
+
+            FormattedText formattedText = PartFAirflowRenderer.Text(mark.Label, brush, PartFAirflowRenderer.labelSize_Px * factor, true);
 
             System.Windows.Point point_Anchor = matrix.Transform(new System.Windows.Point(mark.Position.X, mark.Position.Y));
 
-            System.Windows.Point point_Text = new(point_Anchor.X + 6, point_Anchor.Y - (formattedText.Height / 2));
+            //Nothing was placed for this mark - it became visible between the last layout and this repaint.
+            //Drawn beside the anchor rather than dropped, matching PartFAirflowRenderer.DrawLabel.
+            System.Windows.Point point_Text = PartFAirflowRenderer.Screen(partFTagPlacementResult?.Rectangle2D, matrix) is Rect rect
+                ? rect.TopLeft
+                : new System.Windows.Point(point_Anchor.X + 6, point_Anchor.Y - (formattedText.Height / 2));
 
             Rect rect_Tag = new(
-                point_Text.X - tagPadding_Px,
-                point_Text.Y - (tagPadding_Px / 2),
-                formattedText.Width + (tagPadding_Px * 2),
-                formattedText.Height + tagPadding_Px);
+                point_Text.X - (PartFAirflowRenderer.tagPadding_Px * factor),
+                point_Text.Y - (PartFAirflowRenderer.tagPadding_Px * factor / 2),
+                formattedText.Width + (PartFAirflowRenderer.tagPadding_Px * factor * 2),
+                formattedText.Height + (PartFAirflowRenderer.tagPadding_Px * factor));
 
-            drawingContext.DrawRectangle(plateBrush, TagPen(), rect_Tag);
+            drawingContext.DrawRectangle(PartFAirflowRenderer.plateBrush, PartFAirflowRenderer.TagPen(factor), rect_Tag);
 
             drawingContext.DrawText(formattedText, point_Text);
         }
 
-        private static FormattedText Text(string text, Brush brush)
+        /// <summary>
+        /// A tag's measured size in SCREEN pixels at the annotation scale, which is what the placement
+        /// converts into plane units - matching <c>PartFAirflowRenderer.Size</c>.
+        /// </summary>
+        private static void Size(DesignAirFlowOverlayMark mark, out double width, out double height)
         {
-            return new FormattedText(
-                text ?? string.Empty,
-                CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight,
-                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
-                labelSize_Px,
-                brush,
-                96);
+            FormattedText formattedText = PartFAirflowRenderer.Text(mark.Label, Brushes.Black, PartFAirflowRenderer.labelSize_Px, true);
+
+            width = formattedText.Width;
+            height = formattedText.Height;
         }
 
-        private static Brush Plate()
+        /// <summary>
+        /// The space's own section outline on this plan, cached per space for the length of one layout -
+        /// matching <c>PartFAirflowRenderer.LimitArea</c>.
+        /// </summary>
+        private IClosed2D LimitArea(Dictionary<Guid, IClosed2D> dictionary_LimitArea, Guid guid_Space)
         {
-            SolidColorBrush result = new(Color.FromArgb(0xF2, 0xFF, 0xFF, 0xFF));
-            result.Freeze();
+            if (dictionary_LimitArea.TryGetValue(guid_Space, out IClosed2D result))
+            {
+                return result;
+            }
+
+            Space space = adjacencyCluster.GetSpaces()?.Find(x => x is not null && x.Guid == guid_Space);
+
+            result = space is null
+                ? null
+                : adjacencyCluster.SpaceSectionFace2Ds(space, floorPlan2DControl.Plane)?.Where(x => x is not null).OrderByDescending(x => x.GetArea()).FirstOrDefault();
+
+            dictionary_LimitArea[guid_Space] = result;
+
             return result;
         }
 
-        private static Brush TagBorder()
+        /// <summary>
+        /// How much bigger the drawing is than the sheet - matching <c>PartFAirflowRenderer.Factor</c>.
+        /// </summary>
+        private double Factor(System.Windows.Media.Matrix matrix)
         {
-            SolidColorBrush result = new(Color.FromArgb(0xFF, 0x9A, 0x9A, 0x9A));
-            result.Freeze();
-            return result;
-        }
-
-        private static Pen TagPen()
-        {
-            Pen result = new(tagBorderBrush, 0.7);
-            result.Freeze();
-            return result;
+            return System.Math.Max(System.Math.Abs(matrix.M11), System.Math.Abs(matrix.M22)) / PartFTagPlacement.PixelsPerMetre(annotationScale);
         }
     }
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020–2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Geometry.Object;
+using SAM.Geometry.Planar;
 using SAM.Geometry.UI;
 using SAM.Geometry.UI.WPF;
 using System;
@@ -18,6 +20,14 @@ namespace SAM.Analytical.UI.WPF.Windows
     /// values drawn come only from <c>VentilationTerminal.DesignFlowRate_Lps</c> through
     /// <see cref="DesignAirFlowFloorPlanOverlay"/>.
     /// </para>
+    /// <para>
+    /// <b>Called after <see cref="UpdatePartFAirflow"/>, on purpose.</b> Where a <see cref="PartFAirflowRenderer"/>
+    /// is already drawing on this same view, its currently solved tag rectangles are read here - through
+    /// <see cref="PartFAirflowRenderer.PlacedRectangle2Ds"/> - and handed to the design renderer as
+    /// read-only obstacles, so the two overlays' tags do not land on top of one another without merging
+    /// into a single renderer or a second collision solver. Nothing is ever read back the other way: Part
+    /// F's own layout never depends on whether this overlay exists.
+    /// </para>
     /// </summary>
     public partial class AnalyticalWindow
     {
@@ -30,7 +40,7 @@ namespace SAM.Analytical.UI.WPF.Windows
         /// Draws, refreshes or removes the Ventilation Design overlay on one view, from the view's own
         /// settings. Called after the view's geometry has been loaded, alongside <see cref="UpdatePartFAirflow"/>.
         /// </summary>
-        private void UpdateVentilationDesignAirflow(ViewportControl viewportControl, AnalyticalModel analyticalModel, IViewSettings viewSettings)
+        private void UpdateVentilationDesignAirflow(ViewportControl viewportControl, AnalyticalModel analyticalModel, IViewSettings viewSettings, GeometryObjectModel geometryObjectModel)
         {
             if (viewportControl is null || viewSettings is null)
             {
@@ -58,7 +68,21 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             designAirFlowRenderer.ViewSettings = designAirFlowViewSettings;
 
-            designAirFlowRenderer.Load(analyticalModel.AdjacencyCluster);
+            //Part F's own tags on this SAME view, read-only, so this overlay's tags are solved clear of
+            //them - see the type's own remarks. Absent where Part F is not drawing on this view at all, in
+            //which case this overlay has the room to itself.
+            List<Rectangle2D> partFObstacle2Ds = null;
+            double annotationScale = PartFTagPlacement.DefaultAnnotationScale;
+
+            if (dictionary_PartFAirflowRenderer.TryGetValue(viewportControl.Guid, out PartFAirflowRenderer partFAirflowRenderer)
+                && partFAirflowRenderer is not null
+                && partFAirflowRenderer.ViewSettings.Enabled)
+            {
+                partFObstacle2Ds = partFAirflowRenderer.PlacedRectangle2Ds();
+                annotationScale = partFAirflowRenderer.ViewSettings.AnnotationScale;
+            }
+
+            designAirFlowRenderer.Load(analyticalModel.AdjacencyCluster, geometryObjectModel, partFObstacle2Ds, annotationScale);
         }
 
         /// <summary>Takes the Ventilation Design overlay off a view and stops the renderer listening to it.</summary>

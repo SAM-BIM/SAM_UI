@@ -52,22 +52,33 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// Padding [px] inside a tag, at the annotation scale. Compact: a tag is a label on a drawing, not a
         /// panel, and it has to sit inside a room without covering it.
+        /// <para>
+        /// <b>Internal, not private.</b> <see cref="DesignAirFlowRenderer"/> draws its own tags at this same
+        /// padding, so the two overlays read as one drawing annotation family rather than two systems with
+        /// different proportions - see the sizing convention shared through <see cref="TagPen"/>,
+        /// <see cref="Text"/> and <see cref="Screen"/> below.
+        /// </para>
         /// </summary>
-        private const double tagPadding_Px = 3;
+        internal const double tagPadding_Px = 3;
 
         /// <summary>
         /// Tag text size [px] <b>on the sheet</b> - the size it is measured at, and the size it draws at when
-        /// the view is at the annotation scale.
+        /// the view is at the annotation scale. Shared with <see cref="DesignAirFlowRenderer"/>; see
+        /// <see cref="tagPadding_Px"/>.
         /// </summary>
-        private const double labelSize_Px = 11.5;
+        internal const double labelSize_Px = 11.5;
 
         /// <summary>Caption text size [px] on the sheet, smaller so a caption reads as a qualifier.</summary>
         private const double captionSize_Px = 9.5;
 
-        /// <summary>The tag's white background, and its border. See <see cref="Plate"/>.</summary>
-        private static readonly Brush plateBrush = Plate();
+        /// <summary>
+        /// The tag's white background, and its border. See <see cref="Plate"/>. Internal, not private, so
+        /// <see cref="DesignAirFlowRenderer"/> can paint its own tags identically - see
+        /// <see cref="tagPadding_Px"/>.
+        /// </summary>
+        internal static readonly Brush plateBrush = Plate();
 
-        private static readonly Brush tagBorderBrush = TagBorder();
+        internal static readonly Brush tagBorderBrush = TagBorder();
 
         private static readonly Brush veilBrush = Veil();
 
@@ -143,6 +154,22 @@ namespace SAM.Analytical.UI.WPF
         public PartFTagPlacementResult Placement(PartFOverlayMark mark)
         {
             return mark is not null && placements.TryGetValue(mark, out PartFTagPlacementResult result) ? result : null;
+        }
+
+        /// <summary>
+        /// Every tag rectangle this renderer currently has solved, in the view plane's own coordinates - so
+        /// another overlay on the SAME plan can keep its own tags clear of Part F's without the two
+        /// renderers merging into one and without this renderer needing to know the other overlay exists.
+        /// <see cref="DesignAirFlowRenderer"/> reads this as an obstacle list; nothing here is written back
+        /// to, or read from, that overlay.
+        /// <para>
+        /// Read-only and a snapshot: it reflects whatever this renderer last solved in <see cref="Place"/>,
+        /// and calling it triggers no placement of its own.
+        /// </para>
+        /// </summary>
+        public List<Rectangle2D> PlacedRectangle2Ds()
+        {
+            return [.. placements.Values.Select(x => x?.Rectangle2D).Where(x => x is not null)];
         }
 
         /// <summary>
@@ -824,7 +851,7 @@ namespace SAM.Analytical.UI.WPF
         /// A plane rectangle as a screen rectangle: the bounding box of its transformed corners, so it is
         /// right whichever way the view flips the axes.
         /// </summary>
-        private static Rect? Screen(Rectangle2D rectangle2D, System.Windows.Media.Matrix matrix)
+        internal static Rect? Screen(Rectangle2D rectangle2D, System.Windows.Media.Matrix matrix)
         {
             List<Point2D> point2Ds = rectangle2D?.GetPoints();
             if (point2Ds is null || point2Ds.Count == 0)
@@ -850,7 +877,7 @@ namespace SAM.Analytical.UI.WPF
             return new Rect(new System.Windows.Point(x_Min, y_Min), new System.Windows.Point(x_Max, y_Max));
         }
 
-        private static FormattedText Text(string text, Brush brush, double size, bool bold)
+        internal static FormattedText Text(string text, Brush brush, double size, bool bold)
         {
             return new FormattedText(
                 text ?? string.Empty,
@@ -900,8 +927,11 @@ namespace SAM.Analytical.UI.WPF
             return result;
         }
 
-        /// <summary>A hairline border, scaled with the annotation so it stays a hairline at every zoom.</summary>
-        private static Pen TagPen(double factor)
+        /// <summary>
+        /// A hairline border, scaled with the annotation so it stays a hairline at every zoom. Internal, not
+        /// private - see <see cref="tagPadding_Px"/>.
+        /// </summary>
+        internal static Pen TagPen(double factor)
         {
             Pen result = new(tagBorderBrush, System.Math.Max(0.6, 0.7 * factor));
 

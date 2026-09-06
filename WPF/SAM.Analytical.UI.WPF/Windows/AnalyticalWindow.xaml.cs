@@ -3656,8 +3656,9 @@ namespace SAM.Analytical.UI.WPF.Windows
             UpdatePartFAirflow(viewportControl, analyticalModel, viewSettings, geometryObjectModel_Updated);
 
             //Ventilation Design overlay - the model's current design airflow, read independently of Part F.
-            //See AnalyticalWindow.VentilationDesign.cs.
-            UpdateVentilationDesignAirflow(viewportControl, analyticalModel, viewSettings);
+            //Called after Part F above so its already-solved tags can be read as obstacles. See
+            //AnalyticalWindow.VentilationDesign.cs.
+            UpdateVentilationDesignAirflow(viewportControl, analyticalModel, viewSettings, geometryObjectModel_Updated);
 
             if (viewSettings != null)
             {
