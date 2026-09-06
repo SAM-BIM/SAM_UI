@@ -269,7 +269,7 @@ namespace SAM.Analytical.UI
                     continue;
                 }
 
-                Point2D point2D_Opening = OpeningPoint2D(adjacencyCluster, plane, partFDoorTransferData, out bool isDoor);
+                Point2D point2D_Opening = TransferRouteGeometry.OpeningPoint2D(adjacencyCluster, plane, partFDoorTransferData.ApertureGuid, partFDoorTransferData.UpstreamSpaceGuid, partFDoorTransferData.DownstreamSpaceGuid, out bool isDoor);
                 if (point2D_Opening is null)
                 {
                     //The two spaces adjoin in the assessment but nothing separating them appears on this
@@ -393,116 +393,6 @@ namespace SAM.Analytical.UI
             dictionary_Anchor[guid_Space] = result;
 
             return result;
-        }
-
-        /// <summary>
-        /// Where the transfer route physically crosses, on this plan: the modelled door where there is
-        /// one, and otherwise the separating wall between the two spaces. Null where neither appears on
-        /// the plan.
-        /// </summary>
-        private static Point2D OpeningPoint2D(AdjacencyCluster adjacencyCluster, Plane plane, PartFDoorTransferData partFDoorTransferData, out bool isDoor)
-        {
-            isDoor = false;
-
-            //A modelled door is the best answer and is used wherever there is one.
-            if (partFDoorTransferData.ApertureGuid != Guid.Empty)
-            {
-                Point2D result_Aperture = AperturePoint2D(adjacencyCluster, plane, partFDoorTransferData.ApertureGuid);
-                if (result_Aperture is not null)
-                {
-                    isDoor = true;
-                    return result_Aperture;
-                }
-            }
-
-            //No door aperture in the model. The two spaces still adjoin through a real separating panel,
-            //and that panel is drawn on the plan, so the arrow crosses the wall the reader can see. This
-            //is the common case: many analytical models carry no internal door apertures at all.
-            return PartitionPoint2D(adjacencyCluster, plane, partFDoorTransferData.UpstreamSpaceGuid, partFDoorTransferData.DownstreamSpaceGuid);
-        }
-
-        private static Point2D AperturePoint2D(AdjacencyCluster adjacencyCluster, Plane plane, Guid guid_Aperture)
-        {
-            foreach (Panel panel in adjacencyCluster.GetPanels() ?? [])
-            {
-                Aperture aperture = panel?.Apertures?.Find(x => x is not null && x.Guid == guid_Aperture);
-
-                Face3D face3D = aperture?.GetFace3D();
-                if (face3D is null)
-                {
-                    continue;
-                }
-
-                //The door's own centre, projected onto the plan. A door reaches the floor, so its centre
-                //is above the cut level rather than on it; projecting is what puts the mark in the opening.
-                Point3D point3D = face3D.GetCentroid();
-
-                return point3D is null ? null : Geometry.Spatial.Query.Convert(plane, point3D);
-            }
-
-            return null;
-        }
-
-        private static Point2D PartitionPoint2D(AdjacencyCluster adjacencyCluster, Plane plane, Guid guid_Upstream, Guid guid_Downstream)
-        {
-            List<Panel> panels_Upstream = Panels(adjacencyCluster, guid_Upstream);
-            List<Panel> panels_Downstream = Panels(adjacencyCluster, guid_Downstream);
-
-            if (panels_Upstream is null || panels_Downstream is null)
-            {
-                return null;
-            }
-
-            HashSet<Guid> guids_Downstream = [.. panels_Downstream.Where(x => x is not null).Select(x => x.Guid)];
-
-            List<Panel> panels_Shared = [.. panels_Upstream.Where(x => x is not null && guids_Downstream.Contains(x.Guid))];
-            if (panels_Shared.Count == 0)
-            {
-                return null;
-            }
-
-            Dictionary<Panel, List<ISegmentable3D>> dictionary = Analytical.Query.SectionDictionary<ISegmentable3D>(panels_Shared, plane);
-            if (dictionary is null)
-            {
-                return null;
-            }
-
-            //The longest cut segment of the shared wall, and its midpoint: the middle of the widest run of
-            //partition between the two rooms, which is where a door would be if one were modelled.
-            Segment2D segment2D_Longest = null;
-
-            foreach (KeyValuePair<Panel, List<ISegmentable3D>> keyValuePair in dictionary)
-            {
-                foreach (ISegmentable3D segmentable3D in keyValuePair.Value ?? [])
-                {
-                    foreach (Segment3D segment3D in segmentable3D?.GetSegments() ?? [])
-                    {
-                        Point2D point2D_1 = Geometry.Spatial.Query.Convert(plane, segment3D?[0]);
-                        Point2D point2D_2 = Geometry.Spatial.Query.Convert(plane, segment3D?[1]);
-
-                        if (point2D_1 is null || point2D_2 is null)
-                        {
-                            continue;
-                        }
-
-                        Segment2D segment2D = new(point2D_1, point2D_2);
-
-                        if (segment2D_Longest is null || segment2D.GetLength() > segment2D_Longest.GetLength())
-                        {
-                            segment2D_Longest = segment2D;
-                        }
-                    }
-                }
-            }
-
-            return segment2D_Longest?.Mid();
-        }
-
-        private static List<Panel> Panels(AdjacencyCluster adjacencyCluster, Guid guid_Space)
-        {
-            Space space = adjacencyCluster.GetSpaces()?.Find(x => x is not null && x.Guid == guid_Space);
-
-            return space is null ? null : adjacencyCluster.GetPanels(space);
         }
     }
 }

@@ -47,31 +47,52 @@ namespace SAM.Analytical.UI.WPF
     public class PartFAirflowRenderer
     {
         /// <summary>Screen length [px] of an arrowhead, held constant so it stays legible at every zoom.</summary>
-        private const double arrowHead_Px = 9;
+        internal const double arrowHead_Px = 9;
 
         /// <summary>
         /// Padding [px] inside a tag, at the annotation scale. Compact: a tag is a label on a drawing, not a
         /// panel, and it has to sit inside a room without covering it.
+        /// <para>
+        /// <b>Internal, not private.</b> <see cref="DesignAirFlowRenderer"/> draws its own tags at this same
+        /// padding, so the two overlays read as one drawing annotation family rather than two systems with
+        /// different proportions - see the sizing convention shared through <see cref="TagPen"/>,
+        /// <see cref="Text"/> and <see cref="Screen"/> below.
+        /// </para>
         /// </summary>
-        private const double tagPadding_Px = 3;
+        internal const double tagPadding_Px = 3;
 
         /// <summary>
         /// Tag text size [px] <b>on the sheet</b> - the size it is measured at, and the size it draws at when
-        /// the view is at the annotation scale.
+        /// the view is at the annotation scale. Shared with <see cref="DesignAirFlowRenderer"/>; see
+        /// <see cref="tagPadding_Px"/>.
         /// </summary>
-        private const double labelSize_Px = 11.5;
+        internal const double labelSize_Px = 11.5;
 
         /// <summary>Caption text size [px] on the sheet, smaller so a caption reads as a qualifier.</summary>
-        private const double captionSize_Px = 9.5;
+        internal const double captionSize_Px = 9.5;
 
-        /// <summary>The tag's white background, and its border. See <see cref="Plate"/>.</summary>
-        private static readonly Brush plateBrush = Plate();
+        /// <summary>
+        /// The tag's white background, and its border. See <see cref="Plate"/>. Internal, not private, so
+        /// <see cref="DesignAirFlowRenderer"/> can paint its own tags identically - see
+        /// <see cref="tagPadding_Px"/>.
+        /// </summary>
+        internal static readonly Brush plateBrush = Plate();
 
-        private static readonly Brush tagBorderBrush = TagBorder();
+        internal static readonly Brush tagBorderBrush = TagBorder();
 
         private static readonly Brush veilBrush = Veil();
 
         private readonly FloorPlan2DControl floorPlan2DControl;
+
+        /// <summary>
+        /// This renderer's OWN child of <see cref="FloorPlan2DControl.Overlay"/>. <see cref="Draw"/> clears
+        /// and rebuilds only this container's children, never <c>Overlay.Children</c> itself - that surface
+        /// is shared with other overlays (<see cref="DesignAirFlowRenderer"/> among them), and clearing it
+        /// wipes whatever another renderer drew. Showing the Part F requirement alongside the current
+        /// design airflow is a normal, intended combination, so this renderer must never be able to blank
+        /// another one.
+        /// </summary>
+        private readonly ContainerVisual ownVisual = new();
 
         private AdjacencyCluster adjacencyCluster;
         private List<PartFComplianceResult> partFComplianceResults = [];
@@ -80,8 +101,9 @@ namespace SAM.Analytical.UI.WPF
         private Dictionary<PartFOverlayMark, PartFTagPlacementResult> placements = [];
 
         /// <summary>
-        /// Attaches to a 2D floor plan. The control's own <c>ViewChanged</c> only ever triggers a redraw -
-        /// see <see cref="Draw"/>.
+        /// Attaches to a 2D floor plan, adding this renderer's own container to its shared
+        /// <see cref="FloorPlan2DControl.Overlay"/>. The control's own <c>ViewChanged</c> only ever
+        /// triggers a redraw - see <see cref="Draw"/>.
         /// </summary>
         public PartFAirflowRenderer(FloorPlan2DControl floorPlan2DControl)
         {
@@ -90,6 +112,7 @@ namespace SAM.Analytical.UI.WPF
             if (this.floorPlan2DControl is not null)
             {
                 this.floorPlan2DControl.ViewChanged += FloorPlan2DControl_ViewChanged;
+                this.floorPlan2DControl.Overlay.Children.Add(ownVisual);
             }
         }
 
@@ -131,6 +154,22 @@ namespace SAM.Analytical.UI.WPF
         public PartFTagPlacementResult Placement(PartFOverlayMark mark)
         {
             return mark is not null && placements.TryGetValue(mark, out PartFTagPlacementResult result) ? result : null;
+        }
+
+        /// <summary>
+        /// Every tag rectangle this renderer currently has solved, in the view plane's own coordinates - so
+        /// another overlay on the SAME plan can keep its own tags clear of Part F's without the two
+        /// renderers merging into one and without this renderer needing to know the other overlay exists.
+        /// <see cref="DesignAirFlowRenderer"/> reads this as an obstacle list; nothing here is written back
+        /// to, or read from, that overlay.
+        /// <para>
+        /// Read-only and a snapshot: it reflects whatever this renderer last solved in <see cref="Place"/>,
+        /// and calling it triggers no placement of its own.
+        /// </para>
+        /// </summary>
+        public List<Rectangle2D> PlacedRectangle2Ds()
+        {
+            return [.. placements.Values.Select(x => x?.Rectangle2D).Where(x => x is not null)];
         }
 
         /// <summary>
@@ -269,13 +308,13 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public void Draw()
         {
-            System.Windows.Media.ContainerVisual containerVisual = floorPlan2DControl?.Overlay;
-            if (containerVisual is null)
+            if (floorPlan2DControl is null)
             {
                 return;
             }
 
-            containerVisual.Children.Clear();
+            //Only this renderer's own container, never Overlay itself - see ownVisual.
+            ownVisual.Children.Clear();
 
             if (!ViewSettings.Enabled || overlays.Count == 0)
             {
@@ -301,7 +340,7 @@ namespace SAM.Analytical.UI.WPF
                     Draw(drawingContext, mark, matrix, Placement(mark));
                 }
 
-                containerVisual.Children.Add(drawingVisual);
+                ownVisual.Children.Add(drawingVisual);
             }
         }
 
@@ -323,6 +362,7 @@ namespace SAM.Analytical.UI.WPF
             if (floorPlan2DControl is not null)
             {
                 floorPlan2DControl.ViewChanged -= FloorPlan2DControl_ViewChanged;
+                floorPlan2DControl.Overlay.Children.Remove(ownVisual);
             }
         }
 
@@ -564,7 +604,7 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            floorPlan2DControl.Overlay.Children.Add(drawingVisual);
+            ownVisual.Children.Add(drawingVisual);
         }
 
         // ------------------------------------------------------------------
@@ -703,6 +743,14 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>
         /// The space's own section outline on this plan, cached per space for the length of one layout.
+        /// <para>
+        /// The space itself is found through <see cref="AdjacencyCluster.GetObject{T}(Guid)"/> - a
+        /// dictionary lookup keyed on the object's own type and guid, not a scan of every space in the
+        /// model. <c>GetSpaces()?.Find(...)</c> would make this method, and so <see cref="Place"/>, one
+        /// linear scan of the WHOLE space list per space with a visible mark; on a large model that is
+        /// quadratic in the number of spaces, and the per-layout cache only removes the repeat lookups for
+        /// a second or third mark in the SAME space, not the first lookup of each new one.
+        /// </para>
         /// </summary>
         private IClosed2D LimitArea(Dictionary<Guid, IClosed2D> dictionary_LimitArea, Guid guid_Space)
         {
@@ -711,7 +759,7 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
-            Space space = adjacencyCluster.GetSpaces()?.Find(x => x is not null && x.Guid == guid_Space);
+            Space space = adjacencyCluster.GetObject<Space>(guid_Space);
 
             //The largest piece, matching the anchor: a room cut into a big part and a sliver is tagged in the
             //big part, so constraining the tag to the sliver would leave it unplaceable.
@@ -811,7 +859,7 @@ namespace SAM.Analytical.UI.WPF
         /// A plane rectangle as a screen rectangle: the bounding box of its transformed corners, so it is
         /// right whichever way the view flips the axes.
         /// </summary>
-        private static Rect? Screen(Rectangle2D rectangle2D, System.Windows.Media.Matrix matrix)
+        internal static Rect? Screen(Rectangle2D rectangle2D, System.Windows.Media.Matrix matrix)
         {
             List<Point2D> point2Ds = rectangle2D?.GetPoints();
             if (point2Ds is null || point2Ds.Count == 0)
@@ -837,7 +885,7 @@ namespace SAM.Analytical.UI.WPF
             return new Rect(new System.Windows.Point(x_Min, y_Min), new System.Windows.Point(x_Max, y_Max));
         }
 
-        private static FormattedText Text(string text, Brush brush, double size, bool bold)
+        internal static FormattedText Text(string text, Brush brush, double size, bool bold)
         {
             return new FormattedText(
                 text ?? string.Empty,
@@ -887,8 +935,11 @@ namespace SAM.Analytical.UI.WPF
             return result;
         }
 
-        /// <summary>A hairline border, scaled with the annotation so it stays a hairline at every zoom.</summary>
-        private static Pen TagPen(double factor)
+        /// <summary>
+        /// A hairline border, scaled with the annotation so it stays a hairline at every zoom. Internal, not
+        /// private - see <see cref="tagPadding_Px"/>.
+        /// </summary>
+        internal static Pen TagPen(double factor)
         {
             Pen result = new(tagBorderBrush, System.Math.Max(0.6, 0.7 * factor));
 
@@ -901,7 +952,7 @@ namespace SAM.Analytical.UI.WPF
         /// A leader is a thin hairline in the mark's own colour: it has to connect the tag to the mark
         /// without competing with either.
         /// </summary>
-        private static Pen LeaderPen(Brush brush)
+        internal static Pen LeaderPen(Brush brush)
         {
             Pen result = new(brush, 0.7);
 

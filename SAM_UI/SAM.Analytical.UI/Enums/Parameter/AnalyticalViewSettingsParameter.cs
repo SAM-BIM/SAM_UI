@@ -43,5 +43,13 @@ namespace SAM.Analytical.UI
         /// what every view saved before the overlay existed will correctly report.
         /// </summary>
         [ParameterProperties("Part F Airflow", "Part F airflow overlay presentation settings for this view"), SAMObjectParameterValue(typeof(PartFAirflowViewSettings))] PartFAirflow,
+
+        /// <summary>
+        /// How this view presents the Ventilation Design floor-plan overlay - the design supply/extract
+        /// duty read from <c>VentilationTerminal.DesignFlowRate_Lps</c>, separate from and orthogonal to
+        /// <see cref="PartFAirflow"/>. Presentation only: no flow rate is stored here. Absent means the
+        /// overlay is off.
+        /// </summary>
+        [ParameterProperties("Ventilation Design Airflow", "Ventilation Design floor-plan overlay presentation settings for this view"), SAMObjectParameterValue(typeof(DesignAirFlowViewSettings))] VentilationDesignAirflow,
     }
 }

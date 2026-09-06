@@ -161,6 +161,39 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
+        /// Which <see cref="PartFTagPriority"/> a Ventilation Design mark's tag takes, so its tags share the
+        /// same placement policy - and so the same shared solve - as Part F's own, without ever outranking
+        /// them. See <see cref="PartFTagPriority.DesignSupply"/>.
+        /// </summary>
+        public static PartFTagPriority Priority(DesignAirFlowMarkType designAirFlowMarkType)
+        {
+            return designAirFlowMarkType switch
+            {
+                DesignAirFlowMarkType.Supply => PartFTagPriority.DesignSupply,
+                DesignAirFlowMarkType.Extract => PartFTagPriority.DesignExtract,
+                DesignAirFlowMarkType.Net => PartFTagPriority.DesignNet,
+                DesignAirFlowMarkType.Transfer => PartFTagPriority.DesignTransfer,
+                _ => PartFTagPriority.DesignSupply,
+            };
+        }
+
+        /// <summary>
+        /// Which <see cref="PartFAnnotationType"/> key a Ventilation Design mark's tag is entered into the
+        /// shared adapter under. See <see cref="PartFAnnotationType.DesignSupply"/>.
+        /// </summary>
+        public static PartFAnnotationType AnnotationType(DesignAirFlowMarkType designAirFlowMarkType)
+        {
+            return designAirFlowMarkType switch
+            {
+                DesignAirFlowMarkType.Supply => PartFAnnotationType.DesignSupply,
+                DesignAirFlowMarkType.Extract => PartFAnnotationType.DesignExtract,
+                DesignAirFlowMarkType.Net => PartFAnnotationType.DesignNet,
+                DesignAirFlowMarkType.Transfer => PartFAnnotationType.DesignTransfer,
+                _ => PartFAnnotationType.DesignSupply,
+            };
+        }
+
+        /// <summary>
         /// Places every tag, entering the manually positioned ones as obstacles rather than leaving them out.
         /// </summary>
         /// <param name="partFTagPlacementItems">

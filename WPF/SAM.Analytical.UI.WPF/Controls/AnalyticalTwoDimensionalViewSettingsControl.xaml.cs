@@ -29,6 +29,14 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private PartFAirflowViewSettings partFAirflowViewSettings;
 
+        /// <summary>
+        /// The view's Ventilation Design presentation, edited in its own dialog and stored back on the
+        /// view - the DESIGN airflow overlay, separate from and orthogonal to <see cref="partFAirflowViewSettings"/>.
+        /// Null means this view has never been told about it, kept absent rather than written as disabled
+        /// for the same reason as the Part F settings.
+        /// </summary>
+        private DesignAirFlowViewSettings designAirFlowViewSettings;
+
         private AdjacencyCluster adjacencyCluster_PartF;
 
         /// <summary>
@@ -212,6 +220,44 @@ namespace SAM.Analytical.UI.WPF
                 : null;
 
             UpdatePartFAirflowButton();
+
+            designAirFlowViewSettings = twoDimensionalViewSettings.TryGetValue(AnalyticalViewSettingsParameter.VentilationDesignAirflow, out DesignAirFlowViewSettings designAirFlowViewSettings_Temp)
+                ? designAirFlowViewSettings_Temp
+                : null;
+
+            UpdateVentilationDesignButton();
+        }
+
+        /// <summary>
+        /// Opens the Ventilation Design dialog for this view. A separate dialog from Part F Airflow's, on
+        /// the same footing: the two overlays read different authorities and are independently switched.
+        /// </summary>
+        private void button_VentilationDesign_Click(object sender, RoutedEventArgs e)
+        {
+            DesignAirFlowViewSettingsWindow designAirFlowViewSettingsWindow = new()
+            {
+                DesignAirFlowViewSettings = designAirFlowViewSettings,
+
+                //Fully qualified: an unqualified Window here is SAM.Analytical.Window, the architectural element.
+                Owner = System.Windows.Window.GetWindow(this),
+            };
+
+            if (designAirFlowViewSettingsWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            designAirFlowViewSettings = designAirFlowViewSettingsWindow.DesignAirFlowViewSettings;
+
+            UpdateVentilationDesignButton();
+        }
+
+        /// <summary>Says on the button whether this view carries the overlay, so it reads at a glance.</summary>
+        private void UpdateVentilationDesignButton()
+        {
+            button_VentilationDesign.Content = designAirFlowViewSettings is not null && designAirFlowViewSettings.Enabled
+                ? "Ventilation Design: on..."
+                : "Ventilation Design...";
         }
 
         /// <summary>
@@ -316,6 +362,12 @@ namespace SAM.Analytical.UI.WPF
             if (partFAirflowViewSettings is not null)
             {
                 result.SetValue(AnalyticalViewSettingsParameter.PartFAirflow, partFAirflowViewSettings);
+            }
+
+            //Same rule as Part F: absent means "never told about it", not "off".
+            if (designAirFlowViewSettings is not null)
+            {
+                result.SetValue(AnalyticalViewSettingsParameter.VentilationDesignAirflow, designAirFlowViewSettings);
             }
 
             if (checkBox_UseDefaultName.IsChecked != null && checkBox_UseDefaultName.IsChecked.HasValue)
