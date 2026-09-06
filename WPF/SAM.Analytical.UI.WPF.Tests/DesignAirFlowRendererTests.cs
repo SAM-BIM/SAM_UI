@@ -210,6 +210,149 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         // ------------------------------------------------------------------
+        // Screen-space transfer direction
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// <b>The literal screen-coordinate proof, for a real, physically balanced three-room chain.</b> A
+        /// native acceptance screenshot raised a concern that a transfer arrow might point the wrong way in
+        /// a three-room chain, but that screenshot's own fixture was not physically balanced (SUP 150 / EXT
+        /// 90, no visible middle-room terminal to absorb the 60 l/s difference) and could not be read as
+        /// evidence either way. This test does not reuse those invalid numbers - it uses equal supply and
+        /// extract duties, and proves its middle room is a genuine pass-through from the CALCULATED state
+        /// rather than assuming it from a room name.
+        /// <para>
+        /// <see cref="PartFTransferAirChainDirectionTests"/> (SAM.Tests) pins the same shape at the data
+        /// layer: <c>UpstreamSpaceGuid</c>/<c>DownstreamSpaceGuid</c> and <c>SpaceAirMovement.From</c>/<c>.To</c>.
+        /// Neither that test nor any other in this assembly touches
+        /// <see cref="FloorPlan2DControl.WorldToScreen"/> - the one transform
+        /// <see cref="PartFAirflowRenderer.Draw"/> and <see cref="DesignAirFlowRenderer.Draw"/> actually
+        /// apply before painting a pixel. This test pushes the SAME marks through that SAME matrix, on a
+        /// real (measured and arranged) control, and asserts on the coordinates the arrowhead is drawn AT.
+        /// </para>
+        /// <para>
+        /// <see cref="FloorPlan2DControl.WorldToScreen"/> is documented as flipping only Y ("World Y points
+        /// up, screen Y points down"). Its own construction, <c>new Matrix(scale, 0, 0, -scale, ...)</c>,
+        /// never negates X - so a correct world-space Start-to-End vector pointing toward increasing X can
+        /// only reach the screen still pointing toward increasing X. This test does not take that on faith;
+        /// it reads the control's actual matrix and asserts <c>M11 &gt; 0</c> before trusting anything built
+        /// on it.
+        /// </para>
+        /// <para>
+        /// Bedroom, Hall and Ensuite (<see cref="PartFPlanModel.Room"/>) sit strictly left to right; Bedroom
+        /// supplies, Ensuite extracts by the same amount, and Hall - a circulation space Approved Document F
+        /// gives no terminal to - is proved a genuine pass-through below rather than assumed, for both the
+        /// Part F and the Design authority. Both authorities are checked here, from the SAME production
+        /// terminal duties, through the SAME production transfer-air generation
+        /// (<c>Modify.AddPartFTransferAirMovements</c>, <c>PartFCalculator.Calculate</c>).
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void Chain_TransferMarks_EndSitsDownstreamOfStart_OnScreen_ForBothOverlays()
+        {
+            PartFPlanModel model = new PartFPlanModel()
+                .Room("Bedroom", 8)
+                .Room("Hall", 5)
+                .Room("Ensuite", 3)
+                .Partition("Bedroom", "Hall", "D01")
+                .Partition("Hall", "Ensuite", "D02")
+                .Zone("Flat 2", "Flats", true, "Bedroom", "Hall", "Ensuite");
+
+            //The Design authority's own terminal duties - independent of, and numerically different from,
+            //whatever Part F's Table 1.2 sizing calculates for the same rooms, but physically balanced
+            //(equal supply and extract) so this fixture is itself a valid scenario, unlike the native
+            //acceptance screenshot's own unbalanced SUP 150 / EXT 90.
+            AddTerminal(model.AdjacencyCluster, model.Space("Bedroom"), FlowClassification.Supply, 150.0, "Design Supply");
+            AddTerminal(model.AdjacencyCluster, model.Space("Ensuite"), FlowClassification.Extract, 150.0, "Design Extract");
+
+            //The Design pass-through proof: Hall carries no Design supply or extract terminal of its own.
+            Assert.Empty(model.AdjacencyCluster.VentilationTerminals(model.Space("Hall")));
+
+            List<SpaceAirMovement> spaceAirMovements = model.AdjacencyCluster.AddPartFTransferAirMovements(
+                null, model.AdjacencyCluster.GetSpaces(), out _, out List<string> refusals);
+
+            Assert.True(refusals is null || refusals.Count == 0, string.Join(" ", refusals ?? []));
+            Assert.NotEmpty(spaceAirMovements);
+
+            PartFCalculator partFCalculator = new(Analytical.Create.PartFData(RuleSetPath())) { AdjacencyCluster = model.AdjacencyCluster };
+            Assert.True(partFCalculator.Calculate("Flats"));
+            PartFComplianceResult complianceResult = partFCalculator.DwellingResults[0].ComplianceResult;
+
+            //The Part F pass-through proof, from the CALCULATED state: Hall - a circulation space - carries
+            //no Part F terminal requirement either, so LocalExtractMethod was never needed here and Hall is
+            //not merely assumed to be a pass-through because of its name.
+            Assert.DoesNotContain(complianceResult.Terminals ?? [], x => x.SpaceGuid == model.Space("Hall").Guid);
+
+            FloorPlan2DControl control = new() { Width = 800, Height = 600 };
+            control.Measure(new System.Windows.Size(800, 600));
+            control.Arrange(new System.Windows.Rect(0, 0, 800, 600));
+
+            GeometryObjectModel geometryObjectModel = new();
+            geometryObjectModel.SetValue(GeometryObjectModelParameter.ViewSettings, new TwoDimensionalViewSettings(
+                Guid.NewGuid(), "Level 0 [1.2m]", plane, null, [typeof(Space)], Geometry.Object.Query.DefaultTextAppearance(), null));
+
+            control.Load(geometryObjectModel);
+            control.ZoomExtents();
+
+            //Verified, not assumed: the transform this whole test rests on must not itself be the thing
+            //flipping the picture.
+            Assert.True(control.WorldToScreen.M11 > 0, "The world-to-screen transform unexpectedly flips X - every assertion below would be meaningless.");
+
+            PartFAirflowRenderer partFRenderer = new(control) { ViewSettings = new PartFAirflowViewSettings { Enabled = true, ShowSupply = true, ShowValues = true } };
+            partFRenderer.Load(model.AdjacencyCluster, [complianceResult]);
+
+            DesignAirFlowRenderer designRenderer = new(control) { ViewSettings = new DesignAirFlowViewSettings { Enabled = true, ShowSupply = true, ShowExtract = true } };
+            designRenderer.Load(model.AdjacencyCluster);
+
+            List<PartFOverlayMark> partFTransferMarks = [.. partFRenderer.Marks.Where(x => x.IsTransfer)];
+            List<DesignAirFlowOverlayMark> designTransferMarks = [.. designRenderer.Marks.Where(x => x.MarkType == DesignAirFlowMarkType.Transfer)];
+
+            Assert.Equal(2, partFTransferMarks.Count);
+            Assert.Equal(2, designTransferMarks.Count);
+
+            foreach (PartFOverlayMark mark in partFTransferMarks)
+            {
+                System.Windows.Point screen_Start = control.WorldToScreen.Transform(new System.Windows.Point(mark.Start.X, mark.Start.Y));
+                System.Windows.Point screen_End = control.WorldToScreen.Transform(new System.Windows.Point(mark.End.X, mark.End.Y));
+
+                Assert.True(screen_End.X > screen_Start.X,
+                    string.Format("Part F ({0}): the arrowhead paints at screen X={1:0.#}, to the LEFT of its own tail at X={2:0.#}.", mark.DoorName, screen_End.X, screen_Start.X));
+            }
+
+            foreach (DesignAirFlowOverlayMark mark in designTransferMarks)
+            {
+                System.Windows.Point screen_Start = control.WorldToScreen.Transform(new System.Windows.Point(mark.Start.X, mark.Start.Y));
+                System.Windows.Point screen_End = control.WorldToScreen.Transform(new System.Windows.Point(mark.End.X, mark.End.Y));
+
+                Assert.True(screen_End.X > screen_Start.X,
+                    string.Format("Design: the arrowhead paints at screen X={0:0.#}, to the LEFT of its own tail at X={1:0.#}.", screen_End.X, screen_Start.X));
+            }
+        }
+
+        /// <summary>
+        /// The shipped Part F rule set, found relative to this repository rather than copied into the test
+        /// output: a stale copy of a rule set is exactly the kind of drift these tests exist to catch
+        /// elsewhere.
+        /// </summary>
+        private static string RuleSetPath()
+        {
+            System.IO.DirectoryInfo directoryInfo = new(AppDomain.CurrentDomain.BaseDirectory);
+
+            while (directoryInfo is not null)
+            {
+                string path = System.IO.Path.Combine(directoryInfo.FullName, "SAM", "files", "resources", "Analytical", "SAM_PartFSpaceRulesUKDwellingsMVHR.json");
+                if (System.IO.File.Exists(path))
+                {
+                    return path;
+                }
+
+                directoryInfo = directoryInfo.Parent;
+            }
+
+            throw new System.IO.FileNotFoundException("The shipped Part F rule set was not found above the test output directory.");
+        }
+
+        // ------------------------------------------------------------------
         // Annotation scale
         // ------------------------------------------------------------------
 
