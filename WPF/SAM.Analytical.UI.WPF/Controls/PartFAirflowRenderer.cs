@@ -47,7 +47,7 @@ namespace SAM.Analytical.UI.WPF
     public class PartFAirflowRenderer
     {
         /// <summary>Screen length [px] of an arrowhead, held constant so it stays legible at every zoom.</summary>
-        private const double arrowHead_Px = 9;
+        internal const double arrowHead_Px = 9;
 
         /// <summary>
         /// Padding [px] inside a tag, at the annotation scale. Compact: a tag is a label on a drawing, not a
@@ -69,7 +69,7 @@ namespace SAM.Analytical.UI.WPF
         internal const double labelSize_Px = 11.5;
 
         /// <summary>Caption text size [px] on the sheet, smaller so a caption reads as a qualifier.</summary>
-        private const double captionSize_Px = 9.5;
+        internal const double captionSize_Px = 9.5;
 
         /// <summary>
         /// The tag's white background, and its border. See <see cref="Plate"/>. Internal, not private, so
@@ -743,6 +743,14 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>
         /// The space's own section outline on this plan, cached per space for the length of one layout.
+        /// <para>
+        /// The space itself is found through <see cref="AdjacencyCluster.GetObject{T}(Guid)"/> - a
+        /// dictionary lookup keyed on the object's own type and guid, not a scan of every space in the
+        /// model. <c>GetSpaces()?.Find(...)</c> would make this method, and so <see cref="Place"/>, one
+        /// linear scan of the WHOLE space list per space with a visible mark; on a large model that is
+        /// quadratic in the number of spaces, and the per-layout cache only removes the repeat lookups for
+        /// a second or third mark in the SAME space, not the first lookup of each new one.
+        /// </para>
         /// </summary>
         private IClosed2D LimitArea(Dictionary<Guid, IClosed2D> dictionary_LimitArea, Guid guid_Space)
         {
@@ -751,7 +759,7 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
-            Space space = adjacencyCluster.GetSpaces()?.Find(x => x is not null && x.Guid == guid_Space);
+            Space space = adjacencyCluster.GetObject<Space>(guid_Space);
 
             //The largest piece, matching the anchor: a room cut into a big part and a sliver is tagged in the
             //big part, so constraining the tag to the sliver would leave it unplaceable.
@@ -944,7 +952,7 @@ namespace SAM.Analytical.UI.WPF
         /// A leader is a thin hairline in the mark's own colour: it has to connect the tag to the mark
         /// without competing with either.
         /// </summary>
-        private static Pen LeaderPen(Brush brush)
+        internal static Pen LeaderPen(Brush brush)
         {
             Pen result = new(brush, 0.7);
 

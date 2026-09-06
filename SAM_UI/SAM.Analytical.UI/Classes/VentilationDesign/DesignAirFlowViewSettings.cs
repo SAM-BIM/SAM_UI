@@ -41,6 +41,7 @@ namespace SAM.Analytical.UI
                 ShowSupply = designAirFlowViewSettings.ShowSupply;
                 ShowExtract = designAirFlowViewSettings.ShowExtract;
                 ShowNet = designAirFlowViewSettings.ShowNet;
+                ShowTransfer = designAirFlowViewSettings.ShowTransfer;
             }
         }
 
@@ -58,6 +59,19 @@ namespace SAM.Analytical.UI
         /// </summary>
         public bool ShowNet { get; set; }
 
+        /// <summary>
+        /// Whether the design air moving BETWEEN spaces is drawn - the transfer marks.
+        /// <para>
+        /// On by default, unlike <see cref="ShowNet"/>. The net is a reading derived from two duties that
+        /// are already on the drawing; transfer air is a design duty in its own right, solved over the
+        /// dwelling's internal openings and exported to TAS as an inter-zone air movement. A plan that
+        /// showed a room's raised design supply but nothing about where that air then goes is the gap this
+        /// overlay was extended to close, and defaulting it off would leave the gap open for anyone who
+        /// never found the checkbox.
+        /// </para>
+        /// </summary>
+        public bool ShowTransfer { get; set; } = true;
+
         public override bool FromJsonObject(JsonObject jsonObject)
         {
             if (!base.FromJsonObject(jsonObject))
@@ -69,6 +83,7 @@ namespace SAM.Analytical.UI
             ShowSupply = PartFViewJson.Boolean(jsonObject, "ShowSupply", ShowSupply);
             ShowExtract = PartFViewJson.Boolean(jsonObject, "ShowExtract", ShowExtract);
             ShowNet = PartFViewJson.Boolean(jsonObject, "ShowNet", ShowNet);
+            ShowTransfer = PartFViewJson.Boolean(jsonObject, "ShowTransfer", ShowTransfer);
 
             return true;
         }
@@ -85,6 +100,7 @@ namespace SAM.Analytical.UI
             result["ShowSupply"] = ShowSupply;
             result["ShowExtract"] = ShowExtract;
             result["ShowNet"] = ShowNet;
+            result["ShowTransfer"] = ShowTransfer;
 
             return result;
         }

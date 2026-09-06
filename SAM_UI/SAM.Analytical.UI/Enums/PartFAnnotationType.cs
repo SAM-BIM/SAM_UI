@@ -46,5 +46,13 @@ namespace SAM.Analytical.UI
 
         /// <summary>The design overlay's net (supply minus extract) mark. See <see cref="DesignSupply"/>.</summary>
         [Description("Design Net")] DesignNet,
+
+        /// <summary>
+        /// The design overlay's transfer mark - "TRA 150.0 l/s" between two rooms, read from the model's
+        /// own <c>SpaceAirMovement</c> objects. Distinct from <see cref="Transfer"/>, which keys Approved
+        /// Document F's own transfer label: the two are separate labels on the same drawing, reporting
+        /// separate authorities, and each has to be able to hold its own manual position.
+        /// </summary>
+        [Description("Design Transfer")] DesignTransfer,
     }
 }

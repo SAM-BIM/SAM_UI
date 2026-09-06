@@ -54,6 +54,13 @@ namespace SAM.Analytical.UI.WPF
         private static readonly Color extractColor = Color.FromRgb(0xC2, 0x5B, 0x1B);
         private static readonly Color netColor = Color.FromRgb(0x4A, 0x4A, 0x4A);
 
+        /// <summary>
+        /// The design transfer colour. Deliberately NOT Approved Document F's own transfer-air colour: the
+        /// two are different figures on the same drawing, and giving them the same colour would invite a
+        /// reader to take one for the other.
+        /// </summary>
+        private static readonly Color transferColor = Color.FromRgb(0x2E, 0x7D, 0x53);
+
         private readonly FloorPlan2DControl floorPlan2DControl;
 
         /// <summary>
@@ -182,7 +189,7 @@ namespace SAM.Analytical.UI.WPF
             //regenerates no geometry, so the previous load's text obstacles are kept rather than cleared.
             textObstacle2Ds = PartFAirflowRenderer.ResolveTextObstacles(geometryObjectModel, plane, textObstacle2Ds);
 
-            overlay = DesignAirFlowFloorPlanOverlay.Build(adjacencyCluster, plane, ViewSettings.ShowNet);
+            overlay = DesignAirFlowFloorPlanOverlay.Build(adjacencyCluster, plane, ViewSettings.ShowNet, ViewSettings.ShowTransfer);
 
             Place();
             Draw();
@@ -223,12 +230,14 @@ namespace SAM.Analytical.UI.WPF
                     ObjectGuid = mark.SpaceGuid,
                     AnnotationType = PartFTagPlacement.AnnotationType(mark.MarkType),
                     Priority = PartFTagPlacement.Priority(mark.MarkType),
-                    Anchor2D = mark.Position,
+                    Anchor2D = mark.IsTransfer ? mark.End : mark.Position,
                     Width = width_Px / scale,
                     Height = height_Px / scale,
 
-                    //A design tag's centre stays in its own room, matching Part F's own terminal tags.
-                    LimitArea = LimitArea(dictionary_LimitArea, mark.SpaceGuid),
+                    //A design tag's centre stays in its own room, matching Part F's own terminal tags. A
+                    //transfer tag belongs to the opening between two spaces and so to neither outline, and
+                    //gets none - the same rule PartFAirflowRenderer.Place applies to its own.
+                    LimitArea = mark.IsTransfer ? null : LimitArea(dictionary_LimitArea, mark.SpaceGuid),
 
                     Tag = mark,
                 });
@@ -280,6 +289,13 @@ namespace SAM.Analytical.UI.WPF
 
                 using (DrawingContext drawingContext = drawingVisual.RenderOpen())
                 {
+                    //A transfer mark stands for something with real geometry on the plan, so its route is
+                    //drawn as well as its tag. A terminal mark has only a tag - see DrawTag.
+                    if (mark.IsTransfer)
+                    {
+                        DrawTransfer(drawingContext, mark, matrix);
+                    }
+
                     //The layout was solved in the plane, on a change of input; this only transforms it.
                     DrawTag(drawingContext, mark, matrix, Placement(mark));
                 }
@@ -331,8 +347,83 @@ namespace SAM.Analytical.UI.WPF
                 DesignAirFlowMarkType.Supply => ViewSettings.ShowSupply,
                 DesignAirFlowMarkType.Extract => ViewSettings.ShowExtract,
                 DesignAirFlowMarkType.Net => ViewSettings.ShowNet,
+                DesignAirFlowMarkType.Transfer => ViewSettings.ShowTransfer,
                 _ => true,
             };
+        }
+
+        /// <summary>
+        /// The route geometry of a transfer mark: an arrow across the modelled door it crosses, or a
+        /// dashed cross on the partition where the model establishes no single opening at all.
+        /// <para>
+        /// The same visual language <c>PartFAirflowRenderer.DrawTransfer</c> uses, in this overlay's own
+        /// colour. A reader who has learnt what a dashed cross means on the Approved Document F overlay
+        /// must not have to learn a second meaning for it here.
+        /// </para>
+        /// </summary>
+        private static void DrawTransfer(DrawingContext drawingContext, DesignAirFlowOverlayMark mark, System.Windows.Media.Matrix matrix)
+        {
+            System.Windows.Point point_Start = matrix.Transform(new System.Windows.Point(mark.Start.X, mark.Start.Y));
+            System.Windows.Point point_End = matrix.Transform(new System.Windows.Point(mark.End.X, mark.End.Y));
+
+            Pen pen = RoutePen(mark.IsUnresolved);
+
+            //No span: the model shows no single opening on this route, so there is nothing to draw an arrow
+            //along and no direction that could honestly be pointed. A small dashed cross marks where the
+            //air would have to cross, and the tag carries the rest. A long room-to-room arrow here would be
+            //the visual claim that the design air has a way through, which is exactly the claim this route
+            //cannot make.
+            if (point_Start == point_End)
+            {
+                DrawWarningMarker(drawingContext, pen, point_End);
+                return;
+            }
+
+            drawingContext.DrawLine(pen, point_Start, point_End);
+
+            DrawHead(drawingContext, pen, point_Start, point_End);
+        }
+
+        /// <summary>A small dashed cross marking a route that has nowhere established to pass through.</summary>
+        private static void DrawWarningMarker(DrawingContext drawingContext, Pen pen, System.Windows.Point point)
+        {
+            const double size = 6;
+
+            drawingContext.DrawLine(pen, new System.Windows.Point(point.X - size, point.Y - size), new System.Windows.Point(point.X + size, point.Y + size));
+            drawingContext.DrawLine(pen, new System.Windows.Point(point.X - size, point.Y + size), new System.Windows.Point(point.X + size, point.Y - size));
+        }
+
+        /// <summary>
+        /// The arrowhead, built in SCREEN space so it stays the same size at every zoom - matching
+        /// <c>PartFAirflowRenderer.DrawHead</c>. A head scaled with the building is a dot on a site plan
+        /// and a wedge across a room.
+        /// </summary>
+        private static void DrawHead(DrawingContext drawingContext, Pen pen, System.Windows.Point point_Start, System.Windows.Point point_End)
+        {
+            Vector vector = point_End - point_Start;
+            if (vector.Length <= 0)
+            {
+                return;
+            }
+
+            vector.Normalize();
+
+            Vector vector_Normal = new(-vector.Y, vector.X);
+
+            System.Windows.Point point_1 = point_End - (vector * PartFAirflowRenderer.arrowHead_Px) + (vector_Normal * (PartFAirflowRenderer.arrowHead_Px / 2.5));
+            System.Windows.Point point_2 = point_End - (vector * PartFAirflowRenderer.arrowHead_Px) - (vector_Normal * (PartFAirflowRenderer.arrowHead_Px / 2.5));
+
+            StreamGeometry streamGeometry = new();
+            using (StreamGeometryContext streamGeometryContext = streamGeometry.Open())
+            {
+                streamGeometryContext.BeginFigure(point_End, true, true);
+                streamGeometryContext.LineTo(point_1, true, false);
+                streamGeometryContext.LineTo(point_2, true, false);
+            }
+
+            streamGeometry.Freeze();
+
+            drawingContext.DrawGeometry(pen.Brush, null, streamGeometry);
         }
 
         /// <summary>
@@ -340,10 +431,13 @@ namespace SAM.Analytical.UI.WPF
         /// convention Part F's own tags use - see <see cref="PartFAirflowRenderer.tagPadding_Px"/> - so the
         /// two overlays read as one drawing annotation family.
         /// <para>
-        /// A design mark's <see cref="DesignAirFlowOverlayMark.Position"/> is a synthetic room-level point,
-        /// exactly as a Part F terminal's anchor is - see <c>PartFAirflowRenderer.HasPhysicalAnchor</c>
-        /// - so no leader is drawn back to it: a leader from one synthetic point to another would assert a
-        /// precision neither position has.
+        /// <b>A leader only where the mark stands at a real coordinate.</b> A terminal mark's
+        /// <see cref="DesignAirFlowOverlayMark.Position"/> is a synthetic room-level point, exactly as a
+        /// Part F terminal's anchor is - see <c>PartFAirflowRenderer.HasPhysicalAnchor</c> - so no leader is
+        /// drawn back to it: a leader from one synthetic point to another would assert a precision neither
+        /// position has. A transfer mark is the opposite case: it sits on a modelled door or a modelled
+        /// partition, both of which the plan draws, so it gets the leader for the same reason Approved
+        /// Document F's own transfer marks do.
         /// </para>
         /// </summary>
         private void DrawTag(DrawingContext drawingContext, DesignAirFlowOverlayMark mark, System.Windows.Media.Matrix matrix, PartFTagPlacementResult partFTagPlacementResult)
@@ -352,6 +446,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 DesignAirFlowMarkType.Supply => supplyColor,
                 DesignAirFlowMarkType.Extract => extractColor,
+                DesignAirFlowMarkType.Transfer => transferColor,
                 _ => netColor,
             };
 
@@ -364,35 +459,84 @@ namespace SAM.Analytical.UI.WPF
 
             FormattedText formattedText = PartFAirflowRenderer.Text(mark.Label, brush, PartFAirflowRenderer.labelSize_Px * factor, true);
 
+            FormattedText formattedText_Caption = string.IsNullOrWhiteSpace(mark.Caption)
+                ? null
+                : PartFAirflowRenderer.Text(mark.Caption, brush, PartFAirflowRenderer.captionSize_Px * factor, false);
+
+            double width = System.Math.Max(formattedText.Width, formattedText_Caption?.Width ?? 0);
+            double height = formattedText.Height + (formattedText_Caption?.Height ?? 0);
+
             System.Windows.Point point_Anchor = matrix.Transform(new System.Windows.Point(mark.Position.X, mark.Position.Y));
 
             //Nothing was placed for this mark - it became visible between the last layout and this repaint.
             //Drawn beside the anchor rather than dropped, matching PartFAirflowRenderer.DrawLabel.
             System.Windows.Point point_Text = PartFAirflowRenderer.Screen(partFTagPlacementResult?.Rectangle2D, matrix) is Rect rect
                 ? rect.TopLeft
-                : new System.Windows.Point(point_Anchor.X + 6, point_Anchor.Y - (formattedText.Height / 2));
+                : new System.Windows.Point(point_Anchor.X + 6, point_Anchor.Y - (height / 2));
+
+            //Built from the engineering anchor and the solved rectangle, in the view layer - the shared
+            //solver knows nothing about annotation and must not start to.
+            if (mark.IsTransfer && partFTagPlacementResult?.Leader2D() is Segment2D segment2D)
+            {
+                drawingContext.DrawLine(
+                    PartFAirflowRenderer.LeaderPen(brush),
+                    matrix.Transform(new System.Windows.Point(segment2D[0].X, segment2D[0].Y)),
+                    matrix.Transform(new System.Windows.Point(segment2D[1].X, segment2D[1].Y)));
+            }
 
             Rect rect_Tag = new(
                 point_Text.X - (PartFAirflowRenderer.tagPadding_Px * factor),
                 point_Text.Y - (PartFAirflowRenderer.tagPadding_Px * factor / 2),
-                formattedText.Width + (PartFAirflowRenderer.tagPadding_Px * factor * 2),
-                formattedText.Height + (PartFAirflowRenderer.tagPadding_Px * factor));
+                width + (PartFAirflowRenderer.tagPadding_Px * factor * 2),
+                height + (PartFAirflowRenderer.tagPadding_Px * factor));
 
             drawingContext.DrawRectangle(PartFAirflowRenderer.plateBrush, PartFAirflowRenderer.TagPen(factor), rect_Tag);
 
             drawingContext.DrawText(formattedText, point_Text);
+
+            if (formattedText_Caption is not null)
+            {
+                drawingContext.DrawText(formattedText_Caption, new System.Windows.Point(point_Text.X, point_Text.Y + formattedText.Height));
+            }
+        }
+
+        /// <summary>
+        /// The route line. Dashed where the model establishes no single opening, on the same rule
+        /// <c>PartFAirflowRenderer.Pen</c> applies: an unestablished route never looks more certain than an
+        /// established one.
+        /// </summary>
+        private static Pen RoutePen(bool unresolved)
+        {
+            SolidColorBrush brush = new(transferColor);
+            brush.Freeze();
+
+            Pen result = new(brush, 1.4);
+
+            if (unresolved)
+            {
+                result.DashStyle = new DashStyle([2, 2], 0);
+            }
+
+            result.Freeze();
+
+            return result;
         }
 
         /// <summary>
         /// A tag's measured size in SCREEN pixels at the annotation scale, which is what the placement
-        /// converts into plane units - matching <c>PartFAirflowRenderer.Size</c>.
+        /// converts into plane units - matching <c>PartFAirflowRenderer.Size</c>. Measured exactly as it is
+        /// drawn, caption included, so the box the engine reserves is the box the text fills.
         /// </summary>
         private static void Size(DesignAirFlowOverlayMark mark, out double width, out double height)
         {
             FormattedText formattedText = PartFAirflowRenderer.Text(mark.Label, Brushes.Black, PartFAirflowRenderer.labelSize_Px, true);
 
-            width = formattedText.Width;
-            height = formattedText.Height;
+            FormattedText formattedText_Caption = string.IsNullOrWhiteSpace(mark.Caption)
+                ? null
+                : PartFAirflowRenderer.Text(mark.Caption, Brushes.Black, PartFAirflowRenderer.captionSize_Px, false);
+
+            width = System.Math.Max(formattedText.Width, formattedText_Caption?.Width ?? 0);
+            height = formattedText.Height + (formattedText_Caption?.Height ?? 0);
         }
 
         /// <summary>

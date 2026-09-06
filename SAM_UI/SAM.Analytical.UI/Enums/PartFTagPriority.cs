@@ -70,6 +70,16 @@ namespace SAM.Analytical.UI
         [Description("Diagnostic")] Diagnostic = 6,
 
         /// <summary>
+        /// The Ventilation Design overlay's transfer mark - the design air moving between two rooms.
+        /// First among the design overlay's own tags, for the same reason
+        /// <see cref="TransferAir"/> is first among Approved Document F's: it is the mark that says
+        /// whether the dwelling's air path can carry what the design now asks of it, so it is the one that
+        /// most needs to stay legible and next to the opening it concerns. It is still placed after every
+        /// Approved Document F priority - see <see cref="DesignSupply"/>.
+        /// </summary>
+        [Description("Design Transfer")] DesignTransfer = 7,
+
+        /// <summary>
         /// The Ventilation Design overlay's design supply mark - "SUP 150.0 l/s" - sharing this same
         /// placement policy, and so the same shared <see cref="PartFTagPlacement"/> solve, as Part F's own
         /// tags. Placed AFTER every Part F priority, including <see cref="Diagnostic"/>: Part F carries a
@@ -78,12 +88,12 @@ namespace SAM.Analytical.UI
         /// still solved clear of every Part F tag and of every other design tag - see the tests in
         /// <c>DesignAirFlowRenderer</c> - it simply never wins a contested first-choice position over Part F.
         /// </summary>
-        [Description("Design Supply")] DesignSupply = 7,
+        [Description("Design Supply")] DesignSupply = 8,
 
         /// <summary>The design overlay's design extract mark. See <see cref="DesignSupply"/>.</summary>
-        [Description("Design Extract")] DesignExtract = 8,
+        [Description("Design Extract")] DesignExtract = 9,
 
         /// <summary>The design overlay's net (supply minus extract) mark. See <see cref="DesignSupply"/>.</summary>
-        [Description("Design Net")] DesignNet = 9,
+        [Description("Design Net")] DesignNet = 10,
     }
 }

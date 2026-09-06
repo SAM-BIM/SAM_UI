@@ -39,6 +39,7 @@ namespace SAM.Analytical.UI.WPF
                     ShowSupply = CheckBox_Supply.IsChecked == true,
                     ShowExtract = CheckBox_Extract.IsChecked == true,
                     ShowNet = CheckBox_Net.IsChecked == true,
+                    ShowTransfer = CheckBox_Transfer.IsChecked == true,
                 };
             }
 
@@ -50,6 +51,7 @@ namespace SAM.Analytical.UI.WPF
                 CheckBox_Supply.IsChecked = designAirFlowViewSettings.ShowSupply;
                 CheckBox_Extract.IsChecked = designAirFlowViewSettings.ShowExtract;
                 CheckBox_Net.IsChecked = designAirFlowViewSettings.ShowNet;
+                CheckBox_Transfer.IsChecked = designAirFlowViewSettings.ShowTransfer;
 
                 UpdateEnabled();
             }

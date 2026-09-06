@@ -172,6 +172,7 @@ namespace SAM.Analytical.UI
                 DesignAirFlowMarkType.Supply => PartFTagPriority.DesignSupply,
                 DesignAirFlowMarkType.Extract => PartFTagPriority.DesignExtract,
                 DesignAirFlowMarkType.Net => PartFTagPriority.DesignNet,
+                DesignAirFlowMarkType.Transfer => PartFTagPriority.DesignTransfer,
                 _ => PartFTagPriority.DesignSupply,
             };
         }
@@ -187,6 +188,7 @@ namespace SAM.Analytical.UI
                 DesignAirFlowMarkType.Supply => PartFAnnotationType.DesignSupply,
                 DesignAirFlowMarkType.Extract => PartFAnnotationType.DesignExtract,
                 DesignAirFlowMarkType.Net => PartFAnnotationType.DesignNet,
+                DesignAirFlowMarkType.Transfer => PartFAnnotationType.DesignTransfer,
                 _ => PartFAnnotationType.DesignSupply,
             };
         }
