@@ -56,7 +56,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 ProjectName = "SomeOtherProject",
                 Simulate = false,
                 FullYearSimulation = false,
-                Sizing = false,
+                Sizing = true,
                 UnmetHours = true,
                 UseWidths = true,
                 UpdateConstructionLayersByPanelType = false,
@@ -89,11 +89,18 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// fingerprints, so they have to be the same for a baseline and for every Iteration 2B round that
         /// repeats it - which is why they are fixed here rather than left to whatever the dialog last held.
         /// <para>
-        /// <b>Sizing is on.</b> Nothing in the assessment or in 2B reads a design load, but
-        /// <c>Tas.Query.Sizing</c> runs <c>sizing(0)</c> over the TBD that is about to be simulated and
-        /// writes the sized plant capacities into it - so the annual run is a different thermal case with it
-        /// off. On is what every Part O run to date has been produced with, and changing it is Part O
-        /// engineering rather than a defaults pass.
+        /// <b>Sizing is off.</b> Part O asks for a full year of the building as designed, not a plant sizing
+        /// exercise, and nothing in the assessment or in 2B reads a design load - the only consumer of one
+        /// anywhere is <c>Modify.PrintRoomDataSheets</c>, which is fixed off. <c>Tas.Query.Sizing</c> is not
+        /// a read-only step either: it re-saves the very TBD that is about to be simulated, recomputing every
+        /// zone's max loads and sizing types and applying oversizing factors, and writes an
+        /// <c>_Uncapped.tbd</c> and an <c>_HDDCDD.tbd</c> beside the run because the workflow's call site
+        /// leaves <c>GenerateUncappedFile</c> and <c>GenerateHDDCDDFile</c> at their true defaults. On was
+        /// only ever "what every run to date used".
+        /// </para>
+        /// <para>
+        /// <b>Manual Simulate keeps sizing on</b> - see <c>TheManualSimulateDefaults_AreUnchanged</c>. This
+        /// is a Part O preset decision and not a change to the ordinary command.
         /// </para>
         /// </summary>
         [Fact]
@@ -101,7 +108,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             SimulateOptions simulateOptions = Create.SimulateOptions_PartO(Model("Flat1"), null, null);
 
-            Assert.True(simulateOptions.Sizing);
+            Assert.False(simulateOptions.Sizing);
             Assert.False(simulateOptions.UnmetHours);
             Assert.False(simulateOptions.UseWidths);
             Assert.True(simulateOptions.UpdateConstructionLayersByPanelType);
@@ -138,7 +145,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(simulateOptions.Simulate);
             Assert.True(simulateOptions.FullYearSimulation);
-            Assert.True(simulateOptions.Sizing);
+            Assert.False(simulateOptions.Sizing);
             Assert.False(simulateOptions.UnmetHours);
             Assert.False(simulateOptions.UseWidths);
             Assert.True(simulateOptions.UpdateConstructionLayersByPanelType);
@@ -592,7 +599,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(PartOSimulationContext.Day_Last_FullYear, partOSimulationContext.SimulateTo);
 
             //And the rest of the case is the one an Iteration 2B round will repeat verbatim.
-            Assert.True(partOSimulationContext.Sizing);
+            Assert.False(partOSimulationContext.Sizing);
             Assert.False(partOSimulationContext.UnmetHours);
             Assert.False(partOSimulationContext.UseWidths);
             Assert.True(partOSimulationContext.UpdateConstructionLayersByPanelType);
@@ -617,7 +624,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(simulateOptions.Simulate);
             Assert.True(simulateOptions.FullYearSimulation);
-            Assert.True(simulateOptions.Sizing);
+            Assert.False(simulateOptions.Sizing);
             Assert.False(simulateOptions.CreateTM59);
             Assert.False(simulateOptions.CreateTPD);
             Assert.Equal("Flat1", simulateOptions.ProjectName);
