@@ -26,6 +26,7 @@
         <Label x:Name="label_Group" Content="Group:" HorizontalAlignment="Left" Margin="10,45,0,0" VerticalAlignment="Top"/>
         <ComboBox x:Name="comboBox_Group" HorizontalAlignment="Left" Margin="89,49,0,0" VerticalAlignment="Top" Width="209" Height="21" IsEditable="True"/>
         <Button x:Name="button_PartFAirflow" Content="Part F Airflow..." HorizontalAlignment="Left" Margin="331,49,0,0" VerticalAlignment="Top" Width="109" Height="21" Click="button_PartFAirflow_Click"/>
+        <Button x:Name="button_VentilationDesign" Content="Ventilation Design..." HorizontalAlignment="Left" Margin="331,205,0,0" VerticalAlignment="Top" Width="109" Height="21" Click="button_VentilationDesign_Click"/>
         <GroupBox HorizontalAlignment="Left" Height="122" Margin="332,79,0,0" VerticalAlignment="Top" Width="108">
             <GroupBox.Header>
                 <CheckBox x:Name="checkBox_TextVisibility" Content="Text"/>
