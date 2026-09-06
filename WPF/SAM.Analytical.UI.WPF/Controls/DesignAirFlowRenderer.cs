@@ -398,6 +398,14 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// The space's own section outline on this plan, cached per space for the length of one layout -
         /// matching <c>PartFAirflowRenderer.LimitArea</c>.
+        /// <para>
+        /// The space itself is found through <see cref="AdjacencyCluster.GetObject{T}(Guid)"/> - a
+        /// dictionary lookup keyed on the object's own type and guid, not a scan of every space in the
+        /// model. <c>GetSpaces()?.Find(...)</c> would make this method, and so <see cref="Place"/>, one
+        /// linear scan of the WHOLE space list per space with a visible mark; on a large model that is
+        /// quadratic in the number of spaces, and the per-layout cache above only removes the repeat
+        /// lookups for a second or third mark in the SAME space, not the first lookup of each new one.
+        /// </para>
         /// </summary>
         private IClosed2D LimitArea(Dictionary<Guid, IClosed2D> dictionary_LimitArea, Guid guid_Space)
         {
@@ -406,7 +414,7 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
-            Space space = adjacencyCluster.GetSpaces()?.Find(x => x is not null && x.Guid == guid_Space);
+            Space space = adjacencyCluster.GetObject<Space>(guid_Space);
 
             result = space is null
                 ? null

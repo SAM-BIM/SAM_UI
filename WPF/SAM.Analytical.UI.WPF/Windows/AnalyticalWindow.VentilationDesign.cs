@@ -68,18 +68,18 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             designAirFlowRenderer.ViewSettings = designAirFlowViewSettings;
 
+            double annotationScale = DesignAnnotationScale(viewSettings);
+
             //Part F's own tags on this SAME view, read-only, so this overlay's tags are solved clear of
             //them - see the type's own remarks. Absent where Part F is not drawing on this view at all, in
             //which case this overlay has the room to itself.
             List<Rectangle2D> partFObstacle2Ds = null;
-            double annotationScale = PartFTagPlacement.DefaultAnnotationScale;
 
             if (dictionary_PartFAirflowRenderer.TryGetValue(viewportControl.Guid, out PartFAirflowRenderer partFAirflowRenderer)
                 && partFAirflowRenderer is not null
                 && partFAirflowRenderer.ViewSettings.Enabled)
             {
                 partFObstacle2Ds = partFAirflowRenderer.PlacedRectangle2Ds();
-                annotationScale = partFAirflowRenderer.ViewSettings.AnnotationScale;
             }
 
             designAirFlowRenderer.Load(analyticalModel.AdjacencyCluster, geometryObjectModel, partFObstacle2Ds, annotationScale);
@@ -109,6 +109,30 @@ namespace SAM.Analytical.UI.WPF.Windows
                 && viewSettings_Temp.TryGetValue(AnalyticalViewSettingsParameter.VentilationDesignAirflow, out DesignAirFlowViewSettings result)
                 ? result
                 : null;
+        }
+
+        /// <summary>
+        /// The drawing scale this overlay's tags are sized and solved at, for one view.
+        /// <para>
+        /// Read from the view's own <see cref="PartFAirflowViewSettings"/> whenever it has one - WHETHER OR
+        /// NOT Part F is currently enabled on that view. A view that has Part F set up at, say, 1:100 and
+        /// then merely switches the Part F overlay off must not have its Ventilation Design tags jump to a
+        /// different physical size for no reason a person asked for: the scale is a property of the
+        /// DRAWING, the same way <see cref="PartFAirflowViewSettings.AnnotationScale"/>'s own remarks
+        /// describe, and it should not follow a checkbox that has nothing to do with it.
+        /// </para>
+        /// <para>
+        /// Only a view that has NEVER carried Part F settings at all - <c>PartFAirflowViewSettings(viewSettings)</c>
+        /// is null - falls back to <see cref="PartFTagPlacement.DefaultAnnotationScale"/>. This is
+        /// deliberately independent of which rectangles are used as OBSTACLES in
+        /// <see cref="UpdateVentilationDesignAirflow"/>, which correctly does stop reading Part F's tags the
+        /// moment its overlay is disabled - there is nothing left on the drawing to keep clear of - so the
+        /// two questions ("what size" and "what to avoid") are answered from different things on purpose.
+        /// </para>
+        /// </summary>
+        private static double DesignAnnotationScale(IViewSettings viewSettings)
+        {
+            return PartFAirflowViewSettings(viewSettings)?.AnnotationScale ?? PartFTagPlacement.DefaultAnnotationScale;
         }
     }
 }
