@@ -3,6 +3,8 @@
 
 using SAM.Analytical.Enums;
 using SAM.Analytical.UI;
+using SAM.Core.UI;
+using SAM.Geometry.UI;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -898,6 +900,475 @@ namespace SAM.Analytical.UI.WPF.Tests
             {
                 File.Delete(path_TSD);
             }
+        }
+
+        // ------------------------------------------------------------------------------------------------
+        // The expert workflow: Prepare Iteration, LOOK at what was prepared, then Energy Simulation.
+        //
+        // Preparing and simulating are two separate commands, so a person is between them precisely in order
+        // to look at what was prepared - and SAM keeps view settings ON the model, so looking replaces the
+        // loaded model object. Every one of those replacements used to reach the run as an outside edit and
+        // drop it, silently: the full-year TAS simulation that followed then had no prepared run left to
+        // complete, Modify.Simulate said nothing (its note is written only for a run still in Prepared), and
+        // the Results commands stayed unavailable over results that existed and were valid.
+        //
+        // The guided Prepare & Run command never met it, which is why the two paths disagreed: it prepares,
+        // simulates and assesses inside one gesture, with no point at which a view can be touched.
+        // ------------------------------------------------------------------------------------------------
+
+        /// <summary>A real view-settings object, so the presentation-only writes below carry what they carry in production.</summary>
+        private static IViewSettings ViewSettings(string name)
+        {
+            Geometry.Spatial.Plane plane = Geometry.Spatial.Create.Plane(0);
+
+            return new TwoDimensionalViewSettings(Guid.NewGuid(), name, plane, null, [], Geometry.Object.Query.DefaultTextAppearance(), null);
+        }
+
+        /// <summary>
+        /// Looking at the prepared model, as <c>AnalyticalWindow.UIAnalyticalModel_Modified</c> receives it.
+        /// <para>
+        /// <c>ViewSettingsModification</c> is what every view-settings write announces itself with -
+        /// <c>Modify.Hide</c>, <c>Isolate</c>, <c>RemoveOverrides</c>, <c>ActivateViewSettings</c>,
+        /// <c>EditViewSettings</c>, <c>EnableViewSettings</c>, <c>EditLegend</c>, <c>SetGroup</c>,
+        /// <c>CopyViewSettings</c>, <c>CopyViewSettingsCamera</c>, <c>DuplicateViewSettings</c>,
+        /// <c>RemoveViewSettings</c>, <c>SetActiveGuid</c> and the section-plane range - and every one of
+        /// those sets <c>AnalyticalModelParameter.UIGeometrySettings</c> and nothing else.
+        /// </para>
+        /// <para>
+        /// Routed through the production classifier rather than passing <c>false</c>: a test asserting the
+        /// run's behaviour on a hand-written boolean would keep passing if the window started classifying a
+        /// view change as an edit again.
+        /// </para>
+        /// </summary>
+        private static void LookAtTheModel(PartORun partORun, string name = "Level 0")
+        {
+            List<IModification> modifications = [new ViewSettingsModification(ViewSettings(name), true)];
+
+            partORun.NotifyModified(UI.Query.IsModelChange(modifications));
+        }
+
+        /// <summary>An actual edit, announced the way <c>Modify.AddVentilationByPartF</c>, an import, an undo or a redo announce theirs.</summary>
+        private static void EditTheModel(PartORun partORun)
+        {
+            List<IModification> modifications = [new FullModification()];
+
+            partORun.NotifyModified(UI.Query.IsModelChange(modifications));
+        }
+
+        /// <summary>
+        /// The expression <c>AnalyticalWindow.RefreshPartOButtons</c> assigns to
+        /// <c>RibbonButton_AssessPartOTM59.IsEnabled</c> - what "Results &gt; Overheating (TM59) is
+        /// available" means, read from the one authority that decides it.
+        /// </summary>
+        private static bool ResultsCommandAvailable(PartORun partORun)
+        {
+            return partORun.CanAssess;
+        }
+
+        /// <summary>
+        /// <b>1. The manual path, end to end.</b> Prepare, look at the prepared model the way a person does,
+        /// then let the full-year workflow complete - and the run must reach exactly the state
+        /// <c>Prepare &amp; Run</c> reaches: assessable, over the model the workflow returned, with the
+        /// Results command available and its success tooltip.
+        /// </summary>
+        [Fact]
+        public void TheManualWorkflow_ReachesTheSamePostSimulationStateAsPrepareAndRun()
+        {
+            AnalyticalModel analyticalModel_Prepared = Model("prepared");
+            AnalyticalModel analyticalModel_Workflow = Model("workflow");
+
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+
+                Assert.True(partORun.Prepare(analyticalModel_Prepared, Scenarios()));
+
+                //Between the two commands: switch the active view, turn an overlay on, isolate a dwelling,
+                //edit the appearances, move a section plane. None of them is an edit.
+                LookAtTheModel(partORun, "Level 0");
+                LookAtTheModel(partORun, "Level 1");
+                LookAtTheModel(partORun, "Ventilation Design");
+
+                Assert.Equal(PartORunState.Prepared, partORun.State);
+                Assert.Null(partORun.InvalidationReason);
+
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun, analyticalModel_Workflow, path_TSD, out string refusal));
+                Assert.Null(refusal);
+
+                Assert.Equal(PartORunState.WorkflowCompleted, partORun.State);
+                Assert.True(ResultsCommandAvailable(partORun));
+                Assert.True(partORun.IsAssessable(out string refusal_IsAssessable));
+                Assert.Null(refusal_IsAssessable);
+
+                //The model the workflow returned, by reference - the whole lineage rule, unchanged.
+                Assert.Same(analyticalModel_Workflow, partORun.AnalyticalModel_Assessment);
+                Assert.Equal(path_TSD, partORun.Path_TSD);
+
+                //Not restored: this is a run this session produced, and the tooltip says so.
+                Assert.False(partORun.IsRestored);
+                Assert.Contains("Assess the completed Part O run", ToolTipDescription(partORun));
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// The defect itself, isolated: looking at a prepared model leaves the preparation and its scenarios
+        /// exactly where they were, and says nothing about the model having changed.
+        /// </summary>
+        [Fact]
+        public void LookingAtThePreparedModel_DoesNotDropTheRun()
+        {
+            AnalyticalModel analyticalModel_Prepared = Model("prepared");
+
+            PartORun partORun = new();
+
+            Assert.True(partORun.Prepare(analyticalModel_Prepared, Scenarios()));
+
+            for (int i = 0; i < 5; i++)
+            {
+                LookAtTheModel(partORun, string.Format("view {0}", i));
+            }
+
+            Assert.Equal(PartORunState.Prepared, partORun.State);
+            Assert.Null(partORun.InvalidationReason);
+            Assert.Same(analyticalModel_Prepared, partORun.AnalyticalModel_Prepared);
+            Assert.Single(partORun.OverheatingScenarios);
+            Assert.Contains("prepared but not simulated", ToolTipDescription(partORun));
+        }
+
+        /// <summary>
+        /// And the staleness lock is not weakened by any of it: a real edit after the preparation still drops
+        /// the run, and the full-year workflow that follows still cannot complete anything.
+        /// </summary>
+        [Fact]
+        public void EditingThePreparedModel_StillDropsTheRun()
+        {
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+
+                Assert.True(partORun.Prepare(Model("prepared"), Scenarios()));
+
+                LookAtTheModel(partORun);
+
+                Assert.Equal(PartORunState.Prepared, partORun.State);
+
+                EditTheModel(partORun);
+
+                Assert.Equal(PartORunState.None, partORun.State);
+                Assert.Contains("The model changed after the Part O iteration was prepared", partORun.InvalidationReason);
+
+                //The workflow that follows cannot even be announced to the dropped run - ExpectResults is
+                //reachable only from Prepared - and completing it is refused.
+                Assert.False(partORun.ExpectResults(path_TSD));
+
+                WriteResults(path_TSD);
+
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD, out string refusal));
+                Assert.Contains("No Part O iteration is prepared", refusal);
+                Assert.False(ResultsCommandAvailable(partORun));
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// <b>2. A failed simulation.</b> The workflow did not run over the prepared model, so
+        /// <c>Modify.Simulate</c> drops the run with that reason - and looking at the model beforehand
+        /// changes nothing about it. The Results command stays unavailable and the tooltip carries the
+        /// reason.
+        /// </summary>
+        [Fact]
+        public void AFailedSimulation_LeavesTheResultsCommandUnavailable()
+        {
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+
+                Assert.True(partORun.Prepare(Model("prepared"), Scenarios()));
+
+                LookAtTheModel(partORun);
+
+                //Modify.Simulate's own words for workflowCompleted == false on a prepared run.
+                partORun.Invalidate("The Part O run was not completed: the TAS workflow did not run over the prepared model, so there are no results to assess. Prepare the iteration again and run the energy simulation.");
+
+                Assert.False(ResultsCommandAvailable(partORun));
+                AssertNothingToAssess(partORun);
+                Assert.Contains("the TAS workflow did not run over the prepared model", ToolTipDescription(partORun));
+
+                //Nor can a results file that happens to exist rescue it afterwards: the dropped run cannot
+                //be announced to, and cannot be completed.
+                Assert.False(partORun.ExpectResults(path_TSD));
+
+                WriteResults(path_TSD);
+
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD, out string _));
+                Assert.False(ResultsCommandAvailable(partORun));
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// <b>3. A cancelled simulation.</b> Nothing is armed and nothing is completed, and
+        /// <c>Modify.Simulate</c> deliberately does not drop the run either - the loaded model is untouched,
+        /// so the preparation still describes it. The Results command must stay unavailable, and the tooltip
+        /// must be the one that says what is missing.
+        /// </summary>
+        [Fact]
+        public void ACancelledSimulation_LeavesTheRunPreparedAndTheResultsCommandUnavailable()
+        {
+            PartORun partORun = new();
+
+            Assert.True(partORun.Prepare(Model("prepared"), Scenarios()));
+
+            LookAtTheModel(partORun);
+
+            //A cancelled run: RunPartOSimulation returned null before arming, and Simulate adopted no model.
+
+            Assert.Equal(PartORunState.Prepared, partORun.State);
+            Assert.False(ResultsCommandAvailable(partORun));
+            Assert.False(partORun.IsAssessable(out string refusal));
+            Assert.Contains("not been simulated", refusal);
+            Assert.Null(partORun.AnalyticalModel_Assessment);
+            Assert.Null(partORun.Path_TSD);
+            Assert.Contains("prepared but not simulated", ToolTipDescription(partORun));
+        }
+
+        /// <summary>
+        /// <b>4. An unrelated or incompatible result.</b> Two ways it can be offered to a prepared manual
+        /// run, and both are refused: another run's results file, and a results file offered by a workflow
+        /// that was never announced to this run at all - which is the state a partial, one-day or
+        /// sizing-only manual simulation leaves it in, because <c>RunPartOSimulation</c> arms
+        /// <c>ExpectResults</c> only for the full annual case.
+        /// </summary>
+        [Fact]
+        public void AnUnrelatedResult_CannotCompleteThePreparedManualRun()
+        {
+            string path_TSD_ThisRun = TemporaryTsdPath();
+            string path_TSD_Unrelated = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+
+                Assert.True(partORun.Prepare(Model("prepared"), Scenarios()));
+
+                LookAtTheModel(partORun);
+
+                //Announced for this run's own results, then handed somebody else's.
+                Assert.True(partORun.ExpectResults(path_TSD_ThisRun));
+
+                WriteResults(path_TSD_ThisRun);
+                WriteResults(path_TSD_Unrelated);
+
+                Assert.False(partORun.Complete(Model("workflow"), path_TSD_Unrelated, out string refusal));
+                Assert.Contains("were not announced as this Part O run's", refusal);
+
+                AssertNothingToAssess(partORun);
+                Assert.False(ResultsCommandAvailable(partORun));
+
+                //And the unannounced case, on a freshly prepared run: a real, full, existing results file is
+                //still not this run's, because nothing established that this run produced it.
+                PartORun partORun_Unarmed = new();
+
+                Assert.True(partORun_Unarmed.Prepare(Model("prepared"), Scenarios()));
+
+                LookAtTheModel(partORun_Unarmed);
+
+                Assert.False(partORun_Unarmed.Complete(Model("workflow"), path_TSD_Unrelated, out string refusal_Unarmed));
+                Assert.Contains("Only a full-year simulation of the prepared model completes a Part O run", refusal_Unarmed);
+                Assert.False(ResultsCommandAvailable(partORun_Unarmed));
+            }
+            finally
+            {
+                File.Delete(path_TSD_ThisRun);
+                File.Delete(path_TSD_Unrelated);
+            }
+        }
+
+        /// <summary>
+        /// <b>5. Prepare &amp; Run is unchanged</b> - and its one-shot arming is now strictly more reliable,
+        /// because a presentation-only replacement no longer consumes it. A view change between the arming
+        /// and the run's own write used to spend the expectation, so the write that followed was read as an
+        /// outside edit.
+        /// </summary>
+        [Fact]
+        public void PrepareAndRun_IsUnchanged_AndItsArmingSurvivesLookingAtTheModel()
+        {
+            AnalyticalModel analyticalModel_Workflow = Model("workflow");
+
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+
+                Assert.True(partORun.Prepare(Model("prepared"), Scenarios()));
+
+                //The command arms its own write...
+                partORun.ExpectModification();
+
+                //...and something presentation-only happens first. It must not spend the expectation.
+                LookAtTheModel(partORun);
+
+                //Now the run's own write. Recognised, so the run survives it.
+                partORun.NotifyModified();
+
+                Assert.Equal(PartORunState.Prepared, partORun.State);
+
+                //Still one shot: the next real change drops the run.
+                EditTheModel(partORun);
+
+                Assert.Equal(PartORunState.None, partORun.State);
+
+                //And the ordinary Prepare & Run completion, with nothing looked at, is exactly as it was.
+                PartORun partORun_PrepareAndRun = new();
+
+                Assert.True(partORun_PrepareAndRun.Prepare(Model("prepared"), Scenarios()));
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun_PrepareAndRun, analyticalModel_Workflow, path_TSD, out string refusal));
+                Assert.Null(refusal);
+                Assert.True(ResultsCommandAvailable(partORun_PrepareAndRun));
+                Assert.Same(analyticalModel_Workflow, partORun_PrepareAndRun.AnalyticalModel_Assessment);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// A COMPLETED run survives being looked at too - it is the same rule and the same defect: reviewing
+        /// the assessment, then changing the view to look at what failed, used to require the whole annual
+        /// simulation again.
+        /// </summary>
+        [Fact]
+        public void ACompletedRun_SurvivesLookingAtTheModel()
+        {
+            AnalyticalModel analyticalModel_Workflow = Model("workflow");
+
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+
+                Assert.True(partORun.Prepare(Model("prepared"), Scenarios()));
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun, analyticalModel_Workflow, path_TSD, out string _));
+
+                LookAtTheModel(partORun, "Level 0");
+                LookAtTheModel(partORun, "Level 1");
+
+                Assert.Equal(PartORunState.WorkflowCompleted, partORun.State);
+                Assert.True(ResultsCommandAvailable(partORun));
+                Assert.Same(analyticalModel_Workflow, partORun.AnalyticalModel_Assessment);
+
+                //An edit still drops it, exactly as before.
+                EditTheModel(partORun);
+
+                Assert.Equal(PartORunState.None, partORun.State);
+                Assert.Contains("The model changed after the Part O results were imported", partORun.InvalidationReason);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// <b>The refresh link.</b> The run announces every transition, so the commands become available at
+        /// the moment it becomes assessable rather than at the next refresh a caller remembered to write.
+        /// <para>
+        /// This is what makes <c>Modify.Simulate</c>'s ordering safe: it completes the run AFTER the model
+        /// replacement it belongs to, so the reload that replacement triggers necessarily refreshes the
+        /// ribbon while the run is still <see cref="PartORunState.Prepared"/>. Asserted on the value
+        /// <c>CanAssess</c> has INSIDE the handler, which is what a refresh would read.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void BecomingAssessable_IsAnnounced_SoTheCommandsNeedNoSecondRefresh()
+        {
+            string path_TSD = TemporaryTsd();
+
+            try
+            {
+                PartORun partORun = new();
+
+                List<bool> availability = [];
+
+                partORun.StateChanged += (s, e) => availability.Add(ResultsCommandAvailable(partORun));
+
+                Assert.True(partORun.Prepare(Model("prepared"), Scenarios()));
+
+                Assert.Single(availability);
+                Assert.False(availability[0]);
+
+                //Presentation-only: not a transition, so not announced. A refresh per view change would be
+                //noise on a model with thousands of spaces.
+                LookAtTheModel(partORun);
+
+                Assert.Single(availability);
+
+                Assert.True(CompleteThroughAFullYearWorkflow(partORun, Model("workflow"), path_TSD, out string _));
+
+                //The completion was announced, and the command was ALREADY available when it was.
+                Assert.Equal(2, availability.Count);
+                Assert.True(availability[1]);
+
+                partORun.Invalidate("dropped");
+
+                Assert.Equal(3, availability.Count);
+                Assert.False(availability[2]);
+
+                partORun.Reset();
+
+                //Cleared once, not once for the drop and once for the reason.
+                Assert.Equal(4, availability.Count);
+                Assert.False(availability[3]);
+            }
+            finally
+            {
+                File.Delete(path_TSD);
+            }
+        }
+
+        /// <summary>
+        /// <c>Query.IsModelChange</c> itself: the one place the two kinds of replacement are told apart, and
+        /// it answers "the model changed" for everything it cannot prove is presentation-only.
+        /// </summary>
+        [Fact]
+        public void IsModelChange_IsPresentationOnlyForViewSettingsAndNothingElse()
+        {
+            //Presentation only, one and many.
+            Assert.False(UI.Query.IsModelChange([new ViewSettingsModification(ViewSettings("a"))]));
+            Assert.False(UI.Query.IsModelChange([new ViewSettingsModification(ViewSettings("a"), true), new ViewSettingsModification(ViewSettings("b"), true, true)]));
+
+            //A camera-only view change is presentation-only as well, although it is not undoable - which is
+            //why Undoable is not the question being asked.
+            Assert.False(UI.Query.IsModelChange([new ViewSettingsModification(ViewSettings("a"), false, true)]));
+
+            //A real edit.
+            Assert.True(UI.Query.IsModelChange([new FullModification()]));
+
+            //Mixed: one edit in the set is an edit.
+            Assert.True(UI.Query.IsModelChange([new ViewSettingsModification(ViewSettings("a")), new FullModification()]));
+
+            //And the two cases that state nothing at all.
+            Assert.True(UI.Query.IsModelChange(null));
+            Assert.True(UI.Query.IsModelChange([]));
         }
     }
 }

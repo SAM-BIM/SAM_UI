@@ -26,10 +26,12 @@ namespace SAM.Analytical.UI
     /// incomplete <c>SimulationSpaceMap</c> and every space refused; workflow output resolves all nine.
     /// </para>
     /// <para>
-    /// <b>Staleness is rejected, not detected after the fact.</b> Anything that replaces the loaded model
-    /// between preparing and completing - an edit, an import, an undo, a redo, a second unrelated simulation -
-    /// arrives here as an unexpected <see cref="NotifyModified"/> and drops the run to
-    /// <see cref="PartORunState.None"/> with a reason. The Part O commands announce their own writes with
+    /// <b>Staleness is rejected, not detected after the fact.</b> Anything that <i>changes</i> the loaded
+    /// model between preparing and completing - an edit, an import, an undo, a redo, a second unrelated
+    /// simulation - arrives here as an unexpected <see cref="NotifyModified(bool)"/> and drops the run to
+    /// <see cref="PartORunState.None"/> with a reason. A replacement that changed only how the model is
+    /// <i>drawn</i> is not one of those and is not an event here at all - see
+    /// <see cref="NotifyModified(bool)"/>, and <c>Query.IsModelChange</c> for where the two are told apart. The Part O commands announce their own writes with
     /// <see cref="ExpectModification"/> first, so the only way to reach
     /// <see cref="PartORunState.WorkflowCompleted"/> is a workflow over the model that was prepared and not
     /// touched since. That is what makes pairing one preparation's scenarios with another run's results
@@ -89,6 +91,37 @@ namespace SAM.Analytical.UI
 
         /// <summary>How far this run has got.</summary>
         public PartORunState State { get; private set; } = PartORunState.None;
+
+        /// <summary>
+        /// Raised whenever a transition has moved what this run allows - prepared, adopted an optimisation
+        /// setting, completed, restored, dropped or cleared.
+        ///
+        /// <para><b>Why the run announces it rather than each caller remembering to ask</b></para>
+        /// <para>
+        /// Whether the Approved Document O result commands are available is <see cref="CanAssess"/>, which is
+        /// a fact about this run and about nothing else - so every command that moved the run had to refresh
+        /// the ribbon itself afterwards, and the ordering made that fragile. <c>Modify.Simulate</c> completes
+        /// the run <i>after</i> the model replacement it belongs to, so the refresh that replacement triggers
+        /// runs while the run is still <see cref="PartORunState.Prepared"/>: the commands stay disabled
+        /// unless the caller refreshes a second time, and a caller that did not left a completed run with
+        /// unavailable results and nothing on screen saying why.
+        /// </para>
+        /// <para>
+        /// Raised from the transitions themselves, so "the run became assessable" and "the commands say so"
+        /// cannot come apart. Handlers must only <b>read</b> this run - <see cref="State"/>,
+        /// <see cref="CanAssess"/>, <see cref="IsRestored"/>, <see cref="InvalidationReason"/> and
+        /// <see cref="PreparationContext"/> are all pure reads, so no handler can move the state it is
+        /// describing. <see cref="IsAssessable"/> is deliberately not one of them: it touches the filesystem
+        /// and can drop a run, which is the gate's job and not a status refresh's.
+        /// </para>
+        /// </summary>
+        public event System.EventHandler StateChanged;
+
+        /// <summary>Announces a completed transition. Never called from a place that is mid-transition.</summary>
+        private void OnStateChanged()
+        {
+            StateChanged?.Invoke(this, System.EventArgs.Empty);
+        }
 
         /// <summary>
         /// Why the run was dropped, or null where it never was. Retained through
@@ -242,10 +275,54 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
-        /// The loaded model was replaced. Consumes an armed expectation, or drops the run.
+        /// The loaded model was replaced <b>by something that changed it</b>. Consumes an armed expectation,
+        /// or drops the run.
         /// </summary>
         public void NotifyModified()
         {
+            NotifyModified(true);
+        }
+
+        /// <summary>
+        /// The loaded model was replaced, saying whether the replacement changed the model or only how it is
+        /// drawn - <c>Query.IsModelChange</c>, which is where that is decided and why.
+        ///
+        /// <para><b>Why a view change must not drop a run</b></para>
+        /// <para>
+        /// SAM stores view settings on the model, so hiding a space, isolating one, activating a saved view,
+        /// editing appearances or the legend, moving a section plane or switching the active view all replace
+        /// the loaded model object - and every one of them used to arrive here as an outside edit and drop the
+        /// run. Nothing about a space, a panel, an aperture, an airflow, a zone or an overheating scenario
+        /// moves when one of those happens, so the preparation still describes the model exactly.
+        /// </para>
+        /// <para>
+        /// It made the expert workflow unusable rather than merely awkward. Preparing an iteration and
+        /// simulating it are two separate commands, so a person is between them precisely in order to look at
+        /// what was prepared; looking at it dropped the run, silently, and the full-year TAS simulation that
+        /// followed then had nothing left to complete. The guided <c>Prepare &amp; Run</c> command never met
+        /// it - it prepares, simulates and assesses in one gesture, with no point at which a view can be
+        /// touched - which is why the two paths disagreed.
+        /// </para>
+        /// <para>
+        /// <b>Nothing else is weakened.</b> A presentation-only replacement is not merely tolerated, it is not
+        /// an event at all: it neither drops the run nor consumes an armed
+        /// <see cref="ExpectModification"/>, so a Part O command's own write is still recognised however many
+        /// view changes happen before it. Every other replacement - an edit, an import, an undo, a redo, a
+        /// second unrelated simulation, or anything a future modification type describes - still drops the
+        /// run.
+        /// </para>
+        /// </summary>
+        /// <param name="modelChanged">
+        /// Whether the replacement may have changed the analytical model. False only where it is <i>proved</i>
+        /// to be presentation-only.
+        /// </param>
+        public void NotifyModified(bool modelChanged)
+        {
+            if (!modelChanged)
+            {
+                return;
+            }
+
             if (modificationExpected)
             {
                 modificationExpected = false;
@@ -324,6 +401,10 @@ namespace SAM.Analytical.UI
 
             partOPreparationContext.OptimisationSettings = partOOptimisationSettings;
 
+            //Announced although State has not moved: Modify.CanOptimise reads this off the run, so what the
+            //Iteration 2B command allows has moved even though how far the run has got has not.
+            OnStateChanged();
+
             return true;
         }
 
@@ -365,7 +446,7 @@ namespace SAM.Analytical.UI
         /// </param>
         public bool Prepare(AnalyticalModel analyticalModel_Prepared, IEnumerable<OverheatingScenario> overheatingScenarios, PartOPreparationContext partOPreparationContext, string refusal = null)
         {
-            Reset();
+            ResetCore();
 
             if (analyticalModel_Prepared is null)
             {
@@ -398,6 +479,8 @@ namespace SAM.Analytical.UI
             this.partOPreparationContext = partOPreparationContext;
 
             State = PartORunState.Prepared;
+
+            OnStateChanged();
 
             return true;
         }
@@ -535,6 +618,8 @@ namespace SAM.Analytical.UI
             State = PartORunState.WorkflowCompleted;
             InvalidationReason = null;
 
+            OnStateChanged();
+
             return true;
         }
 
@@ -586,9 +671,23 @@ namespace SAM.Analytical.UI
         /// <param name="refusal">Why no run could be restored, or null where the model simply records none.</param>
         public bool Restore(AnalyticalModel analyticalModel, string path_Model, out string refusal)
         {
+            //One announcement for the whole attempt, whatever it decides: this clears the run before it
+            //knows whether it can restore one, and the refusal paths below return a reason rather than
+            //invalidating, so announcing inside would either report a state nobody saw or not report a
+            //completed run having just been cleared.
+            bool result = RestoreCore(analyticalModel, path_Model, out refusal);
+
+            OnStateChanged();
+
+            return result;
+        }
+
+        /// <summary>The restore itself. See <see cref="Restore"/>, which is the only caller.</summary>
+        private bool RestoreCore(AnalyticalModel analyticalModel, string path_Model, out string refusal)
+        {
             refusal = null;
 
-            Reset();
+            ResetCore();
 
             if (analyticalModel is null)
             {
@@ -654,6 +753,8 @@ namespace SAM.Analytical.UI
             IsRestored = true;
             InvalidationReason = null;
 
+            OnStateChanged();
+
             return true;
         }
 
@@ -718,6 +819,18 @@ namespace SAM.Analytical.UI
         /// <summary>Drops the run and records why. Idempotent; the first reason is not overwritten by a later one.</summary>
         public void Invalidate(string reason)
         {
+            InvalidateCore(reason);
+
+            OnStateChanged();
+        }
+
+        /// <summary>
+        /// The drop itself, without announcing it - so <see cref="Reset"/>, which finishes by clearing the
+        /// reason this records, raises <see cref="StateChanged"/> once for the whole clearing rather than
+        /// once for a state nothing ever saw.
+        /// </summary>
+        private void InvalidateCore(string reason)
+        {
             analyticalModel_Prepared = null;
             overheatingScenarios = [];
             analyticalModel_Workflow = null;
@@ -750,7 +863,20 @@ namespace SAM.Analytical.UI
         /// </summary>
         public void Reset()
         {
-            Invalidate(null);
+            ResetCore();
+
+            OnStateChanged();
+        }
+
+        /// <summary>
+        /// The clearing itself, without announcing it - for the two transitions that <b>start</b> by
+        /// clearing, <see cref="Prepare(AnalyticalModel, IEnumerable{OverheatingScenario}, PartOPreparationContext, string)"/>
+        /// and <see cref="Restore"/>. Each of those announces its own outcome once, and a run cleared on the
+        /// way to being prepared is a state nothing ever saw.
+        /// </summary>
+        private void ResetCore()
+        {
+            InvalidateCore(null);
 
             InvalidationReason = null;
         }

@@ -1,20 +1,176 @@
 # Project Progress
 
 ## Branch
-`feature/parto-defaults-closeout`, branched from `perf/large-model-lookup-closeout` (SAM-BIM/SAM_UI#88).
+`fix/parto-manual-simulation-results`, branched from `sow/2026-Q3`.
 
-**DOES NOT stand alone.** It is stacked on **SAM_UI#88**, which is in turn compiled against **`SAM` branch
-`perf/large-model-lookup-closeout` (SAM-BIM/SAM#101)**. **Merge order: SAM#101, then SAM_UI#88, then this.**
-`SAM_Tas` carries a documentation-only branch (SAM-BIM/SAM_Tas#49) and `SAM_Systems` is untouched. This
-branch needs no change in `SAM` or `SAM_Tas`.
+**Stands alone.** It needs no change in `SAM`, `SAM_Tas`, `SAM_Systems` or any other dependency, and is
+compiled against the merged dependency set. Baseline it was branched from, re-measured before any edit:
 
-Everything below the entry dated 2026-09-05 (Part O defaults) is superseded history retained for context.
+```text
+SAM_UI.sln Release                      0 errors
+SAM.Analytical.UI.WPF.Tests             619/619
+```
+
+Everything below the entry dated 2026-09-07 is superseded history retained for context.
 
 ## Last updated
-2026-09-05 (latest) - a Part O run states its own TAS case instead of inheriting the manual Simulate
-command's, and a reopened run says why it cannot be continued into Iteration 2B.
+2026-09-07 - looking at a prepared Approved Document O model no longer drops the run, so the expert
+workflow (Prepare Iteration, then Energy Simulation) reaches the same assessable state `Prepare & Run`
+does.
 
-## Latest (2026-09-05, latest): the Part O defaults closeout
+## Latest (2026-09-07): the manual Part O workflow reaches its results
+
+**Status: root-caused, implemented, tested, and reproduced-then-fixed under test. Not merged. Native
+SAM_UI acceptance still owed - see below.**
+
+Nothing here changes Part O engineering. It changes which model replacements are treated as edits.
+
+### The defect
+
+Reported and reproduced: `Prepare & Run` reaches `Results > Overheating (TM59)`, but the expert sequence
+
+```text
+Edit > Part O > Prepare Iteration
+Simulate > Energy Simulation      (full year, completes successfully)
+Results > Part O > Overheating (TM59)
+```
+
+leaves the Part O result commands **disabled** over results that exist and are valid, with no message
+saying why.
+
+### Root cause: SAM keeps view settings on the model, so looking at it counted as editing it
+
+`AnalyticalWindow.UIAnalyticalModel_Modified` handed **every** model replacement to
+`PartORun.NotifyModified()`, which drops a prepared or completed run as an unannounced outside edit. That
+is right for an edit, an import, an undo, a redo or a second simulation. It is wrong for a **view** change -
+and a view change is a model replacement in SAM, because view settings live on the model as
+`AnalyticalModelParameter.UIGeometrySettings`.
+
+Thirteen production writes announce themselves with `ViewSettingsModification`, and every one of them sets
+that parameter and nothing else: `Modify.Hide`, `Isolate`, `RemoveOverrides`, `ActivateViewSettings`,
+`EditViewSettings`, `EnableViewSettings`, `EditLegend`, `SetGroup`, `CopyViewSettings`,
+`CopyViewSettingsCamera`, `DuplicateViewSettings`, `RemoveViewSettings`, `SetActiveGuid`, and the
+section-plane range in `AnalyticalWindow`. Not one of them moves a space, a panel, an aperture, an airflow,
+a zone or an overheating scenario.
+
+So: prepare the iteration, then switch view, isolate the dwelling you just prepared, or turn the Part F /
+Ventilation Design overlay on to check it - and the run was gone. Silently, because `Modify.Simulate`
+writes its "the Part O run was not completed" note **only for a run still in `Prepared`**; a run already
+dropped gets no note at all. The full-year TAS run then completed normally, wrote its `.tsd` and its
+per-run `.sam`, and the ribbon stayed disabled with a tooltip - the only place the reason appeared - saying
+the model had changed when nothing about the model had.
+
+### Why `Prepare & Run` was immune
+
+It prepares, simulates and assesses inside **one** gesture: `RunPartOWorkflow` -> `PreparePartOIteration`
+-> `Simulate` -> `AssessPartOTM59`, with the hub dialog modal over the whole thing. There is no point at
+which a view can be touched, so the extra transition never fired. The expert path exists precisely to put
+the user in front of the model between the two steps, which is why only it met the defect.
+
+**The completion machinery itself was already shared and is unchanged.** Both paths run the same
+`Modify.Simulate` -> `Modify.RunPartOSimulation` -> `PartORun.ExpectResults` -> `PartORun.Complete`
+sequence, with the same full-year gate (`Query.IsPartOFullYearSimulation`) and the same lineage rule
+(`PartORun.IsResultsOfThisRun`). No second definition of a valid run was created here, and none existed.
+
+### The fix
+
+**1. One place decides what a replacement was.** New pure query
+`SAM.Analytical.UI.Query.IsModelChange(IEnumerable<IModification>)`: presentation-only means every
+modification in the set is a `ViewSettingsModification`, and **anything it cannot prove** - a null set, an
+empty set, a `FullModification`, a mixed set, a type added later - is a model change. Dropping a run that
+did not need dropping costs a preparation; keeping one that did would pair a preparation's scenarios with a
+different model, so the safe way to be wrong is to drop.
+
+It is deliberately **not** read off `IModification.Undoable`, which answers a different question: an
+appearance edit is undoable and presentation-only, a camera move is not undoable and also
+presentation-only.
+
+**2. `PartORun.NotifyModified(bool modelChanged)`.** A presentation-only replacement is not an event at
+all: it neither drops the run nor consumes an armed `ExpectModification`. The second half matters on its
+own - a view change between a Part O command's arming and its own write used to spend the one-shot
+expectation, so the command's write was then read as somebody else's edit.
+
+**3. `PartORun.StateChanged`, so availability follows the run and not the caller.** `Modify.Simulate`
+completes the run **after** the model replacement it belongs to, so the reload that replacement triggers
+necessarily refreshes the ribbon while the run is still `Prepared`. Every caller therefore had to refresh a
+second time afterwards, and a caller that forgot left a completed run with unavailable results. The run now
+announces each transition once and `AnalyticalWindow` refreshes on it, which is what makes "Overheating is
+available the moment the simulation finishes, with nothing to refresh by hand" structural rather than a
+convention. Existing explicit `RefreshPartOButtons()` calls are left in place - they also cover the
+tooltip-only reads where `IsAssessable` drops a run as the gate.
+
+Exactly one announcement per public transition: `Prepare` and `Restore` clear the run before they know what
+they can build, so they use a non-announcing `ResetCore` / `RestoreCore` and announce their own outcome.
+
+### Invariants preserved
+
+Unchanged, and pinned by the tests below: the workflow-model lineage rule, the full-year requirement, the
+results fingerprint, the refusal of a second simulation's results, the drop on a real edit (prepared and
+completed alike), a restored run being reviewable but never resumable, `PartFRequiredAirFlow` /
+`PartFTransferRequirement` and every other Part F, transfer-air, terminal-duty, Iteration 1b, equipment,
+2B, TM59 and TAS behaviour. No Part O engineering was touched.
+
+### Files changed
+
+Production:
+
+- `SAM_UI/SAM.Analytical.UI/Query/IsModelChange.cs` **(new)**
+- `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartORun.cs` - `NotifyModified(bool)`, `StateChanged`,
+  `OnStateChanged`, `InvalidateCore`, `ResetCore`, `RestoreCore`
+- `WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs` - classify the replacement, subscribe
+  `StateChanged`
+
+Tests:
+
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartORunLineageTests.cs` - +10 (extended, not a parallel file: it
+  already owns the production arm-write-complete sequence through `CompleteThroughAFullYearWorkflow`)
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOResultReopenTests.cs` - +1, the restored-run half
+
+### Tests, builds and validation
+
+```text
+SAM.Analytical.UI.WPF.Tests   630/630   (619 before, +11)
+SAM_UI.sln Release            0 errors
+git diff --check              clean
+```
+
+**The 11 new tests were reproduced against the old behaviour**, not merely written after the fix: with
+`Query.IsModelChange` forced to answer "the model changed" for everything, all 11 fail and all 619
+pre-existing tests still pass. They are driven through the production classifier rather than a hand-written
+boolean, so they would fail again if the window started classifying a view change as an edit.
+
+Covered: the manual path end to end; looking at a prepared model; a real edit still dropping it; a failed
+simulation; a cancelled simulation; an unrelated results file and an unannounced one; `Prepare & Run`
+unchanged plus its arming surviving a view change; a completed run surviving a view change; the
+`StateChanged` refresh link asserted on what a refresh would read inside the handler; `IsModelChange`
+itself; and a restored run surviving a view change.
+
+### Unresolved / risks
+
+- **Native SAM_UI acceptance is owed and is the point of the change.** Open the acceptance model, run
+  `Edit > Part O > Prepare Iteration`, change the view or isolate the dwelling, then
+  `Simulate > Energy Simulation` with Full Year ticked, and click `Results > Overheating (TM59)`
+  immediately. Nothing here was clicked by hand.
+- **The manual Simulate dialog still opens with `FullYearSimulation` off**, because
+  `SimulateOptions.FullYearSimulation` defaults to false and only `Prepare & Run` gets
+  `Create.SimulateOptions_PartO`. That is intentional (the expert command must keep sizing-only and export
+  runs available), and `Modify.Simulate` does say so afterwards - but it says so *after* the TAS time has
+  been spent. Worth revisiting as a pre-run warning; not done here.
+- **A run dropped by a real edit before a successful simulation is still not narrated.**
+  `Modify.Simulate` notes the refusal only for a run still in `Prepared`; a run already dropped leaves the
+  reason in the ribbon tooltip only. Deliberately not changed: `InvalidationReason` survives the whole
+  session, so appending it to every simulation's message box would put a stale note on ordinary expert runs.
+- **The manual path still takes its project name and output directory from the remembered manual
+  `SimulateOptions`**, which overwrite the model-derived values `Modify.Simulate` sets first. Self-
+  consistent within a run - so it does not affect completion - but it can put a Part O run's evidence under
+  another project's name. Recorded, not acted on; the Part O preset already derives and locks both.
+
+### Exact recommended next step
+
+Native SAM_UI acceptance of the manual sequence above. Then, per the standing list and in this order:
+overlay Part F vs Design visual grouping, the second ~180 l/s MVHR, and only then Iteration 3.
+
+## Previous (2026-09-05, latest): the Part O defaults closeout
 
 **Status: root-caused, implemented, tested, and accepted against a real completed run. Not merged.**
 
@@ -174,7 +330,7 @@ the dialog uses.
   `000000_SAM_AnalyticalModel-It1a-futureZ1-Opt06.sam`. Correct behaviour for a fingerprint change, but the
   message names the wrong cause. Not fixed here: the invalidation rules are not to be weakened.
 
-## Latest (2026-09-05, later): large-model lookup closeout - the SAM_UI half
+## Previous (2026-09-05, later): large-model lookup closeout - the SAM_UI half
 
 **Status: root-caused, implemented, tested and measured. Not merged.**
 
