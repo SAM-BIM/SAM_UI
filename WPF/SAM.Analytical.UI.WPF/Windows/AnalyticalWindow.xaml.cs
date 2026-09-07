@@ -801,6 +801,15 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_OptimisePartOTM59.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_OptimisePartOTM59.Click += RibbonButton_OptimisePartOTM59_Click;
 
+            //The two gates above follow the run itself, not whichever command last moved it. Every Part O
+            //transition - prepared, completed, restored, dropped, cleared - raises this, so a run that
+            //becomes assessable enables its commands at that moment rather than at the next refresh
+            //somebody remembered to write. It is what makes the completion ordering in Modify.Simulate safe:
+            //the run is completed AFTER the model replacement that triggers a reload, so the reload's own
+            //refresh necessarily still sees a prepared run. Subscribed here rather than at the field, since
+            //the handler writes ribbon controls InitializeComponent has to have created first.
+            partORun.StateChanged += PartORun_StateChanged;
+
             RibbonButton_EditInternalConditions.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
             RibbonButton_EditInternalConditions.Click += RibbonButton_EditInternalConditions_Click;
 
@@ -2016,6 +2025,11 @@ namespace SAM.Analytical.UI.WPF.Windows
         /// never resumed into Iteration 2B, and the tooltip says the two apart.
         /// </para>
         /// </summary>
+        private void PartORun_StateChanged(object sender, EventArgs e)
+        {
+            RefreshPartOButtons();
+        }
+
         private void RefreshPartOButtons()
         {
             bool canAssess = partORun.CanAssess;
@@ -3439,7 +3453,16 @@ namespace SAM.Analytical.UI.WPF.Windows
             //A Part O command arms the run first so its own write is recognised; anything else drops the run,
             //which is what stops one preparation's overheating scenarios being paired with another run's
             //results. See PartORun.
-            partORun.NotifyModified();
+            //
+            //...but only where the model actually CHANGED. SAM keeps view settings on the model, so hiding a
+            //space, isolating one, activating a saved view, editing appearances or the legend, moving a
+            //section plane and switching the active view all arrive here as replacements while leaving every
+            //space, panel, aperture, airflow, zone and overheating scenario exactly as prepared. Dropping the
+            //run for those made the expert path - Prepare Iteration, look at what was prepared, then Energy
+            //Simulation - lose the run to the act of looking, silently, and told the user the model had
+            //changed when it had not. Query.IsModelChange is where the two are told apart, and it answers
+            //"changed" for anything it cannot prove is presentation-only.
+            partORun.NotifyModified(UI.Query.IsModelChange(e?.Modifications));
 
             Reload(e);
             RefreshHistoryButtons();
