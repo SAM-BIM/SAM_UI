@@ -12,8 +12,7 @@ claims (branch names, "next step" lists) are historical rather than current.
 
 ## Latest (2026-09-07): XBC15's 190 l/s as a ceiling, through the production Iteration 2B path
 
-**Status: implemented and tested; native visual confirmation outstanding. Not merged.
-Do not merge automatically.**
+**Status: implemented, tested, and natively accepted.**
 Branch `test/parto-xbc15-capacity-ceiling`, off `sow/2026-Q3` at **`8219416`** (the PR #96 acceptance record).
 
 Baseline it was branched from, measured before any edit:
@@ -108,9 +107,22 @@ change), `SAM` `test/parto-real-selection-ladder` (the same closeout at library 
 ### Native acceptance
 
 - **Iterations 1a / 1b** - nothing owed. Neither reads the catalogue.
-- **Iteration 2** - one cheap visual confirmation owed, and **no TAS rerun**: open the project, confirm the
-  Iteration window reports two selectable products and that the selected product on the ~150 l/s dwellings is
-  still `MRXBOXAB-ECO5-AECV`, with Part F, design and operating airflows unchanged. The 2026-09-01 licensed
+- **Iteration 2** - **PASSED** on 2026-09-07, observed in SAM_UI on the combined PR heads, with no TAS
+  rerun. All three dwellings still automatically select `Nuaire MRXBOXAB-ECO5-AECV`; design duties remain
+  30/30, 63/63 and 63/63 l/s; selected equipment capacity remains 150/150 l/s; headroom remains 120/120,
+  87/87 and 87/87 l/s; Approved Document F and Design airflow are still shown as separate quantities and
+  remain consistent with the previously accepted model; and no equipment-selection operation changed a
+  design duty.
+
+  The third assertion originally written here - that the Iteration window *reports two selectable
+  products* - is **NOT APPLICABLE to the current interface**. This repository's SAM_UI does not expose the
+  catalogue product list anywhere: `PartOIterationWindow` offers only the `SelectVentilationUnit` on/off
+  checkbox, so there is no surface on which a product count could be read. That the shipped catalogue holds
+  two selectable products is pinned in CI instead, by
+  `PartOPresentationTests.TheShippedCatalogue_OffersTwoProducts_AndStillSelectsTheMRXBOXAtTheProjectsDuties`
+  and by `SAM_Systems`' `TheShippedCatalogue_HoldsBothNuaireProducts`. The missing surface is an explicit
+  **usability gap carried into the next task** (see the closing section of this entry), not a defect of this
+  closeout and not a blocker for it. The 2026-09-01 licensed
   evidence (three dwellings at 30/30, 63/63 and 63/63 l/s; 105,120 hourly TAS values bit-identical with and
   without a product selected) continues to apply, because the XBC15 is larger than the MRXBOX on both sides
   and is therefore never the smallest capable unit at those duties - which the new
@@ -124,15 +136,18 @@ change), `SAM` `test/parto-real-selection-ladder` (the same closeout at library 
   under test is settled before `RunPartOSimulation` is called.
 - **Saved TM59 / results reopen behaviour** - unchanged and already covered.
 
-### Freeze status
+### Status
 
-**Not frozen, and not yet READY TO FREEZE.** All automated acceptance is complete and every solution builds
-clean. One item remains: the **native Iteration 2 visual confirmation** above. On that confirmation,
-Iterations 1a / 1b / 2 / 2B become **READY TO FREEZE**.
+**XBC15 CLOSEOUT COMPLETE - READY FOR FINAL EQUIPMENT-SELECTION UX.**
 
-`FROZEN`, and the frozen integration SHAs, are to be recorded **only after** the three PRs are reviewed and
-merged into `sow/2026-Q3`, when the real integration SHAs exist. Nothing is declared frozen against an
-unmerged branch.
+All automated acceptance is complete, every solution builds clean, and the native Iteration 2 confirmation
+above has PASSED. Nothing further is owed by this closeout.
+
+**Nothing is FROZEN.** Iterations 1a / 1b / 2 / 2B are deliberately **not** marked frozen here. The freeze
+gate is the equipment-selection UX task that follows this one - allowed product pool, convert-to-manual, and
+per-dwelling manual assignment - and the product picker that task adds is precisely the interface the native
+Iteration 2 check above could not exercise. Freezing before that surface exists would freeze a workflow
+nobody can yet drive.
 
 ### Recorded as a future usability enhancement, not an open gate
 
