@@ -869,6 +869,183 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(190, Design(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster, name_Bedroom, FlowClassification.Supply), 6);
         }
 
+        // =================================================================================================
+        // Iteration 2B under MANUAL authority. The identity on the unit is the engineer's, and 2B treats it
+        // exactly as it treats an automatically selected one - as a ceiling, never as a decision to revisit.
+        // =================================================================================================
+
+        /// <summary>
+        /// <b>A manually assigned MRXBOX standing on its own 150 l/s rating has nothing left to give, and
+        /// the XBC15 is NOT silently selected.</b> The larger product is offered, is capable of far more,
+        /// and is never reached for - 2B reports no useful headroom instead, which is the honest answer and
+        /// the one that leaves the escalation decision with the engineer.
+        /// </summary>
+        [Fact]
+        public void AManualMRXBOXAtItsRating_HasNoHeadroom_AndXBC15IsNotSelected()
+        {
+            PartOOptimisationRun partOOptimisationRun = FailingOnTheRealLadder(150, 0, out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext);
+
+            Assert.Equal(model_MRXBOX, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+
+            //The premise: a bigger capable product IS on offer.
+            Assert.Contains(partOPreparationContext.VentilationUnitCapacityDescriptors, x => x.VentilationUnitReference.Model == model_XBC15);
+
+            Modify.CapacityEnvelope(partOOptimisationRun, new PartOOptimisationSettings(), partOPreparationContext, partOSimulationContext);
+
+            //Nothing to grow into, and nothing simulated for it.
+            Assert.False(partOOptimisationRun.CapacityEnvelope?.IsScaled ?? false);
+            Assert.Contains("headroom", partOOptimisationRun.CapacityEnvelopeDescription);
+
+            //THE assertion: still the MRXBOX. No substitution.
+            Assert.Equal(model_MRXBOX, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+            Assert.DoesNotContain(model_XBC15, partOOptimisationRun.CapacityEnvelopeDescription);
+        }
+
+        /// <summary>
+        /// <b>A manually assigned MRXBOX on a design BEYOND its rating holds the identity.</b> 175 l/s
+        /// against 150 l/s of capability is a design that does not work; 2B reports it and changes neither
+        /// the identity nor the design airflow. A capable alternative exists and naming it is a suggestion -
+        /// the substitution is the engineer's to make.
+        /// </summary>
+        [Fact]
+        public void AManualMRXBOXBeyondItsRating_HoldsTheIdentity_AndNeverSubstitutes()
+        {
+            PartOOptimisationRun partOOptimisationRun = FailingOnTheRealLadder(175, 0, out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext);
+
+            Assert.Equal(model_MRXBOX, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+
+            Dictionary<string, double> designs_Before = Designs(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster);
+            Dictionary<string, double> requirements_Before = Requirements(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster);
+
+            Modify.CapacityEnvelope(partOOptimisationRun, new PartOOptimisationSettings(), partOPreparationContext, partOSimulationContext);
+
+            //Held.
+            Assert.Equal(model_MRXBOX, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+
+            //And the design was NOT cut back to 150 to make the box fit, nor was any requirement touched.
+            Assert.Equal(designs_Before, Designs(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+            Assert.Equal(requirements_Before, Requirements(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+
+            //A capable product exists - which is what makes a suggestion possible - and naming it here
+            //changed nothing.
+            Assert.Equal(model_XBC15, Analytical.Query.SelectSmallestCapableVentilationUnit(partOPreparationContext.VentilationUnitCapacityDescriptors, 175, 175).VentilationUnitReference.Model);
+            Assert.Equal(model_MRXBOX, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+        }
+
+        /// <summary>
+        /// <b>Convert to Manual, override one dwelling, and Iteration 2B respects the converted identity
+        /// exactly.</b> The end-to-end contract: the assignment table takes the automatic MRXBOX, hands
+        /// authority to the engineer, is overridden to the XBC15, commits that single identity onto the
+        /// model - and the production envelope then grows the design to 190 and stops, because that is now
+        /// the ceiling.
+        /// </summary>
+        [Fact]
+        public void AConvertedThenOverriddenIdentity_IsTheCeilingTheEnvelopeRespects()
+        {
+            PartOOptimisationRun partOOptimisationRun = FailingOnTheRealLadder(150, 0, out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext);
+
+            AdjacencyCluster adjacencyCluster = partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster;
+
+            Assert.Equal(model_MRXBOX, SelectedModel(adjacencyCluster));
+
+            AirHandlingUnit airHandlingUnit = Assert.Single(adjacencyCluster.GetObjects<AirHandlingUnit>());
+
+            //The automatic answer, as a table.
+            PartOEquipmentAssignmentSet partOEquipmentAssignmentSet = PartOEquipmentAssignmentSet.Create(
+                adjacencyCluster,
+                [airHandlingUnit],
+                [],
+                [],
+                partOPreparationContext.VentilationUnitCapacityDescriptors,
+                new PartOEquipmentSelection(PartOEquipmentSelectionMode.AutomaticAllProducts));
+
+            Assert.Equal(model_MRXBOX, Assert.Single(partOEquipmentAssignmentSet.Assignments).VentilationUnitReference.Model);
+
+            //Convert: an authority change that preserves the identity and writes nothing.
+            partOEquipmentAssignmentSet.ConvertToManual();
+
+            Assert.False(partOEquipmentAssignmentSet.HasChanges);
+            Assert.Equal(model_MRXBOX, Assert.Single(partOEquipmentAssignmentSet.Assignments).VentilationUnitReference.Model);
+
+            //Override: the engineer states the XBC15 instead.
+            VentilationUnitReference ventilationUnitReference_XBC15 = partOPreparationContext.VentilationUnitCapacityDescriptors.Find(x => x.VentilationUnitReference.Model == model_XBC15).VentilationUnitReference;
+
+            Assert.True(partOEquipmentAssignmentSet.Assign(airHandlingUnit.Guid, ventilationUnitReference_XBC15, out _));
+            Assert.True(partOEquipmentAssignmentSet.Commit(adjacencyCluster, out _, out List<string> refusals));
+            Assert.Empty(refusals);
+
+            Assert.Equal(model_XBC15, SelectedModel(adjacencyCluster));
+
+            //AND WRITTEN BACK. AnalyticalModel.AdjacencyCluster hands out a fresh COPY on every access, so
+            //a commit into one access is discarded the moment the next access is made - the model would go
+            //on reporting the MRXBOX while the assignment looked applied. Rebuilding the model from the
+            //cluster the assignment was written into is what makes it stick, and it is exactly what
+            //Modify.PreparePartOIteration does after committing an authored assignment.
+            Assert.Equal(model_MRXBOX, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+
+            partOOptimisationRun.AnalyticalModel_LastValid = new AnalyticalModel(partOOptimisationRun.AnalyticalModel_LastValid, adjacencyCluster);
+
+            Assert.Equal(model_XBC15, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+
+            //And 2B now works within 190, because that is what the model says the dwelling is fitted with.
+            Modify.CapacityEnvelope(partOOptimisationRun, new PartOOptimisationSettings(), partOPreparationContext, partOSimulationContext);
+
+            DesignAirFlowCapacityEnvelopeGroup designAirFlowCapacityEnvelopeGroup = Assert.Single(partOOptimisationRun.CapacityEnvelope.Groups);
+
+            Assert.Equal(model_XBC15, designAirFlowCapacityEnvelopeGroup.VentilationUnitReference.Model);
+            Assert.Equal(190, designAirFlowCapacityEnvelopeGroup.SupplyDuty_After_Lps, 6);
+            Assert.Equal(model_XBC15, SelectedModel(partOOptimisationRun.CapacityEnvelope.AdjacencyCluster));
+
+            Assert.All(partOOptimisationRun.CapacityEnvelope.RoundCandidate.DwellingRounds, x => Assert.Equal(VentilationUnitSelectionOutcome.Kept, x.VentilationUnitSelectionOutcome));
+        }
+
+        /// <summary>
+        /// <b>Narrowing the permitted pool after an assignment has been committed changes nothing 2B
+        /// respects.</b> The pool is a candidate constraint on selection; the model's identity is the
+        /// engineering fact. A procurement change flags the assignment and leaves both the identity and the
+        /// ceiling exactly where they were.
+        /// </summary>
+        [Fact]
+        public void NarrowingThePoolAfterCommit_ChangesNeitherTheIdentityNorTheCeiling()
+        {
+            PartOOptimisationRun partOOptimisationRun = FailingOnTheRealLadder(out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext);
+
+            AdjacencyCluster adjacencyCluster = partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster;
+
+            AirHandlingUnit airHandlingUnit = Assert.Single(adjacencyCluster.GetObjects<AirHandlingUnit>());
+
+            Assert.Equal(model_XBC15, SelectedModel(adjacencyCluster));
+
+            //The XBC15 leaves the permitted set entirely.
+            VentilationUnitReference ventilationUnitReference_MRXBOX = partOPreparationContext.VentilationUnitCapacityDescriptors.Find(x => x.VentilationUnitReference.Model == model_MRXBOX).VentilationUnitReference;
+
+            PartOEquipmentAssignmentSet partOEquipmentAssignmentSet = PartOEquipmentAssignmentSet.Create(
+                adjacencyCluster,
+                [airHandlingUnit],
+                [],
+                [],
+                partOPreparationContext.VentilationUnitCapacityDescriptors,
+                new PartOEquipmentSelection(PartOEquipmentSelectionMode.ManualPerDwelling, [ventilationUnitReference_MRXBOX]));
+
+            PartOEquipmentAssignment partOEquipmentAssignment = Assert.Single(partOEquipmentAssignmentSet.Assignments);
+
+            //Flagged, and nothing more.
+            Assert.True(partOEquipmentAssignment.IsOutsideAllowedPool);
+            Assert.Equal(model_XBC15, partOEquipmentAssignment.VentilationUnitReference.Model);
+            Assert.False(partOEquipmentAssignmentSet.HasChanges);
+
+            Assert.True(partOEquipmentAssignmentSet.Commit(adjacencyCluster, out List<string> notes, out _));
+            Assert.Empty(notes);
+
+            //The model still says XBC15, and 2B still stops at 190.
+            Assert.Equal(model_XBC15, SelectedModel(adjacencyCluster));
+
+            Modify.CapacityEnvelope(partOOptimisationRun, new PartOOptimisationSettings(), partOPreparationContext, partOSimulationContext);
+
+            Assert.Equal(190, Assert.Single(partOOptimisationRun.CapacityEnvelope.Groups).SupplyDuty_After_Lps, 6);
+            Assert.Equal(model_XBC15, SelectedModel(partOOptimisationRun.CapacityEnvelope.AdjacencyCluster));
+        }
+
         // ---- Fixture ---------------------------------------------------------------------------------------
         /// <summary>
         /// <b>The real closeout fixture.</b> A run that stopped on capacity with one failing room, over a
@@ -888,6 +1065,17 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         private static PartOOptimisationRun FailingOnTheRealLadder(double design_Lps, out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext)
         {
+            //Index 1 is the XBC15 - the deliberately oversized selection the closeout is about.
+            return FailingOnTheRealLadder(design_Lps, 1, out partOPreparationContext, out partOSimulationContext);
+        }
+
+        /// <summary>
+        /// The same fixture with the selected product stated, so the manual-authority cases can put the
+        /// SMALLER product on a design it cannot carry - which is what an engineer authoring an assignment
+        /// by hand is able to do, and what the system then has to report rather than correct.
+        /// </summary>
+        private static PartOOptimisationRun FailingOnTheRealLadder(double design_Lps, int index_Selected, out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext)
+        {
             //The MRXBOX is offered FIRST, so an envelope that took the head of the list rather than reading
             //the model's own selection would visibly swap the plant.
             List<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors =
@@ -905,9 +1093,11 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             AirHandlingUnit airHandlingUnit = new("MVHR-01", 20, 20);
 
-            //THE EXPLICIT SELECTION - the XBC15, written as an identity and nothing else, exactly as
-            //Analytical.Modify.SelectVentilationUnit writes one.
-            airHandlingUnit.SetValue(AirHandlingUnitParameter.VentilationUnitReference, ventilationUnitCapacityDescriptors[1].VentilationUnitReference);
+            //THE EXPLICIT SELECTION - written as an identity and nothing else, exactly as
+            //Analytical.Modify.SelectVentilationUnit and Analytical.Modify.AssignVentilationUnit both write
+            //one. An automatically selected product and a manually assigned one are indistinguishable here,
+            //which is the point: 2B does not need to know a human chose it.
+            airHandlingUnit.SetValue(AirHandlingUnitParameter.VentilationUnitReference, ventilationUnitCapacityDescriptors[index_Selected].VentilationUnitReference);
 
             adjacencyCluster.AddObject(airHandlingUnit);
 

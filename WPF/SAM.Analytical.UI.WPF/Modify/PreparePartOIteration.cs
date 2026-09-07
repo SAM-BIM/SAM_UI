@@ -59,6 +59,15 @@ namespace SAM.Analytical.UI.WPF
                 VentilationUnitCatalogue = ventilationUnitCatalogue,
             };
 
+            //The PROJECT's own equipment preselection, restored off the model it belongs to. This is what
+            //makes the mode and the permitted pool survive closing and reopening this dialog, and reopening
+            //the project - and what keeps one project's pool out of the next one, which a global application
+            //setting could not. Absent reads as the historic default. See PartOEquipmentSelection.
+            //
+            //Assigned AFTER VentilationUnitCatalogue, because the pool is restored by ticking catalogue rows
+            //and those rows do not exist until the catalogue has been set.
+            partOIterationWindow.EquipmentSelection = analyticalModel.GetValue<PartOEquipmentSelection>(Analytical.AnalyticalModelParameter.PartOEquipmentSelection);
+
             if (owner is not null)
             {
                 new System.Windows.Interop.WindowInteropHelper(partOIterationWindow).Owner = owner.Handle;
@@ -88,6 +97,7 @@ namespace SAM.Analytical.UI.WPF
                 partOIterationWindow.SelectVentilationUnit)
             {
                 OptimisationSettings = partOIterationWindow.OptimisationSettings,
+                EquipmentSelection = partOIterationWindow.EquipmentSelection,
             };
 
             PreparePartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner);
@@ -146,6 +156,29 @@ namespace SAM.Analytical.UI.WPF
                 ? ventilationUnitCatalogue.CapacityDescriptors
                 : null;
 
+            //The request, or failing that the PROJECT, or failing that the historic default - in that order,
+            //and the order is load-bearing. Query.PartOEquipmentSelection says at length why, and is a named
+            //function precisely because the failure it prevents is silent.
+            PartOEquipmentSelection partOEquipmentSelection = Query.PartOEquipmentSelection(partOWorkflowRequest, analyticalModel);
+
+            //TWO different lists, and conflating them is the one mistake that would break this feature.
+            //
+            //  ventilationUnitCapacityDescriptors  - the WHOLE selectable catalogue. A CAPABILITY LOOKUP.
+            //      It goes into PartOPreparationContext, where Iteration 2B and the capacity envelope read
+            //      it through Query.SelectedVentilationUnitCapacityDescriptor to find what each dwelling's
+            //      ALREADY SELECTED product is rated at. Narrowing it to the pool would make a dwelling
+            //      manually assigned a product that has since left the pool report "capacity unknown", and
+            //      2B would lose the ceiling it stops at.
+            //
+            //  ventilationUnitCapacityDescriptors_Candidate - what an automatic selection may CHOOSE FROM.
+            //      The pool, applied once, here. Null under manual authority, which is how
+            //      Analytical.Modify.PreparePartOIteration is already told "run no rule and leave every
+            //      existing identity alone" - so manual mode needs no new code path in SAM at all. An empty
+            //      list under the pooled mode is an explicit refusal and is never widened back.
+            List<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors_Candidate = partOWorkflowRequest.SelectVentilationUnit
+                ? partOEquipmentSelection.CandidateDescriptors(ventilationUnitCatalogue.CapacityDescriptors)
+                : null;
+
             //Everything this preparation was asked for, kept so an Iteration 2B optimisation can repeat it
             //identically over a changed design. Also carries the optimisation the user asked for, which is
             //not a preparation input and does not affect the call below - see PartOPreparationContext.
@@ -153,9 +186,10 @@ namespace SAM.Analytical.UI.WPF
             {
                 OptimisationSettings = partOWorkflowRequest.OptimisationSettings,
                 Isolated = partOWorkflowRequest.Isolate,
+                EquipmentSelection = partOEquipmentSelection,
             };
 
-            PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel, option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors, partOWorkflowRequest.Isolate);
+            PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel, option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors_Candidate, partOWorkflowRequest.Isolate);
 
             //A refusal returns no model at all, by contract. Nothing is adopted and the run is dropped with
             //the reason, so the ribbon can say why an assessment is unavailable.
@@ -178,12 +212,41 @@ namespace SAM.Analytical.UI.WPF
                 partOIterationPreparation.AnalyticalModel!.Name = Query.ProjectName_Isolated(analyticalModel.Name, partOIsolationContext.ScopeToken);
             }
 
+            //THE prepared model, and ONE working copy of its cluster.
+            //
+            //AnalyticalModel.AdjacencyCluster hands back a FRESH COPY on every access, so a cluster written
+            //through one access is discarded the moment the next access is made. That makes an authored
+            //equipment assignment exactly the kind of change that can be applied, reported as applied, and
+            //silently lost - so the copy is taken once here, the commit below writes into THAT object, and
+            //the model is rebuilt from it. The same discipline, and the same reason, as the
+            //`new AnalyticalModel(analyticalModel, adjacencyCluster)` that ends
+            //Analytical.Modify.PreparePartOIteration's own work.
+            AnalyticalModel analyticalModel_Prepared = partOIterationPreparation.AnalyticalModel!;
+
+            AdjacencyCluster adjacencyCluster_Prepared = analyticalModel_Prepared.AdjacencyCluster;
+
+            //The assignment table, built once against the WHOLE catalogue so that every assigned product
+            //can resolve its own rating, and carrying the mode and pool so the window knows who decides.
+            PartOEquipmentAssignmentSet? partOEquipmentAssignmentSet = partOWorkflowRequest.SelectVentilationUnit
+                ? EquipmentAssignmentSet(adjacencyCluster_Prepared, partOIterationPreparation, zones_Dwelling, ventilationUnitCapacityDescriptors, partOEquipmentSelection)
+                : null;
+
             PartOPreparationWindow partOPreparationWindow = new()
             {
-                Summary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOWorkflowRequest.SelectVentilationUnit, partOIsolationContext),
-                EquipmentRows = EquipmentRows(partOIterationPreparation, ventilationUnitCapacityDescriptors),
-                SpaceRows = (partOIterationPreparation.AnalyticalModel.GetSpaces() ?? []).ConvertAll(x => new PartOSpaceRow(x)),
+                Summary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOWorkflowRequest.SelectVentilationUnit, partOIsolationContext, partOEquipmentAssignmentSet),
+                SpaceRows = (adjacencyCluster_Prepared.GetSpaces() ?? []).ConvertAll(x => new PartOSpaceRow(x)),
             };
+
+            if (partOEquipmentAssignmentSet is not null)
+            {
+                partOPreparationWindow.EquipmentAssignmentSet = partOEquipmentAssignmentSet;
+            }
+            else
+            {
+                //Iteration 1a, or a catalogue that could not be read: the rows still say what each dwelling
+                //is designed to move, and say plainly that no product was selected.
+                partOPreparationWindow.EquipmentRows = EquipmentRows(adjacencyCluster_Prepared, partOIterationPreparation, null);
+            }
 
             partOPreparationWindow.SetDiagnostics(partOIterationPreparation.Notes, partOIterationPreparation.Warnings, partOIterationPreparation.Refusals);
 
@@ -200,7 +263,38 @@ namespace SAM.Analytical.UI.WPF
                 return false;
             }
 
-            if (!partORun.Prepare(partOIterationPreparation, partOPreparationContext))
+            //THE ONE WRITE, and only what the engineer actually changed - so a table that was merely
+            //converted to manual, which changes no identity, writes nothing and leaves the prepared model
+            //bit-for-bit as the preparation built it. Each write goes through
+            //Analytical.Modify.AssignVentilationUnit, which moves no airflow of any kind.
+            if (partOEquipmentAssignmentSet is not null)
+            {
+                if (!partOEquipmentAssignmentSet.Commit(adjacencyCluster_Prepared, out List<string> notes_Commit, out List<string> refusals_Commit))
+                {
+                    MessageBox.Show(string.Format("The equipment assignments were not applied, so the prepared model was not adopted.\n\n{0}", string.Join("\n\n", refusals_Commit)));
+
+                    return false;
+                }
+
+                partOIterationPreparation.Notes.AddRange(notes_Commit);
+
+                if (partOEquipmentAssignmentSet.HasChanges)
+                {
+                    //Rebuilt from the cluster the assignments were written into - see the comment where that
+                    //copy was taken. Guarded, so an unchanged table costs no rebuild.
+                    analyticalModel_Prepared = new AnalyticalModel(analyticalModel_Prepared, adjacencyCluster_Prepared);
+                }
+
+                //The mode and pool as they now stand - "Convert to Manual" changed the mode, and this is
+                //where that becomes the project's own recorded preference rather than a fact about one
+                //dialog. It rides on the model, so it survives the project being saved and reopened and
+                //cannot leak into another project.
+                partOPreparationContext.EquipmentSelection = partOEquipmentAssignmentSet.EquipmentSelection;
+
+                analyticalModel_Prepared.SetValue(Analytical.AnalyticalModelParameter.PartOEquipmentSelection, partOEquipmentAssignmentSet.EquipmentSelection);
+            }
+
+            if (!partORun.Prepare(analyticalModel_Prepared, partOIterationPreparation.OverheatingScenarios, partOPreparationContext, partOIterationPreparation.Refusal))
             {
                 MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason));
 
@@ -210,7 +304,7 @@ namespace SAM.Analytical.UI.WPF
             //Armed immediately before the write, so this replacement is not read as an outside edit.
             partORun.ExpectModification();
 
-            uIAnalyticalModel!.SetJSAMObject(partOIterationPreparation.AnalyticalModel, new FullModification());
+            uIAnalyticalModel!.SetJSAMObject(analyticalModel_Prepared, new FullModification());
 
             return partORun.State == PartORunState.Prepared;
         }
@@ -228,11 +322,111 @@ namespace SAM.Analytical.UI.WPF
         /// pairing matters.
         /// </para>
         /// </summary>
-        private static List<PartOEquipmentRow> EquipmentRows(PartOIterationPreparation partOIterationPreparation, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors)
+        /// <summary>
+        /// Builds the dwelling assignment table from a completed preparation - the one place every model
+        /// read for it happens.
+        ///
+        /// <para><b>Scoped to this run's own dwelling units</b></para>
+        /// <para>
+        /// <c>PartOIterationPreparation.AirHandlingUnits</c> and <c>.VentilationSystems</c> are what this
+        /// preparation built, index for index, so nothing here has to re-derive which units belong to the
+        /// run. A legacy unit the model was drawn with is not one of them and does not appear.
+        /// </para>
+        ///
+        /// <para><b>The whole catalogue, never the pool</b></para>
+        /// <para>
+        /// <paramref name="ventilationUnitCapacityDescriptors"/> is the capability lookup. A dwelling
+        /// assigned a product that is no longer permitted still resolves its own rating from it and is
+        /// flagged as outside the pool - which is the difference between telling an engineer about a
+        /// procurement change and losing their design to one.
+        /// </para>
+        ///
+        /// <para><b>Cost</b></para>
+        /// <para>
+        /// One relation lookup per dwelling zone to name the dwellings, one per system to find its spaces,
+        /// and one duty derivation per unit - then the table is captured numbers. No <c>GetSpaces</c> or
+        /// <c>GetZones</c> rebuild happens inside a dwelling loop, and none happens again when a row is
+        /// edited or the pool changes.
+        /// </para>
+        /// </summary>
+        private static PartOEquipmentAssignmentSet EquipmentAssignmentSet(AdjacencyCluster? adjacencyCluster, PartOIterationPreparation partOIterationPreparation, List<Zone> zones_Dwelling, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors, PartOEquipmentSelection partOEquipmentSelection)
+        {
+            List<AirHandlingUnit> airHandlingUnits = partOIterationPreparation.AirHandlingUnits;
+            List<VentilationSystem> ventilationSystems = partOIterationPreparation.VentilationSystems;
+
+            //Space -> the dwelling it belongs to, built ONCE over the run's zones. Naming a dwelling from
+            //inside the per-unit loop would mean a zone-membership lookup per unit.
+            Dictionary<Guid, string> dictionary_DwellingName_Space = [];
+
+            if (adjacencyCluster is not null)
+            {
+                foreach (Zone zone in zones_Dwelling ?? [])
+                {
+                    if (zone is null)
+                    {
+                        continue;
+                    }
+
+                    foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(zone) ?? [])
+                    {
+                        if (space is not null)
+                        {
+                            dictionary_DwellingName_Space[space.Guid] = zone.Name;
+                        }
+                    }
+                }
+            }
+
+            Dictionary<Guid, string> dictionary_VentilationSystemName = [];
+            Dictionary<Guid, string> dictionary_DwellingName = [];
+
+            for (int i = 0; i < airHandlingUnits.Count; i++)
+            {
+                AirHandlingUnit airHandlingUnit = airHandlingUnits[i];
+                if (airHandlingUnit is null)
+                {
+                    continue;
+                }
+
+                VentilationSystem? ventilationSystem = i < ventilationSystems.Count ? ventilationSystems[i] : null;
+
+                if (ventilationSystem is not null)
+                {
+                    dictionary_VentilationSystemName[airHandlingUnit.Guid] = ventilationSystem.FullName;
+                }
+
+                //The dwelling this unit serves, found through the system's own spaces. Left absent rather
+                //than guessed where nothing resolves - the row then falls back to the system or the unit
+                //name, and never to an invented dwelling.
+                if (adjacencyCluster is null || ventilationSystem is null)
+                {
+                    continue;
+                }
+
+                foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(ventilationSystem) ?? [])
+                {
+                    if (space is not null && dictionary_DwellingName_Space.TryGetValue(space.Guid, out string name_Dwelling))
+                    {
+                        dictionary_DwellingName[airHandlingUnit.Guid] = name_Dwelling;
+
+                        break;
+                    }
+                }
+            }
+
+            return PartOEquipmentAssignmentSet.Create(
+                adjacencyCluster,
+                airHandlingUnits,
+                dictionary_VentilationSystemName,
+                dictionary_DwellingName,
+                ventilationUnitCapacityDescriptors,
+                partOEquipmentSelection);
+        }
+
+        private static List<PartOEquipmentRow> EquipmentRows(AdjacencyCluster? adjacencyCluster, PartOIterationPreparation partOIterationPreparation, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors)
         {
             List<PartOEquipmentRow> result = [];
 
-            AdjacencyCluster? adjacencyCluster = partOIterationPreparation?.AnalyticalModel?.AdjacencyCluster;
             if (adjacencyCluster is null)
             {
                 return result;
@@ -276,7 +470,7 @@ namespace SAM.Analytical.UI.WPF
             return result;
         }
 
-        private static string Summary(PartOIterationPreparation partOIterationPreparation, PartOVentilationStrategyOption option, VentilationUnitCatalogue ventilationUnitCatalogue, bool selectVentilationUnit, PartOIsolationContext? partOIsolationContext)
+        private static string Summary(PartOIterationPreparation partOIterationPreparation, PartOVentilationStrategyOption option, VentilationUnitCatalogue ventilationUnitCatalogue, bool selectVentilationUnit, PartOIsolationContext? partOIsolationContext, PartOEquipmentAssignmentSet? partOEquipmentAssignmentSet)
         {
             //Said FIRST, and said as a scope rather than as a setting. An isolated run is a different
             //thermal model from the whole building - the interfaces to the dwellings left out are simulated
@@ -295,8 +489,11 @@ namespace SAM.Analytical.UI.WPF
                 ? "No mechanical design duty (the natural ventilation route realizes no continuous mechanical terminals)."
                 : string.Format("Design duty totalled across {0} dwelling system(s): {1:N1} l/s supply, {2:N1} l/s extract. Per-dwelling duties are in the equipment table below.", partOIterationPreparation.VentilationSystems.Count, partOIterationPreparation.DesignSupplyDuty_Lps, partOIterationPreparation.DesignExtractDuty_Lps);
 
+            //Asked of the assignment table rather than restated: it knows the mode, how many dwellings
+            //carry a product and how many need looking at, and a second count here could disagree with the
+            //grid immediately below it.
             string equipment = selectVentilationUnit
-                ? string.Format("Equipment selection ran against {0} selectable product(s). A selected product's Maximum is its capability ceiling and is never a design airflow.", ventilationUnitCatalogue.CapacityDescriptors.Count)
+                ? partOEquipmentAssignmentSet?.Description ?? string.Format("Equipment selection ran against {0} selectable product(s). A selected product's Maximum is its capability ceiling and is never a design airflow.", ventilationUnitCatalogue.CapacityDescriptors.Count)
                 : string.Format("No equipment selection ran, so no product is selected. {0}", ventilationUnitCatalogue.Description);
 
             return string.Format("{6}{0}. Route stated: {1} ({2}). {3} {4}\n{5} overheating scenario(s) stated. Simulate this model to produce results the TM59 assessment can read.",
