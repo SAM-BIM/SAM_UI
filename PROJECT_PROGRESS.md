@@ -16,12 +16,13 @@ Everything below the entry dated 2026-09-07 is superseded history retained for c
 ## Last updated
 2026-09-07 - looking at a prepared Approved Document O model no longer drops the run, so the expert
 workflow (Prepare Iteration, then Energy Simulation) reaches the same assessable state `Prepare & Run`
-does.
+does. Native SAM_UI acceptance PASSED; PR #95 merged into `sow/2026-Q3`
+(`0eb9d12e76c5f481b978d41d1338794aec24d1fc`).
 
 ## Latest (2026-09-07): the manual Part O workflow reaches its results
 
-**Status: root-caused, implemented, tested, and reproduced-then-fixed under test. Not merged. Native
-SAM_UI acceptance still owed - see below.**
+**Status: root-caused, implemented, tested, native-accepted, and merged (PR #95,
+`0eb9d12e76c5f481b978d41d1338794aec24d1fc`).**
 
 Nothing here changes Part O engineering. It changes which model replacements are treated as edits.
 
@@ -147,10 +148,10 @@ itself; and a restored run surviving a view change.
 
 ### Unresolved / risks
 
-- **Native SAM_UI acceptance is owed and is the point of the change.** Open the acceptance model, run
-  `Edit > Part O > Prepare Iteration`, change the view or isolate the dwelling, then
-  `Simulate > Energy Simulation` with Full Year ticked, and click `Results > Overheating (TM59)`
-  immediately. Nothing here was clicked by hand.
+- **Native SAM_UI acceptance - PASSED (2026-09-07).** Ran on the acceptance model:
+  `Prepare Iteration` -> presentation/view changes including overlays/isolation ->
+  `Energy Simulation` with Full Year enabled -> successful completion ->
+  `Results > Overheating (TM59)` immediately available. No reopen and no TAS rerun required.
 - **The manual Simulate dialog still opens with `FullYearSimulation` off**, because
   `SimulateOptions.FullYearSimulation` defaults to false and only `Prepare & Run` gets
   `Create.SimulateOptions_PartO`. That is intentional (the expert command must keep sizing-only and export
@@ -167,7 +168,7 @@ itself; and a restored run surviving a view change.
 
 ### Exact recommended next step
 
-Native SAM_UI acceptance of the manual sequence above. Then, per the standing list and in this order:
+Native SAM_UI acceptance PASSED and PR #95 merged. Per the standing list and in this order:
 overlay Part F vs Design visual grouping, the second ~180 l/s MVHR, and only then Iteration 3.
 
 ## Previous (2026-09-05, latest): the Part O defaults closeout
