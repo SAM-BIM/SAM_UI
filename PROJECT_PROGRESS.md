@@ -1,23 +1,130 @@
 # Project Progress
 
 ## Branch
-`fix/parto-manual-simulation-results`, branched from `sow/2026-Q3`.
+`fix/partf-design-overlay-readability`, branched from `sow/2026-Q3`.
 
 **Stands alone.** It needs no change in `SAM`, `SAM_Tas`, `SAM_Systems` or any other dependency, and is
 compiled against the merged dependency set. Baseline it was branched from, re-measured before any edit:
 
 ```text
 SAM_UI.sln Release                      0 errors
-SAM.Analytical.UI.WPF.Tests             619/619
+SAM.Analytical.UI.WPF.Tests             630/630
 ```
 
-Everything below the entry dated 2026-09-07 is superseded history retained for context.
+Everything below the entry dated 2026-09-07 (the Part O manual-simulation-results entry) is superseded
+history retained for context.
 
 ## Last updated
-2026-09-07 - looking at a prepared Approved Document O model no longer drops the run, so the expert
-workflow (Prepare Iteration, then Energy Simulation) reaches the same assessable state `Prepare & Run`
-does. Native SAM_UI acceptance PASSED; PR #95 merged into `sow/2026-Q3`
-(`0eb9d12e76c5f481b978d41d1338794aec24d1fc`).
+2026-09-07 - Part F and Ventilation Design floor-plan tags read as one interchangeable figure when both
+overlays are enabled for the same space or route. Fixed by splitting the shared placement adapter into two
+stable lanes (Part F above a space's own reference row, Design below it) and giving every tag an explicit
+"F "/"D " textual identifier, on top of the existing shared solver - no new placement engine, no change to
+any engineering authority, no change to transfer arrow geometry. Presentation-only; native SAM_UI acceptance
+pending (branch not yet merged).
+
+## Latest (2026-09-07): Part F / Design floor-plan overlay readability
+
+**Status: implemented and tested locally; PR opened against `sow/2026-Q3`; awaiting CI, Codex and native
+SAM_UI acceptance. Do not merge.**
+
+Nothing here changes Part F or Ventilation Design engineering. It changes how the two overlays' tags are
+laid out and labelled relative to each other on the same drawing.
+
+### The problem
+
+With both overlays enabled, a space's Part F requirement and its Ventilation Design duty anchor at (very
+nearly) the same point - each overlay computes the room's own internal point independently, and both
+computations are deterministic functions of the same outline, so they coincide. The shared placement engine
+(`Solver2D`, via `PartFTagPlacement`) then fans both authorities' tags out from that one point using the same
+8-direction search, with no rule saying which authority a displaced tag belongs to. The result, exactly as
+native acceptance showed it: `EXT 82.5`, `EX 22.0 ?`, `SUP 150.0`, the space's own name tag, `SUP 30.0 ✓` -
+Part F and Design interleaved with no way to tell them apart except position, which the search had already
+scrambled.
+
+### The fix
+
+**1. Two stable lanes, not a second solver.** `PartFTagPlacement.Lane(IClosed2D limitArea, double row, bool
+above)` is a new pure-geometry method on the EXISTING shared adapter - no change to `Solver2D` (which lives
+in `SAM.Geometry`, out of scope for this task) and no second placement engine. It clips a tag's existing
+centre constraint (its room outline, or nothing for a transfer tag) to the half of the room on its own side
+of a shared reference row: `PartFAirflowRenderer.Place` builds every terminal tag's `LimitArea` with
+`above: true`, `DesignAirFlowRenderer.Place` with `above: false`. The row itself is each space's own outline
+internal point - the same point either overlay already anchors an un-fanned mark at - so the two renderers
+agree on where the line is without either one reading the other's marks, keeping the existing one-directional
+architecture (Part F never depends on Design) intact.
+<br>A room the row would cut off entirely (fewer than three boundary points survive the clip) falls back to
+the unclipped outline rather than an empty region: the lane is a presentation preference, and a tag that
+cannot be placed at all is a regulatory or design figure lost from the drawing, which is the worse failure. A
+transfer tag has no room outline to begin with, so it keeps its existing behaviour (no `LimitArea`, arrow and
+anchor untouched) and relies on the label change below alone.
+
+**2. An explicit textual identifier on every tag.** `PartFAirflowRenderer.AuthorityPrefix` ("F ") and
+`DesignAirFlowRenderer.AuthorityPrefix` ("D ") are prepended to a tag's DRAWN text only - `PartFOverlayMark.Label`
+/ `DesignAirFlowOverlayMark.Label` and the pure overlay-builder classes are untouched, so nothing that reads
+those values elsewhere (schedules, the text schematic, the existing `mark.Label` unit tests) changed. Neither
+authority is ever called "Calculated": a Part F requirement, a design airflow, an operating airflow and an
+equipment capacity may all be calculated values, so that word would say nothing about which this tag is.
+
+**3. Both distinctions apply everywhere both authorities are drawn**, terminal and transfer alike - "F TRA
+8.0 l/s ?" is never mistakable for "D TRA 67.5 l/s ?" - without recomputing any transfer air, inventing a
+value where none exists, or touching the existing "no modelled transfer opening" `?` behaviour, the transfer
+arrow's geometry, or `SpaceAirMovement` direction.
+
+### Why this could not regress existing scalability or the one-directional invariant
+
+`Lane` runs inside `Place()` - the already-expensive, already-cached per-space call, not a per-redraw or
+per-mark one - and does one small polygon clip (a handful of boundary points) per unique space, exactly the
+same cost order as the outline lookup it sits next to. It never adds a global obstacle (which would have
+been checked against every candidate position for every tag on the plan and would have reintroduced the
+O(N²) shape the existing scaling tests guard against); it only tightens the per-item `LimitArea` centroid
+check the engine already made. `DesignAirFlowRendererScalingTests.Load_AllocatesLinearlyWithTheModel_UpToTwoThousandSpaces`
+stays green with this change in place. Part F's own placement method calls the new method exactly the way it
+already called the outline lookup, so `PartFTagPlacementTests.Place_NeverReadsTheViewTransform` and
+`DesignAirFlowRendererTests.PartFPlace_NeverReachesDesignAirflowRenderer` (both IL-reachability assertions)
+remain true unmodified.
+
+### Production files changed
+
+- `SAM_UI/SAM.Analytical.UI/Classes/PartF/PartFTagPlacement.cs` - `Lane`, `HalfPlane`, `Clip`.
+- `WPF/SAM.Analytical.UI.WPF/Controls/PartFAirflowRenderer.cs` - `Place` wraps its terminal `LimitArea` in
+  `Lane(..., above: true)`; new `Row` cache; `Label` gains the `AuthorityPrefix` ("F ") constant.
+- `WPF/SAM.Analytical.UI.WPF/Controls/DesignAirFlowRenderer.cs` - `Place` wraps its terminal `LimitArea` in
+  `Lane(..., above: false)`; new `Row` cache; new `AuthorityPrefix` ("D ") constant and `Label` helper, used
+  by both `Size` and `DrawTag` so the measured box matches the drawn text.
+
+### Tests added
+
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartFTagPlacementLaneTests.cs` (new) - `Lane` in isolation: clips to the
+  requested half, the two lanes of one room never overlap, a transfer tag's null `LimitArea` still gets the
+  bare half-plane, and a room the row cuts off entirely falls back to its whole outline rather than nothing.
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartFDesignLaneTests.cs` (new) - the end-to-end contract through the real
+  renderers, on native acceptance's own numbers (Part F SUP 30 / Design SUP 150 on one space): Part F above
+  the row, Design below it, both distinguishable by label even when the underlying rate text coincides; the
+  lane holds at a coarser annotation scale; each lane is unaffected by the OTHER overlay not existing at all;
+  the transfer label distinction and the existing "?" behaviour survive together. Deliberately does not
+  repeat what `OverlayOwnershipTests` and `DesignAirFlowRendererTests` (in particular
+  `PartFsPlacement_IsIdentical_WhetherOrNotDesignOverlayExists` and
+  `PartFPlace_NeverReachesDesignAirflowRenderer`) already prove.
+
+### Validation
+
+```text
+dotnet test WPF/SAM.Analytical.UI.WPF.Tests/SAM.Analytical.UI.WPF.Tests.csproj -c Release --no-build
+  -> Passed! Failed: 0, Passed: 640, Skipped: 0, Total: 640
+
+dotnet build SAM_UI.sln -c Release
+  -> 0 Error(s)
+
+git diff --check
+  -> clean
+```
+
+Baseline was 630/630; ten focused tests were added (630 + 10 = 640), none removed or changed.
+
+### Native acceptance
+
+Not yet run. This branch is not merged - stop here for native SAM_UI acceptance per the task's own
+instruction.
 
 ## Latest (2026-09-07): the manual Part O workflow reaches its results
 
