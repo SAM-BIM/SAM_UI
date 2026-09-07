@@ -19,13 +19,36 @@ history retained for context.
 overlays are enabled for the same space or route. Fixed by splitting the shared placement adapter into two
 stable lanes (Part F above a space's own reference row, Design below it) and giving every tag an explicit
 "F "/"D " textual identifier, on top of the existing shared solver - no new placement engine, no change to
-any engineering authority, no change to transfer arrow geometry. Presentation-only; native SAM_UI acceptance
-pending (branch not yet merged).
+any engineering authority, no change to transfer arrow geometry. Native SAM_UI acceptance PASSED; PR #96
+merged into `sow/2026-Q3` (`77b45283e5d2e19f0f382eb3b1294f0c20ea6c69`).
 
 ## Latest (2026-09-07): Part F / Design floor-plan overlay readability
 
-**Status: implemented and tested locally; PR opened against `sow/2026-Q3`; awaiting CI, Codex and native
-SAM_UI acceptance. Do not merge.**
+**Status: root-caused, implemented, tested, native-accepted, and merged (PR #96,
+`77b45283e5d2e19f0f382eb3b1294f0c20ea6c69`).**
+
+### Native acceptance
+
+PASSED. Verified visually with both overlays enabled:
+
+```text
+Studio 1_0
+F EX 22.0 l/s ?
+F SUP 30.0 l/s ✓
+D SUP 150.0 l/s
+D EXT 82.5 l/s
+
+Bathroom 2
+F EX 8.0 l/s ?
+D EXT 67.5 l/s
+
+Transfer
+F TRA 8.0 l/s ?
+D TRA 67.5 l/s ?
+```
+
+Part F is visually grouped above the space tag and Design below it. `F`/`D` authority prefixes are clear.
+Existing unresolved-transfer `? / No modelled transfer opening identified` behaviour is preserved.
 
 Nothing here changes Part F or Ventilation Design engineering. It changes how the two overlays' tags are
 laid out and labelled relative to each other on the same drawing.
@@ -121,10 +144,18 @@ git diff --check
 
 Baseline was 630/630; ten focused tests were added (630 + 10 = 640), none removed or changed.
 
+Post-merge, on `sow/2026-Q3` at `77b45283e5d2e19f0f382eb3b1294f0c20ea6c69`:
+
+```text
+SAM.Analytical.UI.WPF.Tests             640/640
+SAM_UI.sln Release                      0 errors
+git diff --check                        clean
+```
+
 ### Native acceptance
 
-Not yet run. This branch is not merged - stop here for native SAM_UI acceptance per the task's own
-instruction.
+PASSED - see the note at the top of this entry. PR #96 merged into `sow/2026-Q3`
+(`77b45283e5d2e19f0f382eb3b1294f0c20ea6c69`).
 
 ## Latest (2026-09-07): the manual Part O workflow reaches its results
 
