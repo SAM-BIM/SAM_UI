@@ -259,6 +259,7 @@ namespace SAM.Analytical.UI.WPF
             double scale = PartFTagPlacement.PixelsPerMetre(ViewSettings.AnnotationScale);
 
             Dictionary<Guid, IClosed2D> dictionary_LimitArea = [];
+            Dictionary<Guid, double> dictionary_Row = [];
 
             List<PartFTagPlacementItem> partFTagPlacementItems = [];
 
@@ -270,6 +271,11 @@ namespace SAM.Analytical.UI.WPF
                 }
 
                 Size(mark, out double width_Px, out double height_Px);
+
+                //A terminal tag's centre stays in its own room, so it cannot end up reading as the room
+                //next door's. A transfer tag belongs to the opening between two spaces and so to neither
+                //outline, and gets none.
+                IClosed2D limitArea = mark.IsTransfer ? null : LimitArea(dictionary_LimitArea, mark.SpaceGuid);
 
                 partFTagPlacementItems.Add(new PartFTagPlacementItem()
                 {
@@ -284,10 +290,11 @@ namespace SAM.Analytical.UI.WPF
                     Width = width_Px / scale,
                     Height = height_Px / scale,
 
-                    //A terminal tag's centre stays in its own room, so it cannot end up reading as the room
-                    //next door's. A transfer tag belongs to the opening between two spaces and so to neither
-                    //outline, and gets none.
-                    LimitArea = mark.IsTransfer ? null : LimitArea(dictionary_LimitArea, mark.SpaceGuid),
+                    //The Part F lane: this tag's centre stays ABOVE the space's shared reference row, so a
+                    //DesignAirFlowRenderer tag for the same space - kept below the same row - can never land
+                    //in the same visual band even though the two anchor at the same point. See
+                    //PartFTagPlacement.Lane. A transfer tag has no room outline to clip and keeps none.
+                    LimitArea = limitArea is null ? null : PartFTagPlacement.Lane(limitArea, Row(dictionary_Row, mark.SpaceGuid, limitArea), above: true),
 
                     Tag = mark,
                 });
@@ -675,24 +682,37 @@ namespace SAM.Analytical.UI.WPF
         /// proposal into a survey.
         /// </para>
         /// </summary>
+        /// <summary>
+        /// "F ", drawn before every Part F tag so it reads as the Approved Document F requirement even
+        /// where a <see cref="DesignAirFlowRenderer"/> tag for the same space or the same route sits right
+        /// beside it - see that renderer's own <c>AuthorityPrefix</c>. Position (the lane, see
+        /// <see cref="PartFTagPlacement.Lane"/>) and colour tell the two apart too, but neither may be the
+        /// ONLY thing that does: printed in black and white, or read by someone who cannot see colour, the
+        /// prefix is what is left. Not "Calculated" - a Part F requirement, a design airflow, an operating
+        /// airflow and an equipment capacity may all be calculated values, so that word would say nothing
+        /// about WHICH authority this tag reports.
+        /// </summary>
+        internal const string AuthorityPrefix = "F ";
+
         private string Label(PartFOverlayMark mark)
         {
             PartFAirflowAppearance appearance = PartFAirflowAppearance.Get(mark.AirType);
 
             string result = ViewSettings.ShowValues ? mark.Label : appearance.Abbreviation;
 
-            if (!ViewSettings.ShowCompliance)
+            if (ViewSettings.ShowCompliance)
             {
-                return result;
+                string symbol = PartFAirflowAppearance.Status(mark.Status).Symbol;
+
+                //An unresolved transfer route already carries a trailing "?" in its own label, so adding the
+                //cannot-be-determined symbol produced "TRA 63.0 l/s ? ?". One question mark is the message.
+                if (!string.IsNullOrWhiteSpace(symbol) && !result.TrimEnd().EndsWith(symbol, StringComparison.Ordinal))
+                {
+                    result = string.Concat(result, " ", symbol);
+                }
             }
 
-            string symbol = PartFAirflowAppearance.Status(mark.Status).Symbol;
-
-            //An unresolved transfer route already carries a trailing "?" in its own label, so adding the
-            //cannot-be-determined symbol produced "TRA 63.0 l/s ? ?". One question mark is the message.
-            return string.IsNullOrWhiteSpace(symbol) || result.TrimEnd().EndsWith(symbol, StringComparison.Ordinal)
-                ? result
-                : string.Concat(result, " ", symbol);
+            return string.Concat(AuthorityPrefix, result);
         }
 
         /// <summary>The tag's second line, or null where the mark needs no qualifying.</summary>
@@ -768,6 +788,27 @@ namespace SAM.Analytical.UI.WPF
                 : adjacencyCluster.SpaceSectionFace2Ds(space, floorPlan2DControl.Plane)?.Where(x => x is not null).OrderByDescending(x => x.GetArea()).FirstOrDefault();
 
             dictionary_LimitArea[guid_Space] = result;
+
+            return result;
+        }
+
+        /// <summary>
+        /// The shared row [m] this space's Part F and Ventilation Design tags are split about - see
+        /// <see cref="PartFTagPlacement.Lane"/> - cached per space for the length of one layout. The room
+        /// outline's own internal point: the same point <see cref="PartFFloorPlanOverlay"/> anchors an
+        /// un-fanned terminal mark at, so the two overlays agree on where the row is without either reading
+        /// the other's marks.
+        /// </summary>
+        private static double Row(Dictionary<Guid, double> dictionary_Row, Guid guid_Space, IClosed2D limitArea)
+        {
+            if (dictionary_Row.TryGetValue(guid_Space, out double result))
+            {
+                return result;
+            }
+
+            result = limitArea?.GetInternalPoint2D()?.Y ?? 0;
+
+            dictionary_Row[guid_Space] = result;
 
             return result;
         }

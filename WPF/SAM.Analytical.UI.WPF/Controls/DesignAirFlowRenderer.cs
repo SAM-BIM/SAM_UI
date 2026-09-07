@@ -50,6 +50,21 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public class DesignAirFlowRenderer
     {
+        /// <summary>
+        /// "D ", drawn before every Ventilation Design tag - matching
+        /// <see cref="PartFAirflowRenderer.AuthorityPrefix"/> - so "SUP 150.0 l/s" cannot be mistaken for
+        /// Part F's own requirement just because the two sit right beside it, in the same space or on the
+        /// same route. The lane (see <see cref="PartFTagPlacement.Lane"/>) and this overlay's own colours
+        /// reinforce the distinction; neither may be the ONLY thing that makes it, and the prefix is what
+        /// survives a black-and-white printout or a colour-blind reader.
+        /// <para>
+        /// Not "Calculated": a Part F requirement, a design airflow, an operating airflow and an equipment
+        /// capacity may all be calculated values, so that word would say nothing about WHICH authority this
+        /// tag reports.
+        /// </para>
+        /// </summary>
+        internal const string AuthorityPrefix = "D ";
+
         private static readonly Color supplyColor = Color.FromRgb(0x1B, 0x6E, 0xC2);
         private static readonly Color extractColor = Color.FromRgb(0xC2, 0x5B, 0x1B);
         private static readonly Color netColor = Color.FromRgb(0x4A, 0x4A, 0x4A);
@@ -213,6 +228,7 @@ namespace SAM.Analytical.UI.WPF
             double scale = PartFTagPlacement.PixelsPerMetre(annotationScale);
 
             Dictionary<Guid, IClosed2D> dictionary_LimitArea = [];
+            Dictionary<Guid, double> dictionary_Row = [];
 
             List<PartFTagPlacementItem> items = [];
 
@@ -225,6 +241,11 @@ namespace SAM.Analytical.UI.WPF
 
                 Size(mark, out double width_Px, out double height_Px);
 
+                //A design tag's centre stays in its own room, matching Part F's own terminal tags. A
+                //transfer tag belongs to the opening between two spaces and so to neither outline, and
+                //gets none - the same rule PartFAirflowRenderer.Place applies to its own.
+                IClosed2D limitArea = mark.IsTransfer ? null : LimitArea(dictionary_LimitArea, mark.SpaceGuid);
+
                 items.Add(new PartFTagPlacementItem()
                 {
                     ObjectGuid = mark.SpaceGuid,
@@ -234,10 +255,11 @@ namespace SAM.Analytical.UI.WPF
                     Width = width_Px / scale,
                     Height = height_Px / scale,
 
-                    //A design tag's centre stays in its own room, matching Part F's own terminal tags. A
-                    //transfer tag belongs to the opening between two spaces and so to neither outline, and
-                    //gets none - the same rule PartFAirflowRenderer.Place applies to its own.
-                    LimitArea = mark.IsTransfer ? null : LimitArea(dictionary_LimitArea, mark.SpaceGuid),
+                    //The Design lane: this tag's centre stays BELOW the space's shared reference row, so a
+                    //PartFAirflowRenderer tag for the same space - kept above the same row - can never land
+                    //in the same visual band even though the two anchor at the same point. See
+                    //PartFTagPlacement.Lane. A transfer tag has no room outline to clip and keeps none.
+                    LimitArea = limitArea is null ? null : PartFTagPlacement.Lane(limitArea, Row(dictionary_Row, mark.SpaceGuid, limitArea), above: false),
 
                     Tag = mark,
                 });
@@ -457,7 +479,7 @@ namespace SAM.Analytical.UI.WPF
             //the current zoom - see PartFAirflowRenderer.Factor.
             double factor = Factor(matrix);
 
-            FormattedText formattedText = PartFAirflowRenderer.Text(mark.Label, brush, PartFAirflowRenderer.labelSize_Px * factor, true);
+            FormattedText formattedText = PartFAirflowRenderer.Text(Label(mark), brush, PartFAirflowRenderer.labelSize_Px * factor, true);
 
             FormattedText formattedText_Caption = string.IsNullOrWhiteSpace(mark.Caption)
                 ? null
@@ -522,6 +544,12 @@ namespace SAM.Analytical.UI.WPF
             return result;
         }
 
+        /// <summary>The tag's drawn text, with the explicit "D " identifier - see <see cref="AuthorityPrefix"/>.</summary>
+        private static string Label(DesignAirFlowOverlayMark mark)
+        {
+            return string.Concat(AuthorityPrefix, mark.Label);
+        }
+
         /// <summary>
         /// A tag's measured size in SCREEN pixels at the annotation scale, which is what the placement
         /// converts into plane units - matching <c>PartFAirflowRenderer.Size</c>. Measured exactly as it is
@@ -529,7 +557,7 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private static void Size(DesignAirFlowOverlayMark mark, out double width, out double height)
         {
-            FormattedText formattedText = PartFAirflowRenderer.Text(mark.Label, Brushes.Black, PartFAirflowRenderer.labelSize_Px, true);
+            FormattedText formattedText = PartFAirflowRenderer.Text(Label(mark), Brushes.Black, PartFAirflowRenderer.labelSize_Px, true);
 
             FormattedText formattedText_Caption = string.IsNullOrWhiteSpace(mark.Caption)
                 ? null
@@ -565,6 +593,27 @@ namespace SAM.Analytical.UI.WPF
                 : adjacencyCluster.SpaceSectionFace2Ds(space, floorPlan2DControl.Plane)?.Where(x => x is not null).OrderByDescending(x => x.GetArea()).FirstOrDefault();
 
             dictionary_LimitArea[guid_Space] = result;
+
+            return result;
+        }
+
+        /// <summary>
+        /// The shared row [m] this space's Part F and Ventilation Design tags are split about - see
+        /// <see cref="PartFTagPlacement.Lane"/> - cached per space for the length of one layout, matching
+        /// <c>PartFAirflowRenderer.Row</c>. The room outline's own internal point: the same point either
+        /// overlay's builder anchors an un-fanned terminal mark at, so the two agree on where the row is
+        /// without either reading the other's marks.
+        /// </summary>
+        private static double Row(Dictionary<Guid, double> dictionary_Row, Guid guid_Space, IClosed2D limitArea)
+        {
+            if (dictionary_Row.TryGetValue(guid_Space, out double result))
+            {
+                return result;
+            }
+
+            result = limitArea?.GetInternalPoint2D()?.Y ?? 0;
+
+            dictionary_Row[guid_Space] = result;
 
             return result;
         }

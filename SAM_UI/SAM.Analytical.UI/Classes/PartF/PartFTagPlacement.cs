@@ -194,6 +194,95 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
+        /// How far [m] the half-plane <see cref="Lane"/> builds reaches beyond the row it is drawn about.
+        /// Effectively unbounded at building scale - large enough that it is never itself the reason a
+        /// candidate position is rejected - while staying a real, finite <see cref="Rectangle2D"/>.
+        /// </summary>
+        private const double laneHalfExtent_M = 1e6;
+
+        /// <summary>
+        /// Splits a tag's existing centre constraint into the Part F lane (above a shared reference row) or
+        /// the Ventilation Design lane (below it), so a Part F tag and a Ventilation Design tag reporting on
+        /// the same space or the same route can never land on the same side of the row and read as one
+        /// interchangeable figure.
+        /// <para>
+        /// <b>Combined with the existing constraint, not substituted for it.</b> Where <paramref name="limitArea"/>
+        /// is a room outline (a <see cref="Face2D"/>) this clips that outline to its own half by the row, so a
+        /// terminal tag's centre still has to stay inside its own room - the harder rule, kept exactly as
+        /// <see cref="PartFTagPlacementItem.LimitArea"/> already documents it - AND on its own side of the
+        /// row. Where it is null - a transfer tag, which belongs to no single room - the half-plane alone is
+        /// returned, so the lane still applies even though there is no outline to clip.
+        /// </para>
+        /// <para>
+        /// A room the row cuts entirely off - the clip leaves fewer than three points - falls back to the
+        /// UNCLIPPED outline rather than an empty region: the lane is a presentation preference, and a tag
+        /// that cannot be placed at all is a regulatory or design figure lost from the drawing, which is the
+        /// worse failure.
+        /// </para>
+        /// </summary>
+        /// <param name="limitArea">The tag's existing centre constraint - a room outline, or null.</param>
+        /// <param name="row">The reference row [m], in the view plane's own Y, the lane is drawn about.</param>
+        /// <param name="above">True for the Part F lane (centre Y &#8805; row); false for the Design lane (centre Y &#8804; row).</param>
+        public static IClosed2D Lane(IClosed2D limitArea, double row, bool above)
+        {
+            if (limitArea is not Face2D face2D)
+            {
+                return limitArea ?? HalfPlane(row, above);
+            }
+
+            List<Point2D> point2Ds = (face2D.ExternalEdge2D as ISegmentable2D)?.GetPoints();
+
+            return (IClosed2D)Clip(point2Ds, row, above) ?? face2D;
+        }
+
+        private static Rectangle2D HalfPlane(double row, bool above)
+        {
+            double originY = above ? row : row - (2 * laneHalfExtent_M);
+
+            return new Rectangle2D(new Point2D(-laneHalfExtent_M, originY), 2 * laneHalfExtent_M, 2 * laneHalfExtent_M);
+        }
+
+        /// <summary>
+        /// A closed polyline's boundary clipped to one side of a horizontal row - Sutherland-Hodgman against
+        /// the single edge Y = <paramref name="row"/> - or null where fewer than three points remain, i.e.
+        /// the boundary does not reach that side at all.
+        /// </summary>
+        private static Polygon2D Clip(List<Point2D> point2Ds, double row, bool above)
+        {
+            if (point2Ds is null || point2Ds.Count < 3)
+            {
+                return null;
+            }
+
+            List<Point2D> result = [];
+
+            int count = point2Ds.Count;
+
+            for (int i = 0; i < count; i++)
+            {
+                Point2D current = point2Ds[i];
+                Point2D previous = point2Ds[(i - 1 + count) % count];
+
+                bool current_Inside = above ? current.Y >= row : current.Y <= row;
+                bool previous_Inside = above ? previous.Y >= row : previous.Y <= row;
+
+                if (current_Inside != previous_Inside)
+                {
+                    double t = (row - previous.Y) / (current.Y - previous.Y);
+
+                    result.Add(new Point2D(previous.X + (t * (current.X - previous.X)), row));
+                }
+
+                if (current_Inside)
+                {
+                    result.Add(current);
+                }
+            }
+
+            return result.Count < 3 ? null : new Polygon2D(result);
+        }
+
+        /// <summary>
         /// Places every tag, entering the manually positioned ones as obstacles rather than leaving them out.
         /// </summary>
         /// <param name="partFTagPlacementItems">
