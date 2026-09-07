@@ -1,28 +1,177 @@
 # Project Progress
 
 ## Branch
-`fix/partf-design-overlay-readability`, branched from `sow/2026-Q3`.
+`test/parto-xbc15-capacity-ceiling`, branched from `sow/2026-Q3` at **`8219416`**.
 
-**Stands alone.** It needs no change in `SAM`, `SAM_Tas`, `SAM_Systems` or any other dependency, and is
-compiled against the merged dependency set. Baseline it was branched from, re-measured before any edit:
+**Tests plus one documentation comment.** No behaviour changed. `SAM_Systems` carries the substantive change
+of this closeout (the catalogue entry) on `feature/parto-catalogue-xbc15`, and `SAM` carries the library-level
+regressions on `test/parto-real-selection-ladder`; neither is a build dependency of this one.
+
+Everything below the *Latest* entry is superseded history retained for context, and its forward-looking
+claims (branch names, "next step" lists) are historical rather than current.
+
+## Latest (2026-09-07): XBC15's 190 l/s as a ceiling, through the production Iteration 2B path
+
+**Status: implemented, tested, and natively accepted.**
+Branch `test/parto-xbc15-capacity-ceiling`, off `sow/2026-Q3` at **`8219416`** (the PR #96 acceptance record).
+
+Baseline it was branched from, measured before any edit:
 
 ```text
 SAM_UI.sln Release                      0 errors
-SAM.Analytical.UI.WPF.Tests             630/630
+SAM.Analytical.UI.WPF.Tests             640/640
 ```
 
-Everything below the entry dated 2026-09-07 (the Part O manual-simulation-results entry) is superseded
-history retained for context.
+### What this is
 
-## Last updated
-2026-09-07 - Part F and Ventilation Design floor-plan tags read as one interchangeable figure when both
-overlays are enabled for the same space or route. Fixed by splitting the shared placement adapter into two
-stable lanes (Part F above a space's own reference row, Design below it) and giving every tag an explicit
-"F "/"D " textual identifier, on top of the existing shared solver - no new placement engine, no change to
-any engineering authority, no change to transfer arrow geometry. Native SAM_UI acceptance PASSED; PR #96
-merged into `sow/2026-Q3` (`77b45283e5d2e19f0f382eb3b1294f0c20ea6c69`).
+`SAM_Systems` now ships a second real product - **Nuaire XBOXER XBC15, 190/190 l/s** beside the MRXBOX's
+150/150. This branch proves the Approved Document O closeout case **through the production optimisation
+path** in this repository: the XBC15 explicitly selected on a ~150 l/s design, its 190 l/s acting only as a
+ceiling, and Iteration 2B never silently reselecting.
 
-## Latest (2026-09-07): Part F / Design floor-plan overlay readability
+Tests plus one documentation comment. **No behaviour changed.**
+
+### Why the production path, and how it is reachable without TAS
+
+`Modify.CapacityEnvelope` (`WPF/SAM.Analytical.UI.WPF/Modify/OptimisePartOTM59.cs`) is the Iteration 2B
+envelope orchestration, called from `OptimisePartOTM59`. It is called here exactly as `OptimisePartOTM59`
+calls it, through the existing `InternalsVisibleTo` seam - not the `SAM.Analytical` primitive underneath it.
+
+Everything the closeout asserts is settled by the orchestrator **before** it reaches `RunPartOSimulation`,
+which is the only step needing a licensed TAS: the eligibility guards, the target vector,
+`EvaluateDesignAirFlowCapacityEnvelope`, the step construction, the targeted and derived adjustments, the
+notes and the user-facing description. The fixture states no ventilation route, so the run records the whole
+envelope and then stops with its own refusal at the re-preparation stage and **no simulation is attempted** -
+the same seam every existing test in `PartOCapacityEnvelopeTests` uses.
+
+The production path also has a second, independent reason the plant cannot be swapped, and the tests assert
+it: the re-preparation over the envelope design is handed a **null catalogue** on purpose
+(`OptimisePartOTM59.cs`, the `PreparePartOIteration` call inside `CapacityEnvelope`), so preparation has
+nothing to select from either.
+
+### `PartOCapacityEnvelopeTests` - four tests
+
+A new `FailingOnTheRealLadder` fixture: a run stopped on capacity with one failing room, over a dwelling
+designed at 150/150 l/s, whose unit is selected as the **XBC15** - with the MRXBOX offered **first** in the
+list, so anything taking the head of the list or re-running the selection rule would visibly swap the plant.
+
+- `XBC15sRating_IsTheCeilingTheProductionEnvelopeGrowsWithin` - scale `190/150`; duty 150 -> **190/190 with
+  zero headroom, never past it**; the 40 l/s spent as design airflow; the grown design read room by room off
+  the model the orchestrator built; and the sentence the user reads contains `190/190 l/s of 190/190 l/s`
+  and `DIAGNOSTIC ONLY`.
+- `TheProductionEnvelope_KeepsXBC15Selected_AndNeverReselects` - the premise asserted first (the automatic
+  rule *would* choose the MRXBOX at 150/150), then the group's product is the XBC15 by identity, the
+  selection is stable on the last valid model **and** on the envelope's model, every dwelling round reports
+  `Kept`, and the description says `No product was reselected`.
+- `TheProductionEnvelopeOverXBC15_MovesOnlyDesignAirflow` - the authority separation:
+  `PartFRequiredAirFlow != DesignAirFlow != SelectedEquipmentCapacity != OperatingAirFlow`. Requirements
+  bit-identical (13 l/s stays 13 l/s beside a 190 l/s design), no air movement created/removed/re-rated, the
+  accepted design untouched by value and by reference, and the envelope not counted as a round.
+- `ADesignAlreadyAtXBC15sRating_ReportsNoUsefulHeadroomAndSimulatesNothing` - at 190/190 the `NoHeadroom`
+  outcome fires with its explicit reason, no step is appended, **no simulation is spent**, the XBC15 is still
+  selected and the 500 l/s product on offer was never reached for. No capacity rule was relaxed.
+
+### `PartOPresentationTests` - one test, and it is the one the freeze rests on
+
+`TheShippedCatalogue_OffersTwoProducts_AndStillSelectsTheMRXBOXAtTheProjectsDuties`. Selection is
+smallest-capable by `Size_Lps = supply + extract`, and the XBC15 is size 380 against the MRXBOX's 300, so at
+every duty the MRXBOX can also carry the answer is unchanged. Asserted on the **installed** catalogue: two
+selectable products, nothing unselectable, the description reading `2 selectable ventilation unit product(s)
+available.`, and at 30/30, 63/63 **and 150/150** l/s the MRXBOX still selected with the XBC15 offered and not
+taken - then the XBC15 selected at 160/160, the band it was added for.
+
+That is what makes the existing licensed Iteration 2 and 2B acceptance still **valid** rather than merely
+still plausible. It carries the same "skip where the catalogue is not installed" guard as
+`TheShippedCatalogue_OffersTheNuaireProductAt150Maximum`; verified on this machine that the guard does not
+trip and the assertions really run.
+
+### Documentation
+
+`SAM_UI/WPF/SAM.Analytical.UI.WPF/Classes/PartO/VentilationUnitCatalogue.cs` - the class comment said "The
+one product this repository ships states 150 l/s". Reworded for two. No behaviour change; the class still
+reads and reports and decides nothing.
+
+### Validation
+
+| Suite / build | Result |
+| --- | --- |
+| `PartOCapacityEnvelopeTests` (focused) | **33 / 33** (was 29) |
+| `SAM.Analytical.UI.WPF.Tests` (full) | **645 / 645** (was 640) |
+| `dotnet build SAM_UI.sln -c Release` | **0 errors** |
+| `git diff --check` | clean |
+
+Sibling repositories: `SAM_Systems` `feature/parto-catalogue-xbc15` (the catalogue entry - the substantive
+change), `SAM` `test/parto-real-selection-ladder` (the same closeout at library level, **2024/2024**),
+`SAM_Tas` `ec7f505` unchanged. Neither companion branch is a build dependency of this one.
+
+### Native acceptance
+
+- **Iterations 1a / 1b** - nothing owed. Neither reads the catalogue.
+- **Iteration 2** - **PASSED** on 2026-09-07, observed in SAM_UI on the combined PR heads, with no TAS
+  rerun. All three dwellings still automatically select `Nuaire MRXBOXAB-ECO5-AECV`; design duties remain
+  30/30, 63/63 and 63/63 l/s; selected equipment capacity remains 150/150 l/s; headroom remains 120/120,
+  87/87 and 87/87 l/s; Approved Document F and Design airflow are still shown as separate quantities and
+  remain consistent with the previously accepted model; and no equipment-selection operation changed a
+  design duty.
+
+  The third assertion originally written here - that the Iteration window *reports two selectable
+  products* - is **NOT APPLICABLE to the current interface**. This repository's SAM_UI does not expose the
+  catalogue product list anywhere: `PartOIterationWindow` offers only the `SelectVentilationUnit` on/off
+  checkbox, so there is no surface on which a product count could be read. That the shipped catalogue holds
+  two selectable products is pinned in CI instead, by
+  `PartOPresentationTests.TheShippedCatalogue_OffersTwoProducts_AndStillSelectsTheMRXBOXAtTheProjectsDuties`
+  and by `SAM_Systems`' `TheShippedCatalogue_HoldsBothNuaireProducts`. The missing surface is an explicit
+  **usability gap carried into the next task** (see the closing section of this entry), not a defect of this
+  closeout and not a blocker for it. The 2026-09-01 licensed
+  evidence (three dwellings at 30/30, 63/63 and 63/63 l/s; 105,120 hourly TAS values bit-identical with and
+  without a product selected) continues to apply, because the XBC15 is larger than the MRXBOX on both sides
+  and is therefore never the smallest capable unit at those duties - which the new
+  `PartOPresentationTests` test pins in CI.
+- **Iteration 2B** - the existing native 2B workflow acceptance **stands unchanged**: the orchestration is
+  untouched and the recorded runs remain reproducible from the staged fixture. Re-running it would spend a
+  full-year simulation to re-observe behaviour nothing in this change touches.
+- **Iteration 2B with XBC15 explicitly selected** - covered through the production optimisation path above
+  rather than by native observation, because this repository has no explicit product picker (see below). The
+  simulation step is the only part not exercised, and it is the part this change cannot affect: every fact
+  under test is settled before `RunPartOSimulation` is called.
+- **Saved TM59 / results reopen behaviour** - unchanged and already covered.
+
+### Status
+
+**XBC15 CLOSEOUT COMPLETE - READY FOR FINAL EQUIPMENT-SELECTION UX.**
+
+All automated acceptance is complete, every solution builds clean, and the native Iteration 2 confirmation
+above has PASSED. Nothing further is owed by this closeout.
+
+**Nothing is FROZEN.** Iterations 1a / 1b / 2 / 2B are deliberately **not** marked frozen here. The freeze
+gate is the equipment-selection UX task that follows this one - allowed product pool, convert-to-manual, and
+per-dwelling manual assignment - and the product picker that task adds is precisely the interface the native
+Iteration 2 check above could not exercise. Freezing before that surface exists would freeze a workflow
+nobody can yet drive.
+
+### Recorded as a future usability enhancement, not an open gate
+
+This repository has **no explicit ventilation-unit product picker**. `PartOIterationWindow` offers only the
+`SelectVentilationUnit` on/off checkbox, and selection is automatic smallest-capable, so a specific catalogue
+product cannot be chosen on a real model from the interface at all. That is why the XBC15 Iteration 2B case
+is proved through the production optimisation path in test rather than natively.
+
+The agreed shape of the enhancement, deliberately **not** built here: a user-defined **allowed pool**;
+Automatic assigns the smallest capable product from that pool to every dwelling; **Convert to Manual** freezes
+those assignments as the initial per-dwelling selections, after which individual dwellings may be overridden;
+and Manual assignments remain **authoritative during Iteration 2B** - validate capacity and suggest
+alternatives when insufficient, but **never silently reselect**. That last clause is the invariant
+`Modify.CapacityEnvelope` already honours for automatic selections, and the four tests above are what would
+keep it honest for manual ones.
+
+### Next step
+
+- The native Iteration 2 visual confirmation, then mark Iterations 1a / 1b / 2 / 2B **READY TO FREEZE**.
+- Human review of the three PRs, then merge. **Do not merge automatically.** Record `FROZEN` and the SHAs
+  after the merges.
+- Not Iteration 3. The equipment-selection UX above is its own task.
+
+## Superseded (2026-09-07): Part F / Design floor-plan overlay readability - merged as PR #96
 
 **Status: root-caused, implemented, tested, native-accepted, and merged (PR #96,
 `77b45283e5d2e19f0f382eb3b1294f0c20ea6c69`).**

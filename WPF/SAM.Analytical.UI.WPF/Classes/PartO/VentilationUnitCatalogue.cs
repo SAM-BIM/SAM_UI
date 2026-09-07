@@ -27,9 +27,9 @@ namespace SAM.Analytical.UI.WPF
     /// </para>
     /// <para>
     /// <b>The capacity a descriptor carries is the equipment's maximum, never a dwelling's design airflow.</b>
-    /// The one product this repository ships states 150 l/s supply and 150 l/s extract, which is the highest
-    /// free-air point of its fan curve. A dwelling whose design duty is 30 l/s and which selects it still has
-    /// a 30 l/s design duty; the rest is headroom.
+    /// The two products this repository ships state 150/150 l/s and 190/190 l/s supply and extract, each the
+    /// highest free-air point of its own published fan data. A dwelling whose design duty is 30 l/s and which
+    /// selects one still has a 30 l/s design duty; the rest is headroom.
     /// </para>
     /// </summary>
     public class VentilationUnitCatalogue
