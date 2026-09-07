@@ -351,6 +351,58 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// code. The two states above are what cover the reader's behaviour unconditionally.
         /// </para>
         /// </summary>
+        /// <summary>
+        /// <b>A second product in the catalogue does not disturb the accepted Iteration 2 answer.</b>
+        /// <para>
+        /// The shipped catalogue now offers two Nuaire products - the MRXBOX at 150/150 l/s and the XBOXER
+        /// XBC15 at 190/190 l/s. Selection is smallest-capable by size, and the XBC15 is larger on both
+        /// sides, so at every duty the MRXBOX can also carry the answer is unchanged: at the project's own
+        /// 30/30 and 63/63 l/s dwelling duties, and at the 150 l/s boundary itself, the MRXBOX is still what
+        /// is selected and the XBC15 is offered and not taken.
+        /// </para>
+        /// <para>
+        /// This is what makes the existing licensed Iteration 2 and 2B acceptance still valid rather than
+        /// merely still plausible - the XBC15 becomes selectable only in the new 150-190 l/s band. Skipped
+        /// where the catalogue is not installed on the machine running the tests, exactly as the test below
+        /// is: the absence of a shipped resource is an environment fact, not a defect in this code.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TheShippedCatalogue_OffersTwoProducts_AndStillSelectsTheMRXBOXAtTheProjectsDuties()
+        {
+            VentilationUnitCatalogue ventilationUnitCatalogue = VentilationUnitCatalogue.Read();
+
+            if (ventilationUnitCatalogue.State != VentilationUnitCatalogueState.Selectable)
+            {
+                return;
+            }
+
+            Assert.True(ventilationUnitCatalogue.HasSelectableProducts);
+            Assert.Empty(ventilationUnitCatalogue.UnselectableTemplates);
+
+            Assert.Equal(2, ventilationUnitCatalogue.CapacityDescriptors.Count);
+            Assert.Contains("2 selectable ventilation unit product(s) available.", ventilationUnitCatalogue.Description);
+
+            Assert.Contains(ventilationUnitCatalogue.CapacityDescriptors, x => x.VentilationUnitReference?.Model == "MRXBOXAB-ECO5-AECV" && x.MaximumSupplyFlowRate_Lps == 150);
+            Assert.Contains(ventilationUnitCatalogue.CapacityDescriptors, x => x.VentilationUnitReference?.Model == "XBC15" && x.MaximumSupplyFlowRate_Lps == 190);
+
+            //The project's own dwelling duties, and the boundary. Unchanged answers, all three.
+            foreach (double duty_Lps in new double[] { 30, 63, 150 })
+            {
+                VentilationUnitSelection ventilationUnitSelection = Analytical.Query.SelectSmallestCapableVentilationUnit(ventilationUnitCatalogue.CapacityDescriptors, duty_Lps, duty_Lps);
+
+                Assert.True(ventilationUnitSelection.IsSelected);
+                Assert.Equal("MRXBOXAB-ECO5-AECV", ventilationUnitSelection.VentilationUnitReference.Model);
+
+                //The design duty is what it was asked for, and the rest is headroom deliberately untaken.
+                Assert.Equal(duty_Lps, ventilationUnitSelection.SupplyDuty_Lps, 6);
+                Assert.Equal(150 - duty_Lps, ventilationUnitSelection.SupplyHeadroom_Lps, 6);
+            }
+
+            //And the XBC15 is what answers above 150 - the band it was added for.
+            Assert.Equal("XBC15", Analytical.Query.SelectSmallestCapableVentilationUnit(ventilationUnitCatalogue.CapacityDescriptors, 160, 160).VentilationUnitReference.Model);
+        }
+
         [Fact]
         public void TheShippedCatalogue_OffersTheNuaireProductAt150Maximum()
         {

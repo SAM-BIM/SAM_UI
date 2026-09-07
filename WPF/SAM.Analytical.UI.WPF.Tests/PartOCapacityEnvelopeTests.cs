@@ -46,6 +46,12 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         private const string name_Bathroom_Studio = "Bathroom_2";
 
+        /// <summary>The shipped Nuaire hybrid unit's model, 150/150 l/s.</summary>
+        private const string model_MRXBOX = "MRXBOXAB-ECO5-AECV";
+
+        /// <summary>The shipped Nuaire XBOXER commercial unit's model, 190/190 l/s.</summary>
+        private const string model_XBC15 = "XBC15";
+
         private static readonly Guid guid_Studio = new("33333333-3333-3333-3333-333333333333");
 
         private static readonly Guid guid_Bathroom_Studio = new("55555555-5555-5555-5555-555555555555");
@@ -670,7 +676,358 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.True(new PartOOptimisationSettings { CapacityEnvelope = false }.IsValid(out string _));
         }
 
+        // ---- The real catalogue's own products, through the production orchestration ---------------------
+        //
+        // Everything above drives Modify.CapacityEnvelope over fixture products, because the orchestration
+        // is what those tests are about. These four are the Approved Document O closeout case, on the two
+        // products SAM_Systems ships - the Nuaire MRXBOX at 150/150 l/s and the Nuaire XBOXER XBC15 at
+        // 190/190 l/s - with the XBC15 DELIBERATELY selected on a ~150 l/s design rather than the smaller
+        // MRXBOX the automatic rule would pick.
+        //
+        // THE PRODUCTION PATH, not the library primitive. Modify.CapacityEnvelope is what
+        // OptimisePartOTM59 calls, and it is called here exactly as it calls it. Every fact these tests
+        // assert - the ceiling, the retained identity, the absence of a reselection, the untouched
+        // Approved Document F requirements and operating airflows - is settled by the orchestrator BEFORE
+        // it reaches RunPartOSimulation, which is the only step a licensed TAS is needed for. The fixture
+        // states no ventilation route, so the run stops with its own refusal at the re-preparation stage
+        // and no simulation is attempted - the same seam every test above uses.
+        //
+        // SAM_UI does not choose products and must not start: the identities and capacities below are
+        // stated, and that they are what the shipped catalogue says is asserted in SAM_Systems' own
+        // VentilationUnitCatalogueTests.
+
+        /// <summary>
+        /// <b>The closeout case, through the production orchestrator.</b> A 150/150 l/s design whose unit is
+        /// selected as the XBC15 grows proportionally onto 190/190 and stops there - the ~40 l/s of
+        /// equipment-capacity headroom spent as design airflow, and not a thousandth past the rating.
+        /// </summary>
+        [Fact]
+        public void XBC15sRating_IsTheCeilingTheProductionEnvelopeGrowsWithin()
+        {
+            PartOOptimisationRun partOOptimisationRun = FailingOnTheRealLadder(out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext);
+
+            Modify.CapacityEnvelope(partOOptimisationRun, new PartOOptimisationSettings(), partOPreparationContext, partOSimulationContext);
+
+            DesignAirFlowCapacityEnvelope designAirFlowCapacityEnvelope = partOOptimisationRun.CapacityEnvelope;
+
+            Assert.NotNull(designAirFlowCapacityEnvelope);
+            Assert.True(designAirFlowCapacityEnvelope.IsScaled, designAirFlowCapacityEnvelope.Reason);
+            Assert.Equal(DesignAirFlowCapacityEnvelopeOutcome.Scaled, designAirFlowCapacityEnvelope.Outcome);
+
+            DesignAirFlowCapacityEnvelopeGroup designAirFlowCapacityEnvelopeGroup = Assert.Single(designAirFlowCapacityEnvelope.Groups);
+
+            Assert.Equal(190.0 / 150.0, designAirFlowCapacityEnvelopeGroup.Scale, 9);
+
+            Assert.Equal(150, designAirFlowCapacityEnvelopeGroup.SupplyDuty_Before_Lps, 6);
+            Assert.Equal(150, designAirFlowCapacityEnvelopeGroup.ExtractDuty_Before_Lps, 6);
+
+            //THE assertion: 190 l/s acted as a ceiling. On the rating, never past it.
+            Assert.Equal(190, designAirFlowCapacityEnvelopeGroup.SupplyDuty_After_Lps, 6);
+            Assert.Equal(190, designAirFlowCapacityEnvelopeGroup.ExtractDuty_After_Lps, 6);
+
+            Assert.Equal(0, designAirFlowCapacityEnvelopeGroup.SupplyHeadroom_Lps, 6);
+            Assert.Equal(0, designAirFlowCapacityEnvelopeGroup.ExtractHeadroom_Lps, 6);
+
+            //The 40 l/s the closeout is about, spent as design airflow on both sides.
+            Assert.Equal(40, designAirFlowCapacityEnvelopeGroup.SupplyDuty_After_Lps - designAirFlowCapacityEnvelopeGroup.SupplyDuty_Before_Lps, 6);
+
+            //And the grown design itself, room by room, in the model the orchestrator built.
+            Assert.Equal(190, Design(designAirFlowCapacityEnvelope.AdjacencyCluster, name_Bedroom, FlowClassification.Supply), 6);
+            Assert.Equal(190, Design(designAirFlowCapacityEnvelope.AdjacencyCluster, name_Kitchen, FlowClassification.Extract), 6);
+
+            //The run reports it as a diagnostic, and says the ceiling it reached, in the sentence a user
+            //reads - so the number on screen is the selected product's rating and not a design decision.
+            Assert.Contains("190/190 l/s of 190/190 l/s", partOOptimisationRun.CapacityEnvelopeDescription);
+            Assert.Contains("DIAGNOSTIC ONLY", partOOptimisationRun.CapacityEnvelopeDescription);
+        }
+
+        /// <summary>
+        /// <b>XBC15 stays selected, through the orchestration.</b> The MRXBOX is offered, is capable of the
+        /// 150/150 design the envelope started from, and is <b>smaller on both sides</b> - so anything that
+        /// re-ran the selection rule would swap the plant for the cheaper unit and then report no headroom.
+        /// <para>
+        /// The production path has two separate reasons this cannot happen, and both are asserted: the
+        /// envelope reads the model's own selection rather than choosing, and the re-preparation over the
+        /// envelope design is handed a <b>null catalogue</b> on purpose, so preparation has nothing to
+        /// select from either.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TheProductionEnvelope_KeepsXBC15Selected_AndNeverReselects()
+        {
+            PartOOptimisationRun partOOptimisationRun = FailingOnTheRealLadder(out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext);
+
+            //The premise: the automatic rule would prefer the other product at this duty.
+            Assert.Equal(model_MRXBOX, Analytical.Query.SelectSmallestCapableVentilationUnit(partOPreparationContext.VentilationUnitCapacityDescriptors, 150, 150).VentilationUnitReference.Model);
+
+            Assert.Equal(model_XBC15, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+
+            Modify.CapacityEnvelope(partOOptimisationRun, new PartOOptimisationSettings(), partOPreparationContext, partOSimulationContext);
+
+            DesignAirFlowCapacityEnvelope designAirFlowCapacityEnvelope = partOOptimisationRun.CapacityEnvelope;
+
+            Assert.True(designAirFlowCapacityEnvelope.IsScaled, designAirFlowCapacityEnvelope.Reason);
+
+            //The group the ceiling came from is the XBC15, by identity.
+            DesignAirFlowCapacityEnvelopeGroup designAirFlowCapacityEnvelopeGroup = Assert.Single(designAirFlowCapacityEnvelope.Groups);
+
+            Assert.Equal(model_XBC15, designAirFlowCapacityEnvelopeGroup.VentilationUnitReference.Model);
+            Assert.Equal(190, designAirFlowCapacityEnvelopeGroup.VentilationUnitCapacityDescriptor.MaximumSupplyFlowRate_Lps, 6);
+
+            //Still selected on the design the optimisation accepted, and on the envelope's own model.
+            Assert.Equal(model_XBC15, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+            Assert.Equal(model_XBC15, SelectedModel(designAirFlowCapacityEnvelope.AdjacencyCluster));
+
+            //No dwelling of the grown round reports a reselection.
+            Assert.All(designAirFlowCapacityEnvelope.RoundCandidate.DwellingRounds, x => Assert.Equal(VentilationUnitSelectionOutcome.Kept, x.VentilationUnitSelectionOutcome));
+
+            //And the sentence the user reads says so, rather than leaving it to be trusted.
+            Assert.Contains("No product was reselected", partOOptimisationRun.CapacityEnvelopeDescription);
+        }
+
+        /// <summary>
+        /// <b>The authority separation, on the real case, through the orchestration.</b>
+        /// <code>
+        /// PartFRequiredAirFlow != DesignAirFlow != SelectedEquipmentCapacity != OperatingAirFlow
+        /// </code>
+        /// Design airflow moves. The Approved Document F requirements do not. The equipment capacity is read
+        /// as a ceiling and written nowhere. No operating airflow is produced. And the design the
+        /// optimisation accepted is left exactly as it was - the whole safety of the operation, because an
+        /// envelope is a design the ordinary policy refused and a later round must never start from it.
+        /// </summary>
+        [Fact]
+        public void TheProductionEnvelopeOverXBC15_MovesOnlyDesignAirflow()
+        {
+            PartOOptimisationRun partOOptimisationRun = FailingOnTheRealLadder(out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext);
+
+            AdjacencyCluster adjacencyCluster_LastValid = partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster;
+
+            Dictionary<string, double> requirements_Before = Requirements(adjacencyCluster_LastValid);
+            Dictionary<string, double> designs_Before = Designs(adjacencyCluster_LastValid);
+            List<string> airMovements_Before = AirMovements(adjacencyCluster_LastValid);
+
+            Modify.CapacityEnvelope(partOOptimisationRun, new PartOOptimisationSettings(), partOPreparationContext, partOSimulationContext);
+
+            DesignAirFlowCapacityEnvelope designAirFlowCapacityEnvelope = partOOptimisationRun.CapacityEnvelope;
+
+            Assert.True(designAirFlowCapacityEnvelope.IsScaled, designAirFlowCapacityEnvelope.Reason);
+
+            //1. Approved Document F is untouched in the grown model. The requirement was read as a floor and
+            //   never written - 13 l/s stays 13 l/s beside a 190 l/s design.
+            Assert.Equal(requirements_Before, Requirements(designAirFlowCapacityEnvelope.AdjacencyCluster));
+            Assert.Equal(13, Requirement(designAirFlowCapacityEnvelope.AdjacencyCluster, name_Bedroom, FlowClassification.Supply), 6);
+
+            //2. No operating airflow. The envelope creates, removes and re-rates no air movement - that is
+            //   the preparation's job, and doing it here would collapse design airflow into runtime airflow.
+            Assert.Equal(airMovements_Before, AirMovements(designAirFlowCapacityEnvelope.AdjacencyCluster));
+
+            //3. The design the optimisation accepted is untouched, by value and by reference, and remains
+            //   the run's last valid design.
+            Assert.Equal(designs_Before, Designs(adjacencyCluster_LastValid));
+            Assert.Equal(150, Design(adjacencyCluster_LastValid, name_Bedroom, FlowClassification.Supply), 6);
+            Assert.NotSame(adjacencyCluster_LastValid, designAirFlowCapacityEnvelope.AdjacencyCluster);
+
+            //4. The envelope is NOT the run's answer and is not counted as one of its rounds - the
+            //   baseline is not a round either, so nothing here is.
+            Assert.Equal(0, partOOptimisationRun.Rounds);
+            Assert.Empty(partOOptimisationRun.Steps.FindAll(x => x.IsOptimisationRound));
+            Assert.NotSame(partOOptimisationRun.AnalyticalModel_LastValid, partOOptimisationRun.AnalyticalModel_CapacityEnvelope);
+
+            //5. The realised design DID move, and the deliberate adjustments report it against the design
+            //   it grew from rather than against a capacity.
+            Assert.NotEqual(designs_Before, Designs(designAirFlowCapacityEnvelope.AdjacencyCluster));
+            Assert.Contains("no Approved Document F requirement was altered and no operating airflow was written", partOOptimisationRun.CapacityEnvelopeDescription);
+        }
+
+        /// <summary>
+        /// A design already standing on the XBC15's rating has nothing left to give. The orchestrator says
+        /// so in its own words, spends <b>no simulation</b> on it, appends no step - and does not reach for
+        /// the larger product that is also on offer. No capacity rule is relaxed to produce an answer.
+        /// </summary>
+        [Fact]
+        public void ADesignAlreadyAtXBC15sRating_ReportsNoUsefulHeadroomAndSimulatesNothing()
+        {
+            PartOOptimisationRun partOOptimisationRun = FailingOnTheRealLadder(190, out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext);
+
+            Modify.CapacityEnvelope(partOOptimisationRun, new PartOOptimisationSettings(), partOPreparationContext, partOSimulationContext);
+
+            Assert.Null(partOOptimisationRun.Step_CapacityEnvelope);
+            Assert.False(partOOptimisationRun.HasCapacityEnvelope);
+
+            Assert.NotNull(partOOptimisationRun.CapacityEnvelope);
+            Assert.Equal(DesignAirFlowCapacityEnvelopeOutcome.NoHeadroom, partOOptimisationRun.CapacityEnvelope.Outcome);
+            Assert.Contains("no useful headroom", partOOptimisationRun.CapacityEnvelopeDescription);
+
+            //Still the XBC15, and the 500 l/s product on offer was never reached for.
+            Assert.Equal(model_XBC15, SelectedModel(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster));
+            Assert.Equal(model_XBC15, Assert.Single(partOOptimisationRun.CapacityEnvelope.Groups).VentilationUnitReference.Model);
+
+            //Nothing was appended to the history, so nothing that did not happen is in the round count.
+            Assert.Single(partOOptimisationRun.Steps);
+
+            //And the design was left where it was rather than shrunk to create headroom to report.
+            Assert.Equal(190, Design(partOOptimisationRun.AnalyticalModel_LastValid.AdjacencyCluster, name_Bedroom, FlowClassification.Supply), 6);
+        }
+
         // ---- Fixture ---------------------------------------------------------------------------------------
+        /// <summary>
+        /// <b>The real closeout fixture.</b> A run that stopped on capacity with one failing room, over a
+        /// dwelling designed at <paramref name="design_Lps"/> on both sides, whose serving unit is selected
+        /// as the <b>Nuaire XBOXER XBC15</b> (190/190 l/s) - deliberately NOT the smaller MRXBOX that is
+        /// also offered and that the automatic rule would choose at a 150 l/s duty.
+        /// <para>
+        /// No ventilation route is stated, so the orchestration computes and records the whole envelope and
+        /// then stops with its own refusal at the re-preparation stage, before any TAS work. That is the
+        /// same seam the tests above use, and it is what makes the production path assertable here.
+        /// </para>
+        /// </summary>
+        private static PartOOptimisationRun FailingOnTheRealLadder(out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext)
+        {
+            return FailingOnTheRealLadder(150, out partOPreparationContext, out partOSimulationContext);
+        }
+
+        private static PartOOptimisationRun FailingOnTheRealLadder(double design_Lps, out PartOPreparationContext partOPreparationContext, out PartOSimulationContext partOSimulationContext)
+        {
+            //The MRXBOX is offered FIRST, so an envelope that took the head of the list rather than reading
+            //the model's own selection would visibly swap the plant.
+            List<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors =
+            [
+                new VentilationUnitCapacityDescriptor(new VentilationUnitReference("Nuaire", model_MRXBOX, "MR-ECO-COOL-V"), 150, 150, 10),
+                new VentilationUnitCapacityDescriptor(new VentilationUnitReference("Nuaire", model_XBC15, null), 190, 190, 20),
+                new VentilationUnitCapacityDescriptor(new VentilationUnitReference("Test Fixture", "Never Selected", null), 500, 500, 99),
+            ];
+
+            AdjacencyCluster adjacencyCluster = new();
+
+            Zone zone = new("Flat 1");
+
+            adjacencyCluster.AddObject(zone);
+
+            AirHandlingUnit airHandlingUnit = new("MVHR-01", 20, 20);
+
+            //THE EXPLICIT SELECTION - the XBC15, written as an identity and nothing else, exactly as
+            //Analytical.Modify.SelectVentilationUnit writes one.
+            airHandlingUnit.SetValue(AirHandlingUnitParameter.VentilationUnitReference, ventilationUnitCapacityDescriptors[1].VentilationUnitReference);
+
+            adjacencyCluster.AddObject(airHandlingUnit);
+
+            VentilationSystem ventilationSystem = new("Flat 1", new VentilationSystemType("Fixture MVHR", "Fixture"));
+            ventilationSystem.SetValue(VentilationSystemParameter.SupplyUnitName, airHandlingUnit.Name);
+
+            adjacencyCluster.AddObject(ventilationSystem);
+
+            Space space_Bedroom = Room(adjacencyCluster, ventilationSystem, name_Bedroom, PartFTerminalRole.Supply, FlowClassification.Supply, 13, design_Lps);
+            Space space_Kitchen = Room(adjacencyCluster, ventilationSystem, name_Kitchen, PartFTerminalRole.LocalKitchenExtract, FlowClassification.Extract, 13, design_Lps);
+
+            adjacencyCluster.AddRelation(zone, space_Bedroom);
+            adjacencyCluster.AddRelation(zone, space_Kitchen);
+
+            AnalyticalModel analyticalModel = new("Fixture", null, null, null, adjacencyCluster, null, null);
+
+            partOPreparationContext = new PartOPreparationContext(PartOIteration.BasePassive, [zone], [], ventilationUnitCapacityDescriptors);
+            partOSimulationContext = new PartOSimulationContext(Path.GetTempPath(), "Fixture", null, SolarCalculationMethod.SAM, 1, 365);
+
+            PartOOptimisationRun result = new(new PartOOptimisationSettings());
+
+            PartOOptimisationStep partOOptimisationStep = new(0)
+            {
+                ProjectName = "Fixture-Opt00",
+                Path_TSD = Path.Combine(Path.GetTempPath(), "Fixture-Opt00.tsd"),
+                OccupiedSpaceComplianceStatus = TM59ComplianceStatus.Fail,
+                IsCompleted = true,
+            };
+
+            partOOptimisationStep.TM59Results.Add(new PartOTM59SpaceResult(space_Kitchen.Guid, space_Kitchen.Name, ">26 C hours", 300, 142, TM59ComplianceStatus.Fail, true));
+
+            result.Steps.Add(partOOptimisationStep);
+
+            result.AnalyticalModel_LastValid = analyticalModel;
+            result.Path_TSD_LastValid = partOOptimisationStep.Path_TSD;
+            result.StopReason = PartOOptimisationStopReason.CapacityReached;
+
+            return result;
+        }
+
+        /// <summary>The product one model's single air handling unit is selected as.</summary>
+        private static string SelectedModel(AdjacencyCluster adjacencyCluster)
+        {
+            AirHandlingUnit airHandlingUnit = Assert.Single(adjacencyCluster.GetObjects<AirHandlingUnit>());
+
+            return airHandlingUnit.SelectedVentilationUnitReference()?.Model;
+        }
+
+        /// <summary>Every room's design airflow on both sides, so a whole model can be compared before and after.</summary>
+        private static Dictionary<string, double> Designs(AdjacencyCluster adjacencyCluster)
+        {
+            Dictionary<string, double> result = [];
+
+            foreach (Space space in adjacencyCluster.GetSpaces() ?? [])
+            {
+                foreach (FlowClassification flowClassification in new[] { FlowClassification.Supply, FlowClassification.Extract })
+                {
+                    result[string.Format("{0} {1}", space.Name, flowClassification)] = System.Math.Round(Design(adjacencyCluster, space, flowClassification), 6);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>Every room's Approved Document F requirement on both sides - the values no envelope may move.</summary>
+        private static Dictionary<string, double> Requirements(AdjacencyCluster adjacencyCluster)
+        {
+            Dictionary<string, double> result = [];
+
+            foreach (Space space in adjacencyCluster.GetSpaces() ?? [])
+            {
+                foreach (FlowClassification flowClassification in new[] { FlowClassification.Supply, FlowClassification.Extract })
+                {
+                    result[string.Format("{0} {1}", space.Name, flowClassification)] = adjacencyCluster.PartFRequiredFlowRate_Lps(space, flowClassification) ?? double.NaN;
+                }
+            }
+
+            return result;
+        }
+
+        private static double Requirement(AdjacencyCluster adjacencyCluster, string name, FlowClassification flowClassification)
+        {
+            return adjacencyCluster.PartFRequiredFlowRate_Lps(Space(adjacencyCluster, name), flowClassification) ?? double.NaN;
+        }
+
+        private static double Design(AdjacencyCluster adjacencyCluster, string name, FlowClassification flowClassification)
+        {
+            return Design(adjacencyCluster, Space(adjacencyCluster, name), flowClassification);
+        }
+
+        private static double Design(AdjacencyCluster adjacencyCluster, Space space, FlowClassification flowClassification)
+        {
+            return adjacencyCluster.VentilationTerminals(space).VentilationTerminalDesignDuty_Lps(flowClassification) ?? 0;
+        }
+
+        private static Space Space(AdjacencyCluster adjacencyCluster, string name)
+        {
+            Space result = (adjacencyCluster.GetSpaces() ?? []).Find(x => x?.Name == name);
+
+            Assert.NotNull(result);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Every inter-zone air movement in the model, as text. An envelope must not create, remove or
+        /// re-rate one - that is the preparation's job, and doing it here would collapse design airflow into
+        /// operating airflow.
+        /// </summary>
+        private static List<string> AirMovements(AdjacencyCluster adjacencyCluster)
+        {
+            List<string> result = (adjacencyCluster.GetObjects<SpaceAirMovement>() ?? []).ConvertAll(x => string.Format("space|{0}|{1}", x.Name, x.AirFlow));
+
+            result.AddRange((adjacencyCluster.GetObjects<AirHandlingUnitAirMovement>() ?? []).ConvertAll(x => string.Format("ahu|{0}", x.Name)));
+
+            result.Sort(StringComparer.Ordinal);
+
+            return result;
+        }
+
 
         /// <summary>
         /// <b>The real Flat 1 shape from the brief</b>, as a history to report on: a baseline, one completed
