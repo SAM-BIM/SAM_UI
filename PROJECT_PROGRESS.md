@@ -1,14 +1,179 @@
 # Project Progress
 
 ## Branch
-`test/parto-xbc15-capacity-ceiling`, branched from `sow/2026-Q3` at **`8219416`**.
-
-**Tests plus one documentation comment.** No behaviour changed. `SAM_Systems` carries the substantive change
-of this closeout (the catalogue entry) on `feature/parto-catalogue-xbc15`, and `SAM` carries the library-level
-regressions on `test/parto-real-selection-ladder`; neither is a build dependency of this one.
+`sow/2026-Q3`. PR #98 (`feature/parto-equipment-selection-ux`) is merged and the Approved Document O
+iteration programme is **FROZEN** - see the entry immediately below.
 
 Everything below the *Latest* entry is superseded history retained for context, and its forward-looking
 claims (branch names, "next step" lists) are historical rather than current.
+
+## PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN (2026-09-08)
+
+Native acceptance PASSED in SAM_UI, and the equipment-selection closeout is merged into `sow/2026-Q3` in
+dependency order - `SAM` first, because `SAM_UI` consumes `..\..\..\SAM\build\SAM.Analytical.dll`.
+
+| Repository | PR | Reviewed head | Merge commit | Frozen integration SHA |
+| --- | --- | --- | --- | --- |
+| `SAM` | #110 | `0f6dbaf7f9d5c490203e62ebc507ba6a8370a900` | `85d7b70d9d33cb0349be77f27a1c53b8679d09c5` | `85d7b70d9d33cb0349be77f27a1c53b8679d09c5` |
+| `SAM_UI` | #98 | `f5c6ef49631a56decf3cc08ff02b5ecdeb84564f` | `68e314a5f62dd3cd78fd832b92b1911fb4fbeaf2` | `68e314a5f62dd3cd78fd832b92b1911fb4fbeaf2` |
+| `SAM_Systems` | - | untouched | - | `9e1cd06f6031852a3c9395be476b01d8c44a1a4c` |
+| `SAM_Tas` | - | untouched | - | `ec7f50543e123f8a734b6e27b2b16c0cf1f1edde` |
+
+This documentation commit is a descendant of the frozen `SAM_UI` SHA and changes no code. `SAM_Systems`
+and `SAM_Tas` carry **no production change**: both are at the same SHA they were at when the work
+started, with clean trees.
+
+Post-merge verification on those exact heads, `SAM_UI` rebuilt and retested against the **merged** `SAM`
+before its own merge as well as after:
+
+```text
+SAM.sln Release                                  0 errors
+SAM_UI.sln Release                               0 errors
+SAM.Tests                                        2114 / 2114
+SAM.Analytical.UI.WPF.Tests                       771 /  771
+SAM.Analytical.Systems.Tests                       90 /   90
+git diff --check (all four repositories)         clean
+working trees (all four repositories)            clean
+```
+
+### Native acceptance (recorded 2026-09-08)
+
+Confirmed in SAM_UI, with no TAS rerun: Iteration 1a correct with no manufacturer equipment selection;
+Iteration 1b correct with no mechanical equipment selection; Iteration 2 *Automatic - selected pool*
+works; Prepare & Run exposes and respects the same configuration; catalogue visibility works with MRXBOX
+and XBC15 at their correct capacities; the project test product is visible, usable and its capacity
+editable; *Manual per dwelling* and *Convert to Manual* work; multi-row bulk selection and assignment
+works; the Dwelling / Zone column works including Flat and Corridor attribution; the engineer-facing
+picker no longer exposes Rank; design supply/extract remains separate from equipment maximum capacity;
+and **no unexpected airflow mutation was observed**.
+
+Presentation-only ideas were raised (tooltips, spacing, hierarchy, disabled sections, status wording) and
+are explicitly **not** blockers. They were deliberately not implemented here.
+
+### The authority split this freeze protects
+
+```text
+PartFRequiredAirFlow  !=  DesignAirFlow  !=  SelectedEquipmentCapacity  !=  OperatingAirFlow
+```
+
+Confirmed on the merged trees, by reading them rather than by adding anything: Iteration 1a is still the
+base mechanical MVHR design; Iteration 1b invents no mechanical topology or continuous mechanical
+airflow; Iteration 2 selects and assigns without moving airflow; *Automatic - all* works and means the
+shipped manufacturer catalogue; *Automatic - selected pool* has no fallback; *Manual per dwelling* stays
+authoritative, holding and reporting an insufficient assignment rather than accommodating it; the project
+test product is project-scoped and never joins *Automatic - all*; selected identity stays on
+`AirHandlingUnitParameter.VentilationUnitReference`; Iteration 2B locks that identity and treats capacity
+as a ceiling only; there is no silent MRXBOX / XBC15 / test-product reselection - every dwelling round
+reports `Kept`; and saved, reopened and restored result workflows trigger no reselection.
+
+**Iteration 1a FROZEN. Iteration 1b FROZEN. Iteration 2 FROZEN. Iteration 2B FROZEN.**
+
+A presentation-only UI consistency review follows separately, covering Iteration 1a, Iteration 1b,
+Iteration 2 Automatic, Iteration 2 selected pool, the Manual workflow, Prepare & Run and the
+preparation/review windows. It must not reopen the engineering authority closed here.
+**Iteration 3 has not been started.**
+
+## Latest (2026-09-08): bulk assignment, the project test product, a dwelling column, and no more rank
+
+**Status: implemented, tested, natively accepted, merged, frozen.**
+PR #98, branch `feature/parto-equipment-selection-ux`, off `sow/2026-Q3` at **`ad813c9`**.
+
+The four usability findings from native testing, before freeze.
+
+### Bulk manual equipment assignment
+
+A project of a hundred or a thousand flats cannot be authored one row at a time. The assignment grid now
+takes `SelectionMode="Extended"` - so click / Ctrl+click / Shift+click / Ctrl+A are native DataGrid
+behaviour and needed no code - and gained an explicit **Apply to selected** beside a live count of what it
+will touch.
+
+**Deliberately a named action rather than "editing a cell edits every highlighted row."** That
+alternative is triggered by an ordinary mis-click and leaves nothing behind to notice. Single-row editing
+through the Assigned product cell is unchanged and still changes that row alone.
+
+Every selected dwelling is re-evaluated against its **own** duty, so one product applied to twelve flats
+can be sufficient for eleven and reported INSUFFICIENT for the twelfth - where it stays assigned, that
+dwelling's design airflow is not reduced, and nothing larger is substituted. A suggestion remains a value,
+never a mutation. Still staged: `Commit` is the one write and Cancel discards by never reaching it.
+
+`PartOEquipmentAssignmentSet` gained a `Dictionary<Guid, PartOEquipmentAssignment>` and a `HashSet` of
+allowed identity keys, so finding a row, resolving its capability and asking whether a product is
+permitted are each one probe. Assigning *k* rows is **O(k)** and a whole-table refresh is O(D + P) rather
+than the O(D x P) the class comment already claimed. A committed cell edit now refreshes that row instead
+of the table.
+
+### The project test product, in the shared control
+
+Added to `PartOEquipmentSelectionControl`, so Prepare Iteration and Prepare & Run state the same one -
+as they already do the mode and the pool. Framed and marked **PROJECT TEST** in a new Origin column,
+because everything else in that grid is a transcription of somebody's published document and this is not.
+
+**It cannot leave a stale identity behind, by construction.** The permitted pool is *derived* from the
+catalogue rows and the test product is one of those rows: renaming it replaces the row so the pool holds
+the new identity and not the old one in the same step, with the engineer's tick carried across
+explicitly; disabling it removes the row and its permission together. A project reopened with a pool
+naming a project-test identity nothing states any more ticks nothing and drops it. A pool held as its own
+list, kept in step by hand, is what would eventually have left an invisible permission for a product that
+no longer exists.
+
+While dwellings hold it, **Enable and the Name are locked** - the name *is* the identity those dwellings
+carry - and the section says how many and what to do. Its **capacities stay editable**, because re-rating
+a what-if is the whole point of it: the identity never moves, no dwelling is reassigned, and the ceiling
+simply re-resolves.
+
+### Dwelling / Zone on the space table
+
+Resolved once from the model's own zone-space relations, and never from a space's name, its prefix, an
+index or the row order - each of which looks right on a demonstration model and is wrong on a real one.
+
+Part O dwelling membership has **absolute precedence**. The fallback is gated **twice**: the zone must be
+in the same `ZoneParameter.ZoneCategory` as the dwellings in scope **and** be a
+`Query.PartOClassifyAssessmentZones` common-space zone of it. So a communal corridor reads `Corridor`,
+while a fire, thermal, system-grouping or reporting zone fails both gates and cannot reach the column at
+all - "Fire compartment 3" under a heading saying "Dwelling / Zone" would be a confident wrong answer,
+which is worse than no answer because it reads as a statement about the model. Absence **and**
+multi-membership ambiguity both render an em dash; nothing is invented and nothing is concatenated.
+
+One `GetZones` plus one indexed relation lookup per zone, then O(1) per row. The map now feeds the
+equipment table too, replacing a second build of the same thing. The name is repeated on every row rather
+than merged or blanked, because this is a table engineers filter, sort and paste into a spreadsheet.
+
+**Known limitation, deliberate:** a space in two qualifying common-space zones of the assessment category
+shows an em dash. Both names would be defensible and neither is authoritative.
+
+### Rank is out of the picker
+
+Both the per-dwelling picker and the new bulk selector bind
+`VentilationUnitCapacityDescriptor.Label` - identity and both maximum airflows, no rank. Asserted by
+loading the real column template and reading the ComboBox's `DisplayMemberPath`, so the binding cannot
+quietly revert to `ToString()`.
+
+### Reuse also compares the project test product
+
+`PartOWorkflowInspection.Reusable` gained a test-product match beside the existing mode/pool comparison,
+which is untouched. The rating is not a selection input - it is a capability - but it **is** the ceiling
+Iteration 2B stops at for any dwelling assigned to the product, so reusing a preparation made at 165 l/s
+for a request that now says 175 would optimise against the old ceiling while the dialog reported the new
+one.
+
+### Files changed
+- `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOEquipmentAssignmentSet.cs` (guid index, allowed-key set, bulk `Assign`, `AllowedCandidates`)
+- `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOPreparationContext.cs`, `PartOWorkflowRequest.cs`, `PartOWorkflowInspection.cs`
+- `WPF/SAM.Analytical.UI.WPF/Controls/PartOEquipmentSelectionControl.xaml{,.cs}`
+- `WPF/SAM.Analytical.UI.WPF/Query/PartOProjectTestVentilationUnit.cs` (new)
+- `WPF/SAM.Analytical.UI.WPF/Classes/PartO/PartOCatalogueProductRow.cs`, `PartOEquipmentRow.cs`, `PartOSpaceRow.cs`
+- `WPF/SAM.Analytical.UI.WPF/Windows/PartOPreparationWindow.xaml{,.cs}`, `PartOIterationWindow.xaml.cs`, `PartOWorkflowWindow.xaml.cs`
+- `WPF/SAM.Analytical.UI.WPF/Modify/PreparePartOIteration.cs`, `RunPartOWorkflow.cs`
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOEquipmentBulkAssignmentTests.cs` (new, 13 tests)
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOProjectTestProductTests.cs` (new, 26 tests)
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOSpaceRowTests.cs` (new, 15 tests)
+- `WPF/SAM.Analytical.UI.WPF.Tests/PartOPresentationTests.cs` (+3 picker-label tests)
+- `SAM_UI/PROJECT_PROGRESS.md` (this file)
+
+### Validation
+- Focused Part O runs: 175/175 passed on the merged tree; reopen/lineage/warm-start/envelope 125/125.
+- Full `SAM.Analytical.UI.WPF.Tests` Release: **771 passed, 0 failed** (was 714; +57 new).
+- `SAM_UI.sln` Release: 0 errors. `git diff --check`: clean.
 
 ## XBC15 CLOSEOUT COMPLETE - READY FOR FINAL EQUIPMENT-SELECTION UX
 
