@@ -1,8 +1,8 @@
 # Project Progress
 
 ## Branch
-`ui/part-o-consistency-polish`, off `sow/2026-Q3`. PR #99 - a **presentation-only** polish pass over the
-Part O UI family, on top of the FROZEN iteration programme. See the *Latest* entry immediately below.
+`sow/2026-Q3`. PR #99 (`ui/part-o-consistency-polish`) - a **presentation-only** polish pass over the
+Part O UI family - is **merged**. See the *Latest* entry immediately below.
 
 PR #98 (`feature/parto-equipment-selection-ux`) is merged and the Approved Document O iteration
 programme is **FROZEN** - see `PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN` below, which remains the
@@ -15,9 +15,11 @@ claims (branch names, "next step" lists) are historical rather than current.
 
 ### Current status
 
-`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, ten commits, **not merged**.
-Working tree clean. `SAM`, `SAM_Systems` and `SAM_Tas` are **untouched** and clean, at the frozen SHAs
-above.
+**MERGED into `sow/2026-Q3`.** PR #99, ten commits, reviewed head
+`d5c39cc4d979ccba641f7631cb27be4dd31e3c1c`, merge commit
+`1f2beb55868cd54180f401893a46d3d6d6a6c199` (2026-09-08). Working tree clean. `SAM`, `SAM_Systems` and
+`SAM_Tas` are **untouched** and clean, at the frozen SHAs above - this pass needed no change in any of
+them.
 
 ```text
 15c47de  the presentation pass - the five approved areas
@@ -32,9 +34,9 @@ e0ef654  the run heading no longer claims a run that has not happened
 (this)   Copy All renders a missing value as the grid does
 ```
 
-CI has been green on every head checked so far, most recently `12cceb9` (`build` SUCCESS, `spdx`
-SUCCESS). **Seven** Codex review findings were raised and all seven are resolved and answered on the
-PR: the compact 1a / 1b catalogue showing only a count, the Part F tooltip inferring a space type, this
+CI was green on the merged head `d5c39cc` (`build` SUCCESS, `spdx` SUCCESS), and on every head
+checked before it. **Seven** Codex review findings were raised and all seven were resolved and answered
+on the PR before merging: the compact 1a / 1b catalogue showing only a count, the Part F tooltip inferring a space type, this
 file not being updated, the assignment columns not fitting the window, the run heading claiming an
 existing run before anything had run, the manual simulate title promising a simulation that route can
 skip, and Copy All pasting `NaN` where the grid showed an em dash.
@@ -222,9 +224,15 @@ Two existing tests were updated for deliberate changes: `Origin` is now `Project
 
 ### Next step
 
-1. Confirm PR #99's CI is green, then merge it into `sow/2026-Q3`. Nothing is pending in this working
-   tree.
-2. Open the Part O family by hand once before release, per the first risk above.
+1. **Open the Part O family by hand once, before release.** This is the one outstanding item and the
+   first risk above is the reason: every assertion in this pass is over presentation seams and view
+   models, and the windows are constructed in tests but never shown. The column-width defect - the
+   assignment table opening horizontally scrolled with `Status` off the right edge - was invisible to all
+   810 tests and to CI, and was found by review reading the numbers rather than by anything running. Worth
+   one pass each through Prepare Iteration (1a and 2), Review iteration, Prepare & Run, and both simulate
+   dialogs (`Convert to TAS` and `Part O - Convert to TAS and simulate`).
+2. Nothing else is pending. The working tree is clean and no further Part O UI work is scheduled;
+   everything on the deferred list above remains deliberately out of scope.
 
 ## PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN (2026-09-08)
 
