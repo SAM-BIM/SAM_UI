@@ -160,6 +160,15 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private bool refreshing;
 
+        /// <summary>
+        /// The status rows the last rebuild produced, in the inspection's own order, and the two groups the
+        /// list is rendered as. Held only so a test can read them; the grouping is presentation and the rows
+        /// are the inspection's, unaltered.
+        /// </summary>
+        private List<PartOWorkflowStatusRow> statusRows = [];
+
+        private List<PartOWorkflowStatusGroup> statusGroups = [];
+
         public PartOWorkflowWindow()
         {
             InitializeComponent();
@@ -454,6 +463,30 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>The chosen scenario - a base provision plus whether a manufacturer unit is selected.</summary>
         public PartOWorkflowScenario? Scenario => comboBox_Scenario.SelectedItem as PartOWorkflowScenario;
+
+        /// <summary>
+        /// The status rows as the window built them, in the inspection's own order. Exposed for tests, which
+        /// have to be able to assert that grouping the list moved no status and lost no row.
+        /// </summary>
+        internal List<PartOWorkflowStatusRow> StatusRows
+        {
+            get { EnsureInspected(); return statusRows; }
+        }
+
+        /// <summary>The two presentation groups the status list is rendered as. Exposed for tests.</summary>
+        internal List<PartOWorkflowStatusGroup> StatusGroups
+        {
+            get { EnsureInspected(); return statusGroups; }
+        }
+
+        /// <summary>
+        /// Whether the equipment section is showing its compact 1a / 1b summary rather than the full,
+        /// actionable controls. Exposed for tests.
+        /// </summary>
+        internal bool IsEquipmentSelectionCompact
+        {
+            get { EnsureInspected(); return control_EquipmentSelection.IsCompact; }
+        }
 
         /// <summary>The chosen scope.</summary>
         public PartOWorkflowScope Scope
@@ -868,10 +901,14 @@ namespace SAM.Analytical.UI.WPF
             List<PartOWorkflowStatusRow> rows = [];
             foreach (PartOWorkflowStageState partOWorkflowStageState in partOWorkflowInspection.Stages)
             {
-                rows.Add(new PartOWorkflowStatusRow(partOWorkflowStageState));
+                rows.Add(new PartOWorkflowStatusRow(partOWorkflowStageState, Summary(partOWorkflowStageState, partOWorkflowScenario)));
             }
 
-            itemsControl_Status.ItemsSource = rows;
+            statusRows = rows;
+
+            statusGroups = PartOWorkflowStatusGroup.Groups(rows);
+
+            itemsControl_Status.ItemsSource = statusGroups;
 
             UpdateActions(partOWorkflowInspection);
         }
@@ -966,6 +1003,42 @@ namespace SAM.Analytical.UI.WPF
                 : partOWorkflowInspection.OptimisationRefusal ?? "Iteration 2B optimises a completed Iteration 2 run.";
         }
 
+        /// <summary>
+        /// A shorter one-line sentence for a status row, where this window has one that reads better than
+        /// the first sentence of the inspection's own detail. Null everywhere else.
+        ///
+        /// <para><b>Only the Part F N/A line, and only the natural-ventilation route</b></para>
+        /// <para>
+        /// That row's detail is four sentences of carefully worded analytical text - it has to be, because
+        /// it is the sentence that proves no mechanical system was invented AND that System 1 provision was
+        /// not sized either - and it sat permanently open across the middle of the status list on every
+        /// Iteration 1b run. This states the fact in one line and leaves every word of the original behind
+        /// the row's own "Why is this N/A?" disclosure and on its tooltip.
+        /// </para>
+        /// <para>
+        /// <b>The route is read off the chosen scenario, never off the detail text.</b> Nothing here parses,
+        /// classifies or re-derives what the inspection said: where the scenario is not the natural
+        /// ventilation route - an unsettled route, say, whose detail is a different sentence entirely -
+        /// this returns null and the row shortens itself by cutting at its own first full stop.
+        /// </para>
+        /// </summary>
+        private static string? Summary(PartOWorkflowStageState partOWorkflowStageState, PartOWorkflowScenario? partOWorkflowScenario)
+        {
+            if (partOWorkflowStageState is null || partOWorkflowStageState.Stage != PartOWorkflowStage.PartFRequirements)
+            {
+                return null;
+            }
+
+            if (partOWorkflowStageState.Status != PartOWorkflowStageStatus.NotApplicable)
+            {
+                return null;
+            }
+
+            return partOWorkflowScenario?.Option?.PartOVentilationMode == PartOVentilationMode.NaturalVentilation
+                ? "Continuous mechanical rates are not applied on the natural-ventilation route."
+                : null;
+        }
+
         private void UpdateScenarioText(PartOWorkflowScenario? partOWorkflowScenario)
         {
             if (partOWorkflowScenario?.Option is null)
@@ -1037,6 +1110,12 @@ namespace SAM.Analytical.UI.WPF
         private void UpdateEquipmentSelectionControls()
         {
             control_EquipmentSelection.IsSelectionEnabled = Scenario?.SelectVentilationUnit ?? false;
+
+            //The control states the heading itself as part of its compact summary, so this window's own
+            //label would be a second copy of the same two words directly above it.
+            label_EquipmentSelection.Visibility = control_EquipmentSelection.IsSelectionEnabled
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private void UpdateScopeControls()

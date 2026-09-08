@@ -90,7 +90,7 @@ namespace SAM.Analytical.UI
                         continue;
                     }
 
-                    result.Add(new PartOVentilationStrategyOption(partOIteration, partOVentilationMode, ventilationStrategy, DisplayText(partOIteration, partOVentilationMode, ventilationStrategy)));
+                    result.Add(new PartOVentilationStrategyOption(partOIteration, partOVentilationMode, ventilationStrategy, DisplayText(partOVentilationMode)));
                 }
 
                 return result;
@@ -116,13 +116,25 @@ namespace SAM.Analytical.UI
             };
         }
 
-        private static string DisplayText(PartOIteration partOIteration, PartOVentilationMode partOVentilationMode, string ventilationStrategy)
+        /// <summary>
+        /// What the picker shows for one base provision.
+        /// <para>
+        /// <b>The canonical route word is not repeated here.</b> It used to be appended in brackets, which
+        /// on the mechanical route produced the literal reading "base MVHR (MVHR)" - a duplication that
+        /// looked like a defect. The word itself is stated once, beside the picker, by each window's own
+        /// route line, and it is still carried unchanged on <see cref="VentilationStrategy"/> - which is
+        /// what the preparation actually reads. Display text only.
+        /// </para>
+        /// </summary>
+        private static string DisplayText(PartOVentilationMode partOVentilationMode)
         {
             //The iteration number is not derivable from the enum - BasePassive is 1a and predates the name
-            //"BaseMVHR" it should have had - so it is spelled out here for the user's benefit only.
-            string iteration = partOIteration == PartOIteration.BasePassive ? "1a" : "1b";
-
-            return string.Format("Iteration {0} - {1} ({2})", iteration, partOVentilationMode == PartOVentilationMode.MVHR ? "base MVHR" : "base natural ventilation", ventilationStrategy);
+            //"BaseMVHR" it should have had - so it is spelled out for the user's benefit only, and spelled
+            //ONCE: these are the same two constants the Prepare & Run picker uses, so the two windows
+            //cannot name the same base provision differently.
+            return partOVentilationMode == PartOVentilationMode.MVHR
+                ? PartOWorkflowScenario.Text_Iteration1a
+                : PartOWorkflowScenario.Text_Iteration1b;
         }
     }
 }

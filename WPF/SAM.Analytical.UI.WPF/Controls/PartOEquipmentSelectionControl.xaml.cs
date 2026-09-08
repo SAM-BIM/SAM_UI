@@ -127,8 +127,13 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>
         /// Whether equipment selection is in play at all - the Iteration 1a / Iteration 2 difference, which
-        /// each host decides its own way (a tick in one, the chosen scenario in the other). False disables
-        /// everything here without hiding the catalogue.
+        /// each host decides its own way (a tick in one, the chosen scenario in the other).
+        /// <para>
+        /// False replaces the section with a compact read-only summary - the two concept names and one
+        /// sentence each - rather than greying a screenful of controls nothing on this route can use. The
+        /// catalogue stays readable behind the summary's own disclosure. Presentation only: the mode, the
+        /// pool and the project test product this control reports are exactly what they were.
+        /// </para>
         /// </summary>
         public bool IsSelectionEnabled
         {
@@ -249,6 +254,27 @@ namespace SAM.Analytical.UI.WPF
         internal bool IsPoolEditable => !dataGrid_Catalogue.IsReadOnly;
 
         /// <summary>
+        /// Whether the compact read-only summary is showing rather than the full section - true on a route
+        /// that selects no manufacturer unit. Exposed so the 1a / 1b presentation is assertable.
+        /// </summary>
+        internal bool IsCompact => grid_Compact.Visibility == System.Windows.Visibility.Visible;
+
+        /// <summary>Whether the full, actionable section is showing. The complement of <see cref="IsCompact"/>.</summary>
+        internal bool IsFullSectionVisible => stackPanel_Full.Visibility == System.Windows.Visibility.Visible;
+
+        /// <summary>What the compact summary says about equipment selection. For a test to read.</summary>
+        internal string CompactEquipmentDescription => textBlock_CompactEquipment.Text;
+
+        /// <summary>What the compact summary says about the project test product. For a test to read.</summary>
+        internal string CompactProjectTestDescription => textBlock_CompactProjectTest.Text;
+
+        /// <summary>What the compact summary's catalogue disclosure says. For a test to read.</summary>
+        internal string CompactCatalogueDescription => textBlock_CompactCatalogue.Text;
+
+        /// <summary>Whether the catalogue disclosure starts closed - it must never be prominent on 1a / 1b.</summary>
+        internal bool IsCompactCatalogueExpanded => expander_CompactCatalogue.IsExpanded;
+
+        /// <summary>
         /// Keeps the controls consistent with what the current choice actually offers, and restates the line
         /// under the grid.
         /// <para>
@@ -260,6 +286,13 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private void Apply()
         {
+            //THE WHOLE SECTION, or a two-line summary of it. On a route that selects no manufacturer unit
+            //there is nothing here to configure, and a screenful of greyed controls said so far more loudly
+            //than the one sentence that is actually true. See grid_Compact in the XAML.
+            stackPanel_Full.Visibility = isSelectionEnabled ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            grid_Compact.Visibility = isSelectionEnabled ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
+            //Kept, and still correct, for the case a host disables the section while it is shown.
             stackPanel_Mode.IsEnabled = isSelectionEnabled;
             label_Catalogue.IsEnabled = isSelectionEnabled;
             dataGrid_Catalogue.IsEnabled = isSelectionEnabled;
@@ -294,6 +327,10 @@ namespace SAM.Analytical.UI.WPF
                 textBlock_Catalogue.Text = ventilationUnitCatalogue is null
                     ? "The ventilation unit catalogue has not been read."
                     : string.Format("No equipment selection runs for this route, so no product is selected. {0}", ventilationUnitCatalogue.Description);
+
+                //The same sentence, behind the compact summary's disclosure - the catalogue stays readable
+                //on Iteration 1a and 1b without occupying the middle of the dialog.
+                textBlock_CompactCatalogue.Text = textBlock_Catalogue.Text;
 
                 return;
             }

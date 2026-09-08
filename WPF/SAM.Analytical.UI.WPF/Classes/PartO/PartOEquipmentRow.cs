@@ -130,6 +130,12 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// The product, in words. Distinguishes "no catalogue was offered" - Iteration 1a's normal state -
         /// from a catalogue that was offered and could serve nothing.
+        /// <para>
+        /// Spelled by <c>Query.PartOProductLabel</c>, so a project test product named "test" reads as
+        /// <c>test (project test)</c> rather than as the literal identity join <c>Project test test</c>.
+        /// Display only - the identity this row reports through <see cref="Descriptor"/> and
+        /// <see cref="SelectedCandidate"/> is untouched.
+        /// </para>
         /// </summary>
         public string SelectedProduct
         {
@@ -137,12 +143,12 @@ namespace SAM.Analytical.UI.WPF
             {
                 if (partOEquipmentAssignment?.IsAssigned ?? false)
                 {
-                    return partOEquipmentAssignment.VentilationUnitReference.ToString();
+                    return Query.PartOProductLabel(partOEquipmentAssignment.VentilationUnitReference);
                 }
 
                 if (Descriptor?.VentilationUnitReference is not null)
                 {
-                    return Descriptor.VentilationUnitReference.ToString();
+                    return Query.PartOProductLabel(Descriptor.VentilationUnitReference);
                 }
 
                 return Refusal is null ? "No product selected (no catalogue offered)" : "No product selected";

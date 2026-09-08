@@ -29,6 +29,32 @@ namespace SAM.Analytical.UI
     /// </summary>
     public class PartOWorkflowScenario
     {
+        /// <summary>
+        /// The one spelling of each scenario the Part O family uses.
+        ///
+        /// <para><b>Why they are constants</b></para>
+        /// <para>
+        /// Because the same four scenarios are named in a scenario picker, a base-provision picker, a status
+        /// line, a tooltip and a follow-on action, and each place that spelled them for itself spelled them
+        /// slightly differently - "mechanical ventilation, design MVHR" here, "base MVHR (MVHR)" there.
+        /// Named once, an engineer reading two Part O dialogs reads the same four names. Display text only:
+        /// no enum, persisted value or API member carries any of these words.
+        /// </para>
+        /// </summary>
+        public const string Text_Iteration1a = "Iteration 1a — MVHR design duty (no manufacturer unit)";
+
+        /// <summary>The natural-ventilation base provision. See <see cref="Text_Iteration1a"/>.</summary>
+        public const string Text_Iteration1b = "Iteration 1b — Natural ventilation (no mechanical system)";
+
+        /// <summary>Iteration 1a with a real manufacturer unit selected. See <see cref="Text_Iteration1a"/>.</summary>
+        public const string Text_Iteration2 = "Iteration 2 — MVHR with manufacturer unit";
+
+        /// <summary>
+        /// The follow-on optimisation. Deliberately not one of <see cref="Scenarios"/> - it is performed ON a
+        /// completed Iteration 2 run - but it is named here so that every window naming it agrees.
+        /// </summary>
+        public const string Text_Iteration2B = "Iteration 2B — TM59 optimisation";
+
         private PartOWorkflowScenario(PartOVentilationStrategyOption partOVentilationStrategyOption, bool selectVentilationUnit, string text)
         {
             Option = partOVentilationStrategyOption;
@@ -76,8 +102,8 @@ namespace SAM.Analytical.UI
                         partOVentilationStrategyOption,
                         false,
                         mechanical
-                            ? "Iteration 1a - mechanical ventilation, design MVHR"
-                            : "Iteration 1b - natural ventilation"));
+                            ? Text_Iteration1a
+                            : Text_Iteration1b));
 
                     if (mechanical)
                     {
@@ -87,7 +113,7 @@ namespace SAM.Analytical.UI
 
                 if (option_Mechanical is not null)
                 {
-                    result.Add(new PartOWorkflowScenario(option_Mechanical, true, "Iteration 2 - mechanical ventilation with a selected manufacturer unit"));
+                    result.Add(new PartOWorkflowScenario(option_Mechanical, true, Text_Iteration2));
                 }
 
                 return result;

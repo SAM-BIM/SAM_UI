@@ -78,6 +78,20 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public double PartFRequired_Lps { get; }
 
+        /// <summary>
+        /// What the Part F column means for THIS space, in the words an engineer reads - and, where the
+        /// space carries no requirement at all, why the cell is empty rather than zero.
+        /// <para>
+        /// <b>Presentation only, and it states no requirement of its own.</b> The wording is chosen by
+        /// whether <see cref="PartFRequired_Lps"/> resolved, which is the same fact the cell shows. Nothing
+        /// is inferred about the space type beyond that: a space with no <c>PartFSpaceData</c> continuous
+        /// rate has no Part F requirement recorded for it, which is what the tooltip says.
+        /// </para>
+        /// </summary>
+        public string PartFRequiredDescription => double.IsNaN(PartFRequired_Lps) || double.IsInfinity(PartFRequired_Lps)
+            ? "No Part F requirement for this space type."
+            : string.Concat("Minimum continuous mechanical airflow required by the Part F data.", System.Environment.NewLine, "Equipment selection does not change it.");
+
         /// <summary>The design supply airflow [l/s] the prepared model will simulate.</summary>
         public double DesignSupply_Lps { get; }
 

@@ -426,13 +426,18 @@ namespace SAM.Analytical.UI.WPF.Tests
         // ---------------------------------------------------------------------------------------------
 
         /// <summary>
-        /// <b>The manual per-dwelling picker reads the descriptor's engineer-facing label.</b>
+        /// <b>The manual per-dwelling picker reads the engineer-facing label.</b>
         /// <para>
         /// Read off the real template rather than assumed: the assigned-product column's editing template is
-        /// loaded and its <c>ComboBox</c> asked what it displays. Without an explicit
-        /// <c>DisplayMemberPath</c> a <c>ComboBox</c> falls back to <c>ToString</c>, which is the diagnostic
-        /// form and ends with "rank 10" - a catalogue tie-breaker, presented where an engineer is choosing
-        /// equipment and could read it as a rating.
+        /// loaded and its <c>ComboBox</c> asked what it displays. Left to its own devices a <c>ComboBox</c>
+        /// falls back to <c>ToString</c>, which is the diagnostic form and ends with "rank 10" - a catalogue
+        /// tie-breaker, presented where an engineer is choosing equipment and could read it as a rating.
+        /// </para>
+        /// <para>
+        /// It reads it through an <c>ItemTemplate</c> over
+        /// <see cref="PartOProductLabelConverter"/> rather than through <c>DisplayMemberPath</c>, because a
+        /// project test product's identity needs spelling out - "test (project test)" and never the literal
+        /// join "Project test test". Same figures, same separator; see <c>Query.PartOProductLabel</c>.
         /// </para>
         /// </summary>
         [WpfFact]
@@ -459,7 +464,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             System.Windows.Controls.ComboBox comboBox = dataGridTemplateColumn.CellEditingTemplate?.LoadContent() as System.Windows.Controls.ComboBox;
 
             Assert.NotNull(comboBox);
-            Assert.Equal(nameof(VentilationUnitCapacityDescriptor.Label), comboBox.DisplayMemberPath);
+
+            AssertProductLabelTemplate(comboBox);
         }
 
         /// <summary>
@@ -474,7 +480,28 @@ namespace SAM.Analytical.UI.WPF.Tests
             System.Windows.Controls.ComboBox comboBox = (System.Windows.Controls.ComboBox)partOPreparationWindow.FindName("comboBox_BulkProduct");
 
             Assert.NotNull(comboBox);
-            Assert.Equal(nameof(VentilationUnitCapacityDescriptor.Label), comboBox.DisplayMemberPath);
+
+            AssertProductLabelTemplate(comboBox);
+        }
+
+        /// <summary>
+        /// That a picker renders each product through the Part O product-label converter, and through
+        /// nothing else - no <c>DisplayMemberPath</c>, and so no silent fall back to <c>ToString</c>.
+        /// </summary>
+        private static void AssertProductLabelTemplate(System.Windows.Controls.ComboBox comboBox)
+        {
+            Assert.True(string.IsNullOrEmpty(comboBox.DisplayMemberPath));
+
+            Assert.NotNull(comboBox.ItemTemplate);
+
+            System.Windows.Controls.TextBlock textBlock = comboBox.ItemTemplate.LoadContent() as System.Windows.Controls.TextBlock;
+
+            Assert.NotNull(textBlock);
+
+            System.Windows.Data.Binding binding = System.Windows.Data.BindingOperations.GetBinding(textBlock, System.Windows.Controls.TextBlock.TextProperty);
+
+            Assert.NotNull(binding);
+            Assert.IsType<PartOProductLabelConverter>(binding.Converter);
         }
 
         /// <summary>

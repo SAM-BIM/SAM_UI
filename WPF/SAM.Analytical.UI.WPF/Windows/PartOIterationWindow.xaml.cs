@@ -220,6 +220,23 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>Whether OK is currently offered - false while the selection is empty. Exposed for tests.</summary>
         internal bool CanAccept => button_OK.IsEnabled;
 
+        /// <summary>
+        /// Whether the equipment section is showing its compact read-only summary rather than the full,
+        /// actionable controls - true on Iteration 1a and 1b, where no product is selected. Exposed for
+        /// tests.
+        /// </summary>
+        internal bool IsEquipmentSelectionCompact => control_EquipmentSelection.IsCompact;
+
+        /// <summary>
+        /// The "select a ventilation unit" tick itself. Exposed for tests, which have to move the CONTROL
+        /// rather than the derived answer - what is under test is what the tick's own handler does.
+        /// </summary>
+        internal bool SelectVentilationUnitChecked
+        {
+            get => checkBox_SelectVentilationUnit.IsChecked ?? false;
+            set => checkBox_SelectVentilationUnit.IsChecked = value;
+        }
+
         /// <summary>What the window says about the current selection - exposed so it is assertable.</summary>
         public string SelectionDescription => textBlock_Selection.Text;
 
@@ -448,7 +465,7 @@ namespace SAM.Analytical.UI.WPF
 
             textBlock_WarmStart.Text = (checkBox_WarmStart.IsChecked ?? false) && checkBox_WarmStart.IsEnabled
                 ? "Each iteration starts from the TBD this run's own baseline conversion produced, on its own copy of it, instead of exporting and converting the same geometry again - because a design airflow round changes the ventilation and nothing the conversion reads. Every iteration still runs a REAL full-year simulation of its own design and is still assessed with production TM59, and each keeps its own TBD and TSD. Any iteration that cannot be shown to still match that baseline converts in full and says so."
-                : "Every iteration exports the model to gbXML and converts the geometry and shading again. This is the reference path - slower, and identical in result.";
+                : "Every iteration exports the model to gbXML and converts the geometry and shading again. This is the reference path, and the one to use when the converted geometry may no longer be valid for the current model.";
 
             textBlock_CapacityEnvelope.Text = (checkBox_CapacityEnvelope.IsChecked ?? false) && checkBox_CapacityEnvelope.IsEnabled
                 ? "Where the optimisation stops with rooms still failing, one further DIAGNOSTIC run scales the same targets coherently until the already-selected unit's own capacity binds, and reports what TM59 makes of that design. It is reported separately, is never the optimisation's answer, and never reselects a product - it says how close the equipment already chosen can get. It costs one more full-year simulation, and nothing at all on a run that passes."
