@@ -605,6 +605,20 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             //TAS, not Tas - the whole family agrees on the product's name.
             Assert.DoesNotContain("Tas", simulateWindow_PartO.Title, System.StringComparison.Ordinal);
+
+            //AND THE TWO TITLES CLAIM ONLY WHAT THEIR ROUTE DOES. The manual one promises the conversion
+            //alone, because Modify.Simulate supports an unticked Simulate box alongside SAP or the
+            //domestic-overheating XML - a conversion and export with no simulation at all. The Part O one
+            //promises the simulation, and is entitled to: the preset ticks it and LockPartOSettings takes
+            //the box away, so a Part O run always simulates.
+            Assert.DoesNotContain("simulate", SimulateWindow.Title_Manual, System.StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("simulate", SimulateWindow.Title_PartO, System.StringComparison.OrdinalIgnoreCase);
+
+            Assert.True(simulateWindow_PartO.Simulate);
+            Assert.False((simulateWindow_PartO.FindName("simulateControl") as SimulateControl)?.FindName("checkBox_Simulate") is System.Windows.UIElement uIElement && uIElement.IsEnabled);
+
+            //Where the manual dialog leaves it: the user's, and on by default rather than promised.
+            Assert.True((simulateWindow_Manual.FindName("simulateControl") as SimulateControl)?.FindName("checkBox_Simulate") is System.Windows.UIElement uIElement_Manual && uIElement_Manual.IsEnabled);
         }
 
         /// <summary>

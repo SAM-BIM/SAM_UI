@@ -1050,13 +1050,22 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// <summary>
         /// The Part O family says <b>TAS</b>, and the conversion dialog says what it does rather than
         /// "TBD".
+        /// <para>
+        /// <b>"Convert to TAS", not "and simulate."</b> On the ordinary route the Simulate box is the
+        /// user's and may be left unticked while SAP or the domestic-overheating XML is selected, so the
+        /// conversion is the only thing this title can promise. The Part O route's own title claims the
+        /// simulation, and there it is locked on - see
+        /// <c>PartOSimulateDefaultsTests.PartO_TheDialogSaysWhichRouteItIs</c>.
+        /// </para>
         /// </summary>
         [WpfFact]
         public void TheProductName_IsSpelledTAS()
         {
             SimulateWindow simulateWindow = new();
 
-            Assert.Equal("Convert to TAS and simulate", simulateWindow.Title);
+            Assert.Equal("Convert to TAS", simulateWindow.Title);
+            Assert.DoesNotContain("simulate", simulateWindow.Title, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("TBD", simulateWindow.Title, StringComparison.Ordinal);
 
             Assert.DoesNotContain("Tas", new PartOPreparationWindow().Title, StringComparison.Ordinal);
             Assert.DoesNotContain("Tas", new PartOTM59ResultWindow().Title, StringComparison.Ordinal);

@@ -285,10 +285,27 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        /// <summary>The title the ordinary Energy Simulation command shows. Kept here so both are named once.</summary>
-        internal const string Title_Manual = "Convert to TAS and simulate";
+        /// <summary>
+        /// The title the ordinary Energy Simulation command shows. Kept here so both are named once.
+        /// <para>
+        /// <b>It claims the conversion and nothing else.</b> On this route the Simulate box belongs to the
+        /// user, and <c>Modify.Simulate</c> supports leaving it unticked while SAP or the
+        /// domestic-overheating XML is selected - it returns early only when all three are off. So a
+        /// conversion and export with no simulation is a supported outcome, and a title promising a
+        /// simulation would be wrong for it.
+        /// </para>
+        /// </summary>
+        internal const string Title_Manual = "Convert to TAS";
 
-        /// <summary>The title the guided Part O run shows. See <see cref="LockPartOSettings"/>.</summary>
+        /// <summary>
+        /// The title the guided Part O run shows. See <see cref="LockPartOSettings"/>.
+        /// <para>
+        /// Here "and simulate" is a fact rather than a promise: <c>Create.SimulateOptions_PartO</c> sets
+        /// <c>Simulate = true</c> and <see cref="LockPartOSettings"/> disables the box, because a Part O
+        /// run with no full-year simulation is refused by <c>Query.IsPartOFullYearSimulation</c> after the
+        /// TAS run has already been paid for.
+        /// </para>
+        /// </summary>
         internal const string Title_PartO = "Part O — Convert to TAS and simulate";
 
         /// <summary>

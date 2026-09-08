@@ -5,10 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Convert to TAS and simulate" Height="700" Width="350" ResizeMode="NoResize">
-    <!-- The guided Part O run opens THIS window and retitles it - see SimulateWindow.LockPartOSettings.
-         The two routes were previously indistinguishable, which made the Part O route's derived, locked
-         project name read as a fault in the ordinary dialog. -->
+        Title="Convert to TAS" Height="700" Width="350" ResizeMode="NoResize">
+    <!-- "Convert to TAS", and deliberately NOT "and simulate": on this route the Simulate box is the
+         user's, and Modify.Simulate supports leaving it unticked while SAP or the domestic-overheating
+         XML is selected - a conversion and export with no simulation at all. The conversion is the one
+         thing this dialog always does, so it is the one thing the title claims.
+
+         The guided Part O run opens THIS window and retitles it, and there the claim IS true: the
+         Part O preset sets Simulate = true and LockPartOSettings disables the box, so a Part O run
+         always simulates. See SimulateWindow.LockPartOSettings, which also explains why the two routes
+         need to be distinguishable at all. -->
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="253*"/>

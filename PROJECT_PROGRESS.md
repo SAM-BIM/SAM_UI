@@ -15,7 +15,7 @@ claims (branch names, "next step" lists) are historical rather than current.
 
 ### Current status
 
-`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, eight commits, **not merged**.
+`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, nine commits, **not merged**.
 Working tree clean. `SAM`, `SAM_Systems` and `SAM_Tas` are **untouched** and clean, at the frozen SHAs
 above.
 
@@ -27,18 +27,21 @@ bf0c06b  the simulate dialog says which route it is, and why its project name is
 e24ae94  the stale ProjectName_Isolated note corrected
 7602573  this checkpoint, and the Part F tooltip no longer judging the space
 7c39ccf  the assignment row fits the window it opens in
-(this)   the run heading no longer claims a run that has not happened
+e0ef654  the run heading no longer claims a run that has not happened
+(this)   the manual simulate title claims only the conversion
 ```
 
-CI has been green on every head checked so far, most recently `7c39ccf` (`build` SUCCESS, `spdx`
-SUCCESS). **Five** Codex review findings were raised and all five are resolved and answered on the PR:
+CI has been green on every head checked so far, most recently `e0ef654` (`build` SUCCESS, `spdx`
+SUCCESS). **Six** Codex review findings were raised and all six are resolved and answered on the PR:
 the compact 1a / 1b catalogue showing only a count, the Part F tooltip inferring a space type, this file
-not being updated, the assignment columns not fitting the window, and the run heading claiming an
-existing run before anything had run.
+not being updated, the assignment columns not fitting the window, the run heading claiming an existing
+run before anything had run, and the manual simulate title promising a simulation that route can skip.
 
-Three of the five were over-claiming - a heading, a tooltip and a disabled tick each saying more than the
-code behind it knew. That is the failure mode this kind of pass invites, and it is worth watching for in
-any further presentation work here.
+**Four of the six were the same failure: wording that claimed more than the code behind it knew** - a
+group heading, a cell tooltip, a permanently disabled tick and a window title. That is the failure mode
+a presentation pass invites, because renaming something is cheap and re-reading what backs the name is
+not. **Any further presentation work here should check each new string against the condition that
+produces it**, which is what the four fixes and their tests now pin.
 
 ### What this is, and the line it does not cross
 
@@ -134,6 +137,13 @@ spacing, hierarchy, disabled sections, status wording) and are explicitly not bl
   minimum plus an allowance for window chrome, the grid margins and a vertical scrollbar - so widening a
   column past the default again fails a test rather than reaching a user. Asserted arithmetically
   because a `DataGrid` will not lay a row out offscreen.
+- **The two simulate titles claim only what their own route does.** `Convert to TAS` on the ordinary
+  route, because `Modify.Simulate` supports an unticked Simulate box alongside SAP or the
+  domestic-overheating XML - it returns early only when all three are off - so a conversion and export
+  with no simulation is a supported outcome. `Part O - Convert to TAS and simulate` on the guided route,
+  where the claim is a fact: `Create.SimulateOptions_PartO` sets `Simulate = true` and
+  `LockPartOSettings` disables the box. The approved package offered both spellings and asked for the
+  accurate one; the first attempt took the wrong one.
 - **`Query.PartOVentilationRouteText` states the route once** by reading the canonical word back through
   `Analytical.Query.PartOVentilationMode`, printing one word where the two agree - which
   `Modify.PreparePartOIteration` guarantees by refusing a disagreeing pairing - and both where they do
