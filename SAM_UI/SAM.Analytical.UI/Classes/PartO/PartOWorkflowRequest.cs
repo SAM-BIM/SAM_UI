@@ -102,6 +102,21 @@ namespace SAM.Analytical.UI
         public PartOEquipmentSelection EquipmentSelection { get; set; }
 
         /// <summary>
+        /// The project's own test ventilation unit this run is asking for, or null where none is stated.
+        /// <para>
+        /// <b>Null means "not stated", not "none"</b>, exactly as for <see cref="EquipmentSelection"/>: a
+        /// caller that says nothing inherits the PROJECT's own statement, and only a project that has never
+        /// stated one has none. <c>Query.PartOProjectTestVentilationUnit</c> is that resolution.
+        /// </para>
+        /// <para>
+        /// A capability, not a selection - it says what a made-up unit can move, never that any dwelling is
+        /// fitted with it. Which dwellings are is <c>AirHandlingUnitParameter.VentilationUnitReference</c>,
+        /// as for any other product.
+        /// </para>
+        /// </summary>
+        public PartOProjectTestVentilationUnit ProjectTestVentilationUnit { get; set; }
+
+        /// <summary>
         /// The canonical ventilation route stated for every zone in scope: the option's own word, over the
         /// zones in scope. There is no free-text path into this dictionary, which is what keeps the
         /// "prepares then refuses every space at assessment" synonym unreachable - see

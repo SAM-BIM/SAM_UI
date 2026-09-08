@@ -277,6 +277,42 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>The selection authority this window currently states.</summary>
         public PartOEquipmentSelectionMode Mode => control_EquipmentSelection.Mode;
 
+        /// <summary>
+        /// The project's own test ventilation unit as this window currently states it - asked of the same
+        /// shared control, so this window holds no second copy of it either.
+        /// <para>
+        /// <b>Set this before <see cref="EquipmentSelection"/>.</b> A permitted product is restored by
+        /// ticking its row, and the test product has no row until it has been stated.
+        /// </para>
+        /// </summary>
+        public PartOProjectTestVentilationUnit ProjectTestVentilationUnit
+        {
+            get
+            {
+                return control_EquipmentSelection.ProjectTestVentilationUnit;
+            }
+            set
+            {
+                control_EquipmentSelection.ProjectTestVentilationUnit = value;
+            }
+        }
+
+        /// <summary>
+        /// How many dwellings the saved project has fitted with the current test product. Handed in by the
+        /// caller, which is the only party here that holds a model - see
+        /// <c>Query.PartOVentilationUnitAssignmentCount</c>.
+        /// </summary>
+        public int ProjectTestVentilationUnitAssignmentCount
+        {
+            set
+            {
+                control_EquipmentSelection.ProjectTestVentilationUnitAssignmentCount = value;
+            }
+        }
+
+        /// <summary>What this window currently says about the project test product.</summary>
+        public string ProjectTestDescription => control_EquipmentSelection.ProjectTestDescription;
+
         /// <summary>The active mode in one sentence. See <c>PartOEquipmentSelectionControl.ModeDescription</c>.</summary>
         public string ModeDescription => control_EquipmentSelection.ModeDescription;
 

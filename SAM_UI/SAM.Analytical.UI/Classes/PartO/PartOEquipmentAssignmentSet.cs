@@ -31,18 +31,40 @@ namespace SAM.Analytical.UI
     ///
     /// <para><b>Cost</b></para>
     /// <para>
-    /// The catalogue is indexed by identity once, so resolving what each dwelling's product can move is one
-    /// dictionary probe rather than a scan: a full re-evaluation is O(D + P), rising to O(D x P) only where
-    /// dwellings are insufficient and each needs a suggestion chosen from the permitted products. Editing
-    /// one row re-evaluates that row. No operation re-derives a design duty, and none calls
-    /// <c>GetSpaces</c>, <c>GetZones</c> or <c>GetObjects</c> - the rows were built from those once.
+    /// The catalogue is indexed by identity once and the rows are indexed by unit guid once, so resolving
+    /// what a dwelling's product can move, finding a dwelling's row, and asking whether a product is
+    /// permitted are each one dictionary probe rather than a scan. A full re-evaluation is O(D + P), rising
+    /// to O(D x P) only where dwellings are insufficient and each needs a suggestion chosen from the
+    /// permitted products. Editing one row re-evaluates that row; assigning a product to <i>k</i> selected
+    /// dwellings re-evaluates those <i>k</i> rows and is O(k). No operation re-derives a design duty, and
+    /// none calls <c>GetSpaces</c>, <c>GetZones</c> or <c>GetObjects</c> - the rows were built from those
+    /// once.
     /// </para>
     /// </summary>
     public class PartOEquipmentAssignmentSet
     {
         private readonly List<PartOEquipmentAssignment> assignments = [];
 
+        /// <summary>
+        /// Unit guid -> its row, built once. Every operation that names a dwelling goes through this rather
+        /// than a <c>List.Find</c>: bulk assignment over a selection of <i>k</i> rows would otherwise be
+        /// O(k x D), which on a thousand-dwelling project is the difference between an instant operation
+        /// and a visible pause.
+        /// </summary>
+        private readonly Dictionary<Guid, PartOEquipmentAssignment> dictionary_Assignment = [];
+
         private readonly List<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors = [];
+
+        /// <summary>
+        /// What the project's own test ventilation unit contributes - normally none or one. Held apart from
+        /// the manufacturer catalogue above, and not merely appended to it, because
+        /// <see cref="PartOEquipmentSelection.AllowedDescriptors(IEnumerable{VentilationUnitCapacityDescriptor}, IEnumerable{VentilationUnitCapacityDescriptor})"/>
+        /// has to be able to tell them apart: "all catalogue products" means the manufacturer catalogue, and
+        /// a what-if joins only where the engineer said so. Both are indexed into
+        /// <see cref="dictionary_Descriptor"/>, because a dwelling ASSIGNED a test product must resolve its
+        /// rating whatever the mode says about offering it.
+        /// </summary>
+        private readonly List<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors_ProjectTest = [];
 
         /// <summary>
         /// Identity -> capability, built once. A key whose value is null is an identity the catalogue gives
@@ -55,6 +77,13 @@ namespace SAM.Analytical.UI
 
         private List<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors_Allowed = [];
 
+        /// <summary>
+        /// The identity keys of <see cref="ventilationUnitCapacityDescriptors_Allowed"/>, recomputed with
+        /// it. Asking whether one row's product is permitted is then a probe rather than a scan of the
+        /// permitted list, which is what keeps a whole-table refresh O(D + P) instead of O(D x P).
+        /// </summary>
+        private readonly HashSet<string> keys_Allowed = [];
+
         /// <param name="assignments">One row per dwelling air handling unit, already captured.</param>
         /// <param name="ventilationUnitCapacityDescriptors">
         /// The <b>whole</b> selectable catalogue, never the pool. This is the capability lookup - a manually
@@ -62,13 +91,22 @@ namespace SAM.Analytical.UI
         /// procurement change would silently turn a sound dwelling into "capacity unknown".
         /// </param>
         /// <param name="partOEquipmentSelection">The project's mode and permitted pool. Null reads as the default.</param>
-        public PartOEquipmentAssignmentSet(IEnumerable<PartOEquipmentAssignment> assignments, IEnumerable<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors, PartOEquipmentSelection partOEquipmentSelection)
+        /// <param name="ventilationUnitCapacityDescriptors_ProjectTest">
+        /// What the project's own test ventilation unit contributes - normally none or one. Absent where the
+        /// project states none, which is the historic case.
+        /// </param>
+        public PartOEquipmentAssignmentSet(IEnumerable<PartOEquipmentAssignment> assignments, IEnumerable<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors, PartOEquipmentSelection partOEquipmentSelection, IEnumerable<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors_ProjectTest = null)
         {
             foreach (PartOEquipmentAssignment partOEquipmentAssignment in assignments ?? [])
             {
                 if (partOEquipmentAssignment is not null)
                 {
                     this.assignments.Add(partOEquipmentAssignment);
+
+                    //Last row wins a repeated guid, matching what Find would have returned first-wins only
+                    //if the list held one - a preparation cannot produce two rows for one unit, and if it
+                    //ever did, one row answering for it is the only coherent behaviour.
+                    dictionary_Assignment[partOEquipmentAssignment.Guid_AirHandlingUnit] = partOEquipmentAssignment;
                 }
             }
 
@@ -81,6 +119,20 @@ namespace SAM.Analytical.UI
 
                 this.ventilationUnitCapacityDescriptors.Add(ventilationUnitCapacityDescriptor);
 
+                Index(ventilationUnitCapacityDescriptor);
+            }
+
+            foreach (VentilationUnitCapacityDescriptor ventilationUnitCapacityDescriptor in ventilationUnitCapacityDescriptors_ProjectTest ?? [])
+            {
+                if (ventilationUnitCapacityDescriptor is null || !ventilationUnitCapacityDescriptor.IsValid)
+                {
+                    continue;
+                }
+
+                this.ventilationUnitCapacityDescriptors_ProjectTest.Add(ventilationUnitCapacityDescriptor);
+
+                //Indexed as capability, exactly like a manufacturer product: a dwelling assigned a test
+                //product has to resolve its own rating or a sound dwelling would read "capacity unknown".
                 Index(ventilationUnitCapacityDescriptor);
             }
 
@@ -104,13 +156,15 @@ namespace SAM.Analytical.UI
         /// <param name="dictionary_DwellingName">Unit guid -> what to call the dwelling. Display only.</param>
         /// <param name="ventilationUnitCapacityDescriptors">The whole selectable catalogue.</param>
         /// <param name="partOEquipmentSelection">The project's mode and permitted pool.</param>
+        /// <param name="ventilationUnitCapacityDescriptors_ProjectTest">What the project's own test ventilation unit contributes - normally none or one.</param>
         public static PartOEquipmentAssignmentSet Create(
             AdjacencyCluster adjacencyCluster,
             IEnumerable<AirHandlingUnit> airHandlingUnits,
             Dictionary<Guid, string> dictionary_VentilationSystemName,
             Dictionary<Guid, string> dictionary_DwellingName,
             IEnumerable<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors,
-            PartOEquipmentSelection partOEquipmentSelection)
+            PartOEquipmentSelection partOEquipmentSelection,
+            IEnumerable<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors_ProjectTest = null)
         {
             List<PartOEquipmentAssignment> assignments = [];
 
@@ -144,7 +198,7 @@ namespace SAM.Analytical.UI
                     airHandlingUnit.SelectedVentilationUnitReference()));
             }
 
-            return new PartOEquipmentAssignmentSet(assignments, ventilationUnitCapacityDescriptors, partOEquipmentSelection);
+            return new PartOEquipmentAssignmentSet(assignments, ventilationUnitCapacityDescriptors, partOEquipmentSelection, ventilationUnitCapacityDescriptors_ProjectTest);
         }
 
         /// <summary>The project's selection mode and permitted pool, as this table currently stands.</summary>
@@ -202,9 +256,7 @@ namespace SAM.Analytical.UI
         {
             refusal = null;
 
-            PartOEquipmentAssignment partOEquipmentAssignment = assignments.Find(x => x.Guid_AirHandlingUnit == guid_AirHandlingUnit);
-
-            if (partOEquipmentAssignment is null)
+            if (!dictionary_Assignment.TryGetValue(guid_AirHandlingUnit, out PartOEquipmentAssignment partOEquipmentAssignment))
             {
                 refusal = "That air handling unit is not one of this iteration's dwelling units, so no product was assigned to it.";
 
@@ -228,6 +280,88 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
+        /// Assigns <b>one</b> product to <b>several</b> dwellings at once - the bulk edit a project of a
+        /// hundred or a thousand flats needs, and the reason the assigned-product cell is not the only way
+        /// to author one.
+        ///
+        /// <para><b>An explicit act over an explicit set</b></para>
+        /// <para>
+        /// The dwellings are named by the caller, and only they are touched: nothing here reads a grid's
+        /// selection, and editing one row's picker never reaches another row. Bulk assignment being a
+        /// separate deliberate operation - rather than "editing a cell edits every highlighted row" - is
+        /// the whole reason it is safe on a large table, where an accidental multi-row edit would be both
+        /// easy to trigger and hard to notice.
+        /// </para>
+        ///
+        /// <para><b>Every dwelling is still judged on its own duty</b></para>
+        /// <para>
+        /// Each row goes through the same per-row re-evaluation a single edit does, so capability, pool
+        /// membership, headroom, status and any suggestion are that dwelling's own answer about that
+        /// dwelling's own duty. One product assigned to twelve flats can perfectly well be sufficient for
+        /// eleven of them and reported insufficient for the twelfth - and it is not replaced there, and
+        /// that flat's design airflow is not reduced to fit it.
+        /// </para>
+        ///
+        /// <para><b>Still nothing is written</b></para>
+        /// <para>
+        /// Staged exactly like a single edit. <see cref="Commit"/> remains the one seam, and a cancelled
+        /// dialog discards the whole thing by never reaching it.
+        /// </para>
+        ///
+        /// <para><b>Cost</b></para>
+        /// <para>
+        /// O(k) for k selected dwellings: one dictionary probe to find each row, one to resolve its
+        /// capability, one to ask whether the product is permitted. No model, zone, space or catalogue
+        /// rescan, and no re-evaluation of the rows that were not selected.
+        /// </para>
+        /// </summary>
+        /// <param name="guids_AirHandlingUnit">Which dwellings' units. Repeats are assigned once.</param>
+        /// <param name="ventilationUnitReference">The product's identity, validated once for the whole operation.</param>
+        /// <param name="guids_Assigned">The units that now carry it - what a caller refreshes.</param>
+        /// <param name="refusals">Why any named unit was not assigned.</param>
+        /// <returns>True where every named unit was assigned.</returns>
+        public bool Assign(IEnumerable<Guid> guids_AirHandlingUnit, VentilationUnitReference ventilationUnitReference, out List<Guid> guids_Assigned, out List<string> refusals)
+        {
+            guids_Assigned = [];
+            refusals = [];
+
+            //Validated ONCE for the whole operation rather than per row: an identity that names nothing
+            //names nothing for the first dwelling and for the thousandth, and reporting that a thousand
+            //times would bury it.
+            if (ventilationUnitReference is null || !ventilationUnitReference.IsValid)
+            {
+                refusals.Add("No product was assigned: the product offered states neither a manufacturer nor a model and so identifies nothing. Every dwelling's existing assignment is unchanged.");
+
+                return false;
+            }
+
+            HashSet<Guid> guids = [];
+
+            bool result = true;
+
+            foreach (Guid guid_AirHandlingUnit in guids_AirHandlingUnit ?? [])
+            {
+                if (!guids.Add(guid_AirHandlingUnit))
+                {
+                    continue;
+                }
+
+                if (!Assign(guid_AirHandlingUnit, ventilationUnitReference, out string refusal))
+                {
+                    refusals.Add(refusal);
+
+                    result = false;
+
+                    continue;
+                }
+
+                guids_Assigned.Add(guid_AirHandlingUnit);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Takes the suggestion offered for one dwelling. <b>An explicit act</b> - this exists so that
         /// accepting a suggestion is something the engineer does, and never something that happens because a
         /// suggestion was calculated.
@@ -236,7 +370,7 @@ namespace SAM.Analytical.UI
         {
             refusal = null;
 
-            PartOEquipmentAssignment partOEquipmentAssignment = assignments.Find(x => x.Guid_AirHandlingUnit == guid_AirHandlingUnit);
+            dictionary_Assignment.TryGetValue(guid_AirHandlingUnit, out PartOEquipmentAssignment partOEquipmentAssignment);
 
             if (partOEquipmentAssignment?.Suggestion is null)
             {
@@ -261,7 +395,7 @@ namespace SAM.Analytical.UI
         {
             List<VentilationUnitCapacityDescriptor> result = [.. ventilationUnitCapacityDescriptors_Allowed];
 
-            PartOEquipmentAssignment partOEquipmentAssignment = assignments.Find(x => x.Guid_AirHandlingUnit == guid_AirHandlingUnit);
+            dictionary_Assignment.TryGetValue(guid_AirHandlingUnit, out PartOEquipmentAssignment partOEquipmentAssignment);
 
             if (partOEquipmentAssignment is not null && partOEquipmentAssignment.IsOutsideAllowedPool && partOEquipmentAssignment.Descriptor is not null)
             {
@@ -270,6 +404,23 @@ namespace SAM.Analytical.UI
 
             return result;
         }
+
+        /// <summary>
+        /// The products a <b>bulk</b> assignment may choose from: the project's permitted set, and nothing
+        /// else.
+        /// <para>
+        /// <b>Deliberately not the union of every selected dwelling's candidates.</b> A per-dwelling picker
+        /// adds that dwelling's own out-of-pool product so a procurement change cannot make an authored
+        /// assignment unpickable - but that product belongs to that dwelling. Collecting the historical
+        /// outsiders of twelve selected flats into one list would offer, as a project-wide choice, products
+        /// the project does not permit and that most of the selection has nothing to do with.
+        /// </para>
+        /// <para>
+        /// A dwelling can still be given an outsider one row at a time, which is where the fact that it is
+        /// an outsider is visible.
+        /// </para>
+        /// </summary>
+        public List<VentilationUnitCapacityDescriptor> AllowedCandidates => [.. ventilationUnitCapacityDescriptors_Allowed];
 
         /// <summary>
         /// Restates which products the project permits, and re-evaluates the derived columns.
@@ -433,7 +584,17 @@ namespace SAM.Analytical.UI
         /// <summary>Re-evaluates every row's derived columns. See the class remarks for the cost.</summary>
         private void Refresh()
         {
-            ventilationUnitCapacityDescriptors_Allowed = EquipmentSelection.AllowedDescriptors(ventilationUnitCapacityDescriptors);
+            //The two lists are handed over separately, so the mode can decide whether the project's own
+            //test product is among the things being offered - "all catalogue products" means the
+            //manufacturer catalogue. PartOEquipmentSelection.AllowedDescriptors is where that is written.
+            ventilationUnitCapacityDescriptors_Allowed = EquipmentSelection.AllowedDescriptors(ventilationUnitCapacityDescriptors, ventilationUnitCapacityDescriptors_ProjectTest);
+
+            keys_Allowed.Clear();
+
+            foreach (VentilationUnitCapacityDescriptor ventilationUnitCapacityDescriptor in ventilationUnitCapacityDescriptors_Allowed)
+            {
+                keys_Allowed.Add(Key(ventilationUnitCapacityDescriptor.VentilationUnitReference));
+            }
 
             foreach (PartOEquipmentAssignment partOEquipmentAssignment in assignments)
             {
@@ -460,10 +621,17 @@ namespace SAM.Analytical.UI
         /// Whether a product is one the project permits. Asked of the allowed list rather than of
         /// <c>PartOEquipmentSelection.IsAllowed</c>, so that a permitted identity the current catalogue does
         /// not hold is not silently reported as pickable.
+        /// <para>
+        /// One probe of <see cref="keys_Allowed"/>, which is built from that same list, rather than a scan
+        /// of it - so a whole-table refresh costs O(D + P) as the class remarks claim, and not O(D x P).
+        /// The keys agree with <c>VentilationUnitReference.Matches</c> by construction; see
+        /// <see cref="Key"/>, which is the same function this index and
+        /// <see cref="dictionary_Descriptor"/> both use.
+        /// </para>
         /// </summary>
         private bool IsAllowed(VentilationUnitReference ventilationUnitReference)
         {
-            return ventilationUnitCapacityDescriptors_Allowed.Find(x => ventilationUnitReference.Matches(x.VentilationUnitReference)) is not null;
+            return ventilationUnitReference is not null && keys_Allowed.Contains(Key(ventilationUnitReference));
         }
 
         /// <summary>What a product can move, by one dictionary probe. Null is "unknown", never a pass.</summary>

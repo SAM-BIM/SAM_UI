@@ -584,6 +584,19 @@ namespace SAM.Analytical.UI
                 return false;
             }
 
+            //And WHAT the project's own test ventilation unit is rated at, for the same reason one step
+            //further on. That rating is not a selection input - it is a capability - but it IS the ceiling
+            //Iteration 2B stops at for any dwelling assigned to it. A what-if re-rated from 165 to 175 l/s
+            //is a different what-if, and reusing a preparation made under the old rating would optimise
+            //against the old ceiling while the dialog reported the new one.
+            //
+            //Absent on both sides is a match: a project that has never stated one, reused by a request that
+            //states none either, has nothing to disagree about.
+            if (partOWorkflowRequest.SelectVentilationUnit && !Matches(partOPreparationContext.ProjectTestVentilationUnit, partOWorkflowRequest.ProjectTestVentilationUnit))
+            {
+                return false;
+            }
+
             Dictionary<Guid, string> ventilationStrategies = partOWorkflowRequest.VentilationStrategies();
 
             if (partOPreparationContext.VentilationStrategies.Count != ventilationStrategies.Count)
@@ -640,6 +653,20 @@ namespace SAM.Analytical.UI
         private static PartOEquipmentSelection EquipmentSelection(PartOWorkflowRequest partOWorkflowRequest)
         {
             return partOWorkflowRequest?.EquipmentSelection ?? new PartOEquipmentSelection();
+        }
+
+        /// <summary>
+        /// Whether two statements about a project test ventilation unit say the same thing, where either or
+        /// both may be absent. Absent and absent agree; absent and stated do not.
+        /// </summary>
+        private static bool Matches(PartOProjectTestVentilationUnit partOProjectTestVentilationUnit_1, PartOProjectTestVentilationUnit partOProjectTestVentilationUnit_2)
+        {
+            if (partOProjectTestVentilationUnit_1 is null || partOProjectTestVentilationUnit_2 is null)
+            {
+                return partOProjectTestVentilationUnit_1 is null && partOProjectTestVentilationUnit_2 is null;
+            }
+
+            return partOProjectTestVentilationUnit_1.Matches(partOProjectTestVentilationUnit_2);
         }
     }
 }

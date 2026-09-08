@@ -266,7 +266,10 @@ namespace SAM.Analytical.UI.WPF
                 //afterwards, that setter re-seeds. Either order gives the same answer.
                 if (ventilationUnitCatalogue is not null)
                 {
-                    WriteEquipmentSelection(value?.GetValue<PartOEquipmentSelection>(Analytical.AnalyticalModelParameter.PartOEquipmentSelection));
+                    WriteEquipmentSelection(
+                        value?.GetValue<PartOEquipmentSelection>(Analytical.AnalyticalModelParameter.PartOEquipmentSelection),
+                        value?.GetValue<PartOProjectTestVentilationUnit>(Analytical.AnalyticalModelParameter.PartOProjectTestVentilationUnit),
+                        value);
                 }
 
                 Refresh();
@@ -303,6 +306,12 @@ namespace SAM.Analytical.UI.WPF
                     //Re-seeded, because the pool is restored by ticking catalogue rows and those rows did
                     //not exist until now. RunPartOWorkflow sets the model first and the catalogue second;
                     //doing it here as well makes the window correct under either order.
+                    //
+                    //The test product FIRST, for the same reason one step deeper: its row does not exist
+                    //until it has been stated, and the pool is restored by ticking rows.
+                    control_EquipmentSelection.ProjectTestVentilationUnit = analyticalModel?.GetValue<PartOProjectTestVentilationUnit>(Analytical.AnalyticalModelParameter.PartOProjectTestVentilationUnit);
+                    control_EquipmentSelection.ProjectTestVentilationUnitAssignmentCount = Query.PartOVentilationUnitAssignmentCount(analyticalModel, control_EquipmentSelection.ProjectTestVentilationUnit?.VentilationUnitReference);
+
                     control_EquipmentSelection.EquipmentSelection = analyticalModel?.GetValue<PartOEquipmentSelection>(Analytical.AnalyticalModelParameter.PartOEquipmentSelection);
                 }
                 finally
@@ -360,6 +369,28 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>The selection authority this window currently states.</summary>
         public PartOEquipmentSelectionMode Mode => control_EquipmentSelection.Mode;
+
+        /// <summary>
+        /// The project's own test ventilation unit as this window currently states it - the SAME
+        /// project-scoped statement the single-command Prepare Iteration window reads and writes, held in
+        /// the same shared control. There is no Prepare &amp; Run-only what-if.
+        /// </summary>
+        public PartOProjectTestVentilationUnit? ProjectTestVentilationUnit
+        {
+            get
+            {
+                return control_EquipmentSelection.ProjectTestVentilationUnit;
+            }
+            set
+            {
+                WriteEquipmentSelection(EquipmentSelection, value, analyticalModel);
+
+                Refresh();
+            }
+        }
+
+        /// <summary>What this window currently says about the project test product.</summary>
+        public string ProjectTestDescription => control_EquipmentSelection.ProjectTestDescription;
 
         /// <summary>The catalogue rows, so a test can read exactly what the engineer can see.</summary>
         internal List<PartOCatalogueProductRow> CatalogueProductRows => control_EquipmentSelection.CatalogueProductRows;
@@ -641,6 +672,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     OptimisationSettings = OptimisationSettings,
                     EquipmentSelection = EquipmentSelection,
+                    ProjectTestVentilationUnit = ProjectTestVentilationUnit,
                 };
             }
         }
@@ -965,10 +997,30 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private void WriteEquipmentSelection(PartOEquipmentSelection? partOEquipmentSelection)
         {
+            WriteEquipmentSelection(partOEquipmentSelection, control_EquipmentSelection.ProjectTestVentilationUnit, analyticalModel);
+        }
+
+        /// <summary>
+        /// Writes the project test product and then the preselection, in that order and under one
+        /// re-entrancy guard.
+        /// <para>
+        /// <b>The order is load-bearing.</b> A permitted product is restored by ticking its catalogue row,
+        /// and the test product has no row until it has been stated - so writing the pool first would
+        /// silently drop the test product's permission.
+        /// </para>
+        /// </summary>
+        private void WriteEquipmentSelection(PartOEquipmentSelection? partOEquipmentSelection, PartOProjectTestVentilationUnit? partOProjectTestVentilationUnit, AnalyticalModel? analyticalModel_Count)
+        {
             writing_EquipmentSelection = true;
 
             try
             {
+                control_EquipmentSelection.ProjectTestVentilationUnit = partOProjectTestVentilationUnit;
+
+                //Counted off the SAVED project: those are the assignments a rename or a removal would
+                //orphan. One pass over the model's air handling units, once per write.
+                control_EquipmentSelection.ProjectTestVentilationUnitAssignmentCount = Query.PartOVentilationUnitAssignmentCount(analyticalModel_Count, partOProjectTestVentilationUnit?.VentilationUnitReference);
+
                 control_EquipmentSelection.EquipmentSelection = partOEquipmentSelection;
             }
             finally

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Windows;
 
@@ -128,6 +130,130 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>Whether the assignment grid is currently editable - true only in manual mode.</summary>
         internal bool IsEquipmentEditable => !dataGrid_Equipment.IsReadOnly;
 
+        /// <summary>Whether bulk assignment is currently offered at all - manual authority only.</summary>
+        internal bool IsBulkAssignmentAvailable => grid_Bulk.IsEnabled;
+
+        /// <summary>Whether "Apply to selected" can currently be clicked.</summary>
+        internal bool CanApplyToSelected => button_ApplyToSelected.IsEnabled;
+
+        /// <summary>What the window currently says about the selection. For a test to read.</summary>
+        internal string BulkSelectionDescription => textBlock_BulkSelection.Text;
+
+        /// <summary>The products bulk assignment currently offers. For a test to read.</summary>
+        internal List<VentilationUnitCapacityDescriptor> BulkProducts => [.. comboBox_BulkProduct.ItemsSource?.OfType<VentilationUnitCapacityDescriptor>() ?? []];
+
+        /// <summary>
+        /// Selects the rows for the named dwelling units, as clicking and Ctrl+clicking them would. For a
+        /// test to drive a bulk assignment without a mouse.
+        /// </summary>
+        internal void SelectEquipmentRows(IEnumerable<Guid> guids_AirHandlingUnit)
+        {
+            HashSet<Guid> guids = [.. guids_AirHandlingUnit ?? []];
+
+            dataGrid_Equipment.SelectedItems.Clear();
+
+            foreach (PartOEquipmentRow partOEquipmentRow in equipmentRows)
+            {
+                if (guids.Contains(partOEquipmentRow.Guid_AirHandlingUnit))
+                {
+                    dataGrid_Equipment.SelectedItems.Add(partOEquipmentRow);
+                }
+            }
+
+            UpdateBulkAvailability();
+        }
+
+        /// <summary>The product bulk assignment will apply. Settable so a test can choose one.</summary>
+        internal VentilationUnitCapacityDescriptor? BulkProduct
+        {
+            get
+            {
+                return comboBox_BulkProduct.SelectedItem as VentilationUnitCapacityDescriptor;
+            }
+            set
+            {
+                comboBox_BulkProduct.SelectedItem = value;
+
+                UpdateBulkAvailability();
+            }
+        }
+
+        /// <summary>
+        /// <b>Apply to selected.</b> Assigns the chosen product to every selected dwelling and to no other,
+        /// as one deliberate act.
+        ///
+        /// <para><b>Why this exists rather than "editing a cell edits the selection"</b></para>
+        /// <para>
+        /// Because a hundred or a thousand dwellings cannot be authored one row at a time, and because the
+        /// obvious alternative is dangerous: a picker that quietly wrote its value into every highlighted
+        /// row would be triggered by an ordinary mis-click and would leave no trace of having done it. So
+        /// single-row editing stays single-row, and bulk assignment is a named button next to a count of
+        /// what it will touch.
+        /// </para>
+        ///
+        /// <para><b>Each dwelling is judged on its own duty</b></para>
+        /// <para>
+        /// The set re-evaluates each assigned row independently, so capability, pool membership, headroom,
+        /// status and any suggestion are that dwelling's own answer. Nothing here compares a capacity or
+        /// reduces a design airflow to fit a product - and an insufficient assignment stays assigned and is
+        /// reported, exactly as a single-row one does.
+        /// </para>
+        ///
+        /// <para><b>Only the rows that changed are refreshed</b></para>
+        /// <para>
+        /// An assignment changes that row's derived state and no other row's, so refreshing the whole table
+        /// would be O(D) work per bulk operation for nothing. On a thousand-dwelling project that is the
+        /// difference between an instant operation and a visible pause.
+        /// </para>
+        /// </summary>
+        /// <returns>True where every selected dwelling was assigned.</returns>
+        internal bool ApplyToSelected()
+        {
+            if (partOEquipmentAssignmentSet is null || !partOEquipmentAssignmentSet.IsManual)
+            {
+                return false;
+            }
+
+            if (comboBox_BulkProduct.SelectedItem is not VentilationUnitCapacityDescriptor ventilationUnitCapacityDescriptor)
+            {
+                return false;
+            }
+
+            List<PartOEquipmentRow> partOEquipmentRows = [.. dataGrid_Equipment.SelectedItems.OfType<PartOEquipmentRow>()];
+
+            if (partOEquipmentRows.Count == 0)
+            {
+                return false;
+            }
+
+            bool result = partOEquipmentAssignmentSet.Assign(
+                partOEquipmentRows.ConvertAll(x => x.Guid_AirHandlingUnit),
+                ventilationUnitCapacityDescriptor.VentilationUnitReference,
+                out List<Guid> guids_Assigned,
+                out List<string> refusals);
+
+            HashSet<Guid> guids = [.. guids_Assigned];
+
+            foreach (PartOEquipmentRow partOEquipmentRow in partOEquipmentRows)
+            {
+                if (guids.Contains(partOEquipmentRow.Guid_AirHandlingUnit))
+                {
+                    partOEquipmentRow.Refresh();
+                }
+            }
+
+            UpdateAssignmentText();
+
+            UpdateBulkAvailability();
+
+            if (refusals.Count != 0)
+            {
+                MessageBox.Show(string.Format("Not every selected dwelling was assigned.\n\n{0}", string.Join("\n\n", refusals)));
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// <b>Convert to Manual.</b> Hands the selection authority to the engineer and preserves every
         /// dwelling's product exactly, by not touching any of them.
@@ -198,6 +324,23 @@ namespace SAM.Analytical.UI.WPF
 
             dataGrid_Equipment.IsReadOnly = !manual;
 
+            //Offered only under manual authority: in an automatic mode these rows are a rule's results, and
+            //a bulk override made without taking authority would be an authored assignment nobody authored.
+            grid_Bulk.IsEnabled = manual;
+
+            //Rebuilt from the project's permitted set, which "Convert to Manual" and a pool change both
+            //move. The chosen product is preserved by identity where it is still permitted.
+            VentilationUnitReference? ventilationUnitReference = (comboBox_BulkProduct.SelectedItem as VentilationUnitCapacityDescriptor)?.VentilationUnitReference;
+
+            List<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors = partOEquipmentAssignmentSet?.AllowedCandidates ?? [];
+
+            comboBox_BulkProduct.ItemsSource = ventilationUnitCapacityDescriptors;
+            comboBox_BulkProduct.SelectedItem = ventilationUnitReference is null
+                ? null
+                : ventilationUnitCapacityDescriptors.Find(x => ventilationUnitReference.Matches(x.VentilationUnitReference));
+
+            UpdateBulkAvailability();
+
             //Offered only where there is an automatic answer to convert. Converting an empty table would
             //change an authority over nothing, and converting a manual one is already done.
             button_ConvertToManual.IsEnabled = partOEquipmentAssignmentSet is not null
@@ -245,9 +388,38 @@ namespace SAM.Analytical.UI.WPF
             AssignSuggested();
         }
 
+        /// <summary>
+        /// What a bulk assignment would currently do, and whether it can be done at all: a product has to
+        /// be chosen, at least one dwelling selected, and the engineer has to hold the authority.
+        /// </summary>
+        private void UpdateBulkAvailability()
+        {
+            bool manual = partOEquipmentAssignmentSet?.IsManual ?? false;
+
+            int selected = dataGrid_Equipment.SelectedItems.OfType<PartOEquipmentRow>().Count();
+
+            textBlock_BulkSelection.Text = manual
+                ? string.Format("Selected dwellings: {0}", selected)
+                : string.Empty;
+
+            button_ApplyToSelected.IsEnabled = manual && selected != 0 && comboBox_BulkProduct.SelectedItem is VentilationUnitCapacityDescriptor;
+        }
+
         private void dataGrid_Equipment_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             UpdateAssignmentText();
+
+            UpdateBulkAvailability();
+        }
+
+        private void comboBox_BulkProduct_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            UpdateBulkAvailability();
+        }
+
+        private void button_ApplyToSelected_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyToSelected();
         }
 
         /// <summary>
@@ -262,14 +434,19 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
+            //THAT row, and not the table. One dwelling's assignment cannot change another dwelling's
+            //capability, pool membership, headroom, status or suggestion - each of those is an answer about
+            //that dwelling's own duty against the project's own permitted set. Refreshing all of them was
+            //harmless on a demonstration model and is O(D) per keystroke-committed edit on a real one.
+            PartOEquipmentRow? partOEquipmentRow_Edited = e.Row?.Item as PartOEquipmentRow;
+
             Dispatcher.BeginInvoke(new System.Action(() =>
             {
-                foreach (PartOEquipmentRow partOEquipmentRow in equipmentRows)
-                {
-                    partOEquipmentRow.Refresh();
-                }
+                partOEquipmentRow_Edited?.Refresh();
 
                 UpdateAssignmentText();
+
+                UpdateBulkAvailability();
             }));
         }
 
@@ -288,10 +465,10 @@ namespace SAM.Analytical.UI.WPF
 
             stringBuilder.AppendLine();
 
-            stringBuilder.AppendLine("Space\tPart F required l/s\tDesign supply l/s\tDesign extract l/s");
+            stringBuilder.AppendLine("Dwelling / Zone\tSpace\tPart F required l/s\tDesign supply l/s\tDesign extract l/s");
             foreach (PartOSpaceRow row in spaceRows)
             {
-                stringBuilder.AppendLine(string.Format("{0}\t{1:N1}\t{2:N1}\t{3:N1}", row.Name, row.PartFRequired_Lps, row.DesignSupply_Lps, row.DesignExtract_Lps));
+                stringBuilder.AppendLine(string.Format("{0}\t{1}\t{2:N1}\t{3:N1}\t{4:N1}", row.Dwelling, row.Name, row.PartFRequired_Lps, row.DesignSupply_Lps, row.DesignExtract_Lps));
             }
 
             stringBuilder.AppendLine();

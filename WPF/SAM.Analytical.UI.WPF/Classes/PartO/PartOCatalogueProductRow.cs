@@ -41,17 +41,38 @@ namespace SAM.Analytical.UI.WPF
     {
         private bool isUsed;
 
-        public PartOCatalogueProductRow(VentilationUnitCapacityDescriptor ventilationUnitCapacityDescriptor, bool isUsed)
+        public PartOCatalogueProductRow(VentilationUnitCapacityDescriptor ventilationUnitCapacityDescriptor, bool isUsed, bool isProjectTest = false)
         {
             Descriptor = ventilationUnitCapacityDescriptor;
 
             this.isUsed = isUsed;
+
+            IsProjectTest = isProjectTest;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>What this product is and what it can move. The catalogue's fact, held rather than copied.</summary>
         public VentilationUnitCapacityDescriptor Descriptor { get; }
+
+        /// <summary>
+        /// Whether this row is the project's own <b>test</b> product rather than a manufacturer catalogue
+        /// entry.
+        /// <para>
+        /// Shown, not merely known - see <see cref="Origin"/>. A made-up capacity sitting in the same grid
+        /// as transcribed manufacturer data has to be unmistakable, or a figure somebody typed to answer a
+        /// what-if reads later as a published rating. The identity says so too (its manufacturer field is
+        /// the literal words "Project test"), and this is the column that says it without the engineer
+        /// having to parse an identity string.
+        /// </para>
+        /// </summary>
+        public bool IsProjectTest { get; }
+
+        /// <summary>
+        /// Where this product's figures came from, in one short word for a narrow column: the manufacturer
+        /// catalogue, or this project's own test statement.
+        /// </summary>
+        public string Origin => IsProjectTest ? "PROJECT TEST" : "Catalogue";
 
         /// <summary>This product's identity - what a pool stores and what an assignment writes.</summary>
         public VentilationUnitReference? VentilationUnitReference => Descriptor?.VentilationUnitReference;
@@ -96,7 +117,12 @@ namespace SAM.Analytical.UI.WPF
 
         public override string ToString()
         {
-            return string.Format("{0} [{1:0.#} / {2:0.#} l/s maximum]", VentilationUnitReference, MaximumSupply_Lps, MaximumExtract_Lps);
+            return string.Format(
+                "{0} [{1:0.#} / {2:0.#} l/s maximum]{3}",
+                VentilationUnitReference,
+                MaximumSupply_Lps,
+                MaximumExtract_Lps,
+                IsProjectTest ? " - project test" : string.Empty);
         }
 
         private void Raise(string name)

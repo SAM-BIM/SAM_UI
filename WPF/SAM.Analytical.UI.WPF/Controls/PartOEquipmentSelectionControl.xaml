@@ -34,6 +34,9 @@
             <DataGrid.Columns>
                 <DataGridCheckBoxColumn Header="Use" Width="34"
                                         Binding="{Binding IsUsed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <!-- WHERE the figures came from. A capacity somebody typed to answer a what-if sits in the
+                     same grid as transcribed manufacturer data, and has to be unmistakable for it. -->
+                <DataGridTextColumn Header="Origin" Binding="{Binding Origin}" Width="86" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" Width="100" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Model" Binding="{Binding Model}" Width="*" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Variant" Binding="{Binding Reference}" Width="105" IsReadOnly="True"/>
@@ -43,5 +46,41 @@
         </DataGrid>
 
         <TextBlock x:Name="textBlock_Catalogue" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+
+        <!-- THE PROJECT TEST PRODUCT. One made-up unit, this project only, so that "what would a 165 l/s
+             box do here" can be answered without editing shipped manufacturer data or inventing a
+             fictional Nuaire entry.
+
+             Deliberately framed rather than merely labelled: everything else in this control is a
+             transcription of somebody's published document, and this is not. It is deliberately NOT a
+             catalogue editor - a name and two maximums, one product, no second row. -->
+        <Border x:Name="border_ProjectTest" Margin="0,10,0,0" Padding="6,3,6,6"
+                BorderThickness="1" BorderBrush="#C08A00" Background="#FFFBF0D5">
+            <StackPanel>
+                <TextBlock Text="PROJECT TEST PRODUCT (optional) - stated in this project, not manufacturer data"
+                           FontWeight="Bold" Foreground="#7A5600" TextWrapping="Wrap"/>
+                <CheckBox x:Name="checkBox_ProjectTest" Margin="0,5,0,0"
+                          Content="Enable a project test product"
+                          ToolTip="A made-up unit for trying a capacity. It never takes part in &quot;Automatic - all catalogue products&quot;; tick it in the pool above, or assign it by hand."/>
+                <Grid Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="62"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="62"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Grid.Column="0" Content="Name" Padding="0,3,6,0"/>
+                    <TextBox x:Name="textBox_ProjectTestName" Grid.Column="1" VerticalContentAlignment="Center"
+                             ToolTip="The name IS the identity a dwelling assigned this product stores, so it cannot be changed while any dwelling carries it."/>
+                    <Label Grid.Column="2" Content="Max SUP l/s" Padding="10,3,6,0"/>
+                    <TextBox x:Name="textBox_ProjectTestMaximumSupply" Grid.Column="3" VerticalContentAlignment="Center"/>
+                    <Label Grid.Column="4" Content="Max EXT l/s" Padding="10,3,6,0"/>
+                    <TextBox x:Name="textBox_ProjectTestMaximumExtract" Grid.Column="5" VerticalContentAlignment="Center"/>
+                </Grid>
+                <TextBlock x:Name="textBlock_ProjectTest" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="#6B4E00"/>
+            </StackPanel>
+        </Border>
     </StackPanel>
 </UserControl>

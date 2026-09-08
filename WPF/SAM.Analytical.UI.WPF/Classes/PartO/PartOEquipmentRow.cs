@@ -87,6 +87,16 @@ namespace SAM.Analytical.UI.WPF
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
+        /// <summary>
+        /// Which air handling unit this row reports on, by identity.
+        /// <para>
+        /// Exposed so that a bulk assignment can name the dwellings a grid selection covers. Names cannot
+        /// do that job: two dwellings may legitimately be called the same thing, and
+        /// <see cref="Dwelling"/> falls back to a system or a unit name where nothing resolves.
+        /// </para>
+        /// </summary>
+        public System.Guid Guid_AirHandlingUnit => partOEquipmentAssignment?.Guid_AirHandlingUnit ?? System.Guid.Empty;
+
         /// <summary>The air handling unit this row reports on.</summary>
         public string? UnitName { get; }
 

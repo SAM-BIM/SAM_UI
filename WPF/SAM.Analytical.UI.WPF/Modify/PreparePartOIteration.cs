@@ -64,6 +64,16 @@ namespace SAM.Analytical.UI.WPF
             //the project - and what keeps one project's pool out of the next one, which a global application
             //setting could not. Absent reads as the historic default. See PartOEquipmentSelection.
             //
+            //The project's own test ventilation unit, restored the same way and from the same project. Set
+            //BEFORE the preselection below: the pool is restored by ticking catalogue rows, and the test
+            //product has no row until it has been stated.
+            partOIterationWindow.ProjectTestVentilationUnit = analyticalModel.GetValue<PartOProjectTestVentilationUnit>(Analytical.AnalyticalModelParameter.PartOProjectTestVentilationUnit);
+
+            //How many dwellings the SAVED project has fitted with it - which is what makes removing or
+            //renaming it refusable rather than something that silently orphans those assignments. Counted
+            //here because this is the layer that holds a model; the control is told, not asked.
+            partOIterationWindow.ProjectTestVentilationUnitAssignmentCount = Query.PartOVentilationUnitAssignmentCount(analyticalModel, partOIterationWindow.ProjectTestVentilationUnit?.VentilationUnitReference);
+
             //Assigned AFTER VentilationUnitCatalogue, because the pool is restored by ticking catalogue rows
             //and those rows do not exist until the catalogue has been set.
             partOIterationWindow.EquipmentSelection = analyticalModel.GetValue<PartOEquipmentSelection>(Analytical.AnalyticalModelParameter.PartOEquipmentSelection);
@@ -98,6 +108,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 OptimisationSettings = partOIterationWindow.OptimisationSettings,
                 EquipmentSelection = partOIterationWindow.EquipmentSelection,
+                ProjectTestVentilationUnit = partOIterationWindow.ProjectTestVentilationUnit,
             };
 
             PreparePartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner);
@@ -152,8 +163,31 @@ namespace SAM.Analytical.UI.WPF
             //list, so it refuses per dwelling and says so, rather than silently becoming an Iteration 1a run.
             //The Prepare & Run dialog blocks that combination before it gets here - see
             //PartOWorkflowInspection's Equipment stage - and this is what happens if anything else reaches it.
+            //The request, or failing that the PROJECT, or failing that none - the same resolution order as
+            //the preselection below and for the same reason. Absent is ordinary; most projects state none.
+            PartOProjectTestVentilationUnit? partOProjectTestVentilationUnit = Query.PartOProjectTestVentilationUnit(partOWorkflowRequest, analyticalModel);
+
+            //What the project's own test product contributes: none or one. Qualified - SAM.Analytical.UI.WPF
+            //declares a Query of its own.
+            List<VentilationUnitCapacityDescriptor> ventilationUnitCapacityDescriptors_ProjectTest = Analytical.Query.CapacityDescriptors(partOProjectTestVentilationUnit);
+
+            //Null, not an empty list, where no selection is wanted: the preparation reads null as "no
+            //catalogue was offered" and leaves AirHandlingUnitParameter.VentilationUnitReference untouched,
+            //which is Iteration 1a. An empty list would be a catalogue that offers nothing.
+            //
+            //The request states the INTENT and this reads the capability, which is why the two are separate:
+            //an Iteration 2 request on a machine with no readable catalogue hands the preparation an EMPTY
+            //list, so it refuses per dwelling and says so, rather than silently becoming an Iteration 1a run.
+            //The Prepare & Run dialog blocks that combination before it gets here - see
+            //PartOWorkflowInspection's Equipment stage - and this is what happens if anything else reaches it.
+            //
+            //The project's test product joins the CAPABILITY LOOKUP - it has to, or a dwelling assigned to it
+            //would report "capacity unknown" and Iteration 2B would lose that dwelling's ceiling. It joins
+            //INSIDE this guard, so a test product can never by itself turn an unreadable manufacturer
+            //catalogue into a selectable one: whether equipment selection happens at all is still
+            //VentilationUnitCatalogue.HasSelectableProducts' answer, taken in the dialog above.
             List<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors = partOWorkflowRequest.SelectVentilationUnit
-                ? ventilationUnitCatalogue.CapacityDescriptors
+                ? [.. ventilationUnitCatalogue.CapacityDescriptors, .. ventilationUnitCapacityDescriptors_ProjectTest]
                 : null;
 
             //The request, or failing that the PROJECT, or failing that the historic default - in that order,
@@ -175,8 +209,13 @@ namespace SAM.Analytical.UI.WPF
             //      Analytical.Modify.PreparePartOIteration is already told "run no rule and leave every
             //      existing identity alone" - so manual mode needs no new code path in SAM at all. An empty
             //      list under the pooled mode is an explicit refusal and is never widened back.
+            //The two-list overload, and the distinction is load-bearing: "Automatic - all catalogue products"
+            //means the MANUFACTURER catalogue, so a project test product left enabled must not join it, or a
+            //project would select a made-up unit because a capacity happened to still be typed in a box and
+            //every historic answer would move. PartOEquipmentSelection.CandidateDescriptors is where that
+            //rule is written down.
             List<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors_Candidate = partOWorkflowRequest.SelectVentilationUnit
-                ? partOEquipmentSelection.CandidateDescriptors(ventilationUnitCatalogue.CapacityDescriptors)
+                ? partOEquipmentSelection.CandidateDescriptors(ventilationUnitCatalogue.CapacityDescriptors, ventilationUnitCapacityDescriptors_ProjectTest)
                 : null;
 
             //Everything this preparation was asked for, kept so an Iteration 2B optimisation can repeat it
@@ -187,6 +226,10 @@ namespace SAM.Analytical.UI.WPF
                 OptimisationSettings = partOWorkflowRequest.OptimisationSettings,
                 Isolated = partOWorkflowRequest.Isolate,
                 EquipmentSelection = partOEquipmentSelection,
+
+                //Recorded so a preparation is not reused for a re-rated what-if - the capacity itself is
+                //already in the lookup above. See PartOWorkflowInspection.Reusable.
+                ProjectTestVentilationUnit = partOProjectTestVentilationUnit,
             };
 
             PartOIterationPreparation partOIterationPreparation = Analytical.Modify.PreparePartOIteration(analyticalModel, option.PartOIteration, zones_Dwelling, dictionary_VentilationStrategy, ventilationUnitCapacityDescriptors_Candidate, partOWorkflowRequest.Isolate);
@@ -225,16 +268,22 @@ namespace SAM.Analytical.UI.WPF
 
             AdjacencyCluster adjacencyCluster_Prepared = analyticalModel_Prepared.AdjacencyCluster;
 
+            //Space -> what to call the dwelling or zone it belongs to, resolved ONCE for the whole window.
+            //Built here rather than inside the equipment branch below because BOTH tables need it - the
+            //space table names a dwelling per row, and the assignment table names one per unit - and
+            //because an Iteration 1a run has a space table too.
+            Dictionary<Guid, string> dictionary_DwellingName_Space = DwellingNames_Space(adjacencyCluster_Prepared, zones_Dwelling);
+
             //The assignment table, built once against the WHOLE catalogue so that every assigned product
             //can resolve its own rating, and carrying the mode and pool so the window knows who decides.
             PartOEquipmentAssignmentSet? partOEquipmentAssignmentSet = partOWorkflowRequest.SelectVentilationUnit
-                ? EquipmentAssignmentSet(adjacencyCluster_Prepared, partOIterationPreparation, zones_Dwelling, ventilationUnitCapacityDescriptors, partOEquipmentSelection)
+                ? EquipmentAssignmentSet(adjacencyCluster_Prepared, partOIterationPreparation, dictionary_DwellingName_Space, ventilationUnitCatalogue.CapacityDescriptors, partOEquipmentSelection, ventilationUnitCapacityDescriptors_ProjectTest)
                 : null;
 
             PartOPreparationWindow partOPreparationWindow = new()
             {
                 Summary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOWorkflowRequest.SelectVentilationUnit, partOIsolationContext, partOEquipmentAssignmentSet),
-                SpaceRows = (adjacencyCluster_Prepared.GetSpaces() ?? []).ConvertAll(x => new PartOSpaceRow(x)),
+                SpaceRows = (adjacencyCluster_Prepared.GetSpaces() ?? []).ConvertAll(x => new PartOSpaceRow(x, Name_Dwelling(dictionary_DwellingName_Space, x))),
             };
 
             if (partOEquipmentAssignmentSet is not null)
@@ -294,6 +343,23 @@ namespace SAM.Analytical.UI.WPF
                 analyticalModel_Prepared.SetValue(Analytical.AnalyticalModelParameter.PartOEquipmentSelection, partOEquipmentAssignmentSet.EquipmentSelection);
             }
 
+            //The project's test product, stamped beside the preselection and for the same reasons: it rides
+            //on the model, so it survives the project being saved and reopened - which is what lets a
+            //dwelling assigned to it resolve its capacity again rather than coming back as "capacity
+            //unknown" - and it cannot leak into another project. Removed where the project no longer states
+            //one, so a disabled what-if does not linger in a saved file.
+            if (partOWorkflowRequest.SelectVentilationUnit)
+            {
+                if (partOProjectTestVentilationUnit is null)
+                {
+                    analyticalModel_Prepared.RemoveValue(Analytical.AnalyticalModelParameter.PartOProjectTestVentilationUnit);
+                }
+                else
+                {
+                    analyticalModel_Prepared.SetValue(Analytical.AnalyticalModelParameter.PartOProjectTestVentilationUnit, partOProjectTestVentilationUnit);
+                }
+            }
+
             if (!partORun.Prepare(analyticalModel_Prepared, partOIterationPreparation.OverheatingScenarios, partOPreparationContext, partOIterationPreparation.Refusal))
             {
                 MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason));
@@ -349,33 +415,10 @@ namespace SAM.Analytical.UI.WPF
         /// edited or the pool changes.
         /// </para>
         /// </summary>
-        private static PartOEquipmentAssignmentSet EquipmentAssignmentSet(AdjacencyCluster? adjacencyCluster, PartOIterationPreparation partOIterationPreparation, List<Zone> zones_Dwelling, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors, PartOEquipmentSelection partOEquipmentSelection)
+        private static PartOEquipmentAssignmentSet EquipmentAssignmentSet(AdjacencyCluster? adjacencyCluster, PartOIterationPreparation partOIterationPreparation, Dictionary<Guid, string> dictionary_DwellingName_Space, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors, PartOEquipmentSelection partOEquipmentSelection, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors_ProjectTest)
         {
             List<AirHandlingUnit> airHandlingUnits = partOIterationPreparation.AirHandlingUnits;
             List<VentilationSystem> ventilationSystems = partOIterationPreparation.VentilationSystems;
-
-            //Space -> the dwelling it belongs to, built ONCE over the run's zones. Naming a dwelling from
-            //inside the per-unit loop would mean a zone-membership lookup per unit.
-            Dictionary<Guid, string> dictionary_DwellingName_Space = [];
-
-            if (adjacencyCluster is not null)
-            {
-                foreach (Zone zone in zones_Dwelling ?? [])
-                {
-                    if (zone is null)
-                    {
-                        continue;
-                    }
-
-                    foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(zone) ?? [])
-                    {
-                        if (space is not null)
-                        {
-                            dictionary_DwellingName_Space[space.Guid] = zone.Name;
-                        }
-                    }
-                }
-            }
 
             Dictionary<Guid, string> dictionary_VentilationSystemName = [];
             Dictionary<Guid, string> dictionary_DwellingName = [];
@@ -405,7 +448,7 @@ namespace SAM.Analytical.UI.WPF
 
                 foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(ventilationSystem) ?? [])
                 {
-                    if (space is not null && dictionary_DwellingName_Space.TryGetValue(space.Guid, out string name_Dwelling))
+                    if (space is not null && dictionary_DwellingName_Space.TryGetValue(space.Guid, out string name_Dwelling) && !string.Equals(name_Dwelling, PartOSpaceRow.Unresolved, StringComparison.Ordinal))
                     {
                         dictionary_DwellingName[airHandlingUnit.Guid] = name_Dwelling;
 
@@ -420,7 +463,178 @@ namespace SAM.Analytical.UI.WPF
                 dictionary_VentilationSystemName,
                 dictionary_DwellingName,
                 ventilationUnitCapacityDescriptors,
-                partOEquipmentSelection);
+                partOEquipmentSelection,
+                ventilationUnitCapacityDescriptors_ProjectTest);
+        }
+
+        /// <summary>
+        /// Space guid -> what to call the dwelling or zone it belongs to, resolved once for the whole
+        /// preparation window.
+        ///
+        /// <para><b>Part O dwelling membership has absolute precedence</b></para>
+        /// <para>
+        /// The dwelling zones in the current scope are written first, so nothing below can overwrite a
+        /// dwelling attribution. A space in a flat reads as that flat, whatever else it also belongs to.
+        /// </para>
+        ///
+        /// <para><b>The fallback is a real relationship, and is gated twice</b></para>
+        /// <para>
+        /// A space outside every dwelling in scope is named after the zone that groups it - a communal
+        /// corridor, a stair, a landlord area - and a zone qualifies only if it
+        /// </para>
+        /// <list type="number">
+        /// <item>is in the SAME <c>ZoneParameter.ZoneCategory</c> as the dwellings in scope, which is the
+        /// category the Part O assessment operates over; <b>and</b></item>
+        /// <item>is a <c>Query.PartOClassifyAssessmentZones</c> <b>common-space</b> zone of that category -
+        /// the other half of the one classification that already distinguishes a flat from a corridor.</item>
+        /// </list>
+        /// <para>
+        /// <b>This is what keeps unrelated classifications out.</b> A fire zone, a thermal zone, a
+        /// system-grouping zone or a reporting zone is not part of the dwelling / common-space
+        /// classification and is normally in a different category, so it fails both gates and can never
+        /// reach the column. Choosing whichever zone happened to sort first would have produced a
+        /// deterministic answer that was confidently wrong - "Fire compartment 3" in a column headed
+        /// "Dwelling / Zone" - and a wrong answer here is worse than no answer, because it reads as a
+        /// statement about the model.
+        /// </para>
+        ///
+        /// <para><b>Absence and ambiguity both read as an absence</b></para>
+        /// <para>
+        /// A space that resolves to nothing gets <see cref="PartOSpaceRow.Unresolved"/>. So does a space in
+        /// TWO qualifying common-space zones: both names would be defensible, neither is authoritative, and
+        /// picking one would invent an answer the model did not give. Nothing is ever concatenated.
+        /// </para>
+        ///
+        /// <para><b>Cost</b></para>
+        /// <para>
+        /// One <c>GetZones</c> on the prepared cluster and one indexed <c>GetRelatedObjects</c> per zone -
+        /// then every row is an O(1) probe. No <c>GetZones(space)</c> per space, which would materialise
+        /// each space's whole related set (panels, systems, terminals) to find its zones, and no model
+        /// rescan inside a row loop.
+        /// </para>
+        /// </summary>
+        internal static Dictionary<Guid, string> DwellingNames_Space(AdjacencyCluster? adjacencyCluster, List<Zone> zones_Dwelling)
+        {
+            Dictionary<Guid, string> result = [];
+
+            if (adjacencyCluster is null)
+            {
+                return result;
+            }
+
+            //Identity, never name: two dwellings may legitimately be called the same thing.
+            HashSet<Guid> guids_Zone_Dwelling = [];
+
+            foreach (Zone zone in zones_Dwelling ?? [])
+            {
+                if (zone is not null)
+                {
+                    guids_Zone_Dwelling.Add(zone.Guid);
+                }
+            }
+
+            List<Zone> zones = adjacencyCluster.GetZones() ?? [];
+
+            //PASS 1 - the dwellings in scope. Written first, so they win outright.
+            HashSet<string> zoneCategories = [];
+
+            List<Zone> zones_Scope = [];
+
+            foreach (Zone zone in zones)
+            {
+                if (zone is null || !guids_Zone_Dwelling.Contains(zone.Guid))
+                {
+                    continue;
+                }
+
+                zones_Scope.Add(zone);
+
+                //Null category is its own key rather than being skipped: a model whose zones state no
+                //category still has one consistent answer to "the category the dwellings are in".
+                zoneCategories.Add(zone.TryGetValue(ZoneParameter.ZoneCategory, out string zoneCategory) && zoneCategory is not null ? zoneCategory : string.Empty);
+
+                foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(zone) ?? [])
+                {
+                    if (space is not null)
+                    {
+                        result[space.Guid] = zone.Name;
+                    }
+                }
+            }
+
+            //PASS 2 - the common-space zones OF THOSE CATEGORIES, and nothing else. Both gates are applied
+            //here: the category, and then the dwelling / common-space classification within it.
+            List<Zone> zones_Category = [];
+
+            foreach (Zone zone in zones)
+            {
+                if (zone is null || guids_Zone_Dwelling.Contains(zone.Guid))
+                {
+                    continue;
+                }
+
+                string zoneCategory_Zone = zone.TryGetValue(ZoneParameter.ZoneCategory, out string zoneCategory) && zoneCategory is not null ? zoneCategory : string.Empty;
+
+                if (zoneCategories.Contains(zoneCategory_Zone))
+                {
+                    zones_Category.Add(zone);
+                }
+            }
+
+            //Asked rather than repeated - PartFDwellingZones remains the single source of what a dwelling
+            //is, and this is its other half. The scope zones are included so that a zone the classification
+            //would call a dwelling is not offered here as a common space.
+            Analytical.Query.PartOClassifyAssessmentZones([.. zones_Scope, .. zones_Category], out List<Zone> _, out List<Zone> zones_CommonSpace);
+
+            //Spaces seen in more than one qualifying common-space zone: an ambiguity, reported as an
+            //absence rather than resolved by picking one.
+            HashSet<Guid> guids_Space_Ambiguous = [];
+
+            Dictionary<Guid, string> dictionary_CommonSpace = [];
+
+            foreach (Zone zone in zones_CommonSpace ?? [])
+            {
+                if (zone is null || guids_Zone_Dwelling.Contains(zone.Guid))
+                {
+                    continue;
+                }
+
+                foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(zone) ?? [])
+                {
+                    if (space is null || result.ContainsKey(space.Guid))
+                    {
+                        continue;
+                    }
+
+                    if (dictionary_CommonSpace.ContainsKey(space.Guid))
+                    {
+                        guids_Space_Ambiguous.Add(space.Guid);
+
+                        continue;
+                    }
+
+                    dictionary_CommonSpace[space.Guid] = zone.Name;
+                }
+            }
+
+            foreach (KeyValuePair<Guid, string> keyValuePair in dictionary_CommonSpace)
+            {
+                if (!guids_Space_Ambiguous.Contains(keyValuePair.Key))
+                {
+                    result[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// One space's dwelling or zone name, or null where nothing resolved -
+        /// <see cref="PartOSpaceRow"/> turns a null into the em dash it displays.
+        /// </summary>
+        private static string? Name_Dwelling(Dictionary<Guid, string> dictionary_DwellingName_Space, Space? space)
+        {
+            return space is not null && dictionary_DwellingName_Space.TryGetValue(space.Guid, out string name) ? name : null;
         }
 
         private static List<PartOEquipmentRow> EquipmentRows(AdjacencyCluster? adjacencyCluster, PartOIterationPreparation partOIterationPreparation, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors)

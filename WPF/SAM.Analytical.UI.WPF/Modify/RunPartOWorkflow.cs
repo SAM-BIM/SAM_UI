@@ -77,6 +77,8 @@ namespace SAM.Analytical.UI.WPF
             List<Guid>? guids_Dwelling = null;
             PartOOptimisationSettings? partOOptimisationSettings = null;
             PartOEquipmentSelection? partOEquipmentSelection = null;
+            PartOProjectTestVentilationUnit? partOProjectTestVentilationUnit = null;
+            bool stated_ProjectTestVentilationUnit = false;
 
             while (true)
             {
@@ -95,6 +97,17 @@ namespace SAM.Analytical.UI.WPF
                 //dialog that was closed, leaves the project's stored preselection untouched - so without
                 //this the engineer's unsaved change of mode or pool would be silently discarded the moment
                 //the window reopened. Only where a previous showing actually stated one.
+                //The test product first, for the reason the window's own writer gives: the pool is restored
+                //by ticking catalogue rows, and the test product has no row until it has been stated.
+                //
+                //A separate "was it stated" flag rather than a null check, because null is a MEANINGFUL
+                //previous answer here - a previous showing where the engineer switched the test product OFF
+                //has to survive a refused prepare exactly as one where they switched it on does.
+                if (stated_ProjectTestVentilationUnit)
+                {
+                    partOWorkflowWindow.ProjectTestVentilationUnit = partOProjectTestVentilationUnit;
+                }
+
                 if (partOEquipmentSelection is not null)
                 {
                     partOWorkflowWindow.EquipmentSelection = partOEquipmentSelection;
@@ -120,6 +133,8 @@ namespace SAM.Analytical.UI.WPF
                 partOWorkflowScope = partOWorkflowWindow.Scope;
                 partOOptimisationSettings = partOWorkflowWindow.OptimisationSettings;
                 partOEquipmentSelection = partOWorkflowWindow.EquipmentSelection;
+                partOProjectTestVentilationUnit = partOWorkflowWindow.ProjectTestVentilationUnit;
+                stated_ProjectTestVentilationUnit = true;
 
                 guids_Dwelling = [];
                 foreach (Zone zone in partOWorkflowWindow.Zones_Dwelling)

@@ -121,6 +121,26 @@ namespace SAM.Analytical.UI
         public PartOEquipmentSelection EquipmentSelection { get; set; }
 
         /// <summary>
+        /// The project's own test ventilation unit as this run was prepared, or null where the project
+        /// stated none.
+        ///
+        /// <para><b>Recorded so that a preparation is not reused for a different what-if</b></para>
+        /// <para>
+        /// Its capacity is already <i>in</i> <see cref="VentilationUnitCapacityDescriptors"/> - that is how
+        /// Iteration 2B resolves the ceiling of a dwelling assigned to it, and the whole reason the product
+        /// persists on the project. This property records the statement itself so
+        /// <c>PartOWorkflowInspection</c> can tell that a what-if re-rated from 165 to 175 l/s is a
+        /// different what-if: reusing a preparation made under the old rating would simulate the old
+        /// ceiling while the dialog reported the new one.
+        /// </para>
+        /// <para>
+        /// It is <b>not</b> an equipment selection and does not belong inside
+        /// <see cref="EquipmentSelection"/>, which holds identities and never a capacity.
+        /// </para>
+        /// </summary>
+        public PartOProjectTestVentilationUnit ProjectTestVentilationUnit { get; set; }
+
+        /// <summary>
         /// Whether this run's thermal model is the <b>isolated</b> derived model of the dwellings in scope
         /// rather than the whole building.
         /// <para>
