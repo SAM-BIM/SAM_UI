@@ -1111,6 +1111,81 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
+        /// <b>Copy All renders a missing value exactly as the grid does.</b>
+        ///
+        /// <para><b>The regression this pins</b></para>
+        /// <para>
+        /// The cells went through the converter and the export did not, so an absent airflow painted as an
+        /// em dash on screen and pasted as <c>NaN</c> - up to four times per equipment row on an
+        /// Iteration 1a or 1b table, where no product is selected and the maximum and both headroom
+        /// figures are all absent. This text is pasted into an issue, a report or an email, so a table
+        /// that disagrees with the one that was reviewed is the one thing it must not be.
+        /// </para>
+        /// <para>
+        /// Both now call <c>PartOAirFlowConverter.Text</c>, and this asserts the export against the
+        /// converter's own output rather than against a repeated literal.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void CopyAll_RendersAMissingValueTheSameWayTheGridDoes()
+        {
+            //An Iteration 1a row: a real design duty, and no product at all - so the maximum and both
+            //headroom figures are absent. Plus a space that AddVent PartF never sized.
+            PartOPreparationWindow partOPreparationWindow = new()
+            {
+                EquipmentRows = [new PartOEquipmentRow("MVHR-01", "Flat 1 MVHR", 30, 30, null)],
+                SpaceRows = [new PartOSpaceRow(new Space("Bedroom", null))],
+            };
+
+            partOPreparationWindow.SetDiagnostics(null, null, null);
+
+            string text = partOPreparationWindow.CopyAllText();
+
+            //The failure, stated directly.
+            Assert.DoesNotContain("NaN", text, StringComparison.Ordinal);
+
+            //And the absence is present as an absence - the same string the converter gives the cell.
+            PartOAirFlowConverter partOAirFlowConverter = new();
+
+            string unresolved = (string)partOAirFlowConverter.Convert(double.NaN, typeof(string), null, System.Globalization.CultureInfo.CurrentCulture);
+
+            Assert.Equal(PartOAirFlowConverter.Unresolved, unresolved);
+            Assert.Contains(unresolved, text);
+
+            //The figures that DO exist are still figures, and still formatted as the cells format them.
+            string designSupply = (string)partOAirFlowConverter.Convert(30d, typeof(string), null, System.Globalization.CultureInfo.CurrentCulture);
+
+            Assert.Contains(designSupply, text);
+
+            //Every airflow in both tables agrees with the converter, cell for cell.
+            foreach (PartOEquipmentRow partOEquipmentRow in partOPreparationWindow.EquipmentRows)
+            {
+                foreach (double value_Lps in new[]
+                {
+                    partOEquipmentRow.DesignSupplyDuty_Lps,
+                    partOEquipmentRow.DesignExtractDuty_Lps,
+                    partOEquipmentRow.MaximumSupply_Lps,
+                    partOEquipmentRow.MaximumExtract_Lps,
+                    partOEquipmentRow.SupplyHeadroom_Lps,
+                    partOEquipmentRow.ExtractHeadroom_Lps,
+                })
+                {
+                    Assert.Contains(PartOAirFlowConverter.Text(value_Lps), text);
+                }
+            }
+
+            foreach (PartOSpaceRow partOSpaceRow in partOPreparationWindow.SpaceRows)
+            {
+                Assert.Contains(PartOAirFlowConverter.Text(partOSpaceRow.PartFRequired_Lps), text);
+            }
+
+            //The underlying values are untouched by any of it - this is formatting, not substitution.
+            Assert.True(double.IsNaN(partOPreparationWindow.EquipmentRows[0].MaximumSupply_Lps));
+            Assert.True(double.IsNaN(partOPreparationWindow.SpaceRows[0].PartFRequired_Lps));
+            Assert.Equal(30, partOPreparationWindow.EquipmentRows[0].DesignSupplyDuty_Lps);
+        }
+
+        /// <summary>
         /// An unresolved dwelling stays an em dash and is never guessed from a space's name - the existing
         /// precedence, restated here because the display conversion above must not be mistaken for it.
         /// </summary>

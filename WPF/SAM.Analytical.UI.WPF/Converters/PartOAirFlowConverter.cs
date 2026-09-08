@@ -25,6 +25,14 @@ namespace SAM.Analytical.UI.WPF
     /// columns are read-only, <see cref="ConvertBack"/> is not implemented, and the underlying value stays
     /// exactly what its authority produced. Only what the cell paints changes.
     /// </para>
+    ///
+    /// <para><b>The export reads it too</b></para>
+    /// <para>
+    /// <see cref="Text(double?, int)"/> is the whole of the formatting, and Copy All calls it directly.
+    /// Held in one place because the two got out of step immediately once they were separate: the grid
+    /// painted an em dash while the pasted report still said <c>NaN</c>, up to four times per equipment
+    /// row, in a table whose entire purpose is to reproduce what was reviewed.
+    /// </para>
     /// </summary>
     public class PartOAirFlowConverter : IValueConverter
     {
@@ -44,14 +52,27 @@ namespace SAM.Analytical.UI.WPF
                 _ => null,
             };
 
+            return Text(value_Lps, Decimals, culture);
+        }
+
+        /// <summary>
+        /// One airflow as it is shown - the figure, or <see cref="Unresolved"/> where there is none.
+        /// <para>
+        /// The single implementation, so a cell and the Copy All export cannot render the same absent value
+        /// differently. Static because the export has no converter instance and should not need one.
+        /// </para>
+        /// </summary>
+        /// <param name="value_Lps">The airflow, or null / NaN / infinity where there is none.</param>
+        /// <param name="decimals">How many decimals a stated figure is shown to.</param>
+        /// <param name="culture">The culture to format in. Null uses the current one.</param>
+        public static string Text(double? value_Lps, int decimals = 1, CultureInfo culture = null)
+        {
             if (value_Lps is null || double.IsNaN(value_Lps.Value) || double.IsInfinity(value_Lps.Value))
             {
                 return Unresolved;
             }
 
-            int decimals = Decimals < 0 ? 0 : Decimals;
-
-            return value_Lps.Value.ToString(string.Format("N{0}", decimals), culture ?? CultureInfo.CurrentCulture);
+            return value_Lps.Value.ToString(string.Format("N{0}", decimals < 0 ? 0 : decimals), culture ?? CultureInfo.CurrentCulture);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

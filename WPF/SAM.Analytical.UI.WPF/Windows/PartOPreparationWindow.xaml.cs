@@ -559,7 +559,23 @@ namespace SAM.Analytical.UI.WPF
             }));
         }
 
-        private void button_CopyAll_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// What Copy All copies: the summary, both tables and the complete diagnostic record.
+        ///
+        /// <para><b>It reproduces the REVIEWED tables</b></para>
+        /// <para>
+        /// Which is the whole point of it - this text is pasted into an issue, a report or an email - so
+        /// every airflow goes through <c>PartOAirFlowConverter.Text</c>,
+        /// the same formatting the cells use. Formatted independently with <c>N1</c> it disagreed with the
+        /// grid immediately: an absent value painted as an em dash on screen and pasted as <c>NaN</c>, up
+        /// to four times per equipment row on an Iteration 1a or 1b table where no product is selected.
+        /// </para>
+        /// <para>
+        /// Separated from the click handler so the text is assertable without a clipboard - a clipboard the
+        /// test host may not even own.
+        /// </para>
+        /// </summary>
+        internal string CopyAllText()
         {
             StringBuilder stringBuilder = new();
 
@@ -569,7 +585,18 @@ namespace SAM.Analytical.UI.WPF
             stringBuilder.AppendLine("Dwelling\tUnit\tDesign SUP (l/s)\tDesign EXT (l/s)\tAssigned product\tMax SUP (l/s)\tMax EXT (l/s)\tSUP headroom (l/s)\tEXT headroom (l/s)\tStatus");
             foreach (PartOEquipmentRow row in equipmentRows)
             {
-                stringBuilder.AppendLine(string.Format("{0}\t{1}\t{2:N1}\t{3:N1}\t{4}\t{5:N1}\t{6:N1}\t{7:N1}\t{8:N1}\t{9}", row.Dwelling, row.UnitName, row.DesignSupplyDuty_Lps, row.DesignExtractDuty_Lps, row.SelectedProduct, row.MaximumSupply_Lps, row.MaximumExtract_Lps, row.SupplyHeadroom_Lps, row.ExtractHeadroom_Lps, row.SelectionOutcome));
+                stringBuilder.AppendLine(string.Format(
+                    "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}",
+                    row.Dwelling,
+                    row.UnitName,
+                    PartOAirFlowConverter.Text(row.DesignSupplyDuty_Lps),
+                    PartOAirFlowConverter.Text(row.DesignExtractDuty_Lps),
+                    row.SelectedProduct,
+                    PartOAirFlowConverter.Text(row.MaximumSupply_Lps),
+                    PartOAirFlowConverter.Text(row.MaximumExtract_Lps),
+                    PartOAirFlowConverter.Text(row.SupplyHeadroom_Lps),
+                    PartOAirFlowConverter.Text(row.ExtractHeadroom_Lps),
+                    row.SelectionOutcome));
             }
 
             stringBuilder.AppendLine();
@@ -577,7 +604,13 @@ namespace SAM.Analytical.UI.WPF
             stringBuilder.AppendLine("Dwelling / Zone\tSpace\tPart F required (l/s)\tDesign SUP (l/s)\tDesign EXT (l/s)");
             foreach (PartOSpaceRow row in spaceRows)
             {
-                stringBuilder.AppendLine(string.Format("{0}\t{1}\t{2:N1}\t{3:N1}\t{4:N1}", row.Dwelling, row.Name, row.PartFRequired_Lps, row.DesignSupply_Lps, row.DesignExtract_Lps));
+                stringBuilder.AppendLine(string.Format(
+                    "{0}\t{1}\t{2}\t{3}\t{4}",
+                    row.Dwelling,
+                    row.Name,
+                    PartOAirFlowConverter.Text(row.PartFRequired_Lps),
+                    PartOAirFlowConverter.Text(row.DesignSupply_Lps),
+                    PartOAirFlowConverter.Text(row.DesignExtract_Lps)));
             }
 
             stringBuilder.AppendLine();
@@ -587,9 +620,14 @@ namespace SAM.Analytical.UI.WPF
             //silently dropped a repeated warning would be the one place this aggregation could do harm.
             stringBuilder.AppendLine(partODiagnosticSummary.Text);
 
+            return stringBuilder.ToString();
+        }
+
+        private void button_CopyAll_Click(object sender, RoutedEventArgs e)
+        {
             try
             {
-                Clipboard.SetText(stringBuilder.ToString());
+                Clipboard.SetText(CopyAllText());
             }
             catch (System.Runtime.InteropServices.ExternalException)
             {

@@ -15,7 +15,7 @@ claims (branch names, "next step" lists) are historical rather than current.
 
 ### Current status
 
-`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, nine commits, **not merged**.
+`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, ten commits, **not merged**.
 Working tree clean. `SAM`, `SAM_Systems` and `SAM_Tas` are **untouched** and clean, at the frozen SHAs
 above.
 
@@ -28,20 +28,28 @@ e24ae94  the stale ProjectName_Isolated note corrected
 7602573  this checkpoint, and the Part F tooltip no longer judging the space
 7c39ccf  the assignment row fits the window it opens in
 e0ef654  the run heading no longer claims a run that has not happened
-(this)   the manual simulate title claims only the conversion
+12cceb9  the manual simulate title claims only the conversion
+(this)   Copy All renders a missing value as the grid does
 ```
 
-CI has been green on every head checked so far, most recently `e0ef654` (`build` SUCCESS, `spdx`
-SUCCESS). **Six** Codex review findings were raised and all six are resolved and answered on the PR:
-the compact 1a / 1b catalogue showing only a count, the Part F tooltip inferring a space type, this file
-not being updated, the assignment columns not fitting the window, the run heading claiming an existing
-run before anything had run, and the manual simulate title promising a simulation that route can skip.
+CI has been green on every head checked so far, most recently `12cceb9` (`build` SUCCESS, `spdx`
+SUCCESS). **Seven** Codex review findings were raised and all seven are resolved and answered on the
+PR: the compact 1a / 1b catalogue showing only a count, the Part F tooltip inferring a space type, this
+file not being updated, the assignment columns not fitting the window, the run heading claiming an
+existing run before anything had run, the manual simulate title promising a simulation that route can
+skip, and Copy All pasting `NaN` where the grid showed an em dash.
 
-**Four of the six were the same failure: wording that claimed more than the code behind it knew** - a
-group heading, a cell tooltip, a permanently disabled tick and a window title. That is the failure mode
-a presentation pass invites, because renaming something is cheap and re-reading what backs the name is
-not. **Any further presentation work here should check each new string against the condition that
-produces it**, which is what the four fixes and their tests now pin.
+**Two failure modes account for six of the seven, and both are worth carrying forward.**
+
+*Wording that claimed more than the code behind it knew* - four of them: a group heading, a cell
+tooltip, a permanently disabled tick and a window title. Renaming something is cheap and re-reading
+what backs the name is not. **Check every new string against the condition that produces it.**
+
+*A presentation rule applied to one surface and not its twin* - two of them: the catalogue grid styled
+while its 1a / 1b reference view showed only a count, and the cells routed through the airflow converter
+while Copy All still formatted the raw doubles. **Whenever a table changes, ask what else renders the
+same rows** - the export, the clipboard, a second read-only view. `CopyAllText` is now a seam so the
+export is assertable against the converter rather than by eye.
 
 ### What this is, and the line it does not cross
 
@@ -137,6 +145,12 @@ spacing, hierarchy, disabled sections, status wording) and are explicitly not bl
   minimum plus an allowance for window chrome, the grid margins and a vertical scrollbar - so widening a
   column past the default again fails a test rather than reaching a user. Asserted arithmetically
   because a `DataGrid` will not lay a row out offscreen.
+- **The airflow formatting has one implementation, and the export calls it.**
+  `PartOAirFlowConverter.Text` is the whole of it; the cells reach it through the converter and
+  `CopyAllText` calls it directly. Formatted independently the two disagreed at once - an em dash on
+  screen, `NaN` in the pasted report, up to four times per Iteration 1a / 1b equipment row. Copy All was
+  also split out of its click handler so the text is assertable without a clipboard the test host may
+  not own.
 - **The two simulate titles claim only what their own route does.** `Convert to TAS` on the ordinary
   route, because `Modify.Simulate` supports an unticked Simulate box alongside SAP or the
   domestic-overheating XML - it returns early only when all three are off - so a conversion and export
@@ -169,14 +183,14 @@ and `PartOWorkflowScenario` / `PartOVentilationStrategyOption` in `SAM_UI/SAM.An
 
 Also `PROJECT_PROGRESS.md`, which `AGENTS.md` requires and which this pass initially failed to update.
 
-Tests: `PartOConsistencyPolishTests.cs` (new, 36 tests), plus `PartOPresentationTests.cs`,
+Tests: `PartOConsistencyPolishTests.cs` (new, 37 tests), plus `PartOPresentationTests.cs`,
 `PartOProjectTestProductTests.cs` and `PartOSimulateDefaultsTests.cs` updated/extended.
 
 ### Validation performed
 
 ```text
 SAM_UI.sln Release                               0 errors
-SAM.Analytical.UI.WPF.Tests                       809 / 809   (frozen baseline 771 / 771)
+SAM.Analytical.UI.WPF.Tests                       810 / 810   (frozen baseline 771 / 771)
 working tree (SAM_UI)                            clean
 working trees (SAM, SAM_Systems, SAM_Tas)        clean, untouched
 ```
