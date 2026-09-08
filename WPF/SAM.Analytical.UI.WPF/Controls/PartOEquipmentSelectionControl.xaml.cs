@@ -275,6 +275,39 @@ namespace SAM.Analytical.UI.WPF
         internal bool IsCompactCatalogueExpanded => expander_CompactCatalogue.IsExpanded;
 
         /// <summary>
+        /// The rows the compact reference view is bound to - the SAME list the Iteration 2 grid shows.
+        /// Exposed so a test can prove the products are readable on 1a / 1b and are not a second copy.
+        /// </summary>
+        internal System.Collections.IEnumerable? CompactCatalogueRows => dataGrid_CompactCatalogue.ItemsSource;
+
+        /// <summary>Whether the compact reference view can be edited. It cannot, and that is asserted.</summary>
+        internal bool IsCompactCatalogueReadOnly => dataGrid_CompactCatalogue.IsReadOnly;
+
+        /// <summary>
+        /// What the compact reference view's columns are called. Exposed so a test can prove the identity
+        /// and capacity columns are there and that no actionable "Use" column is.
+        /// </summary>
+        internal List<string?> CompactCatalogueColumnHeaders => Headers(dataGrid_CompactCatalogue);
+
+        /// <summary>
+        /// What the Iteration 2 catalogue's columns are called. Exposed alongside the reference view's, so
+        /// a test can prove the actionable grid still has its "Use" column.
+        /// </summary>
+        internal List<string?> CatalogueColumnHeaders => Headers(dataGrid_Catalogue);
+
+        private static List<string?> Headers(System.Windows.Controls.DataGrid dataGrid)
+        {
+            List<string?> result = [];
+
+            foreach (System.Windows.Controls.DataGridColumn dataGridColumn in dataGrid.Columns)
+            {
+                result.Add(dataGridColumn.Header as string);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Keeps the controls consistent with what the current choice actually offers, and restates the line
         /// under the grid.
         /// <para>
@@ -637,6 +670,10 @@ namespace SAM.Analytical.UI.WPF
             }
 
             dataGrid_Catalogue.ItemsSource = catalogueProductRows;
+
+            //The SAME list, so the compact reference view cannot hold a stale or separate catalogue. It
+            //has no editable column, so sharing the rows lends it no authority over the pool.
+            dataGrid_CompactCatalogue.ItemsSource = catalogueProductRows;
         }
 
         /// <summary>

@@ -42,11 +42,40 @@
             <TextBlock x:Name="textBlock_CompactProjectTest" Grid.Row="1" Grid.Column="1" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#555555"
                        Text="Not used on this route."/>
 
-            <!-- The catalogue, one disclosure away and collapsed by default. Reuses the same Expander
-                 pattern the Iteration 2B options use in both hosting windows. -->
+            <!-- THE CATALOGUE ITSELF, one disclosure away and collapsed by default. Reuses the same
+                 Expander pattern the Iteration 2B options use in both hosting windows.
+
+                 The PRODUCTS, and not merely a count of them. An engineer comparing routes legitimately
+                 wants to know what units exist and what they can move, and that is exactly what the
+                 disabled grid used to give them - so the same rows, the same columns and the same styling
+                 appear here, minus everything actionable.
+
+                 READ-ONLY BY CONSTRUCTION, not by being greyed: there is no "Use" column, so there is
+                 nothing to tick, no pool to edit and no way for this view to write to a row. It is bound
+                 to the SAME PartOCatalogueProductRow instances the Iteration 2 grid uses - one list, one
+                 notion of what the catalogue holds - and it neither selects, assigns, nor changes what
+                 applies. -->
             <Expander x:Name="expander_CompactCatalogue" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,8,0,0"
-                      Header="Catalogue products (not used on this route)">
-                <TextBlock x:Name="textBlock_CompactCatalogue" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+                      Header="Catalogue products (not used on this route)"
+                      ToolTip="Reference only. Max SUP and Max EXT are each product's capability ceiling and are never a design airflow.">
+                <StackPanel Margin="0,4,0,0">
+                    <TextBlock x:Name="textBlock_CompactCatalogue" TextWrapping="Wrap" Foreground="#555555"/>
+                    <DataGrid x:Name="dataGrid_CompactCatalogue" Margin="0,4,0,0" MinHeight="60" MaxHeight="150"
+                              AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" SelectionMode="Single"
+                              EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Origin" Binding="{Binding Origin}" Width="86" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" Width="100" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Model" Binding="{Binding Model}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Variant" Binding="{Binding Reference}" Width="105" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Max SUP (l/s)" Binding="{Binding MaximumSupply_Lps, StringFormat=N0}" Width="90" IsReadOnly="True"
+                                                ElementStyle="{StaticResource Style_Numeric}"/>
+                            <DataGridTextColumn Header="Max EXT (l/s)" Binding="{Binding MaximumExtract_Lps, StringFormat=N0}" Width="90" IsReadOnly="True"
+                                                ElementStyle="{StaticResource Style_Numeric}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
             </Expander>
         </Grid>
 

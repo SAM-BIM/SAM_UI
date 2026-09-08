@@ -7,6 +7,7 @@ using SAM.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Xunit;
 
 namespace SAM.Analytical.UI.WPF.Tests
@@ -88,6 +89,130 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(control.IsPoolEditable);
             Assert.Equal(2, control.CatalogueProductRows.Count);
+        }
+
+        /// <summary>
+        /// <b>The compact catalogue disclosure shows the PRODUCTS, not just a count of them.</b>
+        ///
+        /// <para><b>The regression this pins</b></para>
+        /// <para>
+        /// Before the compact summary existed, the Iteration 1a / 1b catalogue was disabled rather than
+        /// hidden, and an engineer comparing routes could still read which products existed and what they
+        /// could move. A disclosure that offered only the count sentence took that away. So the reference
+        /// view carries the same identity and capacity columns the Iteration 2 grid carries.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void TheCompactCatalogueDisclosure_ShowsTheProductsReadOnly()
+        {
+            PartOEquipmentSelectionControl control = new()
+            {
+                VentilationUnitCatalogue = Catalogue(),
+                IsSelectionEnabled = false,
+            };
+
+            Assert.True(control.IsCompact);
+
+            //Collapsed by default, so normal 1a / 1b stays clean - the engineer opens it deliberately.
+            Assert.False(control.IsCompactCatalogueExpanded);
+
+            //The SAME rows, by object identity: one notion of what the catalogue holds, not a second copy
+            //that could drift from it.
+            List<PartOCatalogueProductRow> rows = [.. control.CompactCatalogueRows.OfType<PartOCatalogueProductRow>()];
+
+            Assert.Equal(2, rows.Count);
+            Assert.Equal(control.CatalogueProductRows.Count, rows.Count);
+
+            foreach (PartOCatalogueProductRow partOCatalogueProductRow in control.CatalogueProductRows)
+            {
+                Assert.Single(rows, x => ReferenceEquals(x, partOCatalogueProductRow));
+            }
+
+            //And the products themselves are readable - identity and both capability ceilings.
+            PartOCatalogueProductRow partOCatalogueProductRow_XBC15 = rows.Find(x => x.Model == model_XBC15);
+
+            Assert.NotNull(partOCatalogueProductRow_XBC15);
+            Assert.Equal("Nuaire", partOCatalogueProductRow_XBC15.Manufacturer);
+            Assert.Equal("Catalogue", partOCatalogueProductRow_XBC15.Origin);
+            Assert.Equal(190, partOCatalogueProductRow_XBC15.MaximumSupply_Lps);
+            Assert.Equal(190, partOCatalogueProductRow_XBC15.MaximumExtract_Lps);
+
+            //The count sentence stays too, above the grid.
+            Assert.Contains("selectable ventilation unit product(s) available", control.CompactCatalogueDescription);
+        }
+
+        /// <summary>
+        /// <b>And it is not actionable.</b> Read-only by construction rather than by being greyed: there is
+        /// no "Use" column at all, so there is nothing to tick, no pool to edit and no way for this view to
+        /// write to a row.
+        /// </summary>
+        [WpfFact]
+        public void TheCompactCatalogueDisclosure_IsNotActionable()
+        {
+            PartOEquipmentSelectionControl control = new()
+            {
+                VentilationUnitCatalogue = Catalogue(),
+                IsSelectionEnabled = false,
+            };
+
+            Assert.True(control.IsCompactCatalogueReadOnly);
+
+            List<string> headers = [.. control.CompactCatalogueColumnHeaders];
+
+            Assert.Equal(
+                new[] { "Origin", "Manufacturer", "Model", "Variant", "Max SUP (l/s)", "Max EXT (l/s)" },
+                headers);
+
+            Assert.DoesNotContain("Use", headers);
+
+            //The mode radio buttons, the editable catalogue and the project-test panel are all still gone
+            //from the layout - the reference view added a table, not a way to configure anything.
+            Assert.False(control.IsFullSectionVisible);
+            Assert.False(control.IsPoolEditable);
+
+            //And the preselection this control reports is untouched by any of it.
+            Assert.Equal(PartOEquipmentSelectionMode.AutomaticAllProducts, control.Mode);
+        }
+
+        /// <summary>
+        /// Iteration 2's own catalogue is unchanged by the reference view existing: the actionable grid
+        /// still has its <c>Use</c> column, is still editable in the pooled mode, and ticking a row still
+        /// moves the project's permitted pool.
+        /// </summary>
+        [WpfFact]
+        public void TheIteration2Catalogue_IsUnchangedByTheReferenceView()
+        {
+            PartOEquipmentSelectionControl control = new()
+            {
+                VentilationUnitCatalogue = Catalogue(),
+                IsSelectionEnabled = true,
+            };
+
+            Assert.False(control.IsCompact);
+            Assert.True(control.IsFullSectionVisible);
+
+            List<string> headers = [.. control.CatalogueColumnHeaders];
+
+            Assert.Equal("Use", headers[0]);
+            Assert.Contains("Max SUP (l/s)", headers);
+            Assert.Contains("Max EXT (l/s)", headers);
+
+            control.EquipmentSelection = new PartOEquipmentSelection(PartOEquipmentSelectionMode.AutomaticSelectedPool);
+
+            Assert.True(control.IsPoolEditable);
+
+            //Untick the MRXBOX: the pool follows, exactly as it did before.
+            PartOCatalogueProductRow partOCatalogueProductRow = control.CatalogueProductRows.Find(x => x.Model == model_MRXBOX);
+
+            Assert.NotNull(partOCatalogueProductRow);
+
+            partOCatalogueProductRow.IsUsed = false;
+
+            PartOEquipmentSelection partOEquipmentSelection = control.EquipmentSelection;
+
+            Assert.Equal(PartOEquipmentSelectionMode.AutomaticSelectedPool, partOEquipmentSelection.Mode);
+            Assert.Single(partOEquipmentSelection.AllowedVentilationUnitReferences);
+            Assert.Equal(model_XBC15, partOEquipmentSelection.AllowedVentilationUnitReferences[0].Model);
         }
 
         /// <summary>
@@ -516,6 +641,42 @@ namespace SAM.Analytical.UI.WPF.Tests
                         || partOVentilationStrategyOption.Text == PartOWorkflowScenario.Text_Iteration1b,
                     partOVentilationStrategyOption.Text);
             }
+        }
+
+        /// <summary>
+        /// <b>The review window's header states the route once.</b>
+        /// <para>
+        /// It used to print the settled mode and then the canonical word in brackets, which on the
+        /// mechanical route read <c>MVHR (MVHR)</c> - flagged by native acceptance, and rightly.
+        /// </para>
+        /// <para>
+        /// The two are the same statement, and the helper proves that by reading the canonical word back
+        /// through SAM rather than assuming it. Where they somehow disagreed - which
+        /// <c>Modify.PreparePartOIteration</c> refuses - both are still stated, because a header that hid
+        /// that would be the far worse failure.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void TheRouteIsStatedOnce_AndADisagreementWouldStillStateBoth()
+        {
+            Assert.Equal("MVHR", Query.PartOVentilationRouteText(PartOVentilationMode.MVHR, "MVHR"));
+            Assert.Equal("NV", Query.PartOVentilationRouteText(PartOVentilationMode.NaturalVentilation, "NV"));
+
+            //The literal reading native acceptance flagged, gone.
+            Assert.DoesNotContain("MVHR (MVHR)", Query.PartOVentilationRouteText(PartOVentilationMode.MVHR, "MVHR"));
+
+            //Every option the UI can actually offer states its route in one word.
+            foreach (PartOVentilationStrategyOption partOVentilationStrategyOption in PartOVentilationStrategyOption.Options)
+            {
+                string route = Query.PartOVentilationRouteText(partOVentilationStrategyOption.PartOVentilationMode, partOVentilationStrategyOption.VentilationStrategy);
+
+                Assert.Equal(partOVentilationStrategyOption.VentilationStrategy, route);
+                Assert.DoesNotContain("(", route);
+            }
+
+            //A disagreement is reported rather than hidden - and so is a route with no word handed in.
+            Assert.Contains("the preparation settled on", Query.PartOVentilationRouteText(PartOVentilationMode.NaturalVentilation, "MVHR"));
+            Assert.Equal(SAM.Core.Query.Description(PartOVentilationMode.MVHR), Query.PartOVentilationRouteText(PartOVentilationMode.MVHR, null));
         }
 
         /// <summary>

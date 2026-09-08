@@ -710,10 +710,13 @@ namespace SAM.Analytical.UI.WPF
                 ? partOEquipmentAssignmentSet?.Description ?? string.Format("Equipment selection ran against {0} selectable product(s). A selected product's Maximum is its capability ceiling and is never a design airflow.", ventilationUnitCatalogue.CapacityDescriptors.Count)
                 : string.Format("No equipment selection ran, so no product is selected. {0}", ventilationUnitCatalogue.Description);
 
-            return string.Format("{6}{0}. Route stated: {1} ({2}). {3} {4}\n{5} overheating scenario(s) stated. Simulate this model to produce results the TM59 assessment can read.",
+            //ONE route word, not the settled mode followed by the canonical word in brackets - which on
+            //the mechanical route printed the literal reading "MVHR (MVHR)". The two are the same
+            //statement, and Query.PartOVentilationRouteText proves that rather than assuming it: a
+            //disagreement, which the preparation itself refuses, is the one case that still states both.
+            return string.Format("{5}{0}. Route stated: {1}. {2} {3}\n{4} overheating scenario(s) stated. Simulate this model to produce results the TM59 assessment can read.",
                 option.Text,
-                partOIterationPreparation.VentilationMode,
-                option.VentilationStrategy,
+                Query.PartOVentilationRouteText(partOIterationPreparation.VentilationMode, option.VentilationStrategy),
                 duty,
                 equipment,
                 partOIterationPreparation.OverheatingScenarios.Count,
