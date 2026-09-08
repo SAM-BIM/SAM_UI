@@ -952,8 +952,12 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.True(double.IsNaN(partOSpaceRow.PartFRequired_Lps));
             Assert.Equal("—", partOAirFlowConverter.Convert(partOSpaceRow.PartFRequired_Lps, typeof(string), null, System.Globalization.CultureInfo.InvariantCulture));
 
-            //A space with no requirement says why, rather than leaving a blank cell unexplained.
-            Assert.Equal("No Part F requirement for this space type.", partOSpaceRow.PartFRequiredDescription);
+            //A space with no requirement says why, rather than leaving a blank cell unexplained - and it
+            //reports the absent RECORD rather than judging the space. Nothing here reads a space type, so
+            //a habitable room that AddVent PartF was never run over must not be told its type is exempt.
+            Assert.Equal("No continuous Part F requirement is recorded for this space.", partOSpaceRow.PartFRequiredDescription);
+
+            Assert.DoesNotContain("space type", partOSpaceRow.PartFRequiredDescription);
         }
 
         /// <summary>

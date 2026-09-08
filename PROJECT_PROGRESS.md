@@ -1,11 +1,175 @@
 # Project Progress
 
 ## Branch
-`sow/2026-Q3`. PR #98 (`feature/parto-equipment-selection-ux`) is merged and the Approved Document O
-iteration programme is **FROZEN** - see the entry immediately below.
+`ui/part-o-consistency-polish`, off `sow/2026-Q3`. PR #99 - a **presentation-only** polish pass over the
+Part O UI family, on top of the FROZEN iteration programme. See the *Latest* entry immediately below.
+
+PR #98 (`feature/parto-equipment-selection-ux`) is merged and the Approved Document O iteration
+programme is **FROZEN** - see `PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN` below, which remains the
+authority for the engineering state.
 
 Everything below the *Latest* entry is superseded history retained for context, and its forward-looking
 claims (branch names, "next step" lists) are historical rather than current.
+
+## LATEST - PART O UI CONSISTENCY POLISH, PRESENTATION ONLY (2026-09-08)
+
+### Current status
+
+`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, six commits, **not merged**. Working
+tree clean. `SAM`, `SAM_Systems` and `SAM_Tas` are **untouched** and clean, at the frozen SHAs above.
+
+```text
+15c47de  the presentation pass - the five approved areas
+a37c862  the 1a / 1b catalogue readable again, and the route stated once
+2768145  "Show every line" hidden where it has nothing to do
+bf0c06b  the simulate dialog says which route it is, and why its project name is locked
+e24ae94  the stale ProjectName_Isolated note corrected
+(this)   the two remaining Codex findings
+```
+
+### What this is, and the line it does not cross
+
+Presentation only. **No** airflow, equipment-selection algorithm, capacity logic, manual-assignment
+authority, Iteration 2B behaviour, TAS behaviour, persistence, project-test persistence, data authority,
+simulation orchestration, scenario applicability, warning generation or engineering status value is
+changed. The frozen authority split is restated by nothing new:
+
+```text
+PartFRequiredAirFlow  !=  DesignAirFlow  !=  SelectedEquipmentCapacity  !=  OperatingAirFlow
+```
+
+This is the work the freeze entry below recorded as *"presentation-only ideas were raised (tooltips,
+spacing, hierarchy, disabled sections, status wording) and are explicitly not blockers"*.
+
+### Work completed
+
+1. **Iteration 1a / 1b equipment section is a compact summary**, not a screenful of greyed controls. Two
+   concept lines in the same place as Iteration 2's section, plus a **collapsed** disclosure holding a
+   read-only reference table over the SAME `PartOCatalogueProductRow` instances the Iteration 2 grid
+   uses - Origin, Manufacturer, Model, Variant, Max SUP (l/s), Max EXT (l/s). No `Use` column exists in
+   it, so it cannot tick, edit a pool, assign, or change applicability. Iteration 2 is untouched.
+2. **The Prepare & Run status list is divided into two presentation groups** - `Current configuration`
+   and `Existing run / results` - so `Ventilation design: NEEDS PREPARATION` beside `Results: READY`
+   reads as the legitimate mix it is. Rows are one line, with the inspection's complete sentence on the
+   tooltip and behind a per-row disclosure. The Iteration 1b Part F N/A explanation moves there in full.
+3. **Diagnostics header counts each kind present** and carries `Copy All`, moved off the OK/Cancel row.
+   Byte-identical **warnings** collapse with a `x N`; refusals and notes never do.
+4. **One spelling per concept** - the four scenario names as shared constants, `Max SUP / Max EXT`,
+   `Design SUP / Design EXT`, `Part F required`, unit-in-header, `TAS`, `Project test`, and
+   `test (project test)` for the project test product.
+5. **Table hygiene** - right-aligned numerics, a separator rule at each of the three paired concepts,
+   a live `3 of 412 dwellings selected`, an inline bulk-assignment confirmation, and a missing figure
+   shown as an em dash instead of `NaN`.
+6. **High-value tooltips** on the engineering distinctions, and `Convert to Tas TBD` becomes
+   `Convert to TAS and simulate`.
+
+### Important decisions and assumptions
+
+- **A two-tier grouped DataGrid header was deferred.** It needs a custom column-header component, which
+  is disproportionate for a presentation pass. The three paired concepts are marked instead by a
+  `CellStyle` + `HeaderStyle` left border on each group's first column, asserted to add only
+  `BorderThickness` and `BorderBrush` - an explicit `CellStyle` replaces the implicit style, and one that
+  also set `Template` would blank every cell in three columns.
+- **No stale-result detection was added, and no new status token exists.** `PartOWorkflowStatusGroup` is
+  a heading over rows: it hashes nothing, reads and writes no timestamp, compares nothing between the
+  groups. Every row still carries exactly the `PartOWorkflowStageStatus` the inspection assigned it.
+- **A shortened status row is a PREFIX of the inspection's own sentence** (cut at the first full stop),
+  so a row can only say less than the inspection said, never something different. The single supplied
+  summary - the Iteration 1b Part F line - is chosen from the scenario's ventilation mode, never by
+  parsing the detail text.
+- **Warning grouping is warnings-only and byte-exact.** Refusals and notes are never collapsed, because
+  a person counting refusals on screen has to be counting refusals. Nothing is stripped to manufacture a
+  match: collapsing on less than the complete raw string would mean deciding one warning stands for
+  another.
+- **`Show every line` is HIDDEN where nothing was collapsed, not greyed** - and on today's Part O
+  warnings that is every run. Every warning this window can receive names its space
+  (`Modify.AddPartOBaseMVHRSystem` names the space and the system;
+  `Query.ReconcileVentilationSystemDesignDuty` names the space, the direction and both airflows), so no
+  two are ever byte-identical. A permanently disabled tick advertises a capability that never arrives -
+  which is exactly what native acceptance reported.
+- **The Part O simulate dialog's project name stays LOCKED, and that is deliberate.** A user asked to
+  edit it. `Simulate - Energy Simulation` already leaves it editable; only `Modify.Simulate`'s Part O
+  path calls `SimulateControl.LockPartOSettings`. There the name is the run's identity: every artifact
+  is named from it, an isolated run carries `Query.ProjectName_Isolated`'s scope token in it, and
+  `PartOSimulationContext.Iteration_ProjectName` **parses the Iteration 2B round back out of it** - so
+  retyping `Flat1-Opt07` as `Flat1` restarts numbering at `-Opt01` and overwrites the earlier
+  optimisation's evidence, with nothing refusing it. **Do not unlock it.** The real defect was that both
+  routes opened the same window with the same title, so the lock read as a fault; fixed by retitling the
+  Part O one `Part O - Convert to TAS and simulate` and putting the three reasons on the box's tooltip
+  (which needs `ToolTipService.ShowOnDisabled`, or WPF never shows a tooltip on a disabled control). A
+  different name is set where the name comes from: the model, through **Edit - Properties**, before the
+  iteration is prepared.
+- **The Part F cell tooltip reports an absent RECORD, not a judgement about the space.** It reads "No
+  continuous Part F requirement is recorded for this space." The approved package specified "No Part F
+  requirement for this space type", which says more than the code knows - nothing here examines a space
+  type - and would make a habitable room that `AddVent PartF` was never run over read as a deliberate
+  exemption. Deliberate deviation from the brief, on the same principle as the Dwelling / Zone column's
+  em dash.
+- **`Query.PartOVentilationRouteText` states the route once** by reading the canonical word back through
+  `Analytical.Query.PartOVentilationMode`, printing one word where the two agree - which
+  `Modify.PreparePartOIteration` guarantees by refusing a disagreeing pairing - and both where they do
+  not, because a header that hid that disagreement would be the worse failure.
+
+### Files changed
+
+New in `WPF/SAM.Analytical.UI.WPF`:
+
+```text
+Classes/PartO/PartOWorkflowStatusGroup.cs      the two status headings
+Classes/PartO/PartODiagnosticSummary.cs        counts, warning-only byte-exact grouping, complete record
+Query/PartOProductLabel.cs                     "test (project test)" instead of "Project test test"
+Query/PartOVentilationRouteText.cs             the route stated once
+Converters/PartOAirFlowConverter.cs            NaN -> em dash, display only
+Converters/PartOProductLabelConverter.cs       the label, for a picker ItemTemplate
+```
+
+Modified: the equipment-selection control (XAML + code-behind), the Prepare & Run, Prepare Iteration,
+Review, TM59 and 2B windows, `SimulateWindow` and `SimulateControl`, `Modify/PreparePartOIteration.cs`
+(the header's one `string.Format`), `Query/ProjectName_Isolated.cs` (comment only), the four row classes,
+and `PartOWorkflowScenario` / `PartOVentilationStrategyOption` in `SAM_UI/SAM.Analytical.UI`.
+
+Tests: `PartOConsistencyPolishTests.cs` (new, 34 tests), plus `PartOPresentationTests.cs`,
+`PartOProjectTestProductTests.cs` and `PartOSimulateDefaultsTests.cs` updated/extended.
+
+### Validation performed
+
+```text
+SAM_UI.sln Release                               0 errors
+SAM.Analytical.UI.WPF.Tests                       807 / 807   (frozen baseline 771 / 771)
+working tree (SAM_UI)                            clean
+working trees (SAM, SAM_Systems, SAM_Tas)        clean, untouched
+```
+
+The frozen baseline was **re-measured on this machine** before the work started: 771 passed, 0 failed.
+
+Two existing tests were updated for deliberate changes: `Origin` is now `Project test` rather than
+`PROJECT TEST`, and both product pickers render the label through an `ItemTemplate` converter instead of
+`DisplayMemberPath`.
+
+### Unresolved issues, risks and blockers
+
+- **Not exercised in the real application.** Every assertion is over presentation seams and view models;
+  the windows are constructed in tests but never shown. Worth opening the Part O family by hand once -
+  Prepare Iteration on 1a and on 2, Review iteration, Prepare & Run, and the Part O simulate dialog -
+  before release. Native acceptance screenshots were accepted for the earlier commits.
+- **The `DataGridCell` group-separator style is asserted structurally, not by rendering.** A `DataGrid`
+  will not realise a row offscreen without a `PresentationSource`, so the test asserts the style adds
+  only the two border setters rather than laying a cell out. That is the invariant that matters, but it
+  is not a rendered check.
+- **Deferred by instruction and not started:** search/filter, paging/virtualisation architecture, result
+  persistence, run history, last-run timestamps, stale-result detection, warning semantic classification,
+  severity redesign, new engineering statuses, new Part O workflow behaviour, Iteration 3, and a
+  wholesale redesign of the review-window header/fact grid.
+- **A Part O-aware rename does not exist.** If a different run name is wanted without going through
+  Edit - Properties, the safe shape is editing the name *stem* with the scope token and `-OptNN` suffix
+  preserved and re-derived. That is an engineering change to run identity and persistence, so it belongs
+  in its own PR against the unfrozen programme - not here.
+
+### Next step
+
+1. Confirm PR #99's CI is green, then merge it into `sow/2026-Q3`. Nothing is pending in this working
+   tree.
+2. Open the Part O family by hand once before release, per the first risk above.
 
 ## PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN (2026-09-08)
 
