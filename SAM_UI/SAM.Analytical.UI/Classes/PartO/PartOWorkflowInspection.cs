@@ -523,9 +523,9 @@ namespace SAM.Analytical.UI
         /// <see cref="PartOPreparationContext"/> - which is the same object an Iteration 2B round repeats a
         /// preparation from. Every input that reaches
         /// <c>SAM.Analytical.Modify.PreparePartOIteration</c> is compared: the iteration, the dwelling scope
-        /// by guid, the route word stated for each of them, whether a catalogue was offered, and whether the
-        /// model was isolated. Anything else differing means a different engineering case, so the iteration
-        /// is prepared again.
+        /// by guid, the route word stated for each of them, whether a catalogue was offered, HOW the
+        /// products were chosen from it, and whether the model was isolated. Anything else differing means a
+        /// different engineering case, so the iteration is prepared again.
         /// </para>
         /// <para>
         /// <b>The Iteration 2B settings are deliberately NOT compared</b>, and this is the one exclusion.
@@ -571,6 +571,32 @@ namespace SAM.Analytical.UI
                 return false;
             }
 
+            //HOW the products were chosen, not merely whether any were. A preparation made under
+            //"automatic - all catalogue products" holds the products that rule picked; reusing it for a
+            //request that has since narrowed the pool, or handed authority to the engineer, would simulate
+            //the OLD selection while the dialog reported the new one. Nothing would fail - the answer would
+            //just be about different equipment than the screen claimed.
+            //
+            //Only where equipment selection is in play at all: on an Iteration 1a request the mode is
+            //moot, and refusing reuse over it would repeat a preparation for no difference.
+            if (partOWorkflowRequest.SelectVentilationUnit && !EquipmentSelection(partOPreparationContext).Matches(EquipmentSelection(partOWorkflowRequest)))
+            {
+                return false;
+            }
+
+            //And WHAT the project's own test ventilation unit is rated at, for the same reason one step
+            //further on. That rating is not a selection input - it is a capability - but it IS the ceiling
+            //Iteration 2B stops at for any dwelling assigned to it. A what-if re-rated from 165 to 175 l/s
+            //is a different what-if, and reusing a preparation made under the old rating would optimise
+            //against the old ceiling while the dialog reported the new one.
+            //
+            //Absent on both sides is a match: a project that has never stated one, reused by a request that
+            //states none either, has nothing to disagree about.
+            if (partOWorkflowRequest.SelectVentilationUnit && !Matches(partOPreparationContext.ProjectTestVentilationUnit, partOWorkflowRequest.ProjectTestVentilationUnit))
+            {
+                return false;
+            }
+
             Dictionary<Guid, string> ventilationStrategies = partOWorkflowRequest.VentilationStrategies();
 
             if (partOPreparationContext.VentilationStrategies.Count != ventilationStrategies.Count)
@@ -612,6 +638,35 @@ namespace SAM.Analytical.UI
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// What a prepared run was prepared under. Absent reads as the historic default - automatic over
+        /// the whole catalogue - which is what a run prepared before a mode existed was.
+        /// </summary>
+        private static PartOEquipmentSelection EquipmentSelection(PartOPreparationContext partOPreparationContext)
+        {
+            return partOPreparationContext?.EquipmentSelection ?? new PartOEquipmentSelection();
+        }
+
+        /// <summary>What a request is asking for, read the same way.</summary>
+        private static PartOEquipmentSelection EquipmentSelection(PartOWorkflowRequest partOWorkflowRequest)
+        {
+            return partOWorkflowRequest?.EquipmentSelection ?? new PartOEquipmentSelection();
+        }
+
+        /// <summary>
+        /// Whether two statements about a project test ventilation unit say the same thing, where either or
+        /// both may be absent. Absent and absent agree; absent and stated do not.
+        /// </summary>
+        private static bool Matches(PartOProjectTestVentilationUnit partOProjectTestVentilationUnit_1, PartOProjectTestVentilationUnit partOProjectTestVentilationUnit_2)
+        {
+            if (partOProjectTestVentilationUnit_1 is null || partOProjectTestVentilationUnit_2 is null)
+            {
+                return partOProjectTestVentilationUnit_1 is null && partOProjectTestVentilationUnit_2 is null;
+            }
+
+            return partOProjectTestVentilationUnit_1.Matches(partOProjectTestVentilationUnit_2);
         }
     }
 }

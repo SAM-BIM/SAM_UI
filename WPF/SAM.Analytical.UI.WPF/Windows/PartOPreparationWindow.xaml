@@ -5,43 +5,129 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Part O Iteration" Height="640" Width="1080" FontFamily="Roboto Light">
+        Title="Part O Iteration" Height="700" Width="1140" FontFamily="Roboto Light">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="160"/>
+            <RowDefinition Height="140"/>
             <RowDefinition Height="30"/>
         </Grid.RowDefinitions>
 
         <TextBlock x:Name="textBlock_Summary" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8"/>
 
-        <Label Grid.Row="1" Content="Equipment - design duty and selected product are different quantities" Padding="0,0,0,2" FontWeight="Bold"/>
-        <DataGrid x:Name="dataGrid_Equipment" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" MinHeight="90">
+        <!-- CONVERT TO MANUAL sits with the assignments rather than in the previous dialog, because this is
+             the first point at which the automatic answer exists to be converted. It is a change of
+             SELECTION AUTHORITY and not a recalculation: every dwelling keeps the exact product it has. -->
+        <Grid Grid.Row="1">
+            <Label Content="Dwelling assignments - design duty and equipment capacity are different quantities" Padding="0,0,0,2" FontWeight="Bold" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <TextBlock x:Name="textBlock_Mode" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="#555555"/>
+                <Button x:Name="button_ConvertToManual" Content="Convert to Manual" Width="130" Height="22" Click="button_ConvertToManual_Click"
+                        ToolTip="Keep every dwelling's current product exactly as it is, and take over the choice from here. Nothing is reselected and no airflow changes."/>
+            </StackPanel>
+        </Grid>
+
+        <!-- EXTENDED selection, so click / Ctrl+click / Shift+click / Ctrl+A behave the way every other
+             table in Windows does. A project of a thousand flats cannot be assigned one row at a time, and
+             the bulk action below is what a selection is FOR - editing one row's picker still changes that
+             row alone, deliberately, because "editing a cell edits every highlighted row" is far too easy
+             to trigger by accident and far too hard to notice afterwards.
+
+             Recycling, because the point of all this is large tables. -->
+        <DataGrid x:Name="dataGrid_Equipment" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                  HeadersVisibility="Column" MinHeight="90" SelectionMode="Extended" SelectionUnit="FullRow"
+                  EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                  SelectionChanged="dataGrid_Equipment_SelectionChanged" CellEditEnding="dataGrid_Equipment_CellEditEnding">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Unit" Binding="{Binding UnitName}" Width="90"/>
-                <DataGridTextColumn Header="System" Binding="{Binding SystemName}" Width="150"/>
+                <DataGridTextColumn Header="Dwelling" Binding="{Binding Dwelling}" Width="160" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Unit" Binding="{Binding UnitName}" Width="80" IsReadOnly="True"/>
                 <!-- Design duty and Maximum capacity are deliberately in separate, differently headed
-                     columns. A dwelling designed at 30 l/s that selects a 150 l/s unit is a 30 l/s
+                     columns. A dwelling designed at 30 l/s that is fitted with a 150 l/s unit is a 30 l/s
                      dwelling. -->
-                <DataGridTextColumn Header="Design supply&#x0a;l/s" Binding="{Binding DesignSupplyDuty_Lps, StringFormat=N1}" Width="85"/>
-                <DataGridTextColumn Header="Design extract&#x0a;l/s" Binding="{Binding DesignExtractDuty_Lps, StringFormat=N1}" Width="85"/>
-                <DataGridTextColumn Header="Selected product" Binding="{Binding SelectedProduct}" Width="240"/>
-                <DataGridTextColumn Header="Maximum supply&#x0a;l/s" Binding="{Binding MaximumSupply_Lps, StringFormat=N1}" Width="95"/>
-                <DataGridTextColumn Header="Maximum extract&#x0a;l/s" Binding="{Binding MaximumExtract_Lps, StringFormat=N1}" Width="95"/>
-                <DataGridTextColumn Header="Supply headroom&#x0a;l/s" Binding="{Binding SupplyHeadroom_Lps, StringFormat=N1}" Width="95"/>
-                <DataGridTextColumn Header="Extract headroom&#x0a;l/s" Binding="{Binding ExtractHeadroom_Lps, StringFormat=N1}" Width="95"/>
-                <DataGridTextColumn Header="Selection" Binding="{Binding SelectionOutcome}" Width="80"/>
+                <DataGridTextColumn Header="Design supply&#x0a;l/s" Binding="{Binding DesignSupplyDuty_Lps, StringFormat=N1}" Width="85" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Design extract&#x0a;l/s" Binding="{Binding DesignExtractDuty_Lps, StringFormat=N1}" Width="85" IsReadOnly="True"/>
+
+                <!-- The one editable cell, and only in manual mode - the grid itself is read-only in the
+                     automatic modes, where these rows are results rather than choices. The picker's list is
+                     the project's permitted pool plus this dwelling's own product where that has since left
+                     the pool, so a procurement change can never make an authored assignment unpickable. -->
+                <DataGridTemplateColumn Header="Assigned product" Width="250">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding SelectedProduct}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Description}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <!-- DisplayMemberPath, so the picker reads the descriptor's engineer-facing
+                                 Label - identity and both maximum airflows - and not its ToString, which
+                                 is the diagnostic form and ends with the catalogue's internal rank. Rank
+                                 is a tie-breaker, not an airflow, an efficiency or a rating, and a picker
+                                 that prints it invites it to be read as one. -->
+                            <ComboBox ItemsSource="{Binding Candidates}" DisplayMemberPath="Label"
+                                      SelectedItem="{Binding SelectedCandidate, Mode=TwoWay}" IsEnabled="{Binding IsEditable}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="Maximum supply&#x0a;l/s" Binding="{Binding MaximumSupply_Lps, StringFormat=N1}" Width="95" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Maximum extract&#x0a;l/s" Binding="{Binding MaximumExtract_Lps, StringFormat=N1}" Width="95" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Supply headroom&#x0a;l/s" Binding="{Binding SupplyHeadroom_Lps, StringFormat=N1}" Width="95" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Extract headroom&#x0a;l/s" Binding="{Binding ExtractHeadroom_Lps, StringFormat=N1}" Width="95" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding SelectionOutcome}" Width="105" IsReadOnly="True"/>
             </DataGrid.Columns>
         </DataGrid>
 
-        <Label Grid.Row="3" Content="Spaces - Approved Document F requirement and design airflow are different quantities" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
-        <DataGrid x:Name="dataGrid_Spaces" Grid.Row="4" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" MinHeight="90">
+        <!-- The selected row in words, and the ONLY way a suggestion is ever applied. A suggestion is
+             offered here and taken by clicking; nothing is substituted because a suggestion exists. -->
+        <Grid Grid.Row="3" Margin="0,4,0,0">
+            <TextBlock x:Name="textBlock_Assignment" TextWrapping="Wrap" Foreground="#555555" Margin="0,0,150,0"/>
+            <Button x:Name="button_AssignSuggested" Content="Assign suggested" Width="130" Height="22" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    IsEnabled="False" Click="button_AssignSuggested_Click"
+                    ToolTip="Assign the smallest permitted product that can meet this dwelling's design duty. Changes this dwelling only, and changes no airflow."/>
+        </Grid>
+
+        <!-- BULK ASSIGNMENT. Offered only under manual authority, and an EXPLICIT act: the product is
+             chosen here and applied by clicking, to the rows that are selected and to no others. Every
+             dwelling is then validated against its OWN design duty - one product applied to twelve flats
+             can be sufficient for eleven and reported insufficient for the twelfth, and it is neither
+             replaced there nor is that flat's design airflow reduced to fit it.
+
+             The product list is the project's permitted set, and deliberately NOT the union of every
+             selected dwelling's candidates: an out-of-pool product belongs to the one dwelling that has
+             it, and offering twelve flats' historical outsiders as a project-wide choice would offer
+             products the project does not permit.
+
+             Nothing is written here. Like every other edit in this window it is staged until OK. -->
+        <Grid x:Name="grid_Bulk" Grid.Row="4" Margin="0,6,0,0">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="textBlock_BulkSelection" VerticalAlignment="Center" Foreground="#555555" MinWidth="150"/>
+                <ComboBox x:Name="comboBox_BulkProduct" Width="300" Height="22" Margin="6,0,0,0" DisplayMemberPath="Label"
+                          SelectionChanged="comboBox_BulkProduct_SelectionChanged"
+                          ToolTip="The product to assign to every selected dwelling. The project's permitted products; each dwelling is still checked against its own design duty."/>
+                <Button x:Name="button_ApplyToSelected" Content="Apply to selected" Width="130" Height="22" Margin="6,0,0,0"
+                        IsEnabled="False" Click="button_ApplyToSelected_Click"
+                        ToolTip="Assign the chosen product to every selected dwelling. Unselected dwellings are untouched, no airflow of any kind changes, and nothing is written until OK."/>
+            </StackPanel>
+        </Grid>
+
+        <Label Grid.Row="5" Content="Spaces - Approved Document F requirement and design airflow are different quantities" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <DataGrid x:Name="dataGrid_Spaces" Grid.Row="6" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" MinHeight="90"
+                  EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling">
             <DataGrid.Columns>
+                <!-- WHICH DWELLING a space belongs to, resolved from the model's own zone-space relations
+                     and never from a space's name, prefix, index or row order. The dwelling name is
+                     repeated on every row rather than merged or blanked: repeats read slightly worse and
+                     filter, sort, copy and export far better, and this is a table engineers paste into a
+                     spreadsheet. Presentation only - no membership, scope or airflow is changed. -->
+                <DataGridTextColumn Header="Dwelling / Zone" Binding="{Binding Dwelling}" Width="130"/>
                 <DataGridTextColumn Header="Space" Binding="{Binding Name}" Width="220"/>
                 <DataGridTextColumn Header="Part F required&#x0a;l/s" Binding="{Binding PartFRequired_Lps, StringFormat=N1}" Width="100"/>
                 <DataGridTextColumn Header="Design supply&#x0a;l/s" Binding="{Binding DesignSupply_Lps, StringFormat=N1}" Width="100"/>
@@ -49,11 +135,11 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <Label Grid.Row="5" Content="Notes, warnings and refusals" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
-        <TextBox x:Name="textBox_Notes" Grid.Row="6" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
+        <Label Grid.Row="7" Content="Notes, warnings and refusals" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <TextBox x:Name="textBox_Notes" Grid.Row="8" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
 
-        <Button x:Name="button_CopyAll" Grid.Row="7" Width="70" Height="20" Margin="0,6,150,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
-        <Button x:Name="button_OK" Grid.Row="7" Width="60" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_OK_Click">OK</Button>
-        <Button x:Name="button_Cancel" IsCancel="True" Grid.Row="7" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
+        <Button x:Name="button_CopyAll" Grid.Row="9" Width="70" Height="20" Margin="0,6,150,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
+        <Button x:Name="button_OK" Grid.Row="9" Width="60" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_OK_Click">OK</Button>
+        <Button x:Name="button_Cancel" IsCancel="True" Grid.Row="9" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
     </Grid>
 </Window>

@@ -420,5 +420,87 @@ namespace SAM.Analytical.UI.WPF.Tests
                 && x.MaximumExtractFlowRate_Lps == 150
                 && string.Equals(x.VentilationUnitReference?.Manufacturer, "Nuaire", StringComparison.Ordinal));
         }
+
+        // ---------------------------------------------------------------------------------------------
+        // The manual product picker shows a capacity and never the catalogue's internal rank
+        // ---------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// <b>The manual per-dwelling picker reads the descriptor's engineer-facing label.</b>
+        /// <para>
+        /// Read off the real template rather than assumed: the assigned-product column's editing template is
+        /// loaded and its <c>ComboBox</c> asked what it displays. Without an explicit
+        /// <c>DisplayMemberPath</c> a <c>ComboBox</c> falls back to <c>ToString</c>, which is the diagnostic
+        /// form and ends with "rank 10" - a catalogue tie-breaker, presented where an engineer is choosing
+        /// equipment and could read it as a rating.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void TheManualPicker_DisplaysTheEngineerFacingLabel()
+        {
+            PartOPreparationWindow partOPreparationWindow = new();
+
+            System.Windows.Controls.DataGrid dataGrid = (System.Windows.Controls.DataGrid)partOPreparationWindow.FindName("dataGrid_Equipment");
+
+            Assert.NotNull(dataGrid);
+
+            System.Windows.Controls.DataGridTemplateColumn dataGridTemplateColumn = null;
+
+            foreach (System.Windows.Controls.DataGridColumn dataGridColumn in dataGrid.Columns)
+            {
+                if (dataGridColumn is System.Windows.Controls.DataGridTemplateColumn column && Equals(column.Header, "Assigned product"))
+                {
+                    dataGridTemplateColumn = column;
+                }
+            }
+
+            Assert.NotNull(dataGridTemplateColumn);
+
+            System.Windows.Controls.ComboBox comboBox = dataGridTemplateColumn.CellEditingTemplate?.LoadContent() as System.Windows.Controls.ComboBox;
+
+            Assert.NotNull(comboBox);
+            Assert.Equal(nameof(VentilationUnitCapacityDescriptor.Label), comboBox.DisplayMemberPath);
+        }
+
+        /// <summary>
+        /// And the bulk product selector reads the same label, so the two ways of choosing a product cannot
+        /// describe the same product differently.
+        /// </summary>
+        [WpfFact]
+        public void TheBulkProductSelector_DisplaysTheSameLabel()
+        {
+            PartOPreparationWindow partOPreparationWindow = new();
+
+            System.Windows.Controls.ComboBox comboBox = (System.Windows.Controls.ComboBox)partOPreparationWindow.FindName("comboBox_BulkProduct");
+
+            Assert.NotNull(comboBox);
+            Assert.Equal(nameof(VentilationUnitCapacityDescriptor.Label), comboBox.DisplayMemberPath);
+        }
+
+        /// <summary>
+        /// What that label actually says, for the two shipped products: the identity and both maximum
+        /// airflows, and no mention of rank in any casing.
+        /// </summary>
+        [Fact]
+        public void ThatLabel_StatesTheCapacityAndNeverTheRank()
+        {
+            foreach (VentilationUnitCapacityDescriptor ventilationUnitCapacityDescriptor in new[]
+            {
+                new VentilationUnitCapacityDescriptor(new VentilationUnitReference("Nuaire", "MRXBOXAB-ECO5-AECV", "MR-ECO-COOL-V"), 150, 150, 10),
+                new VentilationUnitCapacityDescriptor(new VentilationUnitReference("Nuaire", "XBC15", null), 190, 190, 20),
+            })
+            {
+                string label = ventilationUnitCapacityDescriptor.Label;
+
+                Assert.Contains("Nuaire", label);
+                Assert.Contains("l/s", label);
+                Assert.Contains(ventilationUnitCapacityDescriptor.MaximumSupplyFlowRate_Lps.ToString("0"), label);
+
+                Assert.DoesNotContain("rank", label, StringComparison.OrdinalIgnoreCase);
+
+                //Where the diagnostic form still carries it, so the two are genuinely different strings.
+                Assert.Contains("rank", ventilationUnitCapacityDescriptor.ToString(), StringComparison.OrdinalIgnoreCase);
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Enums;
@@ -65,6 +65,19 @@ namespace SAM.Analytical.UI.WPF
         private PartODwellingSelection dwellingSelection = new([]);
 
         private List<Zone> zones_Eligible = [];
+
+        /// <summary>
+        /// Whether THIS WINDOW is currently writing to the equipment-selection control, rather than a person
+        /// moving it.
+        /// <para>
+        /// The control raises <c>SelectionChanged</c> for either, and this window answers that with a full
+        /// inspection - a pass over every dwelling in scope. So seeding the control from the model, or
+        /// handing it a catalogue, would buy a second inspection for one gesture, which on a five thousand
+        /// space model is exactly the cost <see cref="PartOWorkflowInitialisationTests"/> exists to keep out.
+        /// Each write site suppresses the event and pays the one inspection it owes itself.
+        /// </para>
+        /// </summary>
+        private bool writing_EquipmentSelection;
 
         private AnalyticalModel? analyticalModel;
 
@@ -165,6 +178,19 @@ namespace SAM.Analytical.UI.WPF
             comboBox_Scope.SelectedIndex = 0;
             comboBox_Scope.SelectionChanged += (s, e) => Refresh();
 
+            //A FULL refresh, unlike the Iteration 2B inputs below. The mode and the pool are preparation
+            //inputs: they decide which products a preparation selects, so a change can move whether the
+            //already-prepared iteration is still the one being asked for - see PartOWorkflowInspection.
+            //
+            //Except when this window is the one writing: see the field.
+            control_EquipmentSelection.SelectionChanged += (s, e) =>
+            {
+                if (!writing_EquipmentSelection)
+                {
+                    Refresh();
+                }
+            };
+
             textBox_AirFlowStep.Text = PartOOptimisationSettings.DefaultAirFlowStep_Lps.ToString();
             textBox_MaximumIterations.Text = PartOOptimisationSettings.DefaultMaximumIterations.ToString();
 
@@ -230,6 +256,22 @@ namespace SAM.Analytical.UI.WPF
 
                 listBox_Dwellings.ItemsSource = view;
 
+                //THE PROJECT's own equipment preselection, restored off the model it belongs to - the same
+                //parameter the single-command Prepare Iteration window reads and Modify.PreparePartOIteration
+                //writes. This is the whole of "changing it in one workflow is reflected in the other": there
+                //is one statement, on the project, and both windows show it. Absent reads as the historic
+                //default. See PartOEquipmentSelection.
+                //
+                //Assigned only where a catalogue is already to hand; where the caller sets the catalogue
+                //afterwards, that setter re-seeds. Either order gives the same answer.
+                if (ventilationUnitCatalogue is not null)
+                {
+                    WriteEquipmentSelection(
+                        value?.GetValue<PartOEquipmentSelection>(Analytical.AnalyticalModelParameter.PartOEquipmentSelection),
+                        value?.GetValue<PartOProjectTestVentilationUnit>(Analytical.AnalyticalModelParameter.PartOProjectTestVentilationUnit),
+                        value);
+                }
+
                 Refresh();
             }
         }
@@ -255,6 +297,28 @@ namespace SAM.Analytical.UI.WPF
             {
                 ventilationUnitCatalogue = value;
 
+                writing_EquipmentSelection = true;
+
+                try
+                {
+                    control_EquipmentSelection.VentilationUnitCatalogue = value;
+
+                    //Re-seeded, because the pool is restored by ticking catalogue rows and those rows did
+                    //not exist until now. RunPartOWorkflow sets the model first and the catalogue second;
+                    //doing it here as well makes the window correct under either order.
+                    //
+                    //The test product FIRST, for the same reason one step deeper: its row does not exist
+                    //until it has been stated, and the pool is restored by ticking rows.
+                    control_EquipmentSelection.ProjectTestVentilationUnit = analyticalModel?.GetValue<PartOProjectTestVentilationUnit>(Analytical.AnalyticalModelParameter.PartOProjectTestVentilationUnit);
+                    control_EquipmentSelection.ProjectTestVentilationUnitAssignmentCount = Query.PartOVentilationUnitAssignmentCount(analyticalModel, control_EquipmentSelection.ProjectTestVentilationUnit?.VentilationUnitReference);
+
+                    control_EquipmentSelection.EquipmentSelection = analyticalModel?.GetValue<PartOEquipmentSelection>(Analytical.AnalyticalModelParameter.PartOEquipmentSelection);
+                }
+                finally
+                {
+                    writing_EquipmentSelection = false;
+                }
+
                 Refresh();
             }
         }
@@ -275,6 +339,67 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>What the window was closed to do. <see cref="PartOWorkflowAction.None"/> where it was closed.</summary>
         public PartOWorkflowAction Action { get; private set; } = PartOWorkflowAction.None;
+
+        /// <summary>
+        /// The project's equipment preselection as this window currently states it - asked of the control
+        /// that owns it, exactly as <c>PartOIterationWindow</c> does.
+        ///
+        /// <para><b>The same configuration, not a copy of it</b></para>
+        /// <para>
+        /// It is read off the model when one is set and written back by
+        /// <c>Modify.PreparePartOIteration</c> onto
+        /// <c>AnalyticalModelParameter.PartOEquipmentSelection</c>, so a mode or pool chosen here is what
+        /// the single-command Prepare Iteration window shows next time, and the other way round. There is
+        /// no Prepare &amp; Run-only pool and no application-wide preference.
+        /// </para>
+        /// </summary>
+        public PartOEquipmentSelection EquipmentSelection
+        {
+            get
+            {
+                return control_EquipmentSelection.EquipmentSelection;
+            }
+            set
+            {
+                WriteEquipmentSelection(value);
+
+                Refresh();
+            }
+        }
+
+        /// <summary>The selection authority this window currently states.</summary>
+        public PartOEquipmentSelectionMode Mode => control_EquipmentSelection.Mode;
+
+        /// <summary>
+        /// The project's own test ventilation unit as this window currently states it - the SAME
+        /// project-scoped statement the single-command Prepare Iteration window reads and writes, held in
+        /// the same shared control. There is no Prepare &amp; Run-only what-if.
+        /// </summary>
+        public PartOProjectTestVentilationUnit? ProjectTestVentilationUnit
+        {
+            get
+            {
+                return control_EquipmentSelection.ProjectTestVentilationUnit;
+            }
+            set
+            {
+                WriteEquipmentSelection(EquipmentSelection, value, analyticalModel);
+
+                Refresh();
+            }
+        }
+
+        /// <summary>What this window currently says about the project test product.</summary>
+        public string ProjectTestDescription => control_EquipmentSelection.ProjectTestDescription;
+
+        /// <summary>The catalogue rows, so a test can read exactly what the engineer can see.</summary>
+        internal List<PartOCatalogueProductRow> CatalogueProductRows => control_EquipmentSelection.CatalogueProductRows;
+
+        /// <summary>What this window currently says about the catalogue and the current mode.</summary>
+        public string CatalogueDescription => control_EquipmentSelection.CatalogueDescription;
+
+        /// <summary>Whether the permitted products can currently be ticked.</summary>
+        internal bool IsPoolEditable => control_EquipmentSelection.IsPoolEditable;
 
         /// <summary>
         /// Re-applies the choices a previous showing of this dialog was closed with, so a person who runs a
@@ -546,6 +671,8 @@ namespace SAM.Analytical.UI.WPF
                 return new PartOWorkflowRequest(partOWorkflowScenario?.Option, Scope, Zones_Dwelling, partOWorkflowScenario is not null && partOWorkflowScenario.SelectVentilationUnit)
                 {
                     OptimisationSettings = OptimisationSettings,
+                    EquipmentSelection = EquipmentSelection,
+                    ProjectTestVentilationUnit = ProjectTestVentilationUnit,
                 };
             }
         }
@@ -715,6 +842,9 @@ namespace SAM.Analytical.UI.WPF
 
             PartOWorkflowScenario? partOWorkflowScenario = Scenario;
 
+            //Before the scenario text, which asks the control what the active mode means.
+            UpdateEquipmentSelectionControls();
+
             UpdateScenarioText(partOWorkflowScenario);
             UpdateScopeControls();
             UpdateOptimiseControls(partOWorkflowScenario);
@@ -848,13 +978,65 @@ namespace SAM.Analytical.UI.WPF
             //The route word is SAM's, carried by the option; this states it rather than choosing it.
             string route = string.Format("Ventilation route stated for every dwelling in scope: {0}.", partOWorkflowScenario.Option.VentilationStrategy);
 
+            //ASKED OF THE ACTIVE MODE, never assumed. This line used to say "the smallest capable
+            //manufacturer unit is selected per dwelling" whatever the project's configuration was - which
+            //is simply untrue of a project under manual authority, and untrue of a narrowed pool. An
+            //engineer reading it would have believed a selection had run that had not.
             string equipment = partOWorkflowScenario.SelectVentilationUnit
-                ? " The smallest capable manufacturer unit is selected per dwelling against the realized design duty; a product's maximum is a capability ceiling and never becomes a design airflow."
+                ? string.Format(" {0}", control_EquipmentSelection.ModeDescription)
                 : partOWorkflowScenario.Option.PartOVentilationMode == PartOVentilationMode.MVHR
                     ? " No manufacturer unit is selected, so the design duty stands on its own."
                     : " No mechanical system, unit or terminal is created on this route.";
 
             textBlock_Scenario.Text = route + equipment;
+        }
+
+        /// <summary>
+        /// Writes the preselection into the control without the window answering its own write with an
+        /// inspection. Every caller pays exactly one <see cref="Refresh"/> of its own. See the field.
+        /// </summary>
+        private void WriteEquipmentSelection(PartOEquipmentSelection? partOEquipmentSelection)
+        {
+            WriteEquipmentSelection(partOEquipmentSelection, control_EquipmentSelection.ProjectTestVentilationUnit, analyticalModel);
+        }
+
+        /// <summary>
+        /// Writes the project test product and then the preselection, in that order and under one
+        /// re-entrancy guard.
+        /// <para>
+        /// <b>The order is load-bearing.</b> A permitted product is restored by ticking its catalogue row,
+        /// and the test product has no row until it has been stated - so writing the pool first would
+        /// silently drop the test product's permission.
+        /// </para>
+        /// </summary>
+        private void WriteEquipmentSelection(PartOEquipmentSelection? partOEquipmentSelection, PartOProjectTestVentilationUnit? partOProjectTestVentilationUnit, AnalyticalModel? analyticalModel_Count)
+        {
+            writing_EquipmentSelection = true;
+
+            try
+            {
+                control_EquipmentSelection.ProjectTestVentilationUnit = partOProjectTestVentilationUnit;
+
+                //Counted off the SAVED project: those are the assignments a rename or a removal would
+                //orphan. One pass over the model's air handling units, once per write.
+                control_EquipmentSelection.ProjectTestVentilationUnitAssignmentCount = Query.PartOVentilationUnitAssignmentCount(analyticalModel_Count, partOProjectTestVentilationUnit?.VentilationUnitReference);
+
+                control_EquipmentSelection.EquipmentSelection = partOEquipmentSelection;
+            }
+            finally
+            {
+                writing_EquipmentSelection = false;
+            }
+        }
+
+        /// <summary>
+        /// Whether equipment selection is in play at all - which on this window is the chosen scenario's
+        /// own answer, the Iteration 1a / Iteration 2 difference. HOW products are then chosen belongs to
+        /// the control.
+        /// </summary>
+        private void UpdateEquipmentSelectionControls()
+        {
+            control_EquipmentSelection.IsSelectionEnabled = Scenario?.SelectVentilationUnit ?? false;
         }
 
         private void UpdateScopeControls()

@@ -95,7 +95,14 @@
 
                 <StackPanel Grid.Row="9" Margin="0,10,0,0">
                     <CheckBox x:Name="checkBox_SelectVentilationUnit" Content="Select a ventilation unit from the manufacturer catalogue (Iteration 2)"/>
-                    <TextBlock x:Name="textBlock_Catalogue" Margin="20,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+
+                    <!-- HOW the product is chosen, which is a different question from WHETHER one is -
+                         hence nested under the tick and disabled without it.
+
+                         Prepare & Run hosts this SAME control over the SAME project-scoped configuration,
+                         so the two workflows cannot describe or apply equipment selection differently.
+                         See PartOEquipmentSelectionControl. -->
+                    <local:PartOEquipmentSelectionControl x:Name="control_EquipmentSelection" Margin="20,6,0,0"/>
 
                     <!-- Iteration 2B is deliberately NOT an entry in the base-provision list above. It is not a base
                          provision: it is an optimisation performed ON an Iteration 2 design, and it needs a selected

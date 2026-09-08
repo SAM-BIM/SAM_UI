@@ -82,11 +82,24 @@
                     <TextBlock x:Name="textBlock_Selection" Grid.Row="2" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
                 </Grid>
 
+                <!-- EQUIPMENT SELECTION, over the SAME project-scoped configuration the single-command
+                     Prepare Iteration window writes - and through the same control, so the two workflows
+                     cannot offer different modes or describe the same one differently. Native testing found
+                     this window claiming a smallest-capable selection on a project the engineer had put
+                     under manual authority; that was the whole of the defect.
+
+                     Disabled, not hidden, on a scenario that selects no unit: an Iteration 1a run has no
+                     equipment to configure, but the catalogue stays readable. -->
+                <StackPanel Grid.Row="6" Margin="0,12,0,0">
+                    <Label Content="Equipment selection" Padding="0,0,0,2"/>
+                    <local:PartOEquipmentSelectionControl x:Name="control_EquipmentSelection"/>
+                </StackPanel>
+
                 <!-- Iteration 2B is NOT one of the scenarios above: it is an optimisation performed on a
                      completed Iteration 2 run. It is set up here because the settings have to be recorded
                      with the preparation for the run to be an optimisation starting point at all, and it
                      is collapsed by default so a baseline run never has to read it. -->
-                <Expander x:Name="expander_Optimise" Grid.Row="6" Margin="0,12,0,0" Header="Follow-on optimisation (Iteration 2B)">
+                <Expander x:Name="expander_Optimise" Grid.Row="7" Margin="0,12,0,0" Header="Follow-on optimisation (Iteration 2B)">
                     <StackPanel Margin="0,6,0,0">
                         <CheckBox x:Name="checkBox_Optimise" Content="Allow automatic TM59 optimisation after this run"/>
 
@@ -104,11 +117,11 @@
                     </StackPanel>
                 </Expander>
 
-                <Label Grid.Row="7" Content="Status" Padding="0,0,0,2" Margin="0,12,0,0"/>
+                <Label Grid.Row="8" Content="Status" Padding="0,0,0,2" Margin="0,12,0,0"/>
 
                 <!-- WHAT EXISTS, WHAT WILL BE REUSED, WHAT WILL CHANGE, WHAT BLOCKS RUN - one line each,
                      every one of them produced by PartOWorkflowInspection from an existing authority. -->
-                <ItemsControl x:Name="itemsControl_Status" Grid.Row="8">
+                <ItemsControl x:Name="itemsControl_Status" Grid.Row="9">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="0,0,0,4">
@@ -125,9 +138,9 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <TextBlock x:Name="textBlock_Blockers" Grid.Row="9" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
+                <TextBlock x:Name="textBlock_Blockers" Grid.Row="10" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
 
-                <TextBlock x:Name="textBlock_Advanced" Grid.Row="10" Margin="0,10,0,10" TextWrapping="Wrap" Foreground="#777777"
+                <TextBlock x:Name="textBlock_Advanced" Grid.Row="11" Margin="0,10,0,10" TextWrapping="Wrap" Foreground="#777777"
                            Text="The individual Part O commands remain available: Edit - Map IC (TM59), AddVent PartF and Prepare Iteration, Simulate - Energy Simulation, and Results - Overheating (TM59) and Optimise (2B)."/>
             </Grid>
         </ScrollViewer>

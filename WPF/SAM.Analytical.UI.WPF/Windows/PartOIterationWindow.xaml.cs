@@ -61,8 +61,13 @@ namespace SAM.Analytical.UI.WPF
                 UpdateOptimiseAvailability();
             };
 
-            checkBox_SelectVentilationUnit.Checked += (s, e) => UpdateOptimiseAvailability();
-            checkBox_SelectVentilationUnit.Unchecked += (s, e) => UpdateOptimiseAvailability();
+            checkBox_SelectVentilationUnit.Checked += (s, e) => UpdateEquipmentSelectionAvailability();
+            checkBox_SelectVentilationUnit.Unchecked += (s, e) => UpdateEquipmentSelectionAvailability();
+
+            //The control owns the modes, the ticks and the wording. All this window adds is the
+            //Iteration 2B gate, which depends on whether a unit is being selected at all.
+            control_EquipmentSelection.SelectionChanged += (s, e) => UpdateOptimiseAvailability();
+
             checkBox_Optimise.Checked += (s, e) => UpdateOptimiseText();
             checkBox_Optimise.Unchecked += (s, e) => UpdateOptimiseText();
             checkBox_CapacityEnvelope.Checked += (s, e) => UpdateOptimiseText();
@@ -95,8 +100,7 @@ namespace SAM.Analytical.UI.WPF
             button_SelectNone.Click += (s, e) => dwellingSelection.SetSelected(false);
 
             UpdateVentilationStrategyText();
-            UpdateCatalogueText();
-            UpdateOptimiseAvailability();
+            UpdateEquipmentSelectionAvailability();
         }
 
         /// <summary>
@@ -193,8 +197,9 @@ namespace SAM.Analytical.UI.WPF
                 checkBox_SelectVentilationUnit.IsEnabled = hasProducts;
                 checkBox_SelectVentilationUnit.IsChecked = hasProducts;
 
-                UpdateCatalogueText();
-                UpdateOptimiseAvailability();
+                control_EquipmentSelection.VentilationUnitCatalogue = value;
+
+                UpdateEquipmentSelectionAvailability();
             }
         }
 
@@ -246,6 +251,76 @@ namespace SAM.Analytical.UI.WPF
         /// <c>AirHandlingUnitParameter.VentilationUnitReference</c> untouched, which is Iteration 1a.
         /// </summary>
         public bool SelectVentilationUnit => (checkBox_SelectVentilationUnit.IsChecked ?? false) && (ventilationUnitCatalogue?.HasSelectableProducts ?? false);
+
+        /// <summary>
+        /// The project's equipment preselection as this window currently states it - asked of the control
+        /// that owns it, so this window holds no second copy of the mode or the pool.
+        /// <para>
+        /// Setting it restores a project's own configuration, which is what makes the mode and pool survive
+        /// closing and reopening this dialog and reopening the project. It is the SAME project-scoped
+        /// configuration Prepare &amp; Run reads and writes, so a change made in either workflow is seen by
+        /// the other.
+        /// </para>
+        /// </summary>
+        public PartOEquipmentSelection EquipmentSelection
+        {
+            get
+            {
+                return control_EquipmentSelection.EquipmentSelection;
+            }
+            set
+            {
+                control_EquipmentSelection.EquipmentSelection = value;
+            }
+        }
+
+        /// <summary>The selection authority this window currently states.</summary>
+        public PartOEquipmentSelectionMode Mode => control_EquipmentSelection.Mode;
+
+        /// <summary>
+        /// The project's own test ventilation unit as this window currently states it - asked of the same
+        /// shared control, so this window holds no second copy of it either.
+        /// <para>
+        /// <b>Set this before <see cref="EquipmentSelection"/>.</b> A permitted product is restored by
+        /// ticking its row, and the test product has no row until it has been stated.
+        /// </para>
+        /// </summary>
+        public PartOProjectTestVentilationUnit ProjectTestVentilationUnit
+        {
+            get
+            {
+                return control_EquipmentSelection.ProjectTestVentilationUnit;
+            }
+            set
+            {
+                control_EquipmentSelection.ProjectTestVentilationUnit = value;
+            }
+        }
+
+        /// <summary>
+        /// How many dwellings the saved project has fitted with the current test product. Handed in by the
+        /// caller, which is the only party here that holds a model - see
+        /// <c>Query.PartOVentilationUnitAssignmentCount</c>.
+        /// </summary>
+        public int ProjectTestVentilationUnitAssignmentCount
+        {
+            set
+            {
+                control_EquipmentSelection.ProjectTestVentilationUnitAssignmentCount = value;
+            }
+        }
+
+        /// <summary>What this window currently says about the project test product.</summary>
+        public string ProjectTestDescription => control_EquipmentSelection.ProjectTestDescription;
+
+        /// <summary>The active mode in one sentence. See <c>PartOEquipmentSelectionControl.ModeDescription</c>.</summary>
+        public string ModeDescription => control_EquipmentSelection.ModeDescription;
+
+        /// <summary>The catalogue rows, so a test can read exactly what the engineer can see.</summary>
+        internal List<PartOCatalogueProductRow> CatalogueProductRows => control_EquipmentSelection.CatalogueProductRows;
+
+        /// <summary>What this window currently says about the catalogue and the current mode.</summary>
+        public string CatalogueDescription => control_EquipmentSelection.CatalogueDescription;
 
         /// <summary>
         /// The Iteration 2B optimisation this run is set up to allow afterwards, or <b>null</b> where none
@@ -389,9 +464,21 @@ namespace SAM.Analytical.UI.WPF
                 : string.Format("Ventilation route stated for every dwelling in scope: {0}. This is the canonical value the assessment reads; it cannot be edited here.", option.VentilationStrategy);
         }
 
-        private void UpdateCatalogueText()
+        /// <summary>
+        /// Says whether equipment selection is in play at all, and hands on to the Iteration 2B gate that
+        /// depends on it.
+        /// <para>
+        /// Everything about HOW products are chosen belongs to <c>PartOEquipmentSelectionControl</c> -
+        /// the modes, the ticks, the read-only pool under "Automatic - all", the empty-pool warning and
+        /// every word of the explanatory text. Held here as well it would drift from Prepare &amp; Run,
+        /// which hosts the same control.
+        /// </para>
+        /// </summary>
+        private void UpdateEquipmentSelectionAvailability()
         {
-            textBlock_Catalogue.Text = ventilationUnitCatalogue?.Description ?? "The ventilation unit catalogue has not been read.";
+            control_EquipmentSelection.IsSelectionEnabled = SelectVentilationUnit;
+
+            UpdateOptimiseAvailability();
         }
 
         /// <summary>

@@ -18,15 +18,31 @@ namespace SAM.Analytical.UI.WPF
     /// m3/s to l/s for display and otherwise untouched. This is the same pair the accepted Grasshopper
     /// component reports, for the same reason: what is shown here is what the export will see.
     /// </para>
+    /// <para>
+    /// <b><see cref="Dwelling"/> is looked up, never inferred.</b> It is handed in, resolved once from the
+    /// model's actual zone-space relationships - never from a space's name, its prefix, its index or its
+    /// position in the table, all of which happen to look right on a demonstration model and are wrong on
+    /// a real one. See <c>Modify.PreparePartOIteration</c>, which builds that map.
+    /// </para>
     /// </summary>
     public class PartOSpaceRow
     {
+        /// <summary>The column's answer where nothing resolved. An em dash, and never a blank or a guess.</summary>
+        internal const string Unresolved = "—";
+
         /// <summary>
         /// Builds the row for one space of the prepared model.
         /// </summary>
-        public PartOSpaceRow(Space space)
+        /// <param name="space">The space.</param>
+        /// <param name="dwelling">
+        /// What to call the dwelling or zone this space belongs to, as the caller resolved it from the
+        /// model. Null or blank reads as <see cref="Unresolved"/> - an absence is shown as an absence.
+        /// </param>
+        public PartOSpaceRow(Space space, string? dwelling = null)
         {
             Name = space?.Name;
+
+            Dwelling = string.IsNullOrWhiteSpace(dwelling) ? Unresolved : dwelling;
 
             //Qualified: SAM.Analytical.UI.WPF declares a Query of its own.
             PartFRequired_Lps = space?.GetValue<PartFSpaceData>(SpaceParameter.PartFSpaceData)?.ContinuousDesignFlowRate_Lps ?? double.NaN;
@@ -40,6 +56,20 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>The space.</summary>
         public string Name { get; }
+
+        /// <summary>
+        /// The Part O dwelling this space belongs to, or failing that the relevant zone that groups it -
+        /// a communal corridor, a stair, a landlord area - or <see cref="Unresolved"/>.
+        /// <para>
+        /// <b>Repeated on every row on purpose.</b> Merged or blanked repeats read more tidily and filter,
+        /// sort, copy and export worse, and this table is one an engineer pastes into a spreadsheet.
+        /// </para>
+        /// <para>
+        /// <b>Presentation only.</b> Naming a dwelling here changes no zone membership, no Part O scope, no
+        /// Approved Document F requirement and no airflow of any kind.
+        /// </para>
+        /// </summary>
+        public string Dwelling { get; }
 
         /// <summary>
         /// What Approved Document F requires of this space [l/s], from its own
