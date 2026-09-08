@@ -906,7 +906,9 @@ namespace SAM.Analytical.UI.WPF
 
             statusRows = rows;
 
-            statusGroups = PartOWorkflowStatusGroup.Groups(rows);
+            //The run group is only called an EXISTING run where results actually exist. The fact is the
+            //capabilities' own, read rather than derived; see PartOWorkflowStatusGroup.
+            statusGroups = PartOWorkflowStatusGroup.Groups(rows, capabilities.ResultsAvailable);
 
             itemsControl_Status.ItemsSource = statusGroups;
 

@@ -26,6 +26,18 @@ namespace SAM.Analytical.UI.WPF
     /// says so.
     /// </para>
     ///
+    /// <para><b>And it does not claim a run that has not happened</b></para>
+    /// <para>
+    /// The run heading said <c>Existing run / results</c> unconditionally, and on a fresh model the three
+    /// rows beneath it are <c>Model check PENDING</c>, <c>Simulation NOT RUN</c> and
+    /// <c>Results NOT RUN</c> - so the heading asserted an existing run over three rows saying there is
+    /// none, which is the very ambiguity the split exists to remove. The word "Existing" is now used only
+    /// where the caller says results exist, and the neutral <see cref="Name_Run"/> otherwise. That is a
+    /// label chosen from a fact the application already publishes
+    /// (<c>PartOWorkflowCapabilities.ResultsAvailable</c>), not a new state of its own: nothing is
+    /// compared, nothing is stored, and no row's status moves either way.
+    /// </para>
+    ///
     /// <para><b>Membership is fixed by stage, not judged</b></para>
     /// <para>
     /// A stage belongs to one group by which question it answers, and a stage the inspection stops
@@ -38,8 +50,24 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>The heading over the stages the current scenario, scope and equipment choice describe.</summary>
         public const string Name_Configuration = "Current configuration";
 
-        /// <summary>The heading over the stages that report what a run has already produced.</summary>
-        public const string Name_Run = "Existing run / results";
+        /// <summary>
+        /// The heading over the run stages where a run has actually produced something.
+        /// <para>
+        /// The word "Existing" is a claim, so it is only made where it is true - see
+        /// <see cref="Groups(IEnumerable{PartOWorkflowStatusRow}, bool)"/>.
+        /// </para>
+        /// </summary>
+        public const string Name_Run_Existing = "Existing run / results";
+
+        /// <summary>
+        /// The heading over the run stages where nothing has run yet: <c>Model check PENDING</c>,
+        /// <c>Simulation NOT RUN</c>, <c>Results NOT RUN</c>.
+        /// <para>
+        /// Neutral, because those three rows are then a statement about the run this dialog is about to
+        /// start rather than about one that happened.
+        /// </para>
+        /// </summary>
+        public const string Name_Run = "Run / results";
 
         private PartOWorkflowStatusGroup(string name, List<PartOWorkflowStatusRow> partOWorkflowStatusRows)
         {
@@ -63,7 +91,14 @@ namespace SAM.Analytical.UI.WPF
         /// the inspection's own list.
         /// </para>
         /// </summary>
-        public static List<PartOWorkflowStatusGroup> Groups(IEnumerable<PartOWorkflowStatusRow> partOWorkflowStatusRows)
+        /// <param name="partOWorkflowStatusRows">The inspection's rows.</param>
+        /// <param name="resultsAvailable">
+        /// Whether a run has actually produced results - the caller's existing answer, normally
+        /// <c>PartOWorkflowCapabilities.ResultsAvailable</c>. True names the run group
+        /// <see cref="Name_Run_Existing"/>; false leaves it the neutral <see cref="Name_Run"/>, because
+        /// three rows reading PENDING and NOT RUN are not an existing run. Nothing else depends on it.
+        /// </param>
+        public static List<PartOWorkflowStatusGroup> Groups(IEnumerable<PartOWorkflowStatusRow> partOWorkflowStatusRows, bool resultsAvailable = false)
         {
             List<PartOWorkflowStatusRow> rows_Configuration = [];
             List<PartOWorkflowStatusRow> rows_Run = [];
@@ -94,7 +129,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (rows_Run.Count != 0)
             {
-                result.Add(new PartOWorkflowStatusGroup(Name_Run, rows_Run));
+                result.Add(new PartOWorkflowStatusGroup(resultsAvailable ? Name_Run_Existing : Name_Run, rows_Run));
             }
 
             return result;

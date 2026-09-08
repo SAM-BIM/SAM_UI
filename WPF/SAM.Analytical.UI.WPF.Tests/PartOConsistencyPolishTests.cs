@@ -302,11 +302,15 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         /// <summary>
         /// The two groups are the ones the engineer needs to tell apart: what the CURRENT CONFIGURATION says,
-        /// and what an EXISTING RUN produced. That division is what makes "Ventilation design: NEEDS
-        /// PREPARATION" beside "Results: READY" legible rather than contradictory.
+        /// and what the RUN says. That division is what makes "Ventilation design: NEEDS PREPARATION" beside
+        /// "Results: READY" legible rather than contradictory.
+        /// <para>
+        /// This fixture has no results, so the run heading is the neutral one - see
+        /// <see cref="TheRunHeading_ClaimsAnExistingRunOnlyWhenThereIsOne"/>.
+        /// </para>
         /// </summary>
         [WpfFact]
-        public void TheTwoGroups_AreTheConfigurationAndTheExistingRun()
+        public void TheTwoGroups_AreTheConfigurationAndTheRun()
         {
             PartOWorkflowWindow partOWorkflowWindow = Window(PartOWorkflowScenario.Scenarios.Find(x => x.SelectVentilationUnit));
 
@@ -337,6 +341,61 @@ namespace SAM.Analytical.UI.WPF.Tests
                     PartOWorkflowStage.Results,
                 },
                 stages_Run);
+        }
+
+        /// <summary>
+        /// <b>The run heading does not claim a run that has not happened.</b>
+        ///
+        /// <para><b>The regression this pins</b></para>
+        /// <para>
+        /// The heading was <c>Existing run / results</c> unconditionally. On a fresh model the three rows
+        /// beneath it read <c>Model check PENDING</c>, <c>Simulation NOT RUN</c> and
+        /// <c>Results NOT RUN</c> - so the heading asserted an existing run directly above three rows
+        /// saying there is none, which is the very ambiguity the split exists to remove.
+        /// </para>
+        /// <para>
+        /// The word is now used only where the capabilities say results exist. That is a label chosen from
+        /// a fact the application already publishes, not a new state: this test also asserts that the rows
+        /// and their statuses are identical in both cases, so nothing but the heading moved.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void TheRunHeading_ClaimsAnExistingRunOnlyWhenThereIsOne()
+        {
+            PartOWorkflowScenario partOWorkflowScenario = PartOWorkflowScenario.Scenarios.Find(x => x.SelectVentilationUnit);
+
+            //Nothing has run.
+            PartOWorkflowWindow partOWorkflowWindow_Fresh = Window(partOWorkflowScenario);
+
+            PartOWorkflowStatusGroup partOWorkflowStatusGroup_Fresh = partOWorkflowWindow_Fresh.StatusGroups[1];
+
+            Assert.Equal(PartOWorkflowStatusGroup.Name_Run, partOWorkflowStatusGroup_Fresh.Name);
+            Assert.Equal("Run / results", partOWorkflowStatusGroup_Fresh.Name);
+            Assert.DoesNotContain("Existing", partOWorkflowStatusGroup_Fresh.Name);
+
+            //And the rows it heads say so themselves, which is what made the old heading a contradiction.
+            Assert.Equal(PartOWorkflowStageStatus.Pending, Row(partOWorkflowStatusGroup_Fresh, PartOWorkflowStage.ModelCheck).State.Status);
+            Assert.Equal(PartOWorkflowStageStatus.NotRun, Row(partOWorkflowStatusGroup_Fresh, PartOWorkflowStage.Simulation).State.Status);
+            Assert.Equal(PartOWorkflowStageStatus.NotRun, Row(partOWorkflowStatusGroup_Fresh, PartOWorkflowStage.Results).State.Status);
+
+            //A run HAS produced results - the case the word was written for.
+            PartOWorkflowWindow partOWorkflowWindow_Results = Window(partOWorkflowScenario, true);
+
+            PartOWorkflowStatusGroup partOWorkflowStatusGroup_Results = partOWorkflowWindow_Results.StatusGroups[1];
+
+            Assert.Equal(PartOWorkflowStatusGroup.Name_Run_Existing, partOWorkflowStatusGroup_Results.Name);
+            Assert.Equal("Existing run / results", partOWorkflowStatusGroup_Results.Name);
+
+            Assert.Equal(PartOWorkflowStageStatus.Ready, Row(partOWorkflowStatusGroup_Results, PartOWorkflowStage.Results).State.Status);
+
+            //ONLY the heading moved: both groups hold the same stages in the same order, and the
+            //configuration heading is untouched.
+            Assert.Equal(
+                partOWorkflowStatusGroup_Fresh.Rows.ConvertAll(x => x.State.Stage),
+                partOWorkflowStatusGroup_Results.Rows.ConvertAll(x => x.State.Stage));
+
+            Assert.Equal(PartOWorkflowStatusGroup.Name_Configuration, partOWorkflowWindow_Fresh.StatusGroups[0].Name);
+            Assert.Equal(PartOWorkflowStatusGroup.Name_Configuration, partOWorkflowWindow_Results.StatusGroups[0].Name);
         }
 
         /// <summary>
@@ -1225,8 +1284,21 @@ namespace SAM.Analytical.UI.WPF.Tests
             return result;
         }
 
+        /// <summary>One group's row for a stage, or a failure naming the stage that was missing.</summary>
+        private static PartOWorkflowStatusRow Row(PartOWorkflowStatusGroup partOWorkflowStatusGroup, PartOWorkflowStage partOWorkflowStage)
+        {
+            PartOWorkflowStatusRow result = partOWorkflowStatusGroup.Rows.Find(x => x.State.Stage == partOWorkflowStage);
+
+            Assert.NotNull(result);
+
+            return result;
+        }
+
         /// <summary>Prepare &amp; Run over a real catalogue, in a stated scenario.</summary>
-        private static PartOWorkflowWindow Window(PartOWorkflowScenario partOWorkflowScenario)
+        /// <param name="resultsAvailable">
+        /// Whether the session has results to review - the capability the run heading reads.
+        /// </param>
+        private static PartOWorkflowWindow Window(PartOWorkflowScenario partOWorkflowScenario, bool resultsAvailable = false)
         {
             AdjacencyCluster adjacencyCluster = new();
 
@@ -1258,7 +1330,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 AnalyticalModel = new AnalyticalModel("Block", null, null, null, adjacencyCluster, new MaterialLibrary("Materials"), new ProfileLibrary("Profiles")),
                 PartORun = new PartORun(),
                 VentilationUnitCatalogue = Catalogue(),
-                Capabilities = new PartOWorkflowCapabilities { EquipmentAvailable = true },
+                Capabilities = new PartOWorkflowCapabilities { EquipmentAvailable = true, ResultsAvailable = resultsAvailable },
             };
 
             result.Restore(partOWorkflowScenario, PartOWorkflowScope.AllDwellings, null, null);

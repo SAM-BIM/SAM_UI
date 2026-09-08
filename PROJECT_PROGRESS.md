@@ -15,7 +15,7 @@ claims (branch names, "next step" lists) are historical rather than current.
 
 ### Current status
 
-`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, seven commits, **not merged**.
+`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, eight commits, **not merged**.
 Working tree clean. `SAM`, `SAM_Systems` and `SAM_Tas` are **untouched** and clean, at the frozen SHAs
 above.
 
@@ -26,13 +26,19 @@ a37c862  the 1a / 1b catalogue readable again, and the route stated once
 bf0c06b  the simulate dialog says which route it is, and why its project name is locked
 e24ae94  the stale ProjectName_Isolated note corrected
 7602573  this checkpoint, and the Part F tooltip no longer judging the space
-(this)   the assignment row fits the window it opens in
+7c39ccf  the assignment row fits the window it opens in
+(this)   the run heading no longer claims a run that has not happened
 ```
 
-CI on `7602573` was green (`build` SUCCESS, `spdx` SUCCESS). Four Codex review findings were raised and
-all four are resolved and answered on the PR: the compact 1a / 1b catalogue showing only a count, the
-Part F tooltip inferring a space type, this file not being updated, and the assignment columns not
-fitting the window.
+CI has been green on every head checked so far, most recently `7c39ccf` (`build` SUCCESS, `spdx`
+SUCCESS). **Five** Codex review findings were raised and all five are resolved and answered on the PR:
+the compact 1a / 1b catalogue showing only a count, the Part F tooltip inferring a space type, this file
+not being updated, the assignment columns not fitting the window, and the run heading claiming an
+existing run before anything had run.
+
+Three of the five were over-claiming - a heading, a tooltip and a disabled tick each saying more than the
+code behind it knew. That is the failure mode this kind of pass invites, and it is worth watching for in
+any further presentation work here.
 
 ### What this is, and the line it does not cross
 
@@ -80,6 +86,13 @@ spacing, hierarchy, disabled sections, status wording) and are explicitly not bl
 - **No stale-result detection was added, and no new status token exists.** `PartOWorkflowStatusGroup` is
   a heading over rows: it hashes nothing, reads and writes no timestamp, compares nothing between the
   groups. Every row still carries exactly the `PartOWorkflowStageStatus` the inspection assigned it.
+- **The run heading says "Existing run / results" only where results exist**, and the neutral
+  "Run / results" otherwise. Unconditionally it asserted an existing run directly above three rows
+  reading `Model check PENDING`, `Simulation NOT RUN`, `Results NOT RUN` - the very ambiguity the split
+  exists to remove. The word is chosen from `PartOWorkflowCapabilities.ResultsAvailable`, a fact the
+  application already publishes; nothing is compared or stored and no row's status moves.
+  `TheRunHeading_ClaimsAnExistingRunOnlyWhenThereIsOne` asserts that only the heading differs between
+  the two cases.
 - **A shortened status row is a PREFIX of the inspection's own sentence** (cut at the first full stop),
   so a row can only say less than the inspection said, never something different. The single supplied
   summary - the Iteration 1b Part F line - is chosen from the scenario's ventilation mode, never by
@@ -146,14 +159,14 @@ and `PartOWorkflowScenario` / `PartOVentilationStrategyOption` in `SAM_UI/SAM.An
 
 Also `PROJECT_PROGRESS.md`, which `AGENTS.md` requires and which this pass initially failed to update.
 
-Tests: `PartOConsistencyPolishTests.cs` (new, 35 tests), plus `PartOPresentationTests.cs`,
+Tests: `PartOConsistencyPolishTests.cs` (new, 36 tests), plus `PartOPresentationTests.cs`,
 `PartOProjectTestProductTests.cs` and `PartOSimulateDefaultsTests.cs` updated/extended.
 
 ### Validation performed
 
 ```text
 SAM_UI.sln Release                               0 errors
-SAM.Analytical.UI.WPF.Tests                       808 / 808   (frozen baseline 771 / 771)
+SAM.Analytical.UI.WPF.Tests                       809 / 809   (frozen baseline 771 / 771)
 working tree (SAM_UI)                            clean
 working trees (SAM, SAM_Systems, SAM_Tas)        clean, untouched
 ```
