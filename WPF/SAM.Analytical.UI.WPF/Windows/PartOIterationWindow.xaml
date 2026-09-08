@@ -96,45 +96,13 @@
                 <StackPanel Grid.Row="9" Margin="0,10,0,0">
                     <CheckBox x:Name="checkBox_SelectVentilationUnit" Content="Select a ventilation unit from the manufacturer catalogue (Iteration 2)"/>
 
-                    <!-- HOW the product is chosen, which is a different question from WHETHER one is - hence
-                         nested under the tick and disabled without it. Three modes and no fourth: an
-                         automatic run over everything, an automatic run over what the engineer permits, or
-                         the engineer stating each dwelling. See PartOEquipmentSelectionMode. -->
-                    <StackPanel x:Name="stackPanel_Mode" Margin="20,6,0,0">
-                        <RadioButton x:Name="radioButton_AutomaticAll" GroupName="PartOEquipmentSelectionMode" IsChecked="True"
-                                     Content="Automatic - all catalogue products"
-                                     ToolTip="Every selectable product is a candidate. Each dwelling is given the smallest one that can meet its design duty."/>
-                        <RadioButton x:Name="radioButton_AutomaticPool" GroupName="PartOEquipmentSelectionMode" Margin="0,3,0,0"
-                                     Content="Automatic - selected pool"
-                                     ToolTip="Only the products ticked below are candidates. The smallest capable one of those is given to each dwelling; nothing falls back to the rest of the catalogue."/>
-                        <RadioButton x:Name="radioButton_Manual" GroupName="PartOEquipmentSelectionMode" Margin="0,3,0,0"
-                                     Content="Manual per dwelling"
-                                     ToolTip="No selection rule runs. Each dwelling keeps the product it already has, and you state the rest in the next window."/>
-                    </StackPanel>
+                    <!-- HOW the product is chosen, which is a different question from WHETHER one is -
+                         hence nested under the tick and disabled without it.
 
-                    <!-- THE CATALOGUE ITSELF. Before this grid existed an engineer could see the product a
-                         dwelling had been given but not what products exist, what they can move, or what
-                         else could be assigned - that meant opening the catalogue JSON. One virtualised row
-                         per product, so a catalogue of hundreds costs a handful of realised rows.
-
-                         The Maximum columns are the products' CAPABILITY ceilings and are never any
-                         dwelling's design airflow, which is why they are headed "Maximum". -->
-                    <Label x:Name="label_Catalogue" Content="Available catalogue products - Maximum is a capability ceiling, never a design airflow" Margin="20,8,0,0" Padding="0,0,0,2"/>
-                    <DataGrid x:Name="dataGrid_Catalogue" Margin="20,0,0,0" MinHeight="60" MaxHeight="150"
-                              AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
-                              GridLinesVisibility="Horizontal" SelectionMode="Single">
-                        <DataGrid.Columns>
-                            <DataGridCheckBoxColumn Header="Use" Width="34"
-                                                    Binding="{Binding IsUsed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                            <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" Width="100" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Model" Binding="{Binding Model}" Width="*" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Variant" Binding="{Binding Reference}" Width="105" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Max SUP&#x0a;l/s" Binding="{Binding MaximumSupply_Lps, StringFormat=N0}" Width="66" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Max EXT&#x0a;l/s" Binding="{Binding MaximumExtract_Lps, StringFormat=N0}" Width="66" IsReadOnly="True"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <TextBlock x:Name="textBlock_Catalogue" Margin="20,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+                         Prepare & Run hosts this SAME control over the SAME project-scoped configuration,
+                         so the two workflows cannot describe or apply equipment selection differently.
+                         See PartOEquipmentSelectionControl. -->
+                    <local:PartOEquipmentSelectionControl x:Name="control_EquipmentSelection" Margin="20,6,0,0"/>
 
                     <!-- Iteration 2B is deliberately NOT an entry in the base-provision list above. It is not a base
                          provision: it is an optimisation performed ON an Iteration 2 design, and it needs a selected

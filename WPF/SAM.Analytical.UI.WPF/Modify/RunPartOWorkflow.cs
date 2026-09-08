@@ -76,6 +76,7 @@ namespace SAM.Analytical.UI.WPF
             PartOWorkflowScope partOWorkflowScope = PartOWorkflowScope.AllDwellings;
             List<Guid>? guids_Dwelling = null;
             PartOOptimisationSettings? partOOptimisationSettings = null;
+            PartOEquipmentSelection? partOEquipmentSelection = null;
 
             while (true)
             {
@@ -89,6 +90,15 @@ namespace SAM.Analytical.UI.WPF
                 };
 
                 partOWorkflowWindow.Restore(partOWorkflowScenario, partOWorkflowScope, guids_Dwelling, partOOptimisationSettings);
+
+                //Carried across the loop, on top of what the model said. A prepare that refused, or a
+                //dialog that was closed, leaves the project's stored preselection untouched - so without
+                //this the engineer's unsaved change of mode or pool would be silently discarded the moment
+                //the window reopened. Only where a previous showing actually stated one.
+                if (partOEquipmentSelection is not null)
+                {
+                    partOWorkflowWindow.EquipmentSelection = partOEquipmentSelection;
+                }
 
                 //Setting up is finished, so the ONE inspection this whole gesture owes is paid here - over
                 //the fully restored state, which is the only one anybody will ever see. Every line above
@@ -109,6 +119,7 @@ namespace SAM.Analytical.UI.WPF
                 partOWorkflowScenario = partOWorkflowWindow.Scenario;
                 partOWorkflowScope = partOWorkflowWindow.Scope;
                 partOOptimisationSettings = partOWorkflowWindow.OptimisationSettings;
+                partOEquipmentSelection = partOWorkflowWindow.EquipmentSelection;
 
                 guids_Dwelling = [];
                 foreach (Zone zone in partOWorkflowWindow.Zones_Dwelling)

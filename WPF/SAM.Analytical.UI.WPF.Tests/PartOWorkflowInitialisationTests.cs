@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Enums;
@@ -231,6 +231,14 @@ namespace SAM.Analytical.UI.WPF.Tests
             //The catalogue.
             partOWorkflowWindow.VentilationUnitCatalogue = null;
             Assert.Equal(++count, partOWorkflowWindow.InspectionCount);
+
+            //The equipment selection. A preparation input - it decides which products a preparation
+            //selects - so it inspects, and ONCE. Setting it writes to the hosted control, which raises its
+            //own change event; answering the window's own write as well would buy a second pass over every
+            //dwelling in scope for one gesture. See PartOWorkflowWindow.writing_EquipmentSelection.
+            partOWorkflowWindow.EquipmentSelection = new PartOEquipmentSelection(PartOEquipmentSelectionMode.ManualPerDwelling);
+            Assert.Equal(++count, partOWorkflowWindow.InspectionCount);
+            Assert.Equal(PartOEquipmentSelectionMode.ManualPerDwelling, partOWorkflowWindow.Mode);
 
             //The model. Setting it rebuilds the dwelling list, and that is one inspection too.
             partOWorkflowWindow.AnalyticalModel = Model(3);

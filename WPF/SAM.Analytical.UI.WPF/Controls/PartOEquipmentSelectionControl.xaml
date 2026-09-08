@@ -1,0 +1,47 @@
+<UserControl x:Class="SAM.Analytical.UI.WPF.PartOEquipmentSelectionControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
+             mc:Ignorable="d"
+             d:DesignHeight="260" d:DesignWidth="600">
+    <StackPanel>
+        <!-- HOW the product is chosen. Three modes and no fourth - see PartOEquipmentSelectionMode. -->
+        <StackPanel x:Name="stackPanel_Mode">
+            <RadioButton x:Name="radioButton_AutomaticAll" GroupName="PartOEquipmentSelectionMode" IsChecked="True"
+                         Content="Automatic - all catalogue products"
+                         ToolTip="Every selectable product is a candidate. Each dwelling is given the smallest one that can meet its design duty."/>
+            <RadioButton x:Name="radioButton_AutomaticPool" GroupName="PartOEquipmentSelectionMode" Margin="0,3,0,0"
+                         Content="Automatic - selected pool"
+                         ToolTip="Only the products ticked below are candidates. The smallest capable one of those is given to each dwelling; nothing falls back to the rest of the catalogue."/>
+            <RadioButton x:Name="radioButton_Manual" GroupName="PartOEquipmentSelectionMode" Margin="0,3,0,0"
+                         Content="Manual per dwelling"
+                         ToolTip="No selection rule runs. Each dwelling keeps the product it already has, and the assignments are stated in the preparation window."/>
+        </StackPanel>
+
+        <!-- THE CATALOGUE ITSELF. Before this grid existed an engineer could see the product a dwelling had
+             been given but not what products exist, what they can move, or what else could be assigned -
+             that meant opening the catalogue JSON. One virtualised row per product, so a catalogue of
+             hundreds costs a handful of realised rows.
+
+             The Maximum columns are the products' CAPABILITY ceilings and are never any dwelling's design
+             airflow, which is why they are headed "Maximum". -->
+        <Label x:Name="label_Catalogue" Content="Catalogue products - Maximum is a capability ceiling, never a design airflow" Margin="0,8,0,0" Padding="0,0,0,2"/>
+        <DataGrid x:Name="dataGrid_Catalogue" MinHeight="60" MaxHeight="150"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal" SelectionMode="Single">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="Use" Width="34"
+                                        Binding="{Binding IsUsed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" Width="100" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Model" Binding="{Binding Model}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Variant" Binding="{Binding Reference}" Width="105" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Max SUP&#x0a;l/s" Binding="{Binding MaximumSupply_Lps, StringFormat=N0}" Width="66" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Max EXT&#x0a;l/s" Binding="{Binding MaximumExtract_Lps, StringFormat=N0}" Width="66" IsReadOnly="True"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock x:Name="textBlock_Catalogue" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+    </StackPanel>
+</UserControl>

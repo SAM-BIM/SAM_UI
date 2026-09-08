@@ -41,13 +41,6 @@ namespace SAM.Analytical.UI.WPF
 
         private VentilationUnitCatalogue ventilationUnitCatalogue;
 
-        /// <summary>
-        /// One row per selectable catalogue product, held so that the ticks survive a mode change. The
-        /// engineer's permitted set is read off these rather than off the grid's own selection, which the
-        /// grid is free to discard when it re-virtualises.
-        /// </summary>
-        private List<PartOCatalogueProductRow> catalogueProductRows = [];
-
         public PartOIterationWindow()
         {
             InitializeComponent();
@@ -71,9 +64,9 @@ namespace SAM.Analytical.UI.WPF
             checkBox_SelectVentilationUnit.Checked += (s, e) => UpdateEquipmentSelectionAvailability();
             checkBox_SelectVentilationUnit.Unchecked += (s, e) => UpdateEquipmentSelectionAvailability();
 
-            radioButton_AutomaticAll.Checked += (s, e) => UpdateEquipmentSelectionAvailability();
-            radioButton_AutomaticPool.Checked += (s, e) => UpdateEquipmentSelectionAvailability();
-            radioButton_Manual.Checked += (s, e) => UpdateEquipmentSelectionAvailability();
+            //The control owns the modes, the ticks and the wording. All this window adds is the
+            //Iteration 2B gate, which depends on whether a unit is being selected at all.
+            control_EquipmentSelection.SelectionChanged += (s, e) => UpdateOptimiseAvailability();
 
             checkBox_Optimise.Checked += (s, e) => UpdateOptimiseText();
             checkBox_Optimise.Unchecked += (s, e) => UpdateOptimiseText();
@@ -107,7 +100,6 @@ namespace SAM.Analytical.UI.WPF
             button_SelectNone.Click += (s, e) => dwellingSelection.SetSelected(false);
 
             UpdateVentilationStrategyText();
-            UpdateCatalogueText();
             UpdateEquipmentSelectionAvailability();
         }
 
@@ -205,28 +197,8 @@ namespace SAM.Analytical.UI.WPF
                 checkBox_SelectVentilationUnit.IsEnabled = hasProducts;
                 checkBox_SelectVentilationUnit.IsChecked = hasProducts;
 
-                //Every selectable product, one row each, ticked. A catalogue arrives with nothing narrowed:
-                //the historic default is that all of it is eligible, and the engineer narrows from there.
-                catalogueProductRows = (value?.CapacityDescriptors ?? []).ConvertAll(x => new PartOCatalogueProductRow(x, true));
+                control_EquipmentSelection.VentilationUnitCatalogue = value;
 
-                //Subscribed, because the grid's tick writes straight to the row and tells nobody else. Left
-                //unsubscribed, the line below the grid would keep reporting the pool the engineer had
-                //BEFORE they last ticked something - which is the one place they look to find out whether an
-                //empty pool is about to refuse the iteration.
-                foreach (PartOCatalogueProductRow partOCatalogueProductRow in catalogueProductRows)
-                {
-                    partOCatalogueProductRow.PropertyChanged += (sender, eventArgs) =>
-                    {
-                        if (eventArgs.PropertyName == nameof(PartOCatalogueProductRow.IsUsed))
-                        {
-                            UpdateEquipmentSelectionText();
-                        }
-                    };
-                }
-
-                dataGrid_Catalogue.ItemsSource = catalogueProductRows;
-
-                UpdateCatalogueText();
                 UpdateEquipmentSelectionAvailability();
             }
         }
@@ -281,74 +253,38 @@ namespace SAM.Analytical.UI.WPF
         public bool SelectVentilationUnit => (checkBox_SelectVentilationUnit.IsChecked ?? false) && (ventilationUnitCatalogue?.HasSelectableProducts ?? false);
 
         /// <summary>
-        /// The project's equipment preselection as this window currently states it: how products are to be
-        /// chosen, and which ones are permitted.
-        ///
-        /// <para><b>Read off the controls, never stored twice</b></para>
+        /// The project's equipment preselection as this window currently states it - asked of the control
+        /// that owns it, so this window holds no second copy of the mode or the pool.
         /// <para>
-        /// The mode comes from the radio buttons and the pool from the ticks, so there is no second copy of
-        /// either to fall out of step with what the engineer is looking at.
-        /// </para>
-        ///
-        /// <para><b>Setting it restores a project's own configuration</b></para>
-        /// <para>
-        /// Which is what makes the mode and the pool survive closing and reopening this dialog, and
-        /// reopening the project: <c>Modify.PreparePartOIteration</c> reads
-        /// <c>AnalyticalModelParameter.PartOEquipmentSelection</c> off the model and assigns it here. A
-        /// product in a restored pool that the current catalogue no longer holds simply has no row to tick,
-        /// and so is dropped rather than keeping a permission nothing can act on.
+        /// Setting it restores a project's own configuration, which is what makes the mode and pool survive
+        /// closing and reopening this dialog and reopening the project. It is the SAME project-scoped
+        /// configuration Prepare &amp; Run reads and writes, so a change made in either workflow is seen by
+        /// the other.
         /// </para>
         /// </summary>
         public PartOEquipmentSelection EquipmentSelection
         {
             get
             {
-                return new PartOEquipmentSelection(Mode, AllowedVentilationUnitReferences());
+                return control_EquipmentSelection.EquipmentSelection;
             }
             set
             {
-                //Absent reads as the historic default rather than as a refusal - a project that has never
-                //stated a preference has none. See PartOEquipmentSelection.
-                PartOEquipmentSelectionMode partOEquipmentSelectionMode = value?.Mode ?? PartOEquipmentSelectionMode.AutomaticAllProducts;
-
-                radioButton_AutomaticPool.IsChecked = partOEquipmentSelectionMode == PartOEquipmentSelectionMode.AutomaticSelectedPool;
-                radioButton_Manual.IsChecked = partOEquipmentSelectionMode == PartOEquipmentSelectionMode.ManualPerDwelling;
-                radioButton_AutomaticAll.IsChecked = partOEquipmentSelectionMode == PartOEquipmentSelectionMode.AutomaticAllProducts;
-
-                //An un-narrowed pool leaves every product ticked, which is what "nothing has been narrowed"
-                //looks like on screen and what the automatic-all mode means in any case.
-                bool all = value is null || !value.HasAllowedVentilationUnitReferences;
-
-                foreach (PartOCatalogueProductRow partOCatalogueProductRow in catalogueProductRows)
-                {
-                    partOCatalogueProductRow.IsUsed = all || value.IsAllowed(partOCatalogueProductRow.VentilationUnitReference);
-                }
-
-                UpdateEquipmentSelectionAvailability();
+                control_EquipmentSelection.EquipmentSelection = value;
             }
         }
 
         /// <summary>The selection authority this window currently states.</summary>
-        public PartOEquipmentSelectionMode Mode
-        {
-            get
-            {
-                if (radioButton_Manual.IsChecked ?? false)
-                {
-                    return PartOEquipmentSelectionMode.ManualPerDwelling;
-                }
+        public PartOEquipmentSelectionMode Mode => control_EquipmentSelection.Mode;
 
-                return (radioButton_AutomaticPool.IsChecked ?? false)
-                    ? PartOEquipmentSelectionMode.AutomaticSelectedPool
-                    : PartOEquipmentSelectionMode.AutomaticAllProducts;
-            }
-        }
+        /// <summary>The active mode in one sentence. See <c>PartOEquipmentSelectionControl.ModeDescription</c>.</summary>
+        public string ModeDescription => control_EquipmentSelection.ModeDescription;
 
         /// <summary>The catalogue rows, so a test can read exactly what the engineer can see.</summary>
-        internal List<PartOCatalogueProductRow> CatalogueProductRows => catalogueProductRows;
+        internal List<PartOCatalogueProductRow> CatalogueProductRows => control_EquipmentSelection.CatalogueProductRows;
 
         /// <summary>What this window currently says about the catalogue and the current mode.</summary>
-        public string CatalogueDescription => textBlock_Catalogue.Text;
+        public string CatalogueDescription => control_EquipmentSelection.CatalogueDescription;
 
         /// <summary>
         /// The Iteration 2B optimisation this run is set up to allow afterwards, or <b>null</b> where none
@@ -492,100 +428,21 @@ namespace SAM.Analytical.UI.WPF
                 : string.Format("Ventilation route stated for every dwelling in scope: {0}. This is the canonical value the assessment reads; it cannot be edited here.", option.VentilationStrategy);
         }
 
-        private void UpdateCatalogueText()
-        {
-            textBlock_Catalogue.Text = ventilationUnitCatalogue?.Description ?? "The ventilation unit catalogue has not been read.";
-        }
-
         /// <summary>
-        /// Keeps the equipment controls consistent with what the current choice actually offers, then hands
-        /// on to the Iteration 2B gate that depends on it.
+        /// Says whether equipment selection is in play at all, and hands on to the Iteration 2B gate that
+        /// depends on it.
         /// <para>
-        /// <b>Under "Automatic - all" the ticks are shown and locked.</b> Every product is eligible by
-        /// definition in that mode, so an editable tick would offer a choice the mode does not have - but
-        /// hiding the grid would take away the catalogue visibility this window exists to provide. So it is
-        /// shown, all ticked, read-only.
-        /// </para>
-        /// <para>
-        /// <b>An empty pool is not corrected here.</b> Under "Automatic - selected pool" with nothing
-        /// ticked, this says so and the iteration will refuse - it does not quietly tick everything,
-        /// because a pool that silently became the whole catalogue is the failure that mode exists to
-        /// prevent.
+        /// Everything about HOW products are chosen belongs to <c>PartOEquipmentSelectionControl</c> -
+        /// the modes, the ticks, the read-only pool under "Automatic - all", the empty-pool warning and
+        /// every word of the explanatory text. Held here as well it would drift from Prepare &amp; Run,
+        /// which hosts the same control.
         /// </para>
         /// </summary>
         private void UpdateEquipmentSelectionAvailability()
         {
-            bool select = SelectVentilationUnit;
+            control_EquipmentSelection.IsSelectionEnabled = SelectVentilationUnit;
 
-            stackPanel_Mode.IsEnabled = select;
-            label_Catalogue.IsEnabled = select;
-            dataGrid_Catalogue.IsEnabled = select;
-
-            bool all = Mode == PartOEquipmentSelectionMode.AutomaticAllProducts;
-
-            dataGrid_Catalogue.IsReadOnly = !select || all;
-
-            if (select && all)
-            {
-                foreach (PartOCatalogueProductRow partOCatalogueProductRow in catalogueProductRows)
-                {
-                    partOCatalogueProductRow.IsUsed = true;
-                }
-            }
-
-            UpdateCatalogueText();
-            UpdateEquipmentSelectionText();
             UpdateOptimiseAvailability();
-        }
-
-        /// <summary>
-        /// What the current mode and pool mean, in the words an engineer needs - including the one
-        /// combination that will not prepare.
-        /// </summary>
-        private void UpdateEquipmentSelectionText()
-        {
-            if (!SelectVentilationUnit)
-            {
-                return;
-            }
-
-            int used = AllowedVentilationUnitReferences().Count;
-            int total = catalogueProductRows.Count;
-
-            switch (Mode)
-            {
-                case PartOEquipmentSelectionMode.AutomaticSelectedPool:
-                    textBlock_Catalogue.Text = used == 0
-                        ? string.Format("No product is ticked, so an automatic selection has nothing to choose from and this iteration will not prepare. Tick the products this project permits - SAM will not fall back to the other {0} in the catalogue.", total)
-                        : string.Format("{0} of {1} product(s) permitted. Each dwelling is given the smallest permitted product that can meet its own design duty; the others are never selected.", used, total);
-                    break;
-
-                case PartOEquipmentSelectionMode.ManualPerDwelling:
-                    textBlock_Catalogue.Text = used == 0 || used == total
-                        ? string.Format("No selection rule runs. Every dwelling keeps the product it already has, and the next window lists all {0} catalogue product(s) for you to state the rest.", total)
-                        : string.Format("No selection rule runs. Every dwelling keeps the product it already has, and the next window offers the {0} product(s) ticked here.", used);
-                    break;
-
-                default:
-                    textBlock_Catalogue.Text = string.Format("{0} Each dwelling is given the smallest product that can meet its own design duty. A product's Maximum is its capability ceiling and is never a design airflow.", ventilationUnitCatalogue?.Description);
-                    break;
-            }
-        }
-
-        /// <summary>The ticked products' identities - the project's permitted pool.</summary>
-        private List<VentilationUnitReference> AllowedVentilationUnitReferences()
-        {
-            List<VentilationUnitReference> result = [];
-
-            foreach (PartOCatalogueProductRow partOCatalogueProductRow in catalogueProductRows)
-            {
-                if (partOCatalogueProductRow.IsUsed && partOCatalogueProductRow.VentilationUnitReference is not null)
-                {
-                    result.Add(partOCatalogueProductRow.VentilationUnitReference);
-                }
-            }
-
-            return result;
         }
 
         /// <summary>
