@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Part O - Prepare &amp; Run" MinHeight="520" MinWidth="700" Width="760"
+        Title="Part O — Prepare &amp; Run" MinHeight="520" MinWidth="700" Width="760"
         SizeToContent="Height" ResizeMode="CanResizeWithGrip" FontFamily="Roboto Light">
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -88,10 +88,14 @@
                      this window claiming a smallest-capable selection on a project the engineer had put
                      under manual authority; that was the whole of the defect.
 
-                     Disabled, not hidden, on a scenario that selects no unit: an Iteration 1a run has no
-                     equipment to configure, but the catalogue stays readable. -->
+                     Reduced to a compact read-only summary, not hidden, on a scenario that selects no
+                     unit: an Iteration 1a or 1b run has no equipment to configure, so the section keeps its
+                     place in the family's skeleton and says in two lines that nothing here applies - with
+                     the catalogue one disclosure away rather than greyed across the middle of the dialog. -->
                 <StackPanel Grid.Row="6" Margin="0,12,0,0">
-                    <Label Content="Equipment selection" Padding="0,0,0,2"/>
+                    <!-- Hidden on Iteration 1a / 1b, where the control states the same heading itself as
+                         part of its compact summary and two of them would read as a repeat. -->
+                    <Label x:Name="label_EquipmentSelection" Content="Equipment selection" Padding="0,0,0,2"/>
                     <local:PartOEquipmentSelectionControl x:Name="control_EquipmentSelection"/>
                 </StackPanel>
 
@@ -99,19 +103,25 @@
                      completed Iteration 2 run. It is set up here because the settings have to be recorded
                      with the preparation for the run to be an optimisation starting point at all, and it
                      is collapsed by default so a baseline run never has to read it. -->
-                <Expander x:Name="expander_Optimise" Grid.Row="7" Margin="0,12,0,0" Header="Follow-on optimisation (Iteration 2B)">
+                <Expander x:Name="expander_Optimise" Grid.Row="7" Margin="0,12,0,0"
+                          Header="Follow-on optimisation (Iteration 2B — TM59 optimisation)"
+                          ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked.">
                     <StackPanel Margin="0,6,0,0">
-                        <CheckBox x:Name="checkBox_Optimise" Content="Allow automatic TM59 optimisation after this run"/>
+                        <CheckBox x:Name="checkBox_Optimise" Content="Allow automatic TM59 optimisation after this run"
+                                  ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked."/>
 
                         <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
-                            <TextBlock Text="Airflow step [l/s]" VerticalAlignment="Center" Width="120"/>
+                            <TextBlock Text="Airflow step (l/s)" VerticalAlignment="Center" Width="120"/>
                             <TextBox x:Name="textBox_AirFlowStep" Width="60" Height="20" VerticalContentAlignment="Center"/>
                             <TextBlock Text="Maximum iterations" VerticalAlignment="Center" Width="130" Margin="20,0,0,0"/>
                             <TextBox x:Name="textBox_MaximumIterations" Width="60" Height="20" VerticalContentAlignment="Center"/>
                         </StackPanel>
 
                         <CheckBox x:Name="checkBox_CapacityEnvelope" Content="Also report what the selected unit could deliver at its capacity ceiling (diagnostic)" Margin="20,8,0,0"/>
-                        <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted geometry between iterations (faster; no change to results)" Margin="20,6,0,0"/>
+                        <!-- Worded as what it reuses, never as a claim about results: the reuse is valid only
+                             while the converted geometry still matches the model. -->
+                        <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted TAS geometry between iterations (faster)" Margin="20,6,0,0"
+                                  ToolTip="Reuses the existing converted TAS geometry between optimisation iterations.&#x0a;Disable this when the geometry is no longer valid for the current model."/>
 
                         <TextBlock x:Name="textBlock_Optimise" Margin="20,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
                     </StackPanel>
@@ -120,20 +130,48 @@
                 <Label Grid.Row="8" Content="Status" Padding="0,0,0,2" Margin="0,12,0,0"/>
 
                 <!-- WHAT EXISTS, WHAT WILL BE REUSED, WHAT WILL CHANGE, WHAT BLOCKS RUN - one line each,
-                     every one of them produced by PartOWorkflowInspection from an existing authority. -->
+                     every one of them produced by PartOWorkflowInspection from an existing authority.
+
+                     DIVIDED INTO TWO PRESENTATION GROUPS, and that is the whole of the change: what the
+                     CURRENT CONFIGURATION says, and what an EXISTING RUN produced. A model can honestly
+                     report "Ventilation design: NEEDS PREPARATION" beside "Results: READY" - saved results
+                     are reviewable without simulating anything - and as one flat list that read like the
+                     dialog contradicting itself. Nothing is compared between the groups, no configuration
+                     is hashed, no timestamp is read or written and no status is inferred: every row still
+                     carries exactly the status the inspection assigned it. See PartOWorkflowStatusGroup.
+
+                     One line per row, with the inspection's complete sentence on the tooltip and behind the
+                     row's own disclosure - nothing is shortened away. -->
                 <ItemsControl x:Name="itemsControl_Status" Grid.Row="9">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="150"/>
-                                    <ColumnDefinition Width="130"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Top"/>
-                                <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding Foreground}" FontWeight="SemiBold" VerticalAlignment="Top"/>
-                                <TextBlock Grid.Column="2" Text="{Binding Detail}" TextWrapping="Wrap" Foreground="#555555"/>
-                            </Grid>
+                            <StackPanel Margin="0,0,0,8">
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#333333" Margin="0,0,0,3"/>
+                                <ItemsControl ItemsSource="{Binding Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="10,0,0,3">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="145"/>
+                                                    <ColumnDefinition Width="125"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Top" ToolTip="{Binding FullDetail}"/>
+                                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding Foreground}" FontWeight="SemiBold" VerticalAlignment="Top" ToolTip="{Binding FullDetail}"/>
+                                                <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding ShortDetail}" TextTrimming="CharacterEllipsis" Foreground="#555555" ToolTip="{Binding FullDetail}"/>
+                                                <Expander Grid.Row="1" Grid.Column="2" Margin="0,2,0,0" FontSize="11"
+                                                          Header="{Binding DisclosureHeader}" Visibility="{Binding DisclosureVisibility}">
+                                                    <TextBlock Text="{Binding FullDetail}" TextWrapping="Wrap" Foreground="#555555" Margin="0,3,0,0"/>
+                                                </Expander>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -141,7 +179,8 @@
                 <TextBlock x:Name="textBlock_Blockers" Grid.Row="10" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
 
                 <TextBlock x:Name="textBlock_Advanced" Grid.Row="11" Margin="0,10,0,10" TextWrapping="Wrap" Foreground="#777777"
-                           Text="The individual Part O commands remain available: Edit - Map IC (TM59), AddVent PartF and Prepare Iteration, Simulate - Energy Simulation, and Results - Overheating (TM59) and Optimise (2B)."/>
+                           Text="The individual Part O commands remain available: Edit - Map IC (TM59), AddVent PartF and Prepare Iteration, Simulate - Energy Simulation, and Results - Overheating (TM59) and Optimise (2B)."
+                           ToolTip="Iteration 1a — MVHR design duty (no manufacturer unit)&#x0a;Iteration 1b — Natural ventilation (no mechanical system)&#x0a;Iteration 2 — MVHR with manufacturer unit&#x0a;Iteration 2B — TM59 optimisation"/>
             </Grid>
         </ScrollViewer>
 

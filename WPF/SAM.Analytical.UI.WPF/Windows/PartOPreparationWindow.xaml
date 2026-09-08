@@ -3,9 +3,62 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Part O Iteration" Height="700" Width="1140" FontFamily="Roboto Light">
+        Title="Part O — Review iteration" Height="700" Width="1260" MinWidth="640" FontFamily="Roboto Light">
+    <Window.Resources>
+        <!-- An absent figure shown as an absence rather than as "NaN". Display only; see the converter. -->
+        <local:PartOAirFlowConverter x:Key="Converter_AirFlow"/>
+
+        <!-- A product's identity in engineer-facing words - "test (project test)" and never the literal
+             join "Project test test". Display only; see Query.PartOProductLabel. -->
+        <local:PartOProductLabelConverter x:Key="Converter_ProductLabel"/>
+
+        <!-- NUMBERS RIGHT, TEXT LEFT, so a column of airflows can be scanned by magnitude. -->
+        <Style x:Key="Style_Numeric" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+
+        <Style x:Key="Style_Numeric_PartF" TargetType="TextBlock" BasedOn="{StaticResource Style_Numeric}">
+            <Setter Property="ToolTip" Value="{Binding PartFRequiredDescription}"/>
+        </Style>
+
+        <Style x:Key="Style_Numeric_Design" TargetType="TextBlock" BasedOn="{StaticResource Style_Numeric}">
+            <Setter Property="ToolTip" Value="Airflow designed by this iteration and passed to the simulation.&#x0a;It is independent of which product is selected."/>
+        </Style>
+
+        <Style x:Key="Style_Numeric_Max" TargetType="TextBlock" BasedOn="{StaticResource Style_Numeric}">
+            <Setter Property="ToolTip" Value="The selected product's capability ceiling.&#x0a;It does not replace the design airflow."/>
+        </Style>
+
+        <Style x:Key="Style_Numeric_Headroom" TargetType="TextBlock" BasedOn="{StaticResource Style_Numeric}">
+            <Setter Property="ToolTip" Value="Product maximum minus design airflow.&#x0a;Positive headroom means the selected unit can meet the design duty."/>
+        </Style>
+
+        <!-- THE THREE PAIRED CONCEPTS - Design, Equipment maximum, Headroom - separated by a rule at the
+             first column of each group rather than by a two-tier header. A grouped header cannot be built
+             out of the DataGrid this window already uses without a custom column-header component, and a
+             new table component is far more than a presentation pass should cost. Consistent names, a
+             fixed order and a visible separator do the same job here. -->
+        <Style x:Key="Style_GroupCell" TargetType="DataGridCell">
+            <Setter Property="BorderThickness" Value="1,0,0,0"/>
+            <Setter Property="BorderBrush" Value="#C8C8C8"/>
+        </Style>
+
+        <Style x:Key="Style_GroupHeader" TargetType="controls:DataGridColumnHeader">
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="BorderThickness" Value="1,0,1,1"/>
+            <Setter Property="BorderBrush" Value="#999999"/>
+            <Setter Property="Padding" Value="4,2,4,2"/>
+        </Style>
+
+        <Style x:Key="Style_NumericHeader" TargetType="controls:DataGridColumnHeader">
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="Padding" Value="4,2,4,2"/>
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -26,11 +79,11 @@
              the first point at which the automatic answer exists to be converted. It is a change of
              SELECTION AUTHORITY and not a recalculation: every dwelling keeps the exact product it has. -->
         <Grid Grid.Row="1">
-            <Label Content="Dwelling assignments - design duty and equipment capacity are different quantities" Padding="0,0,0,2" FontWeight="Bold" VerticalAlignment="Center"/>
+            <Label Content="Dwelling assignments — design duty and equipment capacity are different quantities" Padding="0,0,0,2" FontWeight="Bold" VerticalAlignment="Center"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <TextBlock x:Name="textBlock_Mode" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="#555555"/>
                 <Button x:Name="button_ConvertToManual" Content="Convert to Manual" Width="130" Height="22" Click="button_ConvertToManual_Click"
-                        ToolTip="Keep every dwelling's current product exactly as it is, and take over the choice from here. Nothing is reselected and no airflow changes."/>
+                        ToolTip="Switches to Manual per dwelling while retaining the current assignments as the starting point."/>
             </StackPanel>
         </Grid>
 
@@ -48,17 +101,29 @@
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Dwelling" Binding="{Binding Dwelling}" Width="160" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Unit" Binding="{Binding UnitName}" Width="80" IsReadOnly="True"/>
-                <!-- Design duty and Maximum capacity are deliberately in separate, differently headed
-                     columns. A dwelling designed at 30 l/s that is fitted with a 150 l/s unit is a 30 l/s
-                     dwelling. -->
-                <DataGridTextColumn Header="Design supply&#x0a;l/s" Binding="{Binding DesignSupplyDuty_Lps, StringFormat=N1}" Width="85" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Design extract&#x0a;l/s" Binding="{Binding DesignExtractDuty_Lps, StringFormat=N1}" Width="85" IsReadOnly="True"/>
+
+                <!-- DESIGN. Design duty and equipment maximum are deliberately in separate, differently
+                     headed and visibly separated columns. A dwelling designed at 30 l/s that is fitted with
+                     a 150 l/s unit is a 30 l/s dwelling. -->
+                <DataGridTextColumn Header="Design SUP (l/s)" Binding="{Binding DesignSupplyDuty_Lps, Converter={StaticResource Converter_AirFlow}}" Width="100" IsReadOnly="True"
+                                    ElementStyle="{StaticResource Style_Numeric_Design}" CellStyle="{StaticResource Style_GroupCell}" HeaderStyle="{StaticResource Style_GroupHeader}"/>
+                <DataGridTextColumn Header="Design EXT (l/s)" Binding="{Binding DesignExtractDuty_Lps, Converter={StaticResource Converter_AirFlow}}" Width="100" IsReadOnly="True"
+                                    ElementStyle="{StaticResource Style_Numeric_Design}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
 
                 <!-- The one editable cell, and only in manual mode - the grid itself is read-only in the
                      automatic modes, where these rows are results rather than choices. The picker's list is
                      the project's permitted pool plus this dwelling's own product where that has since left
                      the pool, so a procurement change can never make an authored assignment unpickable. -->
-                <DataGridTemplateColumn Header="Assigned product" Width="250">
+                <!-- THE ONE FLEXIBLE COLUMN. Every other column is sized for its own header, and the
+                     Status column has to be visible without scrolling - it is the one that says whether a
+                     dwelling's product will do. So the spare width goes here, where a longer product name
+                     can use it, and MinWidth keeps the picker usable when the window is made narrow.
+
+                     Fixed columns total 955px; the default 1260px window leaves this about 250px. See
+                     PartOConsistencyPolishTests.TheAssignmentRow_FitsTheDefaultWindowWidth, which fails if
+                     a column is widened past that again - which is how the unit-in-header headings pushed
+                     Status off the right edge of the old 1140px default. -->
+                <DataGridTemplateColumn Header="Assigned product" Width="*" MinWidth="250">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding SelectedProduct}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Description}"/>
@@ -66,21 +131,37 @@
                     </DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate>
                         <DataTemplate>
-                            <!-- DisplayMemberPath, so the picker reads the descriptor's engineer-facing
-                                 Label - identity and both maximum airflows - and not its ToString, which
-                                 is the diagnostic form and ends with the catalogue's internal rank. Rank
-                                 is a tie-breaker, not an airflow, an efficiency or a rating, and a picker
-                                 that prints it invites it to be read as one. -->
-                            <ComboBox ItemsSource="{Binding Candidates}" DisplayMemberPath="Label"
-                                      SelectedItem="{Binding SelectedCandidate, Mode=TwoWay}" IsEnabled="{Binding IsEditable}"/>
+                            <!-- An ItemTemplate over Query.PartOProductLabel, so the picker reads the
+                                 engineer-facing label - identity and both maximum airflows - and never the
+                                 descriptor's ToString, which is the diagnostic form and ends with the
+                                 catalogue's internal rank. Rank is a tie-breaker, not an airflow, an
+                                 efficiency or a rating, and a picker that prints it invites it to be read
+                                 as one. The template rather than DisplayMemberPath because the project test
+                                 product's identity needs spelling out - see the converter. -->
+                            <ComboBox ItemsSource="{Binding Candidates}"
+                                      SelectedItem="{Binding SelectedCandidate, Mode=TwoWay}" IsEnabled="{Binding IsEditable}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource Converter_ProductLabel}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTextColumn Header="Maximum supply&#x0a;l/s" Binding="{Binding MaximumSupply_Lps, StringFormat=N1}" Width="95" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Maximum extract&#x0a;l/s" Binding="{Binding MaximumExtract_Lps, StringFormat=N1}" Width="95" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Supply headroom&#x0a;l/s" Binding="{Binding SupplyHeadroom_Lps, StringFormat=N1}" Width="95" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Extract headroom&#x0a;l/s" Binding="{Binding ExtractHeadroom_Lps, StringFormat=N1}" Width="95" IsReadOnly="True"/>
+                <!-- EQUIPMENT MAXIMUM. A capability ceiling, never a design airflow and never a target. -->
+                <DataGridTextColumn Header="Max SUP (l/s)" Binding="{Binding MaximumSupply_Lps, Converter={StaticResource Converter_AirFlow}}" Width="95" IsReadOnly="True"
+                                    ElementStyle="{StaticResource Style_Numeric_Max}" CellStyle="{StaticResource Style_GroupCell}" HeaderStyle="{StaticResource Style_GroupHeader}"/>
+                <DataGridTextColumn Header="Max EXT (l/s)" Binding="{Binding MaximumExtract_Lps, Converter={StaticResource Converter_AirFlow}}" Width="95" IsReadOnly="True"
+                                    ElementStyle="{StaticResource Style_Numeric_Max}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
+
+                <!-- HEADROOM. The equipment maximum less the design airflow, and nothing else. -->
+                <DataGridTextColumn Header="SUP headroom (l/s)" Binding="{Binding SupplyHeadroom_Lps, Converter={StaticResource Converter_AirFlow}}" Width="110" IsReadOnly="True"
+                                    ElementStyle="{StaticResource Style_Numeric_Headroom}" CellStyle="{StaticResource Style_GroupCell}" HeaderStyle="{StaticResource Style_GroupHeader}"/>
+                <DataGridTextColumn Header="EXT headroom (l/s)" Binding="{Binding ExtractHeadroom_Lps, Converter={StaticResource Converter_AirFlow}}" Width="110" IsReadOnly="True"
+                                    ElementStyle="{StaticResource Style_Numeric_Headroom}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
+
                 <DataGridTextColumn Header="Status" Binding="{Binding SelectionOutcome}" Width="105" IsReadOnly="True"/>
             </DataGrid.Columns>
         </DataGrid>
@@ -91,7 +172,7 @@
             <TextBlock x:Name="textBlock_Assignment" TextWrapping="Wrap" Foreground="#555555" Margin="0,0,150,0"/>
             <Button x:Name="button_AssignSuggested" Content="Assign suggested" Width="130" Height="22" HorizontalAlignment="Right" VerticalAlignment="Top"
                     IsEnabled="False" Click="button_AssignSuggested_Click"
-                    ToolTip="Assign the smallest permitted product that can meet this dwelling's design duty. Changes this dwelling only, and changes no airflow."/>
+                    ToolTip="Populates the suggested smallest-capable assignment as a starting point for manual review - this dwelling only.&#x0a;Manual mode remains authoritative, and no airflow changes."/>
         </Grid>
 
         <!-- BULK ASSIGNMENT. Offered only under manual authority, and an EXPLICIT act: the product is
@@ -108,17 +189,27 @@
              Nothing is written here. Like every other edit in this window it is staged until OK. -->
         <Grid x:Name="grid_Bulk" Grid.Row="4" Margin="0,6,0,0">
             <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="textBlock_BulkSelection" VerticalAlignment="Center" Foreground="#555555" MinWidth="150"/>
-                <ComboBox x:Name="comboBox_BulkProduct" Width="300" Height="22" Margin="6,0,0,0" DisplayMemberPath="Label"
+                <TextBlock x:Name="textBlock_BulkSelection" VerticalAlignment="Center" Foreground="#555555" MinWidth="170"/>
+                <ComboBox x:Name="comboBox_BulkProduct" Width="300" Height="22" Margin="6,0,0,0"
                           SelectionChanged="comboBox_BulkProduct_SelectionChanged"
-                          ToolTip="The product to assign to every selected dwelling. The project's permitted products; each dwelling is still checked against its own design duty."/>
+                          ToolTip="The product to assign to every selected dwelling. The project's permitted products; each dwelling is still checked against its own design duty.">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource Converter_ProductLabel}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <Button x:Name="button_ApplyToSelected" Content="Apply to selected" Width="130" Height="22" Margin="6,0,0,0"
-                        IsEnabled="False" Click="button_ApplyToSelected_Click"
-                        ToolTip="Assign the chosen product to every selected dwelling. Unselected dwellings are untouched, no airflow of any kind changes, and nothing is written until OK."/>
+                        IsEnabled="False" Click="button_ApplyToSelected_Click" ToolTipService.ShowOnDisabled="True"
+                        ToolTip="Assigns the chosen product to the selected dwellings.&#x0a;Design airflows are unchanged, and nothing is written until OK."/>
+                <!-- What the last bulk assignment actually did, inline and beside the button that did it.
+                     Presentation feedback only: it is cleared by the next selection or authority change and
+                     nothing reads it. -->
+                <TextBlock x:Name="textBlock_BulkConfirmation" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="DarkGreen"/>
             </StackPanel>
         </Grid>
 
-        <Label Grid.Row="5" Content="Spaces - Approved Document F requirement and design airflow are different quantities" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <Label Grid.Row="5" Content="Spaces — Approved Document F requirement and design airflow are different quantities" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
         <DataGrid x:Name="dataGrid_Spaces" Grid.Row="6" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" MinHeight="90"
                   EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling">
             <DataGrid.Columns>
@@ -129,16 +220,40 @@
                      spreadsheet. Presentation only - no membership, scope or airflow is changed. -->
                 <DataGridTextColumn Header="Dwelling / Zone" Binding="{Binding Dwelling}" Width="130"/>
                 <DataGridTextColumn Header="Space" Binding="{Binding Name}" Width="220"/>
-                <DataGridTextColumn Header="Part F required&#x0a;l/s" Binding="{Binding PartFRequired_Lps, StringFormat=N1}" Width="100"/>
-                <DataGridTextColumn Header="Design supply&#x0a;l/s" Binding="{Binding DesignSupply_Lps, StringFormat=N1}" Width="100"/>
-                <DataGridTextColumn Header="Design extract&#x0a;l/s" Binding="{Binding DesignExtract_Lps, StringFormat=N1}" Width="100"/>
+                <DataGridTextColumn Header="Part F required (l/s)" Binding="{Binding PartFRequired_Lps, Converter={StaticResource Converter_AirFlow}}" Width="120"
+                                    ElementStyle="{StaticResource Style_Numeric_PartF}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
+                <DataGridTextColumn Header="Design SUP (l/s)" Binding="{Binding DesignSupply_Lps, Converter={StaticResource Converter_AirFlow}}" Width="110"
+                                    ElementStyle="{StaticResource Style_Numeric_Design}" CellStyle="{StaticResource Style_GroupCell}" HeaderStyle="{StaticResource Style_GroupHeader}"/>
+                <DataGridTextColumn Header="Design EXT (l/s)" Binding="{Binding DesignExtract_Lps, Converter={StaticResource Converter_AirFlow}}" Width="110"
+                                    ElementStyle="{StaticResource Style_Numeric_Design}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
             </DataGrid.Columns>
         </DataGrid>
 
-        <Label Grid.Row="7" Content="Notes, warnings and refusals" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <!-- THE DIAGNOSTICS HEADER, which now says HOW MANY of each kind there are before a person starts
+             reading, and carries Copy All - which belongs with the text it copies rather than beside OK and
+             Cancel, where it read as a third way of closing the dialog.
+
+             The WARNINGS below are grouped: warning lines that are character-for-character identical are
+             shown once with a "× N" after them. Refusals and notes are never collapsed. Nothing is parsed,
+             categorised, re-graded or dropped, and "Show every line" puts the complete record back on
+             screen. Copy All is always the complete record. -->
+        <Grid Grid.Row="7" Margin="0,10,0,0">
+            <Label x:Name="label_Diagnostics" Content="Notes, warnings and refusals" Padding="0,0,0,2" FontWeight="Bold" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <!-- HIDDEN, not greyed, where nothing was collapsed - which on today's Part O warnings is
+                     every run: each one names its space, so no two are ever character-for-character
+                     identical. A permanently disabled tick advertises a capability that never arrives and
+                     invites the engineer to work out why they cannot use it. See SetDiagnostics. -->
+                <CheckBox x:Name="checkBox_ShowEveryLine" Content="Show every line" VerticalAlignment="Center" Margin="0,0,10,0"
+                          Visibility="Collapsed" IsEnabled="False" Click="checkBox_ShowEveryLine_Click"
+                          ToolTip="Identical warnings are shown once with a &quot;× N&quot; count; refusals and notes are never collapsed. Tick this to list every line separately. Copy All always copies every line."/>
+                <Button x:Name="button_CopyAll" Content="Copy All" Width="80" Height="20" Click="button_CopyAll_Click"
+                        ToolTip="Copy the summary, both tables and every note, warning and refusal - ungrouped and complete."/>
+            </StackPanel>
+        </Grid>
+
         <TextBox x:Name="textBox_Notes" Grid.Row="8" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
 
-        <Button x:Name="button_CopyAll" Grid.Row="9" Width="70" Height="20" Margin="0,6,150,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
         <Button x:Name="button_OK" Grid.Row="9" Width="60" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_OK_Click">OK</Button>
         <Button x:Name="button_Cancel" IsCancel="True" Grid.Row="9" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
     </Grid>

@@ -78,6 +78,30 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public double PartFRequired_Lps { get; }
 
+        /// <summary>
+        /// What the Part F column means for THIS space, in the words an engineer reads - and, where the
+        /// space carries no requirement at all, why the cell is empty rather than zero.
+        ///
+        /// <para><b>It reports an absent RECORD, never a judgement about the space</b></para>
+        /// <para>
+        /// The only thing behind this wording is whether <see cref="PartFRequired_Lps"/> resolved - the
+        /// same fact the cell itself shows - and that is the absence of a <c>PartFSpaceData</c> continuous
+        /// rate on this space. It is <b>not</b> a statement that this kind of space needs no continuous
+        /// mechanical airflow, because nothing here examines the space type and SAM was never asked.
+        /// </para>
+        /// <para>
+        /// This sentence used to read "No Part F requirement for this space type", which said the second
+        /// thing while only knowing the first - and the two differ exactly where it matters: a habitable
+        /// room that <c>AddVent PartF</c> was never run over reaches this tooltip too, and telling an
+        /// engineer its <i>type</i> has no requirement would make an accidental omission read as a
+        /// deliberate exemption. The same trap the Dwelling / Zone column refuses by showing an em dash
+        /// rather than a guess.
+        /// </para>
+        /// </summary>
+        public string PartFRequiredDescription => double.IsNaN(PartFRequired_Lps) || double.IsInfinity(PartFRequired_Lps)
+            ? "No continuous Part F requirement is recorded for this space."
+            : string.Concat("Minimum continuous mechanical airflow required by the Part F data.", System.Environment.NewLine, "Equipment selection does not change it.");
+
         /// <summary>The design supply airflow [l/s] the prepared model will simulate.</summary>
         public double DesignSupply_Lps { get; }
 

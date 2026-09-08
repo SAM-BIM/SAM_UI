@@ -52,7 +52,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         // =================================================================================================
 
         /// <summary>
-        /// A stated test product appears as a catalogue row whose Origin says <b>PROJECT TEST</b> and whose
+        /// A stated test product appears as a catalogue row whose Origin says <b>Project test</b> and whose
         /// manufacturer field is the literal words "Project test". A made-up capacity sitting in the same
         /// grid as transcribed manufacturer data has to be unmistakable for it.
         /// </summary>
@@ -66,7 +66,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartOCatalogueProductRow partOCatalogueProductRow = Row(control, name_Test);
 
             Assert.True(partOCatalogueProductRow.IsProjectTest);
-            Assert.Equal("PROJECT TEST", partOCatalogueProductRow.Origin);
+            Assert.Equal("Project test", partOCatalogueProductRow.Origin);
             Assert.Equal(PartOProjectTestVentilationUnit.Manufacturer, partOCatalogueProductRow.Manufacturer);
             Assert.Equal(165, partOCatalogueProductRow.MaximumSupply_Lps);
             Assert.Equal(170, partOCatalogueProductRow.MaximumExtract_Lps);

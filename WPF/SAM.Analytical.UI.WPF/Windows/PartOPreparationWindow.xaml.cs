@@ -38,6 +38,13 @@ namespace SAM.Analytical.UI.WPF
 
         private PartOEquipmentAssignmentSet? partOEquipmentAssignmentSet;
 
+        /// <summary>
+        /// The notes, warnings and refusals as handed in - counted and, for the screen, grouped. Held so
+        /// that Copy All and the "Show every line" tick both read the same complete record rather than
+        /// re-deriving it from what the box happens to be showing.
+        /// </summary>
+        private PartODiagnosticSummary partODiagnosticSummary = new(null, null, null);
+
         public PartOPreparationWindow()
         {
             InitializeComponent();
@@ -138,6 +145,12 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>What the window currently says about the selection. For a test to read.</summary>
         internal string BulkSelectionDescription => textBlock_BulkSelection.Text;
+
+        /// <summary>
+        /// What the window says the last bulk assignment did, or empty where none has been made since the
+        /// selection or the authority last moved. Presentation feedback; nothing reads it but a test.
+        /// </summary>
+        internal string BulkConfirmation => textBlock_BulkConfirmation.Text;
 
         /// <summary>The products bulk assignment currently offers. For a test to read.</summary>
         internal List<VentilationUnitCapacityDescriptor> BulkProducts => [.. comboBox_BulkProduct.ItemsSource?.OfType<VentilationUnitCapacityDescriptor>() ?? []];
@@ -246,6 +259,17 @@ namespace SAM.Analytical.UI.WPF
 
             UpdateBulkAvailability();
 
+            //Said inline, beside the button that did it, because a bulk assignment that changes twelve rows
+            //off the top of a scrolled table is otherwise indistinguishable from a click that did nothing.
+            //Presentation feedback: it reports the set's own answer and decides none of it.
+            textBlock_BulkConfirmation.Text = guids.Count == 0
+                ? string.Empty
+                : string.Format(
+                    "Assigned {0} to {1} dwelling{2}.",
+                    Query.PartOProductLabel(ventilationUnitCapacityDescriptor.VentilationUnitReference),
+                    guids.Count,
+                    guids.Count == 1 ? string.Empty : "s");
+
             if (refusals.Count != 0)
             {
                 MessageBox.Show(string.Format("Not every selected dwelling was assigned.\n\n{0}", string.Join("\n\n", refusals)));
@@ -301,16 +325,103 @@ namespace SAM.Analytical.UI.WPF
             return true;
         }
 
-        /// <summary>Notes, warnings and refusals, refusals first.</summary>
+        /// <summary>
+        /// Notes, warnings and refusals, refusals first - counted in the header, and shown with
+        /// character-for-character identical warnings collapsed.
+        ///
+        /// <para><b>Nothing is interpreted and nothing is lost</b></para>
+        /// <para>
+        /// No line is parsed, classified, re-graded or suppressed; the only aggregation is that two
+        /// byte-identical warnings become one line and a <c>× 2</c>.
+        /// <see cref="DiagnosticsFullText"/> - what Copy All copies, and what the "Show every line" tick
+        /// puts back on screen - is every line as produced. See <see cref="PartODiagnosticSummary"/>.
+        /// </para>
+        ///
+        /// <para><b>The tick is HIDDEN where nothing was collapsed, not merely disabled</b></para>
+        /// <para>
+        /// And on today's Part O warnings that is every run. Every warning this window can receive names
+        /// its space - <c>Modify.AddPartOBaseMVHRSystem</c>'s stale-relation warning names the space and
+        /// the system, and <c>Query.ReconcileVentilationSystemDesignDuty</c>'s headroom and shortfall
+        /// warnings name the space, the direction and both airflows - so no two of them are ever
+        /// character-for-character identical and the collapsing is a no-op. The counts in the header are
+        /// the part that always earns its place.
+        /// </para>
+        /// <para>
+        /// A permanently greyed tick is worse than no tick: it advertises a capability that never arrives
+        /// and leaves the engineer working out why they cannot use it. So the affordance appears only when
+        /// it has something to do - which keeps the grouping honest for any producer that does repeat a
+        /// line, without putting dead furniture on the window.
+        /// </para>
+        /// </summary>
         public void SetDiagnostics(IEnumerable<string> notes, IEnumerable<string> warnings, IEnumerable<string> refusals)
         {
-            StringBuilder stringBuilder = new();
+            partODiagnosticSummary = new PartODiagnosticSummary(notes, warnings, refusals);
 
-            Append(stringBuilder, "REFUSAL", refusals);
-            Append(stringBuilder, "WARNING", warnings);
-            Append(stringBuilder, "NOTE", notes);
+            label_Diagnostics.Content = partODiagnosticSummary.Header;
 
-            textBox_Notes.Text = stringBuilder.ToString();
+            //Offered only where collapsing actually removed a line - and taken off the window entirely
+            //otherwise, rather than left greyed.
+            checkBox_ShowEveryLine.Visibility = partODiagnosticSummary.IsGrouped ? Visibility.Visible : Visibility.Collapsed;
+            checkBox_ShowEveryLine.IsEnabled = partODiagnosticSummary.IsGrouped;
+
+            if (!partODiagnosticSummary.IsGrouped)
+            {
+                checkBox_ShowEveryLine.IsChecked = false;
+            }
+
+            UpdateDiagnosticsText();
+        }
+
+        /// <summary>What the diagnostics header says - the counts. For a test to read.</summary>
+        internal string DiagnosticsHeader => label_Diagnostics.Content as string ?? string.Empty;
+
+        /// <summary>What the diagnostics box is currently showing - grouped, or every line. For a test to read.</summary>
+        internal string DiagnosticsText => textBox_Notes.Text;
+
+        /// <summary>
+        /// Every note, warning and refusal as produced, ungrouped. What Copy All copies, whatever the box is
+        /// showing. For a test to read.
+        /// </summary>
+        internal string DiagnosticsFullText => partODiagnosticSummary.Text;
+
+        /// <summary>How many warnings were handed in, before any identical lines were collapsed.</summary>
+        internal int WarningCount => partODiagnosticSummary.WarningCount;
+
+        /// <summary>Whether the box is listing every line rather than the grouped view. Settable for tests.</summary>
+        internal bool ShowEveryLine
+        {
+            get
+            {
+                return checkBox_ShowEveryLine.IsChecked ?? false;
+            }
+            set
+            {
+                checkBox_ShowEveryLine.IsChecked = value;
+
+                UpdateDiagnosticsText();
+            }
+        }
+
+        /// <summary>Whether collapsing identical warnings removed anything, and so whether the tick has work.</summary>
+        internal bool IsDiagnosticsGrouped => partODiagnosticSummary.IsGrouped;
+
+        /// <summary>
+        /// Whether the "Show every line" tick is on the window at all. False - and hidden rather than
+        /// greyed - wherever no two warnings were identical, which is every run of today's Part O
+        /// warnings. Exposed so that is assertable rather than merely intended.
+        /// </summary>
+        internal bool IsShowEveryLineOffered => checkBox_ShowEveryLine.Visibility == Visibility.Visible && checkBox_ShowEveryLine.IsEnabled;
+
+        private void UpdateDiagnosticsText()
+        {
+            textBox_Notes.Text = ShowEveryLine
+                ? partODiagnosticSummary.Text
+                : partODiagnosticSummary.GroupedText;
+        }
+
+        private void checkBox_ShowEveryLine_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateDiagnosticsText();
         }
 
         /// <summary>
@@ -351,6 +462,9 @@ namespace SAM.Analytical.UI.WPF
                 ? string.Empty
                 : Core.Query.Description(partOEquipmentAssignmentSet.EquipmentSelection.Mode);
 
+            //A confirmation of an assignment made under a different authority would be misleading here.
+            textBlock_BulkConfirmation.Text = string.Empty;
+
             UpdateAssignmentText();
         }
 
@@ -365,17 +479,6 @@ namespace SAM.Analytical.UI.WPF
             //answer, and applying a suggestion over it would be an authored assignment made without the
             //engineer having taken authority.
             button_AssignSuggested.IsEnabled = (partOEquipmentAssignmentSet?.IsManual ?? false) && (partOEquipmentRow?.HasSuggestion ?? false);
-        }
-
-        private static void Append(StringBuilder stringBuilder, string label, IEnumerable<string> descriptions)
-        {
-            foreach (string description in descriptions ?? [])
-            {
-                if (!string.IsNullOrWhiteSpace(description))
-                {
-                    stringBuilder.AppendLine(string.Format("{0}: {1}", label, description));
-                }
-            }
         }
 
         private void button_ConvertToManual_Click(object sender, RoutedEventArgs e)
@@ -398,8 +501,11 @@ namespace SAM.Analytical.UI.WPF
 
             int selected = dataGrid_Equipment.SelectedItems.OfType<PartOEquipmentRow>().Count();
 
+            //Live, and phrased as a proportion: "3 of 412 dwellings selected" says both what a bulk
+            //assignment would touch and how much of the project it is, which "Selected dwellings: 3" did
+            //not.
             textBlock_BulkSelection.Text = manual
-                ? string.Format("Selected dwellings: {0}", selected)
+                ? string.Format("{0} of {1} dwelling{2} selected", selected, equipmentRows.Count, equipmentRows.Count == 1 ? string.Empty : "s")
                 : string.Empty;
 
             button_ApplyToSelected.IsEnabled = manual && selected != 0 && comboBox_BulkProduct.SelectedItem is VentilationUnitCapacityDescriptor;
@@ -407,6 +513,9 @@ namespace SAM.Analytical.UI.WPF
 
         private void dataGrid_Equipment_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
+            //A confirmation about the previous selection would be read as being about this one.
+            textBlock_BulkConfirmation.Text = string.Empty;
+
             UpdateAssignmentText();
 
             UpdateBulkAvailability();
@@ -450,33 +559,75 @@ namespace SAM.Analytical.UI.WPF
             }));
         }
 
-        private void button_CopyAll_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// What Copy All copies: the summary, both tables and the complete diagnostic record.
+        ///
+        /// <para><b>It reproduces the REVIEWED tables</b></para>
+        /// <para>
+        /// Which is the whole point of it - this text is pasted into an issue, a report or an email - so
+        /// every airflow goes through <c>PartOAirFlowConverter.Text</c>,
+        /// the same formatting the cells use. Formatted independently with <c>N1</c> it disagreed with the
+        /// grid immediately: an absent value painted as an em dash on screen and pasted as <c>NaN</c>, up
+        /// to four times per equipment row on an Iteration 1a or 1b table where no product is selected.
+        /// </para>
+        /// <para>
+        /// Separated from the click handler so the text is assertable without a clipboard - a clipboard the
+        /// test host may not even own.
+        /// </para>
+        /// </summary>
+        internal string CopyAllText()
         {
             StringBuilder stringBuilder = new();
 
             stringBuilder.AppendLine(textBlock_Summary.Text);
             stringBuilder.AppendLine();
 
-            stringBuilder.AppendLine("Dwelling\tUnit\tDesign supply l/s\tDesign extract l/s\tAssigned product\tMaximum supply l/s\tMaximum extract l/s\tSupply headroom l/s\tExtract headroom l/s\tStatus");
+            stringBuilder.AppendLine("Dwelling\tUnit\tDesign SUP (l/s)\tDesign EXT (l/s)\tAssigned product\tMax SUP (l/s)\tMax EXT (l/s)\tSUP headroom (l/s)\tEXT headroom (l/s)\tStatus");
             foreach (PartOEquipmentRow row in equipmentRows)
             {
-                stringBuilder.AppendLine(string.Format("{0}\t{1}\t{2:N1}\t{3:N1}\t{4}\t{5:N1}\t{6:N1}\t{7:N1}\t{8:N1}\t{9}", row.Dwelling, row.UnitName, row.DesignSupplyDuty_Lps, row.DesignExtractDuty_Lps, row.SelectedProduct, row.MaximumSupply_Lps, row.MaximumExtract_Lps, row.SupplyHeadroom_Lps, row.ExtractHeadroom_Lps, row.SelectionOutcome));
+                stringBuilder.AppendLine(string.Format(
+                    "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}",
+                    row.Dwelling,
+                    row.UnitName,
+                    PartOAirFlowConverter.Text(row.DesignSupplyDuty_Lps),
+                    PartOAirFlowConverter.Text(row.DesignExtractDuty_Lps),
+                    row.SelectedProduct,
+                    PartOAirFlowConverter.Text(row.MaximumSupply_Lps),
+                    PartOAirFlowConverter.Text(row.MaximumExtract_Lps),
+                    PartOAirFlowConverter.Text(row.SupplyHeadroom_Lps),
+                    PartOAirFlowConverter.Text(row.ExtractHeadroom_Lps),
+                    row.SelectionOutcome));
             }
 
             stringBuilder.AppendLine();
 
-            stringBuilder.AppendLine("Dwelling / Zone\tSpace\tPart F required l/s\tDesign supply l/s\tDesign extract l/s");
+            stringBuilder.AppendLine("Dwelling / Zone\tSpace\tPart F required (l/s)\tDesign SUP (l/s)\tDesign EXT (l/s)");
             foreach (PartOSpaceRow row in spaceRows)
             {
-                stringBuilder.AppendLine(string.Format("{0}\t{1}\t{2:N1}\t{3:N1}\t{4:N1}", row.Dwelling, row.Name, row.PartFRequired_Lps, row.DesignSupply_Lps, row.DesignExtract_Lps));
+                stringBuilder.AppendLine(string.Format(
+                    "{0}\t{1}\t{2}\t{3}\t{4}",
+                    row.Dwelling,
+                    row.Name,
+                    PartOAirFlowConverter.Text(row.PartFRequired_Lps),
+                    PartOAirFlowConverter.Text(row.DesignSupply_Lps),
+                    PartOAirFlowConverter.Text(row.DesignExtract_Lps)));
             }
 
             stringBuilder.AppendLine();
-            stringBuilder.AppendLine(textBox_Notes.Text);
 
+            //THE COMPLETE RECORD, never what the box happens to be showing: the grouped view exists to be
+            //read quickly and Copy All exists to be pasted into an issue, a report or an email. A copy that
+            //silently dropped a repeated warning would be the one place this aggregation could do harm.
+            stringBuilder.AppendLine(partODiagnosticSummary.Text);
+
+            return stringBuilder.ToString();
+        }
+
+        private void button_CopyAll_Click(object sender, RoutedEventArgs e)
+        {
             try
             {
-                Clipboard.SetText(stringBuilder.ToString());
+                Clipboard.SetText(CopyAllText());
             }
             catch (System.Runtime.InteropServices.ExternalException)
             {

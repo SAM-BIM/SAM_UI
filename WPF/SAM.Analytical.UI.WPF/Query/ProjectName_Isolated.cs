@@ -32,8 +32,28 @@ namespace SAM.Analytical.UI.WPF
         /// <para>
         /// Applied to the model's name, which is what the Simulate dialog offers as the project name - so
         /// the isolated identity reaches every artifact through the naming path that already exists, rather
-        /// than through a second one beside it. A person may still overwrite it in that dialog; that is
-        /// their choice to make, and the <c>.sam</c> still states what the run was.
+        /// than through a second one beside it.
+        /// </para>
+        ///
+        /// <para><b>And on the guided route it is no longer overwritable</b></para>
+        /// <para>
+        /// This paragraph used to end "a person may still overwrite it in that dialog; that is their choice
+        /// to make", and that stopped being true: <c>SimulateControl.LockPartOSettings</c> locks the project
+        /// name on the Part O route. The reason it locks is one that did not exist when the sentence was
+        /// written - <see cref="PartOSimulationContext.Iteration_ProjectName"/> reads an Iteration 2B round
+        /// number back OUT of the project name, so a hand-edited name can restart the numbering at
+        /// <c>-Opt01</c> and overwrite a previous optimisation's evidence.
+        /// </para>
+        /// <para>
+        /// <b>The paragraph above is unaffected by that.</b> Nothing reads ISOLATION back out of the name,
+        /// and the <c>.sam</c> remains the authority for what a run was; the lock is about the round number,
+        /// not about the scope token. The two facts simply live in the same string.
+        /// </para>
+        /// <para>
+        /// A different name is set where the name actually comes from - the model, through Edit - Properties
+        /// - before the iteration is prepared, rather than typed over the derived one afterwards. The
+        /// ordinary <c>Simulate - Energy Simulation</c> command still opens this dialog unlocked, because
+        /// nothing on that path derives an identity from the name.
         /// </para>
         /// </summary>
         /// <param name="projectName">The name the model already carries.</param>

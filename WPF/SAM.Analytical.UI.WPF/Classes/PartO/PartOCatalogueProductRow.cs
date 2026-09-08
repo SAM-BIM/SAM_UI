@@ -21,8 +21,8 @@ namespace SAM.Analytical.UI.WPF
     /// <para><b>A capability, never a duty</b></para>
     /// <para>
     /// <see cref="MaximumSupply_Lps"/> is what this box can move at most. It is not any dwelling's design
-    /// airflow and it is not an Approved Document F requirement, and the column it appears under says
-    /// "Maximum" for that reason.
+    /// airflow and it is not an Approved Document F requirement, and the columns it appears under are
+    /// headed "Max SUP" and "Max EXT" for that reason - never "Design".
     /// </para>
     ///
     /// <para><b>Ticking a box permits a product; it does not assign one</b></para>
@@ -71,8 +71,13 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// Where this product's figures came from, in one short word for a narrow column: the manufacturer
         /// catalogue, or this project's own test statement.
+        /// <para>
+        /// Ordinary engineer-facing text in both cases. It used to shout <c>PROJECT TEST</c>, which read as
+        /// an alarm rather than as a provenance - and the row is already framed as a what-if by the panel
+        /// that states it, by the identity's own manufacturer field and by the wording beneath the grid.
+        /// </para>
         /// </summary>
-        public string Origin => IsProjectTest ? "PROJECT TEST" : "Catalogue";
+        public string Origin => IsProjectTest ? "Project test" : "Catalogue";
 
         /// <summary>This product's identity - what a pool stores and what an assignment writes.</summary>
         public VentilationUnitReference? VentilationUnitReference => Descriptor?.VentilationUnitReference;

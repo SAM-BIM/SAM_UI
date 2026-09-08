@@ -530,6 +530,98 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
+        /// <b>And the locked box says why, on the box.</b>
+        /// <para>
+        /// This is the same dialog the ordinary Energy Simulation command opens with the field editable, so
+        /// an engineer has every reason to expect to be able to type in it - and a locked field with no
+        /// explanation reads as a defect rather than as a derived identity. The tooltip has to be marked
+        /// shown-on-disabled, or WPF never shows it at all on a disabled control, which would leave the
+        /// explanation written and invisible.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void PartO_ProjectName_SaysWhyItIsLocked()
+        {
+            SimulateControl simulateControl = new()
+            {
+                SimulateOptions = Create.SimulateOptions_PartO(Model("Flat1", Weather("LondonHeathrowDSY1")), null, null),
+            };
+
+            System.Windows.Controls.TextBox textBox_ProjectName = simulateControl.FindName("textBox_ProjectName") as System.Windows.Controls.TextBox;
+
+            Assert.NotNull(textBox_ProjectName);
+
+            //Nothing before it is locked: the ordinary dialog carries no explanation because it has nothing
+            //to explain.
+            Assert.Null(textBox_ProjectName.ToolTip);
+
+            simulateControl.LockPartOSettings();
+
+            string toolTip = textBox_ProjectName.ToolTip as string;
+
+            Assert.False(string.IsNullOrWhiteSpace(toolTip));
+
+            //It has to reach a person looking at a DISABLED box.
+            Assert.True(System.Windows.Controls.ToolTipService.GetShowOnDisabled(textBox_ProjectName));
+
+            //And it has to name the three reasons, because each is a different way an edit does damage.
+            Assert.Contains("identity", toolTip);
+            Assert.Contains(".tsd", toolTip);
+            Assert.Contains("isolated", toolTip);
+            Assert.Contains("Iteration 2B", toolTip);
+
+            //Plus where the field IS editable, so the answer is not merely "no".
+            Assert.Contains("Energy Simulation", toolTip);
+        }
+
+        /// <summary>
+        /// <b>The two routes are distinguishable.</b> The guided Part O run and the ordinary Energy
+        /// Simulation open the SAME window; until the Part O one retitled itself they were identical on
+        /// screen, so a derived, locked project name read as the ordinary dialog having broken.
+        /// </summary>
+        [WpfFact]
+        public void PartO_TheDialogSaysWhichRouteItIs()
+        {
+            SimulateWindow simulateWindow_Manual = new()
+            {
+                SimulateOptions = new SimulateOptions { ProjectName = "SomeProject" },
+            };
+
+            Assert.Equal(SimulateWindow.Title_Manual, simulateWindow_Manual.Title);
+
+            SimulateWindow simulateWindow_PartO = new()
+            {
+                SimulateOptions = Create.SimulateOptions_PartO(Model("Flat1", Weather("LondonHeathrowDSY1")), null, null),
+            };
+
+            //Untitled as Part O until the Part O path claims it - LockPartOSettings is a call, not a
+            //constructor, and that is what keeps the manual route the manual route.
+            Assert.Equal(SimulateWindow.Title_Manual, simulateWindow_PartO.Title);
+
+            simulateWindow_PartO.LockPartOSettings();
+
+            Assert.Equal(SimulateWindow.Title_PartO, simulateWindow_PartO.Title);
+            Assert.Contains("Part O", simulateWindow_PartO.Title);
+
+            //TAS, not Tas - the whole family agrees on the product's name.
+            Assert.DoesNotContain("Tas", simulateWindow_PartO.Title, System.StringComparison.Ordinal);
+
+            //AND THE TWO TITLES CLAIM ONLY WHAT THEIR ROUTE DOES. The manual one promises the conversion
+            //alone, because Modify.Simulate supports an unticked Simulate box alongside SAP or the
+            //domestic-overheating XML - a conversion and export with no simulation at all. The Part O one
+            //promises the simulation, and is entitled to: the preset ticks it and LockPartOSettings takes
+            //the box away, so a Part O run always simulates.
+            Assert.DoesNotContain("simulate", SimulateWindow.Title_Manual, System.StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("simulate", SimulateWindow.Title_PartO, System.StringComparison.OrdinalIgnoreCase);
+
+            Assert.True(simulateWindow_PartO.Simulate);
+            Assert.False((simulateWindow_PartO.FindName("simulateControl") as SimulateControl)?.FindName("checkBox_Simulate") is System.Windows.UIElement uIElement && uIElement.IsEnabled);
+
+            //Where the manual dialog leaves it: the user's, and on by default rather than promised.
+            Assert.True((simulateWindow_Manual.FindName("simulateControl") as SimulateControl)?.FindName("checkBox_Simulate") is System.Windows.UIElement uIElement_Manual && uIElement_Manual.IsEnabled);
+        }
+
+        /// <summary>
         /// <b>And the manual dialog's project name is untouched.</b> Renaming the output of an ordinary
         /// simulation is an ordinary thing to want; nothing there derives an identity from it. The lock exists
         /// only on the guided Part O path, which is what <c>LockPartOSettings</c> being a call rather than a
@@ -553,6 +645,9 @@ namespace SAM.Analytical.UI.WPF.Tests
             simulateControl.ProjectName = "RenamedByHand";
 
             Assert.Equal("RenamedByHand", simulateControl.SimulateOptions.ProjectName);
+
+            //And nothing explains a restriction that is not there.
+            Assert.Null(textBox_ProjectName.ToolTip);
         }
 
         /// <summary>
