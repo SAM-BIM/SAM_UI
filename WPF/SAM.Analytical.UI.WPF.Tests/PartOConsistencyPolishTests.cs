@@ -575,8 +575,9 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Contains("Refusals (1)", partOPreparationWindow.DiagnosticsHeader);
             Assert.Contains("Warnings (3)", partOPreparationWindow.DiagnosticsHeader);
 
-            //Grouped on screen.
+            //Grouped on screen, and the tick is on the window because it has something to do.
             Assert.True(partOPreparationWindow.IsDiagnosticsGrouped);
+            Assert.True(partOPreparationWindow.IsShowEveryLineOffered);
             Assert.False(partOPreparationWindow.ShowEveryLine);
             Assert.Contains("× 2", partOPreparationWindow.DiagnosticsText);
 
@@ -595,17 +596,70 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
-        /// Where nothing is duplicated the tick has nothing to do, and is not offered.
+        /// <b>Where nothing is duplicated the tick is not on the window at all.</b>
+        /// <para>
+        /// Hidden rather than greyed. A permanently disabled tick advertises a capability that never
+        /// arrives and leaves the engineer working out why they cannot use it - which is exactly what
+        /// happened in native acceptance, because on today's Part O warnings the collapsing is always a
+        /// no-op (see the next test). The box shows every line anyway, and Copy All is complete.
+        /// </para>
         /// </summary>
         [WpfFact]
-        public void WithNoDuplicates_TheShowEveryLineTickIsNotOffered()
+        public void WithNoDuplicates_TheShowEveryLineTickIsNotOnTheWindow()
         {
             PartOPreparationWindow partOPreparationWindow = new();
 
             partOPreparationWindow.SetDiagnostics(null, ["One warning."], null);
 
             Assert.False(partOPreparationWindow.IsDiagnosticsGrouped);
+            Assert.False(partOPreparationWindow.IsShowEveryLineOffered);
+
+            //Nothing was collapsed, so what is on screen already IS every line.
             Assert.Equal(partOPreparationWindow.DiagnosticsFullText, partOPreparationWindow.DiagnosticsText);
+            Assert.Contains("WARNING: One warning.", partOPreparationWindow.DiagnosticsText);
+        }
+
+        /// <summary>
+        /// <b>And that is the normal case for Part O, which is why the tick is hidden rather than greyed.</b>
+        ///
+        /// <para><b>Why no two Part O warnings are ever identical</b></para>
+        /// <para>
+        /// Every warning this window can receive names its space:
+        /// <c>Modify.AddPartOBaseMVHRSystem</c>'s stale-relation warning names the space and the system,
+        /// and <c>Query.ReconcileVentilationSystemDesignDuty</c>'s headroom and shortfall warnings name the
+        /// space, the direction and both airflows. So a hundred flats produce a hundred distinct lines, and
+        /// even one space's supply and extract lines differ. The two warnings below are shaped exactly like
+        /// the real ones, and the collapsing does nothing to them - by design, and asserted here rather
+        /// than assumed.
+        /// </para>
+        /// <para>
+        /// <b>Nothing is stripped to make them match.</b> That is the whole point: collapsing by anything
+        /// other than the complete raw string would mean deciding that one warning stands for another.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void RealPartOWarningsNameTheirSpace_SoTheTickNeverAppears()
+        {
+            PartOPreparationWindow partOPreparationWindow = new();
+
+            partOPreparationWindow.SetDiagnostics(
+                null,
+                [
+                    "Space 'Flat 1 Bedroom': the design supply terminals total 13 l/s against the 11 l/s Approved Document F sized, so 2 l/s of that room's airflow is design headroom above the requirement.",
+                    "Space 'Flat 2 Bedroom': the design supply terminals total 13 l/s against the 11 l/s Approved Document F sized, so 2 l/s of that room's airflow is design headroom above the requirement.",
+                ],
+                null);
+
+            Assert.Equal(2, partOPreparationWindow.WarningCount);
+            Assert.Contains("Warnings (2)", partOPreparationWindow.DiagnosticsHeader);
+
+            //Two spaces, two lines, no "× 2" and no tick.
+            Assert.False(partOPreparationWindow.IsDiagnosticsGrouped);
+            Assert.False(partOPreparationWindow.IsShowEveryLineOffered);
+            Assert.DoesNotContain("×", partOPreparationWindow.DiagnosticsText);
+
+            Assert.Contains("Flat 1 Bedroom", partOPreparationWindow.DiagnosticsText);
+            Assert.Contains("Flat 2 Bedroom", partOPreparationWindow.DiagnosticsText);
         }
 
         // =================================================================================================

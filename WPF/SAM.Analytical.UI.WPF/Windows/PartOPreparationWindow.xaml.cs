@@ -327,13 +327,30 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>
         /// Notes, warnings and refusals, refusals first - counted in the header, and shown with
-        /// character-for-character identical lines collapsed.
+        /// character-for-character identical warnings collapsed.
+        ///
+        /// <para><b>Nothing is interpreted and nothing is lost</b></para>
         /// <para>
-        /// <b>Nothing is interpreted and nothing is lost.</b> No line is parsed, classified, re-graded or
-        /// suppressed; the only aggregation is that two byte-identical lines become one line and a
-        /// <c>× 2</c>. <see cref="DiagnosticsFullText"/> - what Copy All copies, and what the "Show every
-        /// line" tick puts back on screen - is every line as produced. See
-        /// <see cref="PartODiagnosticSummary"/>.
+        /// No line is parsed, classified, re-graded or suppressed; the only aggregation is that two
+        /// byte-identical warnings become one line and a <c>× 2</c>.
+        /// <see cref="DiagnosticsFullText"/> - what Copy All copies, and what the "Show every line" tick
+        /// puts back on screen - is every line as produced. See <see cref="PartODiagnosticSummary"/>.
+        /// </para>
+        ///
+        /// <para><b>The tick is HIDDEN where nothing was collapsed, not merely disabled</b></para>
+        /// <para>
+        /// And on today's Part O warnings that is every run. Every warning this window can receive names
+        /// its space - <c>Modify.AddPartOBaseMVHRSystem</c>'s stale-relation warning names the space and
+        /// the system, and <c>Query.ReconcileVentilationSystemDesignDuty</c>'s headroom and shortfall
+        /// warnings name the space, the direction and both airflows - so no two of them are ever
+        /// character-for-character identical and the collapsing is a no-op. The counts in the header are
+        /// the part that always earns its place.
+        /// </para>
+        /// <para>
+        /// A permanently greyed tick is worse than no tick: it advertises a capability that never arrives
+        /// and leaves the engineer working out why they cannot use it. So the affordance appears only when
+        /// it has something to do - which keeps the grouping honest for any producer that does repeat a
+        /// line, without putting dead furniture on the window.
         /// </para>
         /// </summary>
         public void SetDiagnostics(IEnumerable<string> notes, IEnumerable<string> warnings, IEnumerable<string> refusals)
@@ -342,8 +359,9 @@ namespace SAM.Analytical.UI.WPF
 
             label_Diagnostics.Content = partODiagnosticSummary.Header;
 
-            //Offered only where collapsing actually removed a line. A tick that does nothing is a tick a
-            //person has to try before they can tell it does nothing.
+            //Offered only where collapsing actually removed a line - and taken off the window entirely
+            //otherwise, rather than left greyed.
+            checkBox_ShowEveryLine.Visibility = partODiagnosticSummary.IsGrouped ? Visibility.Visible : Visibility.Collapsed;
             checkBox_ShowEveryLine.IsEnabled = partODiagnosticSummary.IsGrouped;
 
             if (!partODiagnosticSummary.IsGrouped)
@@ -384,8 +402,15 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        /// <summary>Whether collapsing identical lines removed anything, and so whether the tick has work.</summary>
+        /// <summary>Whether collapsing identical warnings removed anything, and so whether the tick has work.</summary>
         internal bool IsDiagnosticsGrouped => partODiagnosticSummary.IsGrouped;
+
+        /// <summary>
+        /// Whether the "Show every line" tick is on the window at all. False - and hidden rather than
+        /// greyed - wherever no two warnings were identical, which is every run of today's Part O
+        /// warnings. Exposed so that is assertable rather than merely intended.
+        /// </summary>
+        internal bool IsShowEveryLineOffered => checkBox_ShowEveryLine.Visibility == Visibility.Visible && checkBox_ShowEveryLine.IsEnabled;
 
         private void UpdateDiagnosticsText()
         {
