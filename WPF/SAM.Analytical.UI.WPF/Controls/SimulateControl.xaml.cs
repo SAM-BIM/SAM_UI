@@ -562,6 +562,19 @@ namespace SAM.Analytical.UI.WPF
             textBox_ProjectName.IsReadOnly = true;
             textBox_ProjectName.IsEnabled = false;
 
+            //SAYS WHY, on the box itself. A locked field with no explanation reads as a defect - and this
+            //one is the same dialog the ordinary Energy Simulation command opens with the field editable,
+            //so an engineer has every reason to expect to be able to type in it. ShowOnDisabled, because
+            //the box is disabled and a tooltip on a disabled control is otherwise never shown.
+            System.Windows.Controls.ToolTipService.SetShowOnDisabled(textBox_ProjectName, true);
+
+            textBox_ProjectName.ToolTip = string.Concat(
+                "Locked on the Part O route: this is the run's identity, not a label on it.",
+                System.Environment.NewLine,
+                "Every artifact is named from it - .tbd, .tsd, .sam and the TM59 report - an isolated run carries its scope in it, and Iteration 2B reads its round number back out of it, so an edited name can overwrite a previous optimisation's evidence.",
+                System.Environment.NewLine,
+                "It is derived from the prepared model. Simulate - Energy Simulation opens this same dialog with the name editable.");
+
             //The From/To boxes follow the full-year box, and its own rule already disables them while it is
             //ticked. Asked again here rather than assumed, so this method states the whole locked state.
             EnableFullYearSimulation();

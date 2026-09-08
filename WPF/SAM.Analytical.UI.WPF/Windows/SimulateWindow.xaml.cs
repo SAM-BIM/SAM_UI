@@ -285,15 +285,32 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>The title the ordinary Energy Simulation command shows. Kept here so both are named once.</summary>
+        internal const string Title_Manual = "Convert to TAS and simulate";
+
+        /// <summary>The title the guided Part O run shows. See <see cref="LockPartOSettings"/>.</summary>
+        internal const string Title_PartO = "Part O — Convert to TAS and simulate";
+
         /// <summary>
         /// Locks the settings an Approved Document O run does not leave open - see
         /// <see cref="SimulateControl.LockPartOSettings"/> for which, and why each one.
+        ///
+        /// <para><b>And says which dialog this is</b></para>
+        /// <para>
+        /// The guided Part O run and the ordinary Energy Simulation open the SAME window, and until this
+        /// title existed they were indistinguishable - so a locked project name on the Part O one read as
+        /// the ordinary dialog having broken, rather than as a different route with a derived identity. The
+        /// title is the cheapest honest answer to "why can I not type here?", and the box's own tooltip is
+        /// the full one.
+        /// </para>
         /// <para>
         /// <b>Call it after <see cref="SimulateOptions"/> has been set</b>, not before.
         /// </para>
         /// </summary>
         public void LockPartOSettings()
         {
+            Title = Title_PartO;
+
             simulateControl.LockPartOSettings();
         }
 

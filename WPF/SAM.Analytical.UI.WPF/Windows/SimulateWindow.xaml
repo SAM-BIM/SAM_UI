@@ -6,6 +6,9 @@
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
         Title="Convert to TAS and simulate" Height="700" Width="350" ResizeMode="NoResize">
+    <!-- The guided Part O run opens THIS window and retitles it - see SimulateWindow.LockPartOSettings.
+         The two routes were previously indistinguishable, which made the Part O route's derived, locked
+         project name read as a fault in the ordinary dialog. -->
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="253*"/>
