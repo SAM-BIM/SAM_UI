@@ -6,7 +6,7 @@
         xmlns:controls="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Part O — Review iteration" Height="700" Width="1140" FontFamily="Roboto Light">
+        Title="Part O — Review iteration" Height="700" Width="1260" MinWidth="640" FontFamily="Roboto Light">
     <Window.Resources>
         <!-- An absent figure shown as an absence rather than as "NaN". Display only; see the converter. -->
         <local:PartOAirFlowConverter x:Key="Converter_AirFlow"/>
@@ -114,7 +114,16 @@
                      automatic modes, where these rows are results rather than choices. The picker's list is
                      the project's permitted pool plus this dwelling's own product where that has since left
                      the pool, so a procurement change can never make an authored assignment unpickable. -->
-                <DataGridTemplateColumn Header="Assigned product" Width="250">
+                <!-- THE ONE FLEXIBLE COLUMN. Every other column is sized for its own header, and the
+                     Status column has to be visible without scrolling - it is the one that says whether a
+                     dwelling's product will do. So the spare width goes here, where a longer product name
+                     can use it, and MinWidth keeps the picker usable when the window is made narrow.
+
+                     Fixed columns total 955px; the default 1260px window leaves this about 250px. See
+                     PartOConsistencyPolishTests.TheAssignmentRow_FitsTheDefaultWindowWidth, which fails if
+                     a column is widened past that again - which is how the unit-in-header headings pushed
+                     Status off the right edge of the old 1140px default. -->
+                <DataGridTemplateColumn Header="Assigned product" Width="*" MinWidth="250">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding SelectedProduct}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Description}"/>

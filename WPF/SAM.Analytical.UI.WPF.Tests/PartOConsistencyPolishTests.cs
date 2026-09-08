@@ -907,6 +907,88 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
+        /// <b>The whole assignment row fits the window it opens in.</b>
+        ///
+        /// <para><b>The regression this pins</b></para>
+        /// <para>
+        /// Moving the unit into each heading - <c>Design supply / l/s</c> on two lines becoming
+        /// <c>Design SUP (l/s)</c> on one - made four columns wider, and the fixed widths went from 1145px
+        /// to 1205px inside a 1140px window. The review opened horizontally scrolled with the
+        /// <c>Status</c> column, the one that says whether a dwelling's product will do, off the right
+        /// edge. A table an engineer has to scroll before it answers its own question is worse than the
+        /// two-line headings it replaced.
+        /// </para>
+        /// <para>
+        /// So: one star-sized column absorbs the slack, every other column is sized for its own header,
+        /// and the fixed total has to leave room for the star column's minimum inside the default width -
+        /// after window chrome, the grid margins and a vertical scrollbar, which is what the allowance
+        /// below stands for. Asserted arithmetically rather than by rendering, because a DataGrid will not
+        /// lay a row out offscreen.
+        /// </para>
+        /// </summary>
+        [WpfFact]
+        public void TheAssignmentRow_FitsTheDefaultWindowWidth()
+        {
+            PartOPreparationWindow partOPreparationWindow = new();
+
+            System.Windows.Controls.DataGrid dataGrid = (System.Windows.Controls.DataGrid)partOPreparationWindow.FindName("dataGrid_Equipment");
+
+            Assert.NotNull(dataGrid);
+
+            double width_Fixed = 0;
+            double width_StarMinimum = 0;
+            int count_Star = 0;
+
+            foreach (System.Windows.Controls.DataGridColumn dataGridColumn in dataGrid.Columns)
+            {
+                if (dataGridColumn.Width.IsStar)
+                {
+                    count_Star++;
+
+                    width_StarMinimum += dataGridColumn.MinWidth;
+
+                    continue;
+                }
+
+                width_Fixed += dataGridColumn.Width.DisplayValue;
+            }
+
+            //At least one column has to be flexible, or widening the window buys empty space on the right
+            //while the row still cannot fit when it is narrowed.
+            Assert.True(count_Star >= 1, "The assignment grid needs a flexible column.");
+
+            //Window chrome (two resize borders), the Grid's 10px margins and the DataGrid's own vertical
+            //scrollbar, which is present the moment there are more dwellings than rows on screen.
+            const double allowance = 16 + 20 + 17;
+
+            Assert.True(
+                width_Fixed + width_StarMinimum + allowance <= partOPreparationWindow.Width,
+                string.Format(
+                    "The assignment row needs {0}px ({1} fixed + {2} minimum for {3} flexible column(s)) plus {4}px of chrome, but the window opens at {5}px - so the Status column would open off-screen.",
+                    width_Fixed + width_StarMinimum + allowance,
+                    width_Fixed,
+                    width_StarMinimum,
+                    count_Star,
+                    allowance,
+                    partOPreparationWindow.Width));
+
+            //The space table is narrower than the assignment table and must stay so - it has no flexible
+            //column and would scroll on its own if it grew past the window.
+            System.Windows.Controls.DataGrid dataGrid_Spaces = (System.Windows.Controls.DataGrid)partOPreparationWindow.FindName("dataGrid_Spaces");
+
+            double width_Spaces = 0;
+
+            foreach (System.Windows.Controls.DataGridColumn dataGridColumn in dataGrid_Spaces.Columns)
+            {
+                width_Spaces += dataGridColumn.Width.IsStar ? dataGridColumn.MinWidth : dataGridColumn.Width.DisplayValue;
+            }
+
+            Assert.True(
+                width_Spaces + allowance <= partOPreparationWindow.Width,
+                string.Format("The space table needs {0}px but the window opens at {1}px.", width_Spaces + allowance, partOPreparationWindow.Width));
+        }
+
+        /// <summary>
         /// The Part O family says <b>TAS</b>, and the conversion dialog says what it does rather than
         /// "TBD".
         /// </summary>

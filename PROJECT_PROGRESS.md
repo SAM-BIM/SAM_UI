@@ -15,8 +15,9 @@ claims (branch names, "next step" lists) are historical rather than current.
 
 ### Current status
 
-`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, six commits, **not merged**. Working
-tree clean. `SAM`, `SAM_Systems` and `SAM_Tas` are **untouched** and clean, at the frozen SHAs above.
+`ui/part-o-consistency-polish`, PR #99 open against `sow/2026-Q3`, seven commits, **not merged**.
+Working tree clean. `SAM`, `SAM_Systems` and `SAM_Tas` are **untouched** and clean, at the frozen SHAs
+above.
 
 ```text
 15c47de  the presentation pass - the five approved areas
@@ -24,8 +25,14 @@ a37c862  the 1a / 1b catalogue readable again, and the route stated once
 2768145  "Show every line" hidden where it has nothing to do
 bf0c06b  the simulate dialog says which route it is, and why its project name is locked
 e24ae94  the stale ProjectName_Isolated note corrected
-(this)   the two remaining Codex findings
+7602573  this checkpoint, and the Part F tooltip no longer judging the space
+(this)   the assignment row fits the window it opens in
 ```
+
+CI on `7602573` was green (`build` SUCCESS, `spdx` SUCCESS). Four Codex review findings were raised and
+all four are resolved and answered on the PR: the compact 1a / 1b catalogue showing only a count, the
+Part F tooltip inferring a space type, this file not being updated, and the assignment columns not
+fitting the window.
 
 ### What this is, and the line it does not cross
 
@@ -105,6 +112,15 @@ spacing, hierarchy, disabled sections, status wording) and are explicitly not bl
   type - and would make a habitable room that `AddVent PartF` was never run over read as a deliberate
   exemption. Deliberate deviation from the brief, on the same principle as the Dwelling / Zone column's
   em dash.
+- **The assignment table has ONE flexible column and a default width that fits the row.** Moving the
+  unit into each heading widened four columns, and the fixed total went from 1145px to 1205px inside a
+  1140px window - so the review opened horizontally scrolled with `Status`, the column that says whether
+  a dwelling's product will do, off the right edge. `Assigned product` is now star-sized with a 250px
+  minimum, every other column stays sized for its own header, and the window opens at 1260px.
+  `TheAssignmentRow_FitsTheDefaultWindowWidth` asserts the arithmetic - fixed total plus the star
+  minimum plus an allowance for window chrome, the grid margins and a vertical scrollbar - so widening a
+  column past the default again fails a test rather than reaching a user. Asserted arithmetically
+  because a `DataGrid` will not lay a row out offscreen.
 - **`Query.PartOVentilationRouteText` states the route once** by reading the canonical word back through
   `Analytical.Query.PartOVentilationMode`, printing one word where the two agree - which
   `Modify.PreparePartOIteration` guarantees by refusing a disagreeing pairing - and both where they do
@@ -128,14 +144,16 @@ Review, TM59 and 2B windows, `SimulateWindow` and `SimulateControl`, `Modify/Pre
 (the header's one `string.Format`), `Query/ProjectName_Isolated.cs` (comment only), the four row classes,
 and `PartOWorkflowScenario` / `PartOVentilationStrategyOption` in `SAM_UI/SAM.Analytical.UI`.
 
-Tests: `PartOConsistencyPolishTests.cs` (new, 34 tests), plus `PartOPresentationTests.cs`,
+Also `PROJECT_PROGRESS.md`, which `AGENTS.md` requires and which this pass initially failed to update.
+
+Tests: `PartOConsistencyPolishTests.cs` (new, 35 tests), plus `PartOPresentationTests.cs`,
 `PartOProjectTestProductTests.cs` and `PartOSimulateDefaultsTests.cs` updated/extended.
 
 ### Validation performed
 
 ```text
 SAM_UI.sln Release                               0 errors
-SAM.Analytical.UI.WPF.Tests                       807 / 807   (frozen baseline 771 / 771)
+SAM.Analytical.UI.WPF.Tests                       808 / 808   (frozen baseline 771 / 771)
 working tree (SAM_UI)                            clean
 working trees (SAM, SAM_Systems, SAM_Tas)        clean, untouched
 ```
