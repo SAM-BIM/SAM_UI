@@ -360,7 +360,7 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            if (!partORun.Prepare(analyticalModel_Prepared, partOIterationPreparation.OverheatingScenarios, partOPreparationContext, partOIterationPreparation.Refusal))
+            if (!AdoptPartOPreparation(partORun, analyticalModel_Prepared, partOIterationPreparation, partOPreparationContext))
             {
                 MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason));
 
@@ -373,6 +373,26 @@ namespace SAM.Analytical.UI.WPF
             uIAnalyticalModel!.SetJSAMObject(analyticalModel_Prepared, new FullModification());
 
             return partORun.State == PartORunState.Prepared;
+        }
+
+        /// <summary>
+        /// Adopts an accepted preparation into the run - over the dialog's own prepared model, which is
+        /// rebuilt after an equipment edit and so is not always the preparation's - <b>with the identities of
+        /// the ventilation systems the preparation built</b>.
+        /// <para>
+        /// Those identities are the Iteration 3 system scope (SAM #114), and this is the only moment they are
+        /// known: see <see cref="PartORun.Guids_VentilationSystem_Prepared"/>. Adopting without them leaves a
+        /// run that simulates and assesses normally and can never start Iteration 3.
+        /// </para>
+        /// </summary>
+        internal static bool AdoptPartOPreparation(PartORun partORun, AnalyticalModel analyticalModel_Prepared, PartOIterationPreparation partOIterationPreparation, PartOPreparationContext partOPreparationContext)
+        {
+            return partORun.Prepare(
+                analyticalModel_Prepared,
+                partOIterationPreparation.OverheatingScenarios,
+                partOPreparationContext,
+                PartORun.Guids_VentilationSystem(partOIterationPreparation),
+                partOIterationPreparation.Refusal);
         }
 
         /// <summary>

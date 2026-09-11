@@ -1,0 +1,113 @@
+﻿<Window x:Class="SAM.Analytical.UI.WPF.PartOIteration3ResultWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
+        mc:Ignorable="d"
+        Title="Part O — Iteration 3 (A/B) — explicit TAS Systems ventilation" Height="820" Width="1400" FontFamily="Roboto Light">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="170"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="120"/>
+            <RowDefinition Height="30"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="textBlock_Outcome" Grid.Row="0" TextWrapping="Wrap" FontWeight="Bold" Margin="0,0,0,4"/>
+        <TextBlock x:Name="textBlock_Summary" Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#555555"/>
+
+        <!-- Shown only on a refusal. It states the stage that refused and the reasons VERBATIM, and it is
+             also what the hidden comparison rows below are replaced by: a refused pairing presents no
+             Candidate B numbers at all. -->
+        <TextBlock x:Name="textBlock_Refusal" Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="Firebrick" Visibility="Collapsed"/>
+
+        <Label Grid.Row="3" Content="Stages" Padding="0,0,0,2" FontWeight="Bold"/>
+        <DataGrid x:Name="dataGrid_Stage" Grid.Row="4" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="False" HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal" FontSize="11"
+                  EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Stage" Binding="{Binding Name}" Width="160"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="90"/>
+                <DataGridTextColumn Header="Detail" Binding="{Binding Detail}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- The comparison summary. Hidden outright on a refusal, together with the grid: a pooled bias
+             over rooms that were never produced would be the most convincing wrong number in the window. -->
+        <StackPanel x:Name="stackPanel_Comparison" Grid.Row="5" Margin="0,10,0,0">
+            <TextBlock x:Name="textBlock_Comparison" TextWrapping="Wrap" FontWeight="Bold"/>
+            <TextBlock x:Name="textBlock_Dwellings" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="#555555"/>
+        </StackPanel>
+
+        <StackPanel x:Name="stackPanel_Filters" Grid.Row="6" Orientation="Horizontal" Margin="0,8,0,4">
+            <TextBlock Text="Search" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="textBox_Search" Width="240" Height="22" VerticalContentAlignment="Center" TextChanged="textBox_Search_TextChanged"/>
+            <CheckBox x:Name="checkBox_Changed" Content="Changed verdicts only" VerticalAlignment="Center" Margin="14,0,0,0" Checked="Filter_Changed" Unchecked="Filter_Changed"/>
+            <CheckBox x:Name="checkBox_Failures" Content="Failures only" VerticalAlignment="Center" Margin="14,0,0,0" Checked="Filter_Changed" Unchecked="Filter_Changed"/>
+            <TextBlock x:Name="textBlock_RowCount" VerticalAlignment="Center" Margin="14,0,0,0" Foreground="#555555"/>
+        </StackPanel>
+
+        <!-- Virtualised and recycling, because a block of 5 000 dwellings is 15 000 rows and realising
+             them all would allocate tens of thousands of visual elements before the window appeared.
+             Grouped by dwelling through a CollectionView, which virtualises with the grid. -->
+        <DataGrid x:Name="dataGrid_Comparison" Grid.Row="7" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="True" HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal" FontSize="11"
+                  EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Item"
+                  ScrollViewer.CanContentScroll="True">
+            <DataGrid.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock FontWeight="Bold" Margin="2,6,0,2">
+                                <Run Text="{Binding Name, Mode=OneWay}"/>
+                                <Run Text=" — "/>
+                                <Run Text="{Binding ItemCount, Mode=OneWay}"/>
+                                <Run Text=" row(s)"/>
+                            </TextBlock>
+                        </DataTemplate>
+                    </GroupStyle.HeaderTemplate>
+                </GroupStyle>
+            </DataGrid.GroupStyle>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Dwelling" Binding="{Binding Dwelling}" Width="110"/>
+                <DataGridTextColumn Header="Space" Binding="{Binding Space}" Width="130"/>
+                <DataGridTextColumn Header="TM59 criterion" Binding="{Binding Criterion}" Width="170"/>
+                <DataGridTextColumn Header="A actual" Binding="{Binding Actual_A, TargetNullValue=—}" Width="70"/>
+                <DataGridTextColumn Header="A limit" Binding="{Binding Limit_A, TargetNullValue=—}" Width="65"/>
+                <DataGridTextColumn Header="A" Binding="{Binding Status_A}" Width="70"/>
+                <DataGridTextColumn Header="B actual" Binding="{Binding Actual_B, TargetNullValue=—}" Width="70"/>
+                <DataGridTextColumn Header="B limit" Binding="{Binding Limit_B, TargetNullValue=—}" Width="65"/>
+                <DataGridTextColumn Header="B" Binding="{Binding Status_B}" Width="70"/>
+                <DataGridTextColumn Header="Δ actual" Binding="{Binding Delta_Actual, TargetNullValue=—}" Width="70"/>
+                <DataGridTextColumn Header="Hours" Binding="{Binding Count}" Width="60"/>
+                <DataGridTextColumn Header="Mean A (°C)" Binding="{Binding Mean_A, StringFormat={}{0:0.###}}" Width="90"/>
+                <DataGridTextColumn Header="Mean B (°C)" Binding="{Binding Mean_B, StringFormat={}{0:0.###}}" Width="90"/>
+                <DataGridTextColumn Header="Bias B−A (K)" Binding="{Binding MeanBias, StringFormat={}{0:0.###}}" Width="95"/>
+                <DataGridTextColumn Header="RMSE (K)" Binding="{Binding RootMeanSquareError, StringFormat={}{0:0.###}}" Width="80"/>
+                <DataGridTextColumn Header="Max |B−A| (K)" Binding="{Binding MaximumAbsoluteDifference, StringFormat={}{0:0.###}}" Width="100"/>
+                <DataGridTextColumn Header="at hour" Binding="{Binding Hour_MaximumAbsoluteDifference}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Label x:Name="label_Diagnostics" Grid.Row="8" Content="Notes" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
+        <TextBox x:Name="textBox_Diagnostics" Grid.Row="9" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
+
+        <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,6,0,4">
+            <Button x:Name="button_ReportA" Width="140" Height="20" Margin="0,0,8,0" Click="button_ReportA_Click" ToolTipService.ShowOnDisabled="True">TM59 report (A)</Button>
+            <Button x:Name="button_ReportB" Width="140" Height="20" Margin="0,0,8,0" Click="button_ReportB_Click" ToolTipService.ShowOnDisabled="True">TM59 report (B)</Button>
+            <Button x:Name="button_OpenFolder" Width="100" Height="20" Click="button_OpenFolder_Click" ToolTipService.ShowOnDisabled="True">Open Folder</Button>
+        </StackPanel>
+
+        <Button x:Name="button_CopyAll" Grid.Row="10" Width="70" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
+        <Button x:Name="button_Close" IsCancel="True" Grid.Row="10" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Close_Click">Close</Button>
+    </Grid>
+</Window>

@@ -190,8 +190,13 @@
                         ToolTipService.ShowOnDisabled="True">Prepare &amp; Run</Button>
                 <Button x:Name="button_Review" Width="120" Height="24" Margin="0,0,8,0" IsEnabled="False" Click="button_Review_Click"
                         ToolTipService.ShowOnDisabled="True">Review Results</Button>
-                <Button x:Name="button_Optimise" Width="120" Height="24" IsEnabled="False" Click="button_Optimise_Click"
+                <Button x:Name="button_Optimise" Width="120" Height="24" Margin="0,0,8,0" IsEnabled="False" Click="button_Optimise_Click"
                         ToolTipService.ShowOnDisabled="True">Optimise (2B)</Button>
+                <!-- ONE action, not two. Whether it runs a Candidate B or reopens the pairing this run
+                     already produced is decided by Query.PartOIteration3Eligibility, and the content and
+                     the tooltip say which - two greyed buttons would make a person work that out. -->
+                <Button x:Name="button_Iteration3" Width="130" Height="24" IsEnabled="False" Click="button_Iteration3_Click"
+                        ToolTipService.ShowOnDisabled="True">Iteration 3 (A/B)</Button>
             </StackPanel>
             <Button x:Name="button_Close" IsCancel="True" Width="70" Height="24" HorizontalAlignment="Right" Click="button_Close_Click">Close</Button>
         </Grid>

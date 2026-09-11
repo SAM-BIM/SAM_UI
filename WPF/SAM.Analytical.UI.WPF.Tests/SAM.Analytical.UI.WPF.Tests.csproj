@@ -40,6 +40,24 @@
          that actually depends on Modify.RestampSimulationZoneIdentity - and asserts which identity comes out
          of it. Convert.ToTM59 / Convert.ToXml / Building / Zone are XML writers over analytical objects, so
          this stays as COM-free as the reference above. -->
+    <!-- The Approved Document O Iteration 3 tests drive the real orchestration over REAL SAM_Systems and
+         SAM_Tas result types - a materialisation, a ventilation route, a thermal source, a set of
+         resultant temperatures - rather than over stand-ins for them. A hand-written stand-in would let
+         PR4 be tested against PR4's idea of PR1/PR2/PR3, which is exactly the disagreement the
+         reconciliation exists to catch. Every one of those types is free of TAS COM types and publicly
+         constructible, so nothing here needs an installed TAS. -->
+    <Reference Include="SAM.Analytical.Systems">
+      <HintPath>..\..\..\SAM_Systems\build\SAM.Analytical.Systems.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.Systems">
+      <HintPath>..\..\..\SAM_Systems\build\SAM.Core.Systems.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Analytical.Tas.TPD">
+      <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.TPD.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.Tas">
+      <HintPath>..\..\..\SAM_Tas\build\SAM.Core.Tas.dll</HintPath>
+    </Reference>
     <Reference Include="SAM.Analytical.Tas.TM59">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.TM59.dll</HintPath>
     </Reference>
