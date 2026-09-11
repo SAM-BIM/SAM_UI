@@ -1,8 +1,9 @@
 # Project Progress
 
 ## Branch
-`sow/2026-Q3`. PR #99 (`ui/part-o-consistency-polish`) - a **presentation-only** polish pass over the
-Part O UI family - is **merged**. See the *Latest* entry immediately below.
+`sow/2026-Q3`. The Approved Document O **Iteration 3 (A/B) foundation** is the current work - see the
+*Latest* entry immediately below. PR #99 (`ui/part-o-consistency-polish`), a presentation-only polish
+pass over the Part O UI family, is merged and is the entry beneath it.
 
 PR #98 (`feature/parto-equipment-selection-ux`) is merged and the Approved Document O iteration
 programme is **FROZEN** - see `PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN` below, which remains the
@@ -11,7 +12,88 @@ authority for the engineering state.
 Everything below the *Latest* entry is superseded history retained for context, and its forward-looking
 claims (branch names, "next step" lists) are historical rather than current.
 
-## LATEST - PART O UI CONSISTENCY POLISH, PRESENTATION ONLY (2026-09-08)
+## LATEST - PART O ITERATION 3 (A/B) FOUNDATION - PR4 (2026-09-11)
+
+### Current status
+
+Branch `feature/part-o-iteration3-orchestration`, open against `sow/2026-Q3`. SAM-BIM/SAM#111 PR4:
+`SAM_UI` orchestrates the Iteration 3 A/B pairing and presents and persists the evidence. **SAM,
+SAM_Systems and SAM_Tas carry no production change** and were verified clean at `413215cc`,
+`89cf1399` and `1d62f380` (which includes #52, the yearly-profile alignment fix; SAM_Tas was rebuilt
+from that source before SAM_UI, so no stale HintPath DLL could reintroduce the one-hour shift).
+
+Validation: Release build 0 errors; `SAM.Analytical.UI.WPF.Tests` **949/949** (810 baseline unchanged
++ 139 new). Licensed TAS acceptance run on the canonical fixture - see
+`Documentation/evidence/PR4-ITERATION3-FOUNDATION.md` and `PR4-comparison.tsv`.
+
+### What it is
+
+SAM_UI sequences four existing authorities and holds none of its own. SAM keeps the analytical design
+and **TM59**; SAM_Systems the materialisation; SAM_Tas the no-IZAM source, the TPD conversion, the
+Systems simulation and the `IResultantTemperatureProvider`. SAM_UI decides sequencing, scope, identity
+and presentation, and computes **descriptive** A/B statistics with no parity threshold anywhere.
+
+Fourteen ordered stages. The ledger - not the caller - enforces the pipeline rule: a refusal fixes the
+stage and rejects every later completion, so a refused pairing has no comparison object at all and the
+window shows no Candidate B number anywhere.
+
+### SAM #114, resolved by identity in the caller
+
+`PartORun` captures `PartOIterationPreparation.VentilationSystems`' identities at the moment the run
+adopts the preparation - the only moment the answer is known - and clears them on reset, invalidate and
+restore. The scope keeps exactly those, drops an authored system carrying no effective mechanical duty
+from a **copy** of the cluster with an evidence note, and refuses one that does. The design is never
+rewritten and no NV, UV, opening or infiltration leaves the thermal model.
+
+The comparability gate PR4 adds is both halves: the scope refuses an unrelated system with duty on
+**any** thermally participating room (the no-IZAM sweep is model-wide, and an unassessed room is
+thermally coupled to the assessed ones), and the reconciliation refuses a retained system's duty
+Candidate B did not reinstate. On the canonical fixture the three MVHR systems are retained and `NV`,
+`UV` and `MV` are each excluded with the recorded reason that they carry no design ventilation terminal.
+
+### Licensed acceptance - what passed
+
+Canonical fixture SHA-256 verified. Three physical MVHR air systems, eight served rooms, `Corridor_1`
+not bound, fourteen directed legs (3 supply / 6 extract / 5 transfer), **maximum airflow delta 0 l/s**
+against the prepared design's own terminals, 8 x 8760 finite `ZoneTemperature`, 8 x 8760 finite
+`ResultantTemperature`, and the provider's series **identical to what TM59 read back from the same
+file over 70 080 values**. Both cases through the same unchanged TM59 path: **A PASS, B PASS**, 0 of 8
+criterion outcomes differ. Pooled bias +0.373 K, RMSE 0.834 K, max 2.909 K.
+
+The planned refusal (a locked bridge file) refused at exactly `ResultantTemperature`, left every later
+stage `NOT RUN`, presented no Candidate B number, reported **only** the files that attempt wrote - the
+previous attempt's 16 MB bridge TSD sitting at the same fixed path was correctly not claimed - and had
+already deleted the previous Candidate B `.sam`. Rerunning after removing the lock reproduced the
+statistics bit-identically and the comparison TSV byte-identically.
+
+Reopening the pairing started **no TAS process** and changed **no TAS artifact's** length or write
+time; touching the bridge TSD made the review refuse **by name** with no comparison.
+
+### The one gate that could not be demonstrated, and why it is not this PR's
+
+`SimulationResultProvenance.Fingerprint(AnalyticalModel)` is **not stable across a `.sam` save and
+reload** for a model the TAS workflow returned, so `PartORun.Restore` refuses a persisted Part O run on
+this fixture. Isolated three ways: the raw fixture round-trips stably; it reproduces with no Iteration 3
+anywhere near it; and **it reproduces on the untouched baseline build at `af7535db`**, which contains no
+Iteration 3 code. It blocks the pre-existing "reopen a saved run and Review Results" feature
+independently of this PR, and it surfaces once more on PR4's own side when the review reloads Candidate
+B's model - where it refuses correctly, by name, and fail-closed.
+
+**Follow-up, in the SAM repository and outside PR4:** make that fingerprint stable for a model carrying
+TAS result series, or exclude those series from it. One change fixes both reviews.
+
+### Programme state
+
+```text
+PR1 MERGED   PR2 MERGED   PR3 MERGED   #52 MERGED   PR4 this branch
+```
+
+SAM #111 stays **open** for PR5 manufacturer-aware behaviour. SAM #114's production resolution is
+implemented and demonstrated; record and close it only after this PR is reviewed and merged.
+
+---
+
+## PART O UI CONSISTENCY POLISH, PRESENTATION ONLY (2026-09-08)
 
 ### Current status
 
