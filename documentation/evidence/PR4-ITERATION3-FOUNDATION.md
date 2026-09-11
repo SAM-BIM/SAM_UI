@@ -270,6 +270,40 @@ reaches one.
 stable for a model carrying TAS result series, or exclude those series from it. This blocks reopen for
 both the existing Part O review and Iteration 3, and both are fixed by the same change.
 
+#### 5.6.1 Closeout (2026-09-11) — the follow-up landed, and the gate now demonstrates
+
+SAM-BIM/SAM#116 fixed the two root causes recorded above: `GroundTemperature.FromJsonObject` reading an
+absent (`NaN` / "not stated") field back as a stated `0`, and SAM_UI's own presentation-only "UI Geometry
+Settings" parameter not being excluded from the fingerprint. Merged into `sow/2026-Q3` at merge commit
+`553957dc61db876926a5599154770d7aa22f959f` (reviewed head `d43a4ff92f7ce2996175a5ab2939f4078e34daab`,
+`SAM.Tests` 2120/2120).
+
+SAM_UI was rebuilt against the merged SAM (`SAM_Systems` at `89cf1399`, `SAM_Tas` at `1d62f380`,
+unchanged): `SAM.Analytical.UI.WPF.Tests` **961/961**, Release build 0 errors. The gate this section
+recorded as undemonstrable was then run for real, on the same licensed pairing at `C:\TasOut\pr5a`,
+against the rebuilt application:
+
+- opening the saved Reference A `.sam` restored the Part O run with no provenance refusal
+  (`Simulation: READY - Reopened from this model's own saved run`);
+- `Review It. 3 (A/B)` completed: Reference A Pass, Candidate B Pass, 0 of 8 TM59 criterion outcomes
+  differ, bias 0.373 K, RMSE 0.834 K, max 2.909 K in `Ensuite_8` — matching the recorded engineering
+  numbers;
+- the process was then killed and relaunched from the same `.sam`, and Review was run again: same run
+  restored, same statistics, byte-for-byte;
+- both runs were polled every 250 ms for TAS-family processes throughout — only `TSD` (the result
+  reader) ever appeared, never `TBD`/`TPD`/`TAS3D`, confirming no simulation reran either time;
+- file timestamps on `C:\TasOut\pr5a` confirm the comparison-defining artifacts (both `.tsd`, both
+  `.tbd`, the Candidate B `.sam`, the `Iteration3.json` pairing record) were untouched by either Review,
+  while the two TM59 `.txt` reports were freshly rewritten by each — the Codex P1 lineage exclusion
+  working exactly as designed.
+
+One immaterial discrepancy: this rerun's comparison names the max-delta hour as `5299`; the number
+originally recorded in §5.6's sibling acceptance note (2026-09-11, pre-#116) said `5491`. Bias, RMSE and
+the max magnitude itself (2.909 K) are identical between the two, and the two close/reopen runs in this
+closeout agree with each other exactly — so this reads as which one of two equally-maximal hours is
+reported first (dictionary/enumeration order), not a change in the underlying series. Recorded rather
+than quietly corrected.
+
 ---
 
 ## 6. Persistence, lineage and stale-result protection

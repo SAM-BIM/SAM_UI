@@ -82,14 +82,32 @@ B's model - where it refuses correctly, by name, and fail-closed.
 **Follow-up, in the SAM repository and outside PR4:** make that fingerprint stable for a model carrying
 TAS result series, or exclude those series from it. One change fixes both reviews.
 
+### Closeout (2026-09-11) — SAM #116 landed, the gate now demonstrates
+
+SAM-BIM/SAM#116 fixed both root causes above (`GroundTemperature` NaN/"not stated" round trip; SAM_UI's
+own "UI Geometry Settings" excluded from the fingerprint beside `CaseDescription`), reviewed at head
+`d43a4ff92f7ce2996175a5ab2939f4078e34daab` (`SAM.Tests` 2120/2120), merged into `sow/2026-Q3` at
+`553957dc61db876926a5599154770d7aa22f959f`.
+
+SAM_UI rebuilt against the merged SAM (`SAM_Systems` `89cf1399`, `SAM_Tas` `1d62f380`, both unchanged):
+`SAM.Analytical.UI.WPF.Tests` **961/961**, Release build 0 errors, `SAM Analytical.deps.json` confirmed
+to carry `SAM.Analytical.Tas.TPD`. The previously-undemonstrable gate was then run for real against the
+rebuilt app on the existing `C:\TasOut\pr5a` pairing: Reference A reopened with no provenance refusal,
+`Review It. 3 (A/B)` completed (A Pass, B Pass, 0/8 differ, bias 0.373 K, RMSE 0.834 K, max 2.909 K), and
+repeated identically after killing and relaunching the process from the same `.sam`. Both runs were
+polled continuously for TAS-family processes — only `TSD` readers ever appeared — and the
+comparison-defining artifacts' file timestamps were unchanged by either Review while both TM59 `.txt`
+reports were freshly rewritten each time, exactly as designed. Full detail:
+`Documentation/evidence/PR4-ITERATION3-FOUNDATION.md` §5.6.1.
+
 ### Programme state
 
 ```text
-PR1 MERGED   PR2 MERGED   PR3 MERGED   #52 MERGED   PR4 this branch
+PR1 MERGED   PR2 MERGED   PR3 MERGED   #52 MERGED   #116 MERGED   PR4 this branch, ready to merge
 ```
 
 SAM #111 stays **open** for PR5 manufacturer-aware behaviour. SAM #114's production resolution is
-implemented and demonstrated; record and close it only after this PR is reviewed and merged.
+implemented and demonstrated on the canonical fixture above; close it once this PR merges.
 
 ---
 
