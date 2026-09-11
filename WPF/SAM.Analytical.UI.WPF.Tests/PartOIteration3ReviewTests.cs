@@ -622,5 +622,276 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Null(partOIteration3Result.Path_TM59Report_ReferenceA);
             Assert.Null(partOIteration3Result.Path_TM59Report_CandidateB);
         }
+
+        //-------------------------------------------------------------------------------------------------
+        //The persisted A/B review report
+        //-------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// A successful pairing writes its whole review beside the pairing record, in both forms, and the
+        /// result names what it wrote.
+        /// </summary>
+        [Fact]
+        public void A_completed_run_writes_its_A_B_review_report()
+        {
+            Run(out PartOIteration3Result partOIteration3Result, out List<Guid> _);
+
+            string path_Report = Path.Combine(directory, "Flat-Iteration3-Review.txt");
+            string path_Report_Json = Path.Combine(directory, "Flat-Iteration3-Review.json");
+
+            Assert.Equal(path_Report, partOIteration3Result.Path_Report);
+            Assert.Equal(path_Report_Json, partOIteration3Result.Path_Report_Json);
+            Assert.Null(partOIteration3Result.Refusal_Report);
+
+            Assert.True(File.Exists(path_Report));
+            Assert.True(File.Exists(path_Report_Json));
+        }
+
+        /// <summary>
+        /// The report has to answer "which A/B pairing is this, of which design state?" on its own, away
+        /// from the session and the model that produced it.
+        /// </summary>
+        [Fact]
+        public void The_report_records_the_pairing_identity_and_provenance()
+        {
+            Run(out PartOIteration3Result partOIteration3Result, out List<Guid> guids_Bound);
+
+            string text = File.ReadAllText(partOIteration3Result.Path_Report);
+
+            PartOIteration3Record partOIteration3Record = partOIteration3Result.Record;
+
+            Assert.Contains("PAIRING PROVENANCE", text);
+            Assert.Contains(PartOIteration3ReportText.CurrentSchema, text);
+            Assert.Contains(partOIteration3Record.Guid_Run.ToString(), text);
+            Assert.Contains(partOIteration3Record.ProjectName_ReferenceA, text);
+            Assert.Contains(partOIteration3Record.ProjectName_CandidateB, text);
+            Assert.Contains(partOIteration3Record.Path_TSD_ReferenceA, text);
+            Assert.Contains(partOIteration3Record.Fingerprint_Model_ReferenceA, text);
+            Assert.Contains(partOIteration3Record.Fingerprint_Scenarios_ReferenceA, text);
+            Assert.Contains(partOIteration3Record.Fingerprint_Scenario, text);
+            Assert.Contains(partOIteration3Result.Path_Record, text);
+
+            //Every bound room, by identity, so the report names the rooms it compared.
+            foreach (Guid guid in guids_Bound)
+            {
+                Assert.Contains(guid.ToString(), text);
+            }
+
+            //Both the pooled and the per-room statistics an engineer read on screen.
+            Assert.Contains("room(s), ", text);
+            Assert.Contains("Dwelling\tSpace\tTM59 criterion", text);
+
+            //And the structured sibling embeds the record whole rather than re-spelling it.
+            System.Text.Json.Nodes.JsonObject jsonObject = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(partOIteration3Result.Path_Report_Json)) as System.Text.Json.Nodes.JsonObject;
+
+            Assert.NotNull(jsonObject);
+            Assert.Equal(PartOIteration3ReportText.CurrentSchema, (string)jsonObject["Schema"]);
+            Assert.NotNull(jsonObject["Record"]);
+            Assert.NotNull(jsonObject["Comparison"]);
+            Assert.Equal(
+                partOIteration3Record.Guid_Run,
+                PartOIteration3Record.FromJsonObject(jsonObject["Record"] as System.Text.Json.Nodes.JsonObject).Guid_Run);
+        }
+
+        /// <summary>
+        /// The report survives the session that wrote it: a later review of the same unchanged pairing
+        /// finds it, rewrites it, and a second review of that same pairing produces the same bytes.
+        /// </summary>
+        [Fact]
+        public void The_report_survives_reopening_and_is_deterministic()
+        {
+            PartORun partORun = Run(out PartOIteration3Result partOIteration3Result_Run, out List<Guid> _);
+
+            string path_Report = partOIteration3Result_Run.Path_Report;
+
+            string text_Run = File.ReadAllText(path_Report);
+
+            int count = 0;
+
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, new PartOIteration3PipelineReviewOnly
+            {
+                Func_Assess = guids => Assessment(guids, ++count == 1 ? 20.0 : 21.0),
+            });
+
+            Assert.True(partOIteration3Result.IsComplete);
+            Assert.Equal(path_Report, partOIteration3Result.Path_Report);
+            Assert.True(File.Exists(path_Report));
+
+            string text_Review = File.ReadAllText(path_Report);
+
+            //A review states its own provenance - that it IS a review, and which reports it wrote - so it
+            //is not byte-identical to the run's. What it must be is reproducible, which is what a second
+            //review of the same unchanged pairing proves.
+            count = 0;
+
+            PartOIteration3Result partOIteration3Result_Again = Modify.ReviewPartOIteration3(partORun, new PartOIteration3PipelineReviewOnly
+            {
+                Func_Assess = guids => Assessment(guids, ++count == 1 ? 20.0 : 21.0),
+            });
+
+            Assert.True(partOIteration3Result_Again.IsComplete);
+            Assert.Equal(text_Review, File.ReadAllText(path_Report));
+
+            //And every version names the same pairing.
+            Assert.Contains(partOIteration3Result_Run.Record.Guid_Run.ToString(), text_Run);
+            Assert.Contains(partOIteration3Result_Run.Record.Guid_Run.ToString(), text_Review);
+        }
+
+        /// <summary>
+        /// <b>The rule this whole feature turns on.</b> Once Reference A's design state moves, Review
+        /// correctly refuses - and the report that described the successful pairing is left exactly where
+        /// it is. A refusal that overwrote it would replace the only durable evidence of a real A/B
+        /// comparison with a record of a refusal.
+        /// </summary>
+        [Fact]
+        public void A_refused_review_neither_writes_nor_overwrites_the_last_successful_report()
+        {
+            PartORun partORun = Run(out PartOIteration3Result partOIteration3Result_Run, out List<Guid> guids_Bound);
+
+            string path_Report = partOIteration3Result_Run.Path_Report;
+            string path_Report_Json = partOIteration3Result_Run.Path_Report_Json;
+
+            string text = File.ReadAllText(path_Report);
+            string text_Json = File.ReadAllText(path_Report_Json);
+
+            long ticks = File.GetLastWriteTimeUtc(path_Report).Ticks;
+
+            //The design state the record copied no longer describes the model in front of us.
+            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+
+            PartOIteration3Record partOIteration3Record = Query.PartOIteration3PairingRecord(path_Record);
+
+            File.WriteAllText(path_Record, partOIteration3Record.ToString().Replace(partOIteration3Record.Fingerprint_Model_ReferenceA, "0000000000000000"));
+
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, ReviewPipeline(guids_Bound));
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("design state has changed"));
+
+            //The refused review claims no report of its own...
+            Assert.Null(partOIteration3Result.Path_Report);
+            Assert.Null(partOIteration3Result.Path_Report_Json);
+            Assert.Null(partOIteration3Result.Refusal_Report);
+
+            //...and the successful one is untouched, byte for byte.
+            Assert.Equal(text, File.ReadAllText(path_Report));
+            Assert.Equal(text_Json, File.ReadAllText(path_Report_Json));
+            Assert.Equal(ticks, File.GetLastWriteTimeUtc(path_Report).Ticks);
+
+            //It is still reachable as history, at the path the window derives from the pairing record.
+            Assert.Equal(path_Report, PartOIteration3Paths.Path_Report_ForRecord(partOIteration3Result.Path_Record));
+        }
+
+        /// <summary>
+        /// A pairing that refused on its own run writes no report at all - there is no comparison to
+        /// persist, and a file named "review report" holding nothing but a refusal is exactly the artifact
+        /// this design exists to prevent.
+        /// </summary>
+        [Fact]
+        public void A_refused_run_writes_no_report()
+        {
+            adjacencyCluster = PartOIteration3Fixture.Design(out guids_VentilationSystem, out zones);
+
+            guids_Space_Dwelling = [];
+            foreach (Zone zone in zones)
+            {
+                foreach (Space space in PartOIteration3Fixture.Spaces(adjacencyCluster, zone))
+                {
+                    guids_Space_Dwelling.Add(space.Guid);
+                }
+            }
+
+            PartORun partORun = new();
+
+            partORun.Prepare(
+                PartOIteration3Fixture.Model(adjacencyCluster),
+                PartOIteration3Fixture.Scenarios(),
+                new PartOPreparationContext(PartOIteration.BasePassive, zones, null, null),
+                guids_VentilationSystem);
+
+            string path_TSD = Path.Combine(directory, "Flat.tsd");
+
+            partORun.ExpectResults(path_TSD);
+
+            File.WriteAllText(path_TSD, "reference A results");
+
+            AnalyticalModel analyticalModel_Workflow = PartOIteration3Fixture.Model(new AdjacencyCluster(adjacencyCluster), "Flat");
+
+            analyticalModel_Workflow.SetValue(Analytical.AnalyticalModelParameter.OverheatingScenarios, new Core.SAMCollection<OverheatingScenario>(partORun.OverheatingScenarios));
+            analyticalModel_Workflow.SetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, new SimulationResultProvenance(analyticalModel_Workflow, path_TSD));
+
+            partORun.Complete(analyticalModel_Workflow, path_TSD, PartOIteration3Fixture.SimulationContext(directory), out string _);
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, new PartOIteration3PipelineFake
+            {
+                Materialisation = new MechanicalVentilationMaterialisation(null, ["The topology template could not be resolved."], null, null),
+                Assessment_ReferenceA = Assessment(guids_Space_Dwelling, 20.0),
+            });
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Null(partOIteration3Result.Path_Report);
+            Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3-Review.txt")));
+            Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3-Review.json")));
+        }
+
+        /// <summary>
+        /// A later save that fails part way through - here, because another handle has the .json sibling
+        /// open exclusively, the same symptom a locked or permission-denied file produces - must leave the
+        /// pairing exactly as the earlier successful save left it: not just "a report still exists", but
+        /// the <b>same bytes</b> on <b>both</b> siblings, never one replaced by this attempt's (different)
+        /// content while the other is left from the earlier one.
+        /// <para>
+        /// The second review is given different Reference A/Candidate B temperatures than the run used, so
+        /// its report would be textually different from the run's if it were written - which is what makes
+        /// this test able to tell "overwritten" apart from "untouched". A writer that composed straight
+        /// onto <c>path_Report</c> before attempting <c>path_Report_Json</c> would let this review's
+        /// content land on the first file while the run's content is still on the second - passing a
+        /// "some report still exists" check while failing this one.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void A_locked_destination_leaves_both_siblings_of_the_earlier_successful_report_untouched()
+        {
+            PartORun partORun = Run(out PartOIteration3Result partOIteration3Result_Run, out List<Guid> _);
+
+            string path_Report = partOIteration3Result_Run.Path_Report;
+            string path_Report_Json = partOIteration3Result_Run.Path_Report_Json;
+
+            string text = File.ReadAllText(path_Report);
+            string text_Json = File.ReadAllText(path_Report_Json);
+
+            PartOIteration3Result partOIteration3Result_Review;
+
+            //FileShare.None reproduces, from this same process, exactly what a locked or permission-denied
+            //file looks like to the writer: neither a rename nor a delete of this path can go through while
+            //the handle is open.
+            using (new FileStream(path_Report_Json, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                int count = 0;
+
+                partOIteration3Result_Review = Modify.ReviewPartOIteration3(partORun, new PartOIteration3PipelineReviewOnly
+                {
+                    Func_Assess = guids => Assessment(guids, ++count == 1 ? 20.0 : 25.0),
+                });
+
+                Assert.True(partOIteration3Result_Review.IsComplete);
+
+                //The review itself is genuine - it is only the save that could not complete.
+                Assert.Null(partOIteration3Result_Review.Path_Report);
+                Assert.Null(partOIteration3Result_Review.Path_Report_Json);
+                Assert.NotNull(partOIteration3Result_Review.Refusal_Report);
+            }
+
+            //Both siblings the run wrote are exactly as the run left them - not one of them replaced by
+            //this review's (different) numbers while the lock was held.
+            Assert.Equal(text, File.ReadAllText(path_Report));
+            Assert.Equal(text_Json, File.ReadAllText(path_Report_Json));
+
+            //And no temporary or backup file from the failed attempt was left beside them.
+            Assert.False(File.Exists(path_Report + ".tmp"));
+            Assert.False(File.Exists(path_Report_Json + ".tmp"));
+            Assert.False(File.Exists(path_Report + ".bak"));
+            Assert.False(File.Exists(path_Report_Json + ".bak"));
+        }
     }
 }
