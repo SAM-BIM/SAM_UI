@@ -112,8 +112,16 @@ namespace SAM.Analytical.UI.WPF
         /// carrying on past it is how a later step ends up reading a file that is not there.
         /// </para>
         /// </param>
+        /// <param name="partOWorkflowRunner">
+        /// Who runs the workflow itself, once everything above it has been prepared. <b>Null - the default,
+        /// and every existing caller - executes <see cref="RunWorkflow(AnalyticalModel, WorkflowSettings, CancellationToken, out bool, bool)"/>
+        /// exactly as before.</b> Approved Document O Iteration 3 supplies
+        /// <c>SAM_Tas Create.NoIzamThermalSource</c> here so Candidate B's thermal source is produced by
+        /// the identical pipeline with only its last step changed; see <see cref="PartOWorkflowRunner"/>
+        /// for why the seam is exactly this narrow.
+        /// </param>
         /// <returns>The model the workflow returned, or null where it did not run, failed or was cancelled.</returns>
-        public static AnalyticalModel RunPartOSimulation(AnalyticalModel analyticalModel, PartOSimulationContext partOSimulationContext, string projectName, PartORun partORun, CancellationToken externalCancellationToken, out string path_TBD, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes, out string refusal, PartOCanonicalTBD partOCanonicalTBD = null)
+        public static AnalyticalModel RunPartOSimulation(AnalyticalModel analyticalModel, PartOSimulationContext partOSimulationContext, string projectName, PartORun partORun, CancellationToken externalCancellationToken, out string path_TBD, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes, out string refusal, PartOCanonicalTBD partOCanonicalTBD = null, PartOWorkflowRunner partOWorkflowRunner = null)
         {
             path_TBD = null;
             path_TSD = null;
@@ -449,7 +457,13 @@ namespace SAM.Analytical.UI.WPF
                 // between there and here has worked on it. Without saying so the workflow took a SECOND
                 // deep copy of the same model for the same guarantee - and Simulate, which calls this
                 // method, had taken a third. See WorkflowCalculator.Calculate(AnalyticalModel, bool).
-                result = Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled, true);
+                //
+                // The seam, and the only substitutable step on this path - see PartOWorkflowRunner. The
+                // null default IS Modify.RunWorkflow with exactly the arguments it always had, so no
+                // existing caller's behaviour depends on this line having been written.
+                result = partOWorkflowRunner is null
+                    ? Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled, true)
+                    : partOWorkflowRunner(analyticalModel, workflowSettings, cancellationToken, out cancelled);
             }
 
             if (cancelled || result is null)

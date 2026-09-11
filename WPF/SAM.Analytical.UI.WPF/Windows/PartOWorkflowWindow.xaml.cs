@@ -762,6 +762,18 @@ namespace SAM.Analytical.UI.WPF
             get { EnsureInspected(); return button_Optimise.IsEnabled; }
         }
 
+        /// <summary>Whether the Iteration 3 (A/B) action is currently offered. Exposed for tests.</summary>
+        public bool CanRunIteration3
+        {
+            get { EnsureInspected(); return button_Iteration3.IsEnabled; }
+        }
+
+        /// <summary>What the Iteration 3 action would do, as the button says it. Exposed for tests.</summary>
+        public string Iteration3ActionText
+        {
+            get { EnsureInspected(); return button_Iteration3.Content as string; }
+        }
+
         /// <summary>
         /// Rebuilds every derived part of the window from the current controls: the scenario and scope notes,
         /// which controls apply, the status list, and which actions are offered.
@@ -1003,6 +1015,17 @@ namespace SAM.Analytical.UI.WPF
             button_Optimise.ToolTip = partOWorkflowInspection.CanOptimise
                 ? "Raise the design airflow of failing mechanically ventilated rooms by the configured step, rebalance, re-prepare, re-simulate the same weather case and reassess. The selected product is never changed."
                 : partOWorkflowInspection.OptimisationRefusal ?? "Iteration 2B optimises a completed Iteration 2 run.";
+
+            //Read off the capabilities the caller gathered once, not re-derived here - the eligibility
+            //authority touches the filesystem (it looks for the pairing record) and a status list rebuilt
+            //on every keystroke must not.
+            button_Iteration3.IsEnabled = partOWorkflowCapabilities.Iteration3Available;
+            button_Iteration3.Content = partOWorkflowCapabilities.Iteration3Review ? "Review It. 3 (A/B)" : "Iteration 3 (A/B)";
+            button_Iteration3.ToolTip = partOWorkflowCapabilities.Iteration3Available
+                ? (partOWorkflowCapabilities.Iteration3Review
+                    ? "Reopen the Approved Document O Iteration 3 A/B pairing recorded for this run and rebuild its comparison from the existing results. No TAS simulation is run."
+                    : "Run the explicit TAS Systems ventilation route against this Iteration 1a reference and compare the two through the same CIBSE TM59 assessment. This runs TAS twice and takes a long time.")
+                : partOWorkflowCapabilities.Iteration3Refusal ?? "Iteration 3 compares a completed Iteration 1a run against the explicit TAS Systems route.";
         }
 
         /// <summary>
@@ -1229,6 +1252,13 @@ namespace SAM.Analytical.UI.WPF
         private void button_Optimise_Click(object sender, RoutedEventArgs e)
         {
             Action = PartOWorkflowAction.Optimise;
+
+            DialogResult = true;
+        }
+
+        private void button_Iteration3_Click(object sender, RoutedEventArgs e)
+        {
+            Action = PartOWorkflowAction.Iteration3;
 
             DialogResult = true;
         }

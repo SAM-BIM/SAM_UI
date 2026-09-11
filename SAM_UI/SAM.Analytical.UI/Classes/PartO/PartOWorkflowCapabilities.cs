@@ -49,5 +49,20 @@ namespace SAM.Analytical.UI
 
         /// <summary>Why not, in that authority's own words.</summary>
         public string OptimisationRefusal { get; set; }
+
+        /// <summary>
+        /// Whether the Iteration 3 A/B action can do anything at all - either start a Candidate B run or
+        /// reopen a completed record. <c>Query.PartOIteration3Eligibility</c>, asked once.
+        /// </summary>
+        public bool Iteration3Available { get; set; }
+
+        /// <summary>
+        /// Whether the action would <b>review</b> a persisted pairing rather than run a new one. A restored
+        /// run, and an in-session run that already has a record, both review.
+        /// </summary>
+        public bool Iteration3Review { get; set; }
+
+        /// <summary>Why the action can do nothing, in the eligibility authority's own words.</summary>
+        public string Iteration3Refusal { get; set; }
     }
 }

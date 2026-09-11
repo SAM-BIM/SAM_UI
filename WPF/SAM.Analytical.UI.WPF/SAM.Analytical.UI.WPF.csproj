@@ -67,6 +67,19 @@
     <Reference Include="SAM.Analytical.Systems">
       <HintPath>..\..\..\SAM_Systems\build\SAM.Analytical.Systems.dll</HintPath>
     </Reference>
+    <!-- PR1's materialised SystemEnergyCentre is the input the Approved Document O Iteration 3 explicit
+         ventilation route converts, and its type lives here. Referenced for that one graph and nothing
+         else - no system is authored, selected or modified in this assembly. -->
+    <Reference Include="SAM.Core.Systems">
+      <HintPath>..\..\..\SAM_Systems\build\SAM.Core.Systems.dll</HintPath>
+    </Reference>
+    <!-- SAM_Tas' TAS Systems route and its replaceable ResultantTemperature provider - Approved Document O
+         Iteration 3's Candidate B. Its whole public surface here (SystemVentilationRoute,
+         ResultantTemperatureResults, IResultantTemperatureProvider) is free of TAS COM types, exactly as
+         SAM.Analytical.Tas.TM59's is, so no interop assembly is loaded by referencing it. -->
+    <Reference Include="SAM.Analytical.Tas.TPD">
+      <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.TPD.dll</HintPath>
+    </Reference>
     <Reference Include="SAM.Analytical.LadybugTools">
       <HintPath>..\..\..\SAM_LadybugTools\build\SAM.Analytical.LadybugTools.dll</HintPath>
     </Reference>

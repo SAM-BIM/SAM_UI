@@ -161,6 +161,10 @@ namespace SAM.Analytical.UI.WPF
                         RunPartOOptimisation(uIAnalyticalModel, partORun, owner);
                         break;
 
+                    case PartOWorkflowAction.Iteration3:
+                        PartOIteration3(partORun, owner);
+                        break;
+
                     default:
                         return;
                 }
@@ -316,6 +320,17 @@ namespace SAM.Analytical.UI.WPF
             result.OptimisationRefusal = refusal_Optimisation ?? (partOOptimisationSettings is null
                 ? "This Part O run was not prepared with automatic TM59 optimisation enabled, so there is no airflow step or iteration limit to run it at. Prepare and run the iteration again with the follow-on optimisation ticked."
                 : null);
+
+            //Asked here for the same reason the two above are: the eligibility authority looks for the
+            //pairing record on disk, and a status list rebuilt on every keystroke must not touch the
+            //filesystem. It reuses the IsAssessable answer already taken rather than asking it twice -
+            //that call can DROP a run whose results have gone, and dropping it twice in one gesture would
+            //report the second drop against a run that no longer exists.
+            PartOIteration3Eligibility partOIteration3Eligibility = Query.PartOIteration3Eligibility(partORun, result.ResultsAvailable, result.ResultsRefusal);
+
+            result.Iteration3Available = partOIteration3Eligibility.Available;
+            result.Iteration3Review = partOIteration3Eligibility.Review;
+            result.Iteration3Refusal = partOIteration3Eligibility.Refusal;
 
             return result;
         }

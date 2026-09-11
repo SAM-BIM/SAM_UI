@@ -23,5 +23,14 @@ namespace SAM.Analytical.UI
         [Description("Review Results")] ReviewResults,
 
         [Description("Optimise (2B)")] Optimise,
+
+        /// <summary>
+        /// The Approved Document O Iteration 3 A/B pairing - <c>Modify.RunPartOIteration3</c> on an
+        /// eligible in-session run, and <c>Modify.ReviewPartOIteration3</c> where there is a persisted
+        /// record to reopen. One action rather than two: which of the two it is is a property of the state
+        /// the run is in, and asking a person to work that out from two greyed buttons is worse than
+        /// telling them.
+        /// </summary>
+        [Description("Iteration 3 (A/B)")] Iteration3,
     }
 }

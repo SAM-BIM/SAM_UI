@@ -1,0 +1,196 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+namespace SAM.Analytical.UI.WPF
+{
+    public static partial class Query
+    {
+        /// <summary>
+        /// Everything that has to still be true before a persisted Iteration 3 pairing may be shown, and
+        /// the Candidate B model where it is.
+        ///
+        /// <para><b>Validated by identity and by file fingerprint, never by name alone</b></para>
+        /// <para>
+        /// A pairing is a statement about two specific results files produced from one specific design
+        /// state. Any of the three moving makes the statement false, and each of them can move between
+        /// sessions: a design is edited, a simulation is rerun, a file is replaced by hand. So this
+        /// re-asks all three - the run being reviewed is the Reference A the record names, Reference A's
+        /// design and scenarios still match the fingerprints the record copied from its own provenance,
+        /// and every Candidate B file is still byte-length and write-time identical to what was recorded.
+        /// </para>
+        /// <para>
+        /// <b>Refused by name.</b> Each failure says which file or which fingerprint, because "this
+        /// pairing is stale" without saying what moved is not something a person can act on.
+        /// </para>
+        /// <para>
+        /// <b>Nothing here opens a TAS file.</b> The only file actually read is Candidate B's own
+        /// <c>.sam</c>, through SAM's ordinary model reader.
+        /// </para>
+        /// </summary>
+        /// <param name="partORun">The run being reviewed - Reference A.</param>
+        /// <param name="partOIteration3Record">The record read off disk.</param>
+        /// <param name="analyticalModel_CandidateB">Candidate B's reopened model, where everything passed.</param>
+        /// <param name="path_TSD_CandidateB">The bridge results Candidate B's temperatures come from.</param>
+        internal static List<string> PartOIteration3ReviewRefusals(
+            PartORun partORun,
+            PartOIteration3Record partOIteration3Record,
+            out AnalyticalModel analyticalModel_CandidateB,
+            out string path_TSD_CandidateB)
+        {
+            List<string> result = [];
+
+            analyticalModel_CandidateB = null;
+            path_TSD_CandidateB = null;
+
+            if (partORun is null || partOIteration3Record is null)
+            {
+                result.Add("There is no Part O run or no Iteration 3 pairing record, so nothing could be validated.");
+
+                return result;
+            }
+
+            if (!string.Equals(partOIteration3Record.Schema, PartOIteration3Record.CurrentSchema, StringComparison.Ordinal))
+            {
+                result.Add(string.Format(
+                    "The Iteration 3 pairing record states schema '{0}' and this build writes '{1}', so it cannot be read as one.",
+                    partOIteration3Record.Schema ?? "<none>",
+                    PartOIteration3Record.CurrentSchema));
+
+                return result;
+            }
+
+            //-------------------------------------------------------------------------------------------
+            //Reference A
+            //-------------------------------------------------------------------------------------------
+            string path_TSD_ReferenceA = partORun.Path_TSD;
+
+            if (!string.Equals(partOIteration3Record.Path_TSD_ReferenceA, path_TSD_ReferenceA, StringComparison.OrdinalIgnoreCase))
+            {
+                result.Add(string.Format(
+                    "This Iteration 3 pairing was recorded against the results at '{0}', and the run being reviewed produced '{1}'.",
+                    partOIteration3Record.Path_TSD_ReferenceA ?? "<none>",
+                    path_TSD_ReferenceA ?? "<none>"));
+            }
+
+            AnalyticalModel analyticalModel_ReferenceA = partORun.AnalyticalModel_Assessment;
+
+            if (analyticalModel_ReferenceA is null
+                || !analyticalModel_ReferenceA.TryGetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, out SimulationResultProvenance simulationResultProvenance_ReferenceA)
+                || simulationResultProvenance_ReferenceA is null)
+            {
+                result.Add("Reference A carries no simulation-result provenance, so this Iteration 3 pairing cannot be shown to describe it.");
+            }
+            else
+            {
+                if (!string.Equals(simulationResultProvenance_ReferenceA.Fingerprint_Model, partOIteration3Record.Fingerprint_Model_ReferenceA, StringComparison.Ordinal))
+                {
+                    result.Add("Reference A's design state has changed since this Iteration 3 pairing was produced, so the pairing no longer describes the model in front of you. Prepare and run Iteration 1a again, then run Iteration 3.");
+                }
+
+                if (!string.Equals(simulationResultProvenance_ReferenceA.Fingerprint_OverheatingScenarios, partOIteration3Record.Fingerprint_Scenarios_ReferenceA, StringComparison.Ordinal))
+                {
+                    result.Add("Reference A's overheating scenarios have changed since this Iteration 3 pairing was produced, so the two cases were assessed against different criteria. Prepare and run Iteration 1a again, then run Iteration 3.");
+                }
+            }
+
+            //The TAS case can only be re-checked where the session still holds one. A reopened run
+            //deliberately carries no simulation context, and saying so is more honest than silently
+            //skipping the check.
+            if (partORun.SimulationContext is null)
+            {
+                //Not a refusal: the fingerprints above already tie the pairing to Reference A's design
+                //and scenarios, and the two results files are tied to it by their own provenance.
+            }
+            else if (!string.Equals(PartOIteration3ScenarioFingerprint(partORun.SimulationContext), partOIteration3Record.Fingerprint_Scenario, StringComparison.Ordinal))
+            {
+                result.Add(string.Format(
+                    "This Iteration 3 pairing was run as '{0}' and this session's run is '{1}', so the two are not the same thermal case.",
+                    partOIteration3Record.Fingerprint_Scenario ?? "<none>",
+                    PartOIteration3ScenarioFingerprint(partORun.SimulationContext)));
+            }
+
+            //-------------------------------------------------------------------------------------------
+            //Candidate B's files
+            //-------------------------------------------------------------------------------------------
+            foreach (PartOIteration3FileRecord partOIteration3FileRecord in partOIteration3Record.Files)
+            {
+                if (!partOIteration3FileRecord.Current(out string refusal))
+                {
+                    result.Add(refusal);
+                }
+            }
+
+            if (result.Count != 0)
+            {
+                return result;
+            }
+
+            //A refused pairing has no Candidate B model to load and is not supposed to have one - its
+            //ledger is the whole answer. Validating the files above still applies, because the artifacts
+            //it DID produce are part of that answer.
+            if (!partOIteration3Record.IsComplete)
+            {
+                return result;
+            }
+
+            PartOIteration3FileRecord partOIteration3FileRecord_Model = partOIteration3Record.File(PartOIteration3Roles.CandidateB_Model);
+            PartOIteration3FileRecord partOIteration3FileRecord_TSD = partOIteration3Record.File(PartOIteration3Roles.Bridge_TSD);
+
+            if (partOIteration3FileRecord_Model is null || partOIteration3FileRecord_TSD is null)
+            {
+                result.Add("This Iteration 3 pairing records itself as complete but does not name both Candidate B's model and the results it was produced from, so it cannot be reopened.");
+
+                return result;
+            }
+
+            try
+            {
+                analyticalModel_CandidateB = Core.Convert.ToSAM<AnalyticalModel>(partOIteration3FileRecord_Model.Path)?.Find(x => x is not null);
+            }
+            catch (IOException exception)
+            {
+                result.Add(string.Format("Candidate B's model at '{0}' could not be read. ({1})", partOIteration3FileRecord_Model.Path, exception.Message));
+
+                return result;
+            }
+
+            if (analyticalModel_CandidateB is null)
+            {
+                result.Add(string.Format("Candidate B's model at '{0}' could not be read as an analytical model.", partOIteration3FileRecord_Model.Path));
+
+                return result;
+            }
+
+            //The persisted Candidate B must record its own provenance to the BRIDGE results - the file
+            //its resultant temperatures were read from. This is the same authority a reopened Reference A
+            //is validated by, asked of the other side of the pairing.
+            if (!analyticalModel_CandidateB.TryGetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, out SimulationResultProvenance simulationResultProvenance_CandidateB) || simulationResultProvenance_CandidateB is null)
+            {
+                result.Add(string.Format("Candidate B's model at '{0}' records no simulation results, so it cannot be shown to belong to this pairing.", partOIteration3FileRecord_Model.Path));
+
+                return result;
+            }
+
+            if (!simulationResultProvenance_CandidateB.TryResolvePath_TSD(analyticalModel_CandidateB, partOIteration3FileRecord_Model.Path, out path_TSD_CandidateB, out string refusal_CandidateB))
+            {
+                result.Add(string.Format("Candidate B's model does not belong to its recorded results. {0}", refusal_CandidateB));
+
+                return result;
+            }
+
+            if (!string.Equals(path_TSD_CandidateB, partOIteration3FileRecord_TSD.Path, StringComparison.OrdinalIgnoreCase))
+            {
+                result.Add(string.Format(
+                    "Candidate B's model records the results at '{0}' and this pairing recorded '{1}', so the model and the temperatures being compared are not from the same run.",
+                    path_TSD_CandidateB,
+                    partOIteration3FileRecord_TSD.Path));
+            }
+
+            return result;
+        }
+    }
+}

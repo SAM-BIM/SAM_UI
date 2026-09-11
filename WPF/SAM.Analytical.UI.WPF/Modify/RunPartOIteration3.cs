@@ -1,0 +1,795 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Analytical.Systems;
+using SAM.Analytical.Tas.TPD;
+using SAM.Core;
+using SAM.Core.Tas;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+
+namespace SAM.Analytical.UI.WPF
+{
+    public static partial class Modify
+    {
+        /// <summary>
+        /// How close two design airflows have to be to be the same airflow [l/s].
+        /// <para>
+        /// The two numbers being compared are the <b>same</b> design duty read twice - once off the
+        /// prepared model's terminals, once off what the materialisation put on the route - so the only
+        /// difference that can legitimately exist is the last bit of a double that has been summed in a
+        /// different order. A thousandth of a litre per second is far below anything a ventilation design
+        /// states and far above that. It is deliberately <b>not</b> an engineering tolerance: there is no
+        /// airflow difference this run is willing to accept.
+        /// </para>
+        /// </summary>
+        internal const double Tolerance_DesignAirFlow_Lps = 1e-6;
+
+        /// <summary>
+        /// Runs one Approved Document O Iteration 3 A/B pairing, start to finish, and answers the ordered
+        /// ledger, the durable record and - only where every stage completed - the comparison.
+        ///
+        /// <para><b>Orchestration only. There is no second engineering authority here</b></para>
+        /// <para>
+        /// Every number this produces is either another authority's, carried verbatim, or a descriptive
+        /// statistic over two series those authorities produced. SAM remains the analytical and design
+        /// authority and owns TM59; SAM_Systems owns the mechanical-system materialisation; SAM_Tas owns
+        /// the no-IZAM source, the TPD conversion, the Systems simulation and the resultant-temperature
+        /// provider. What is decided here is sequencing, scope, identity and presentation.
+        /// </para>
+        ///
+        /// <para><b>Fail closed at every boundary</b></para>
+        /// <para>
+        /// The ledger, not this method, enforces the pipeline rule: once a stage refuses, no later stage
+        /// can be recorded as completed, and <c>PartOIteration3Result</c> drops the comparison unless the
+        /// whole chain completed. Each stage below therefore returns as soon as it refuses, and the two
+        /// rules agree by construction rather than by discipline.
+        /// </para>
+        ///
+        /// <para><b>Deterministic paths, proven ownership</b></para>
+        /// <para>
+        /// Candidate B's files are named from Reference A's project, which is what makes the pairing
+        /// reopenable and also means a failed attempt leaves its files exactly where this one will look.
+        /// So every fixed path is fingerprinted before anything is written, and a file that has not
+        /// changed since is never reported as this attempt's - see
+        /// <see cref="PartOIteration3Artifacts"/>. The previous Candidate B model and the previous record
+        /// are additionally <b>deleted</b> at the start, because those two are the artifacts a later
+        /// session would act on.
+        /// </para>
+        ///
+        /// <para><b>Scaling</b></para>
+        /// <para>
+        /// Every join below is a dictionary lookup on a guid, every index is built once, and the only
+        /// walks over the annual series are the two the comparison itself has to make. Nothing is looked
+        /// up by name - three flats hold three rooms called "Bedroom 2" - and no list is scanned inside a
+        /// loop over another list.
+        /// </para>
+        /// </summary>
+        /// <param name="partORun">The completed, eligible Iteration 1a run this pairing is built on.</param>
+        /// <param name="iPartOIteration3Pipeline">Who does the work - see <see cref="IPartOIteration3Pipeline"/>.</param>
+        /// <param name="cancellationToken">Aborts the TAS steps between stages.</param>
+        public static PartOIteration3Result RunPartOIteration3(PartORun partORun, IPartOIteration3Pipeline iPartOIteration3Pipeline, CancellationToken cancellationToken = default)
+        {
+            PartOIteration3Ledger partOIteration3Ledger = new();
+
+            PartOIteration3Record partOIteration3Record = new()
+            {
+                Guid_Run = Guid.NewGuid(),
+                Ticks_Utc = DateTime.UtcNow.Ticks,
+            };
+
+            List<string> notes = [];
+
+            //=================================================================================================
+            //Input
+            //=================================================================================================
+            if (partORun is null || iPartOIteration3Pipeline is null)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "No Part O run or no pipeline was supplied.", ["No Part O run or no pipeline was supplied, so no Approved Document O Iteration 3 pairing could be attempted."]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, null, notes);
+            }
+
+            PartOIteration3Eligibility partOIteration3Eligibility = Query.PartOIteration3Eligibility(partORun, partORun.IsAssessable(out string refusal_Assessable), refusal_Assessable);
+
+            if (!partOIteration3Eligibility.CanRun)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "This Part O run cannot produce a Candidate B.", [partOIteration3Eligibility.Refusal_Run]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, null, notes);
+            }
+
+            AnalyticalModel analyticalModel_Prepared = partORun.AnalyticalModel_Prepared;
+            AnalyticalModel analyticalModel_ReferenceA = partORun.AnalyticalModel_Assessment;
+            PartOSimulationContext partOSimulationContext = partORun.SimulationContext;
+            PartOPreparationContext partOPreparationContext = partORun.PreparationContext;
+            List<OverheatingScenario> overheatingScenarios = partORun.OverheatingScenarios;
+
+            string path_TSD_ReferenceA = partORun.Path_TSD;
+
+            PartOIteration3Paths partOIteration3Paths = PartOIteration3Paths.Create(partOSimulationContext, path_TSD_ReferenceA);
+
+            PartOIteration3Artifacts partOIteration3Artifacts = new(partOIteration3Record.Guid_Run);
+            partOIteration3Artifacts.Snapshot(partOIteration3Paths.Paths_CandidateB);
+
+            //Deleted, not merely fingerprinted. These two are the artifacts a LATER session acts on - one
+            //is a reopenable Candidate B model and the other is the pairing record itself - so a failed or
+            //abandoned attempt must not leave either of them behind claiming to describe this design.
+            //Everything else Candidate B writes is evidence, and evidence is proven by ownership rather
+            //than by deletion. This does not weaken the no-IZAM source's or the bridge's own stale-output
+            //deletion, which still runs.
+            List<string> refusals_Clear = [];
+            Delete(partOIteration3Paths.Path_Model_CandidateB, "the previous Candidate B model", refusals_Clear, notes);
+            Delete(partOIteration3Paths.Path_Record, "the previous Iteration 3 pairing record", refusals_Clear, notes);
+
+            if (refusals_Clear.Count != 0)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "An earlier attempt's Candidate B could not be cleared.", refusals_Clear);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Record.Path_TSD_ReferenceA = path_TSD_ReferenceA;
+            partOIteration3Record.Path_Model_ReferenceA = Query.Path_PartORunModel(path_TSD_ReferenceA);
+            partOIteration3Record.ProjectName_ReferenceA = partOIteration3Paths.ProjectName_ReferenceA;
+            partOIteration3Record.ProjectName_CandidateB = partOIteration3Paths.ProjectName_CandidateB;
+            partOIteration3Record.Fingerprint_Scenario = Query.PartOIteration3ScenarioFingerprint(partOSimulationContext);
+            partOIteration3Record.AddPreparedSystems(partORun.Guids_VentilationSystem_Prepared);
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.Input,
+                string.Format(
+                    "Iteration 1a run '{0}' is in this session, complete over the full year, and captured {1} prepared ventilation system identity(ies). Candidate B will be written as '{2}'.",
+                    partOIteration3Paths.ProjectName_ReferenceA,
+                    partORun.Guids_VentilationSystem_Prepared.Count,
+                    partOIteration3Paths.ProjectName_CandidateB));
+
+            //=================================================================================================
+            //Reference A
+            //=================================================================================================
+            if (!analyticalModel_ReferenceA.TryGetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, out SimulationResultProvenance simulationResultProvenance) || simulationResultProvenance is null || !simulationResultProvenance.IsComplete)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.ReferenceA,
+                    "Reference A does not record the results it was produced from.",
+                    ["The Iteration 1a run's model carries no complete simulation-result provenance, so the pairing could not state which design state and which results it is built on. Prepare and run the iteration again."]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Record.Fingerprint_Model_ReferenceA = simulationResultProvenance.Fingerprint_Model;
+            partOIteration3Record.Fingerprint_Scenarios_ReferenceA = simulationResultProvenance.Fingerprint_OverheatingScenarios;
+
+            AdjacencyCluster adjacencyCluster_Prepared = analyticalModel_Prepared?.AdjacencyCluster;
+
+            if (adjacencyCluster_Prepared is null)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.ReferenceA,
+                    "Reference A carries no prepared design.",
+                    ["The Iteration 1a run holds no prepared analytical model, so Candidate B has no design to be built from."]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            //One walk. Everything below is a dictionary lookup off this.
+            Dictionary<Guid, PartOIteration3Room> dictionary_Room = Query.PartOIteration3Rooms(adjacencyCluster_Prepared, partOPreparationContext.Zones);
+
+            if (dictionary_Room.Count == 0)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.ReferenceA,
+                    "The dwelling scope resolves to no room.",
+                    ["The Approved Document O dwelling scope this run was prepared over resolves to no space on the prepared model, so there is nothing to compare."]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            List<Guid> guids_Space_Dwelling = [.. dictionary_Room.Keys];
+            guids_Space_Dwelling.Sort();
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.ReferenceA,
+                string.Format("Reference A is '{0}' over {1} dwelling room(s), produced by the existing TBD/IZAM route.", path_TSD_ReferenceA, dictionary_Room.Count));
+
+            //=================================================================================================
+            //Reference A TM59 - the UNCHANGED authority, with its resultant temperatures captured
+            //=================================================================================================
+            PartOIteration3Assessment partOIteration3Assessment_A = iPartOIteration3Pipeline.Assess(analyticalModel_ReferenceA, path_TSD_ReferenceA, overheatingScenarios, guids_Space_Dwelling);
+
+            if (partOIteration3Assessment_A is null || !partOIteration3Assessment_A.IsAssessed)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.ReferenceATM59,
+                    "Reference A could not be assessed.",
+                    [partOIteration3Assessment_A?.Refusal ?? string.Format("The Iteration 1a results at '{0}' could not be assessed.", path_TSD_ReferenceA)]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Record.Status_ReferenceA = partOIteration3Assessment_A.OccupiedSpaceComplianceStatus;
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.ReferenceATM59,
+                string.Format(
+                    "The existing TM59 authority assessed Reference A over {0} space(s): {1}. {2} dwelling room(s) carry a captured resultant temperature series.",
+                    partOIteration3Assessment_A.Count_Processed,
+                    Core.Query.Description(partOIteration3Assessment_A.OccupiedSpaceComplianceStatus),
+                    partOIteration3Assessment_A.ResultantTemperatures.Count));
+
+            //=================================================================================================
+            //System scope - SAM #114
+            //=================================================================================================
+            PartOIteration3SystemScope partOIteration3SystemScope = Query.PartOIteration3SystemScope(adjacencyCluster_Prepared, partORun.Guids_VentilationSystem_Prepared, guids_Space_Dwelling);
+
+            if (!partOIteration3SystemScope.IsScoped)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.SystemScope, "The ventilation design under assessment could not be scoped.", partOIteration3SystemScope.Refusals);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Record.AddScopedOutSystems(partOIteration3SystemScope.Guids_Removed);
+            partOIteration3Record.AddScopeNotes(partOIteration3SystemScope.Notes);
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.SystemScope,
+                string.Format(
+                    "{0} ventilation system(s) built by this iteration are the design under assessment; {1} authored system(s) carry no mechanical duty and were left out of the materialisation input.",
+                    partOIteration3SystemScope.Guids_Retained.Count,
+                    partOIteration3SystemScope.Guids_Removed.Count));
+
+            //=================================================================================================
+            //Materialisation - SAM_Systems
+            //=================================================================================================
+            List<Space> spaces_Scope = [];
+            foreach (Guid guid in guids_Space_Dwelling)
+            {
+                Space space = partOIteration3SystemScope.AdjacencyCluster.GetObject<Space>(guid);
+
+                if (space is not null)
+                {
+                    spaces_Scope.Add(space);
+                }
+            }
+
+            MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation = iPartOIteration3Pipeline.Materialise(partOIteration3SystemScope.AdjacencyCluster, spaces_Scope);
+
+            if (mechanicalVentilationMaterialisation is null || !mechanicalVentilationMaterialisation.IsMaterialised)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.Materialisation,
+                    "The explicit mechanical ventilation could not be materialised.",
+                    mechanicalVentilationMaterialisation?.Refusals ?? ["The mechanical ventilation materialisation produced nothing and said nothing about why."]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.Materialisation,
+                string.Format("SAM_Systems materialised the explicit mechanical ventilation over {0} room(s) with {1} analytical binding(s).", spaces_Scope.Count, mechanicalVentilationMaterialisation.Bindings.Count));
+
+            //=================================================================================================
+            //Thermal source - SAM_Tas, the same case as Reference A with no mechanical ventilation of its own
+            //=================================================================================================
+            PartOSimulationContext partOSimulationContext_CandidateB = partOSimulationContext.Copy(partOIteration3Paths.ProjectName_CandidateB);
+
+            NoIzamThermalSource noIzamThermalSource = iPartOIteration3Pipeline.ThermalSource(
+                analyticalModel_Prepared,
+                partOSimulationContext_CandidateB,
+                partOIteration3Paths.ProjectName_CandidateB,
+                cancellationToken,
+                out AnalyticalModel analyticalModel_CandidateB,
+                out bool cancelled,
+                out List<string> notes_ThermalSource,
+                out string refusal_ThermalSource);
+
+            AddNotes(notes, notes_ThermalSource);
+
+            if (cancelled || noIzamThermalSource is null || !noIzamThermalSource.IsComplete || analyticalModel_CandidateB is null)
+            {
+                List<string> reasons = [];
+
+                if (cancelled)
+                {
+                    reasons.Add("The Candidate B thermal source run was cancelled, so no comparison was produced.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(refusal_ThermalSource))
+                {
+                    reasons.Add(refusal_ThermalSource);
+                }
+
+                AddNotes(reasons, noIzamThermalSource?.Refusals);
+
+                if (analyticalModel_CandidateB is null && !cancelled)
+                {
+                    reasons.Add("The no-IZAM workflow returned no analytical model, so there is nothing carrying the TAS zone identities Candidate B's assessment resolves against.");
+                }
+
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.ThermalSource,
+                    "Candidate B's dedicated no-IZAM thermal source was not produced.",
+                    reasons,
+                    Claim(partOIteration3Artifacts, [partOIteration3Paths.Path_TBD_ThermalSource, partOIteration3Paths.Path_TSD_ThermalSource]));
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Record.RemovedIZAMs = noIzamThermalSource.RemovedIZAMs;
+            partOIteration3Record.RemovedMechanicalVentilationGains = noIzamThermalSource.RemovedMechanicalVentilationGains;
+
+            if (!partOIteration3Artifacts.TryClaim(new[] { partOIteration3Paths.Path_TBD_ThermalSource, partOIteration3Paths.Path_TSD_ThermalSource }, out List<string> artifacts_ThermalSource, out List<string> refusals_ThermalSource))
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.ThermalSource, "Candidate B's thermal source cannot be told apart from an earlier attempt's.", refusals_ThermalSource, artifacts_ThermalSource);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.ThermalSource_TBD, partOIteration3Paths.Path_TBD_ThermalSource, Length(partOIteration3Paths.Path_TBD_ThermalSource), Ticks(partOIteration3Paths.Path_TBD_ThermalSource)));
+            partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.ThermalSource_TSD, partOIteration3Paths.Path_TSD_ThermalSource, Length(partOIteration3Paths.Path_TSD_ThermalSource), Ticks(partOIteration3Paths.Path_TSD_ThermalSource)));
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.ThermalSource,
+                string.Format(
+                    "The no-IZAM thermal source simulated the same TAS case as Reference A: inherited IZAMs {0}, mechanical ventilation gain {1}, {2} room(s) carrying a TAS zone identity.",
+                    noIzamThermalSource.RemovedIZAMs ? "removed" : "NOT removed",
+                    noIzamThermalSource.RemovedMechanicalVentilationGains ? "neutralised" : "NOT neutralised",
+                    noIzamThermalSource.Count_ZoneReferences),
+                artifacts_ThermalSource);
+
+            //=================================================================================================
+            //Systems conversion, simulation and zone temperature - SAM_Tas, one call, three stages
+            //=================================================================================================
+            int startHour = 0;
+            int endHour = PartOSimulationContext.HourCount_FullYear - 1;
+
+            SystemVentilationRoute systemVentilationRoute = iPartOIteration3Pipeline.Route(noIzamThermalSource, mechanicalVentilationMaterialisation, partOIteration3Paths.Path_TPD, startHour, endHour);
+
+            if (systemVentilationRoute is null || !systemVentilationRoute.IsComplete)
+            {
+                //Attributed to the stage the route actually got to, read off what it handed back: no
+                //simulation evidence at all means the conversion never ran one; evidence that is not
+                //complete means the simulation itself failed; complete evidence means the results did not
+                //reconcile. The route does not tag its refusals with a stage, and inventing a fourth
+                //place that decides what failed would be a second opinion about SAM_Tas' own run.
+                SimulationEvidence simulationEvidence = systemVentilationRoute?.SimulationEvidence;
+
+                PartOIteration3Stage partOIteration3Stage = simulationEvidence is null
+                    ? PartOIteration3Stage.SystemsConversion
+                    : simulationEvidence.Completed
+                        ? PartOIteration3Stage.ZoneTemperature
+                        : PartOIteration3Stage.SystemsSimulation;
+
+                //Every stage before the failing one still completed, and the ledger will not record a
+                //later stage until the earlier ones are there.
+                if (partOIteration3Stage != PartOIteration3Stage.SystemsConversion)
+                {
+                    partOIteration3Ledger.Complete(PartOIteration3Stage.SystemsConversion, "The explicit ventilation converted to a TAS Systems document and reconciled against the source graph.", Claim(partOIteration3Artifacts, [partOIteration3Paths.Path_TPD]));
+                }
+
+                if (partOIteration3Stage == PartOIteration3Stage.ZoneTemperature)
+                {
+                    partOIteration3Ledger.Complete(PartOIteration3Stage.SystemsSimulation, "The TAS Systems simulation is evidenced as complete.");
+                }
+
+                List<string> reasons = [.. systemVentilationRoute?.Refusals ?? []];
+
+                if (reasons.Count == 0)
+                {
+                    reasons.Add("The explicit TAS Systems ventilation route did not complete, and said nothing about why.");
+                }
+
+                partOIteration3Ledger.Refuse(
+                    partOIteration3Stage,
+                    "The explicit TAS Systems ventilation route did not complete.",
+                    reasons,
+                    partOIteration3Stage == PartOIteration3Stage.SystemsConversion ? Claim(partOIteration3Artifacts, [partOIteration3Paths.Path_TPD]) : null);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            AddNotes(notes, systemVentilationRoute.Notes);
+
+            if (!partOIteration3Artifacts.TryClaim(partOIteration3Paths.Path_TPD, out string artifact_TPD, out string refusal_TPD))
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.SystemsConversion, "Candidate B's TAS Systems document cannot be told apart from an earlier attempt's.", [refusal_TPD]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            List<SystemVentilationBinding> systemVentilationBindings = systemVentilationRoute.Bindings;
+            List<SystemVentilationConnectionBinding> systemVentilationConnectionBindings = systemVentilationRoute.ConnectionBindings;
+
+            HashSet<Guid> guids_AirSystem = [];
+            int count_Supply = 0;
+            int count_Extract = 0;
+            int count_Transfer = 0;
+
+            foreach (SystemVentilationConnectionBinding systemVentilationConnectionBinding in systemVentilationConnectionBindings)
+            {
+                switch (systemVentilationConnectionBinding.ConnectionType)
+                {
+                    case SystemVentilationConnectionType.Supply:
+                        count_Supply++;
+                        break;
+
+                    case SystemVentilationConnectionType.Extract:
+                        count_Extract++;
+                        break;
+
+                    case SystemVentilationConnectionType.Transfer:
+                        count_Transfer++;
+                        break;
+                }
+            }
+
+            foreach (SystemVentilationBinding systemVentilationBinding in systemVentilationBindings)
+            {
+                guids_AirSystem.Add(systemVentilationBinding.Guid_AirSystem);
+            }
+
+            partOIteration3Record.Count_Connection_Supply = count_Supply;
+            partOIteration3Record.Count_Connection_Extract = count_Extract;
+            partOIteration3Record.Count_Connection_Transfer = count_Transfer;
+            partOIteration3Record.Count_AirSystem = guids_AirSystem.Count;
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.SystemsConversion,
+                string.Format(
+                    "{0} physical air system(s), {1} room(s) and {2} directed leg(s) ({3} supply, {4} extract, {5} transfer) converted and reconciled against the source graph.",
+                    guids_AirSystem.Count,
+                    systemVentilationBindings.Count,
+                    systemVentilationConnectionBindings.Count,
+                    count_Supply,
+                    count_Extract,
+                    count_Transfer),
+                [artifact_TPD]);
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.SystemsSimulation,
+                string.Format("The TAS Systems simulation is evidenced as complete. {0}", systemVentilationRoute.SimulationEvidence?.NativeDiagnostic is string diagnostic && !string.IsNullOrWhiteSpace(diagnostic) ? string.Format("TAS said: {0}", diagnostic) : "TAS reported no diagnostic."));
+
+            SystemZoneTemperatureResults systemZoneTemperatureResults = systemVentilationRoute.SystemZoneTemperatureResults;
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.ZoneTemperature,
+                string.Format(
+                    "{0} room(s) returned a complete finite ZoneTemperature series over hours {1}..{2}.",
+                    systemZoneTemperatureResults.Results.Count,
+                    systemZoneTemperatureResults.StartHour,
+                    systemZoneTemperatureResults.EndHour));
+
+            //=================================================================================================
+            //Resultant temperature - SAM_Tas' replaceable provider
+            //=================================================================================================
+            ResultantTemperatureResults resultantTemperatureResults = iPartOIteration3Pipeline.ResultantTemperatures(systemVentilationRoute, partOIteration3Paths.Path_TBD_Bridge);
+
+            if (resultantTemperatureResults is null || !resultantTemperatureResults.IsComplete)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.ResultantTemperature,
+                    "Candidate B's resultant temperature was not produced.",
+                    resultantTemperatureResults?.Refusals ?? ["The resultant temperature provider produced nothing and said nothing about why."],
+                    Claim(partOIteration3Artifacts, [partOIteration3Paths.Path_TBD_Bridge, partOIteration3Paths.Path_TSD_Bridge]));
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            AddNotes(notes, resultantTemperatureResults.Notes);
+
+            if (!partOIteration3Artifacts.TryClaim(new[] { partOIteration3Paths.Path_TBD_Bridge, partOIteration3Paths.Path_TSD_Bridge }, out List<string> artifacts_Bridge, out List<string> refusals_Bridge))
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.ResultantTemperature, "Candidate B's resultant temperature files cannot be told apart from an earlier attempt's.", refusals_Bridge, artifacts_Bridge);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Record.Method_ResultantTemperature = resultantTemperatureResults.Method;
+            partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.Bridge_TBD, partOIteration3Paths.Path_TBD_Bridge, Length(partOIteration3Paths.Path_TBD_Bridge), Ticks(partOIteration3Paths.Path_TBD_Bridge)));
+            partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.Bridge_TSD, partOIteration3Paths.Path_TSD_Bridge, Length(partOIteration3Paths.Path_TSD_Bridge), Ticks(partOIteration3Paths.Path_TSD_Bridge)));
+            partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.Systems_TPD, partOIteration3Paths.Path_TPD, Length(partOIteration3Paths.Path_TPD), Ticks(partOIteration3Paths.Path_TPD)));
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.ResultantTemperature,
+                string.Format(
+                    "{0} room(s) carry a complete finite ResultantTemperature series over hours {1}..{2}, obtained by: {3}",
+                    resultantTemperatureResults.Results.Count,
+                    resultantTemperatureResults.StartHour,
+                    resultantTemperatureResults.EndHour,
+                    resultantTemperatureResults.Method ?? "an unnamed method"),
+                artifacts_Bridge);
+
+            //=================================================================================================
+            //Candidate B TM59 - the SAME unchanged authority, over the bridge results
+            //=================================================================================================
+            List<Guid> guids_Space_Bound = [];
+            foreach (SystemVentilationBinding systemVentilationBinding in systemVentilationBindings)
+            {
+                guids_Space_Bound.Add(systemVentilationBinding.Guid_Space);
+            }
+
+            guids_Space_Bound.Sort();
+
+            PartOIteration3Assessment partOIteration3Assessment_B = iPartOIteration3Pipeline.Assess(analyticalModel_CandidateB, partOIteration3Paths.Path_TSD_Bridge, overheatingScenarios, guids_Space_Bound);
+
+            if (partOIteration3Assessment_B is null || !partOIteration3Assessment_B.IsAssessed)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.CandidateBTM59,
+                    "Candidate B could not be assessed.",
+                    [partOIteration3Assessment_B?.Refusal ?? string.Format("The Candidate B results at '{0}' could not be assessed.", partOIteration3Paths.Path_TSD_Bridge)]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            //The provider's own series and the values TM59 then read out of the SAME file must be the same
+            //numbers. They are produced by two independent readers of one result file, and if they ever
+            //disagree then one of them is resolving a room to the wrong zone - which would be invisible in
+            //every other check, because both answers are complete, finite and plausible.
+            List<string> refusals_Identity = Query.PartOIteration3ProviderIdentityRefusals(resultantTemperatureResults, partOIteration3Assessment_B, guids_Space_Bound, dictionary_Room, out long count_IdentityValues);
+
+            if (refusals_Identity.Count != 0)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.CandidateBTM59, "The resultant temperatures the provider produced and the ones TM59 read back are not the same numbers.", refusals_Identity);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Record.Status_CandidateB = partOIteration3Assessment_B.OccupiedSpaceComplianceStatus;
+            partOIteration3Record.ProviderMatchesResultFile = true;
+            partOIteration3Record.Count_ProviderIdentityValues = count_IdentityValues;
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.CandidateBTM59,
+                string.Format(
+                    "The existing TM59 authority assessed Candidate B over {0} space(s): {1}. The provider's series and the {2} value(s) TM59 read from the same file are identical.",
+                    partOIteration3Assessment_B.Count_Processed,
+                    Core.Query.Description(partOIteration3Assessment_B.OccupiedSpaceComplianceStatus),
+                    count_IdentityValues));
+
+            //=================================================================================================
+            //Reconciliation - guid only, fail closed
+            //=================================================================================================
+            List<string> refusals_Reconciliation = Query.PartOIteration3ReconciliationRefusals(
+                adjacencyCluster_Prepared,
+                partOIteration3SystemScope,
+                systemVentilationRoute,
+                noIzamThermalSource,
+                partOIteration3Assessment_A,
+                partOIteration3Assessment_B,
+                dictionary_Room,
+                out List<PartOIteration3Room> rooms_Comparable,
+                out List<PartOIteration3CriterionComparison> criteria,
+                out List<string> notes_Reconciliation);
+
+            AddNotes(notes, notes_Reconciliation);
+
+            if (refusals_Reconciliation.Count != 0)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Reconciliation, "Reference A and Candidate B did not reconcile.", refusals_Reconciliation);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            foreach (SystemVentilationBinding systemVentilationBinding in systemVentilationBindings)
+            {
+                dictionary_Room.TryGetValue(systemVentilationBinding.Guid_Space, out PartOIteration3Room partOIteration3Room);
+
+                partOIteration3Record.Add(new PartOIteration3BindingRecord(
+                    systemVentilationBinding.Guid_Space,
+                    partOIteration3Room?.Name_Space,
+                    partOIteration3Room?.Guid_Dwelling ?? Guid.Empty,
+                    partOIteration3Room?.Name_Dwelling,
+                    systemVentilationBinding.Guid_SystemSpace,
+                    systemVentilationBinding.Guid_AirSystem,
+                    systemVentilationBinding.Reference_SystemZone,
+                    systemVentilationBinding.DesignFlowRate_Supply_Lps,
+                    systemVentilationBinding.DesignFlowRate_Extract_Lps));
+            }
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.Reconciliation,
+                string.Format(
+                    "{0} room(s) reconcile by identity between Reference A and Candidate B: same rooms, same TM59 criteria, same design airflows and the same transfer topology.",
+                    rooms_Comparable.Count));
+
+            //=================================================================================================
+            //Comparison - descriptive statistics, no parity threshold
+            //=================================================================================================
+            PartOIteration3Comparison partOIteration3Comparison = PartOIteration3Comparison.Create(
+                rooms_Comparable,
+                partOIteration3Assessment_A.ResultantTemperatures,
+                partOIteration3Assessment_B.ResultantTemperatures,
+                criteria,
+                out List<string> refusals_Comparison);
+
+            if (partOIteration3Comparison is null)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Comparison, "The A/B comparison could not be computed.", refusals_Comparison);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.Comparison,
+                string.Format("{0}. {1} TM59 criterion outcome(s) differ between the two routes.", partOIteration3Comparison.Statistics, partOIteration3Comparison.Count_Changed));
+
+            //=================================================================================================
+            //Persistence
+            //=================================================================================================
+            List<string> refusals_Persistence = [];
+            List<string> artifacts_Persistence = [];
+
+            //Candidate B's own reopenable model, provenanced to the BRIDGE results - the file its
+            //resultant temperatures were actually read from - and stamped with the same overheating
+            //scenarios Reference A was assessed under, which is what makes a reopened Candidate B
+            //reviewable against the same criteria.
+            analyticalModel_CandidateB.SetValue(Analytical.AnalyticalModelParameter.OverheatingScenarios, new SAMCollection<OverheatingScenario>(overheatingScenarios));
+            analyticalModel_CandidateB.SetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, new SimulationResultProvenance(analyticalModel_CandidateB, partOIteration3Paths.Path_TSD_Bridge));
+
+            if (!iPartOIteration3Pipeline.Persist(analyticalModel_CandidateB, partOIteration3Paths.Path_TSD_Bridge, partOIteration3Paths.Path_TBD_ThermalSource, out string note_Persist))
+            {
+                refusals_Persistence.Add(note_Persist ?? string.Format("Candidate B's analytical model could not be written to '{0}', so this pairing could not be reopened.", partOIteration3Paths.Path_Model_CandidateB));
+            }
+            else
+            {
+                AddNotes(notes, [note_Persist]);
+
+                if (partOIteration3Artifacts.TryClaim(partOIteration3Paths.Path_Model_CandidateB, out string artifact_Model, out string refusal_Model))
+                {
+                    artifacts_Persistence.Add(artifact_Model);
+
+                    partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.CandidateB_Model, partOIteration3Paths.Path_Model_CandidateB, Length(partOIteration3Paths.Path_Model_CandidateB), Ticks(partOIteration3Paths.Path_Model_CandidateB)));
+                }
+                else
+                {
+                    refusals_Persistence.Add(refusal_Model);
+                }
+            }
+
+            //The two TM59 reports the assessments wrote. Reference A's is beside A's own results and is
+            //not this attempt's to claim - A wrote it, possibly in an earlier session - so it is recorded
+            //with its current fingerprint and reported as a report rather than as an artifact of this run.
+            if (!string.IsNullOrWhiteSpace(partOIteration3Assessment_A.Path_Report))
+            {
+                partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.ReferenceA_TM59Report, partOIteration3Assessment_A.Path_Report, Length(partOIteration3Assessment_A.Path_Report), Ticks(partOIteration3Assessment_A.Path_Report)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(partOIteration3Assessment_B.Path_Report))
+            {
+                if (partOIteration3Artifacts.TryClaim(partOIteration3Assessment_B.Path_Report, out string artifact_Report, out string _))
+                {
+                    artifacts_Persistence.Add(artifact_Report);
+                }
+
+                partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.CandidateB_TM59Report, partOIteration3Assessment_B.Path_Report, Length(partOIteration3Assessment_B.Path_Report), Ticks(partOIteration3Assessment_B.Path_Report)));
+            }
+
+            if (refusals_Persistence.Count != 0)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Persistence, "This pairing could not be made reopenable.", refusals_Persistence, artifacts_Persistence);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, partOIteration3Assessment_A, partOIteration3Assessment_B, partOIteration3Paths, notes);
+            }
+
+            partOIteration3Ledger.Complete(
+                PartOIteration3Stage.Persistence,
+                string.Format("Candidate B is reopenable at '{0}', provenanced to '{1}', and the pairing record is at '{2}'.", partOIteration3Paths.Path_Model_CandidateB, partOIteration3Paths.Path_TSD_Bridge, partOIteration3Paths.Path_Record),
+                artifacts_Persistence);
+
+            return Result(partOIteration3Ledger, partOIteration3Record, partOIteration3Comparison, partOIteration3Assessment_A, partOIteration3Assessment_B, partOIteration3Paths, notes);
+        }
+
+        /// <summary>
+        /// Adopts the ledger into the record, writes the record, and answers the result.
+        ///
+        /// <para><b>The record is written on every path, including every refusal</b></para>
+        /// <para>
+        /// A refused pairing's ledger is its diagnosis, and a person who reopens the model tomorrow needs
+        /// it as much as a completed one - more, in fact. So this is the single exit and every refusal
+        /// above returns through it.
+        /// </para>
+        /// <para>
+        /// <b>The record file is not an artifact of the Persistence stage.</b> It cannot be: the stage's
+        /// own row has to be inside the record, so the record is serialized after the last stage is
+        /// recorded. It is reported as the pairing's location instead, which is what a reader actually
+        /// needs from it.
+        /// </para>
+        /// </summary>
+        private static PartOIteration3Result Result(
+            PartOIteration3Ledger partOIteration3Ledger,
+            PartOIteration3Record partOIteration3Record,
+            PartOIteration3Comparison partOIteration3Comparison,
+            PartOIteration3Assessment partOIteration3Assessment_A,
+            PartOIteration3Assessment partOIteration3Assessment_B,
+            PartOIteration3Paths partOIteration3Paths,
+            List<string> notes)
+        {
+            partOIteration3Record.Adopt(partOIteration3Ledger);
+
+            string path_Record = partOIteration3Paths?.Path_Record;
+
+            if (!string.IsNullOrWhiteSpace(path_Record))
+            {
+                try
+                {
+                    File.WriteAllText(path_Record, partOIteration3Record.ToString());
+                }
+                catch (Exception exception)
+                {
+                    //Noted, never fatal. The comparison in front of the user is already correct; what is
+                    //lost is the ability to reopen it, and saying so is more use than failing a run that
+                    //succeeded.
+                    notes.Add(string.Format("The Iteration 3 pairing record could not be written to '{0}', so this pairing cannot be reopened in a later session. ({1})", path_Record, exception.Message));
+                }
+            }
+
+            return new PartOIteration3Result(
+                partOIteration3Ledger,
+                partOIteration3Record,
+                partOIteration3Comparison,
+                partOIteration3Assessment_A,
+                partOIteration3Assessment_B,
+                partOIteration3Assessment_A?.Path_Report,
+                partOIteration3Assessment_B?.Path_Report,
+                path_Record,
+                false,
+                notes);
+        }
+
+        private static void Delete(string path, string description, List<string> refusals, List<string> notes)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                File.Delete(path);
+
+                notes.Add(string.Format("Deleted {0} at '{1}' so a failed attempt cannot leave a reopenable Candidate B behind.", description, path));
+            }
+            catch (Exception exception)
+            {
+                refusals.Add(string.Format(
+                    "{0} at '{1}' could not be deleted, so an earlier attempt's Candidate B would remain reopenable beside this one's. ({2})",
+                    char.ToUpperInvariant(description[0]) + description.Substring(1),
+                    path,
+                    exception.Message));
+            }
+        }
+
+        /// <summary>Whatever of the stated paths this attempt can honestly claim. Refusals are ignored: this is the FAILURE path, where the question is only what to show.</summary>
+        private static List<string> Claim(PartOIteration3Artifacts partOIteration3Artifacts, IEnumerable<string> paths)
+        {
+            partOIteration3Artifacts.TryClaim(paths, out List<string> artifacts, out List<string> _);
+
+            return artifacts;
+        }
+
+        private static long Length(string path)
+        {
+            return PartOIteration3Artifacts.TryRead(path, out long length, out long _) ? length : -1;
+        }
+
+        private static long Ticks(string path)
+        {
+            return PartOIteration3Artifacts.TryRead(path, out long _, out long ticks) ? ticks : -1;
+        }
+
+        private static void AddNotes(List<string> notes, IEnumerable<string> additions)
+        {
+            foreach (string addition in additions ?? [])
+            {
+                if (!string.IsNullOrWhiteSpace(addition))
+                {
+                    notes.Add(addition);
+                }
+            }
+        }
+    }
+}

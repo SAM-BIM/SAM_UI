@@ -1,0 +1,266 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
+
+using SAM.Core;
+using System;
+using System.Collections.Generic;
+
+namespace SAM.Analytical.UI.WPF
+{
+    public static partial class Modify
+    {
+        /// <summary>
+        /// Reopens a persisted Approved Document O Iteration 3 pairing and rebuilds its comparison from
+        /// the results that already exist - <b>without running TAS</b>.
+        ///
+        /// <para><b>The promise, and what enforces it</b></para>
+        /// <para>
+        /// Nothing here starts <c>TBD.exe</c>, <c>TSD.exe</c>, <c>TAS3D.exe</c> or <c>TPD.exe</c>, and no
+        /// TAS file is written or touched. That is not a convention: the only pipeline member this
+        /// reaches is <see cref="IPartOIteration3Pipeline.Assess"/>, which reads a results file through
+        /// the TSD reader the ordinary Review Results command already uses. The four members that run TAS
+        /// are never called, which a test can assert by handing in a pipeline whose other members throw.
+        /// </para>
+        ///
+        /// <para><b>Validated before anything is read</b></para>
+        /// <list type="number">
+        /// <item>The record parses and is of this build's schema.</item>
+        /// <item>It names <b>these</b> results - the run being reviewed is the Reference A it was written
+        /// against.</item>
+        /// <item>Reference A's design state and overheating scenarios still match the fingerprints the
+        /// record copied from its own provenance, so the pairing is not being shown against a design that
+        /// has moved.</item>
+        /// <item>Every Candidate B file the record names is still exactly the file it recorded - present,
+        /// same length, same write time. A changed or missing one refuses <b>by name</b>.</item>
+        /// <item>Candidate B's persisted model records its provenance to the <b>bridge</b> results, which
+        /// is where its resultant temperatures were read from.</item>
+        /// </list>
+        ///
+        /// <para><b>A refused record shows its ledger and nothing else</b></para>
+        /// <para>
+        /// Where the recorded pairing did not complete, the ledger is the whole answer: the refused stage,
+        /// its reasons verbatim, the artifacts that attempt genuinely produced, and the stages that never
+        /// ran. No assessment is read and no Candidate B number is produced, because there are none - and
+        /// producing some from the files that happen to be on disk is exactly the failure this design is
+        /// built against.
+        /// </para>
+        ///
+        /// <para><b>Deterministic</b></para>
+        /// <para>
+        /// The rebuild uses the record's own room set, its own dwelling grouping and its own bound rooms,
+        /// captures exactly those rooms on both sides, and orders everything by guid before walking it.
+        /// So re-exporting an unchanged completed pairing produces the same text every time, on any
+        /// machine.
+        /// </para>
+        /// </summary>
+        /// <param name="partORun">The Part O run whose results the pairing was written against.</param>
+        /// <param name="iPartOIteration3Pipeline">Only <see cref="IPartOIteration3Pipeline.Assess"/> is used.</param>
+        public static PartOIteration3Result ReviewPartOIteration3(PartORun partORun, IPartOIteration3Pipeline iPartOIteration3Pipeline)
+        {
+            List<string> notes = [];
+
+            PartOIteration3Ledger partOIteration3Ledger = new();
+
+            if (partORun is null || iPartOIteration3Pipeline is null)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "No Part O run or no pipeline was supplied.", ["No Part O run or no pipeline was supplied, so no Iteration 3 pairing could be reopened."]);
+
+                return new PartOIteration3Result(partOIteration3Ledger, null, null, null, null, null, null, null, true, notes);
+            }
+
+            string path_TSD_ReferenceA = partORun.Path_TSD;
+            string path_Record = PartOIteration3Paths.Path_Record_ForResults(path_TSD_ReferenceA);
+
+            PartOIteration3Record partOIteration3Record = Query.PartOIteration3PairingRecord(path_Record);
+
+            if (partOIteration3Record is null)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.Input,
+                    "There is no Iteration 3 pairing to reopen.",
+                    [string.Format("No Approved Document O Iteration 3 pairing record could be read at '{0}'.", path_Record ?? "<no path>")]);
+
+                return new PartOIteration3Result(partOIteration3Ledger, null, null, null, null, null, null, path_Record, true, notes);
+            }
+
+            //The ledger of the RECORDED attempt is what a review shows; it is never rebuilt here. What
+            //this method adds is either the rebuilt comparison, or its own refusal to trust the record.
+            PartOIteration3Ledger partOIteration3Ledger_Recorded = Recorded(partOIteration3Record);
+
+            List<string> refusals = Query.PartOIteration3ReviewRefusals(partORun, partOIteration3Record, out AnalyticalModel analyticalModel_CandidateB, out string path_TSD_CandidateB);
+
+            if (refusals.Count != 0)
+            {
+                //A record that cannot be trusted is shown as an Input refusal of THIS review, on a fresh
+                //ledger - not as the recorded attempt's verdict, which may well have completed. The two
+                //are different statements and a reader must not have them merged.
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "This Iteration 3 pairing can no longer be shown.", refusals);
+
+                return new PartOIteration3Result(
+                    partOIteration3Ledger,
+                    partOIteration3Record,
+                    null,
+                    null,
+                    null,
+                    partOIteration3Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path,
+                    partOIteration3Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path,
+                    path_Record,
+                    true,
+                    notes);
+            }
+
+            if (!partOIteration3Record.IsComplete)
+            {
+                //The recorded attempt refused. Its ledger IS the answer, and nothing is read.
+                notes.Add("This Approved Document O Iteration 3 attempt refused, so it produced no comparison. Its stage ledger is the record of what happened and how far it got.");
+
+                return new PartOIteration3Result(
+                    partOIteration3Ledger_Recorded,
+                    partOIteration3Record,
+                    null,
+                    null,
+                    null,
+                    partOIteration3Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path,
+                    partOIteration3Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path,
+                    path_Record,
+                    true,
+                    notes);
+            }
+
+            //---------------------------------------------------------------------------------------------
+            //Re-read the two EXISTING results files through the same unchanged TM59 authority.
+            //---------------------------------------------------------------------------------------------
+            List<PartOIteration3BindingRecord> bindings = partOIteration3Record.Bindings;
+
+            List<Guid> guids_Space_Bound = [];
+            Dictionary<Guid, PartOIteration3Room> dictionary_Room = [];
+
+            foreach (PartOIteration3BindingRecord partOIteration3BindingRecord in bindings)
+            {
+                guids_Space_Bound.Add(partOIteration3BindingRecord.Guid_Space);
+
+                dictionary_Room[partOIteration3BindingRecord.Guid_Space] = new PartOIteration3Room(
+                    partOIteration3BindingRecord.Guid_Space,
+                    partOIteration3BindingRecord.Name_Space,
+                    partOIteration3BindingRecord.Guid_Dwelling,
+                    partOIteration3BindingRecord.Name_Dwelling);
+            }
+
+            guids_Space_Bound.Sort();
+
+            PartOIteration3Assessment partOIteration3Assessment_A = iPartOIteration3Pipeline.Assess(partORun.AnalyticalModel_Assessment, path_TSD_ReferenceA, partORun.OverheatingScenarios, guids_Space_Bound);
+
+            List<OverheatingScenario> overheatingScenarios_CandidateB = [];
+            if (analyticalModel_CandidateB.TryGetValue(Analytical.AnalyticalModelParameter.OverheatingScenarios, out SAMCollection<OverheatingScenario> collection) && collection is not null)
+            {
+                foreach (OverheatingScenario overheatingScenario in collection)
+                {
+                    if (overheatingScenario is not null)
+                    {
+                        overheatingScenarios_CandidateB.Add(overheatingScenario);
+                    }
+                }
+            }
+
+            PartOIteration3Assessment partOIteration3Assessment_B = iPartOIteration3Pipeline.Assess(analyticalModel_CandidateB, path_TSD_CandidateB, overheatingScenarios_CandidateB, guids_Space_Bound);
+
+            if (partOIteration3Assessment_A is null || !partOIteration3Assessment_A.IsAssessed || partOIteration3Assessment_B is null || !partOIteration3Assessment_B.IsAssessed)
+            {
+                List<string> reasons = [];
+
+                if (partOIteration3Assessment_A is null || !partOIteration3Assessment_A.IsAssessed)
+                {
+                    reasons.Add(partOIteration3Assessment_A?.Refusal ?? string.Format("Reference A's results at '{0}' could not be reassessed.", path_TSD_ReferenceA));
+                }
+
+                if (partOIteration3Assessment_B is null || !partOIteration3Assessment_B.IsAssessed)
+                {
+                    reasons.Add(partOIteration3Assessment_B?.Refusal ?? string.Format("Candidate B's results at '{0}' could not be reassessed.", path_TSD_CandidateB));
+                }
+
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "This Iteration 3 pairing could not be reassessed from its existing results.", reasons);
+
+                return new PartOIteration3Result(partOIteration3Ledger, partOIteration3Record, null, null, null, null, null, path_Record, true, notes);
+            }
+
+            //---------------------------------------------------------------------------------------------
+            //Rebuild the reconciliation and the comparison from the record's own bindings.
+            //---------------------------------------------------------------------------------------------
+            List<string> refusals_Reconciliation = Query.PartOIteration3ReviewReconciliationRefusals(
+                partOIteration3Record,
+                partOIteration3Assessment_A,
+                partOIteration3Assessment_B,
+                dictionary_Room,
+                out List<PartOIteration3Room> rooms_Comparable,
+                out List<PartOIteration3CriterionComparison> criteria);
+
+            if (refusals_Reconciliation.Count != 0)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "This Iteration 3 pairing no longer reconciles.", refusals_Reconciliation);
+
+                return new PartOIteration3Result(partOIteration3Ledger, partOIteration3Record, null, null, null, null, null, path_Record, true, notes);
+            }
+
+            PartOIteration3Comparison partOIteration3Comparison = PartOIteration3Comparison.Create(
+                rooms_Comparable,
+                partOIteration3Assessment_A.ResultantTemperatures,
+                partOIteration3Assessment_B.ResultantTemperatures,
+                criteria,
+                out List<string> refusals_Comparison);
+
+            if (partOIteration3Comparison is null)
+            {
+                partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "This Iteration 3 pairing's comparison could not be rebuilt.", refusals_Comparison);
+
+                return new PartOIteration3Result(partOIteration3Ledger, partOIteration3Record, null, null, null, null, null, path_Record, true, notes);
+            }
+
+            notes.Add(string.Format(
+                "Rebuilt from the existing results at '{0}' and '{1}'. No TAS simulation was run and no TAS file was written.",
+                path_TSD_ReferenceA,
+                path_TSD_CandidateB));
+
+            return new PartOIteration3Result(
+                partOIteration3Ledger_Recorded,
+                partOIteration3Record,
+                partOIteration3Comparison,
+                partOIteration3Assessment_A,
+                partOIteration3Assessment_B,
+                partOIteration3Assessment_A.Path_Report ?? partOIteration3Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path,
+                partOIteration3Assessment_B.Path_Report ?? partOIteration3Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path,
+                path_Record,
+                true,
+                notes);
+        }
+
+        /// <summary>
+        /// The recorded attempt's ledger, rebuilt from the record so the review shows exactly what that
+        /// run said - including the stages that never ran.
+        /// <para>
+        /// Replayed through the live <see cref="PartOIteration3Ledger"/> rather than trusted as a list,
+        /// so the ordering rule that governed the run governs what is shown: a record claiming a stage
+        /// completed after a refusal is rejected here exactly as it would have been there.
+        /// </para>
+        /// </summary>
+        private static PartOIteration3Ledger Recorded(PartOIteration3Record partOIteration3Record)
+        {
+            PartOIteration3Ledger result = new();
+
+            foreach (PartOIteration3StageState partOIteration3StageState in partOIteration3Record?.Stages ?? [])
+            {
+                switch (partOIteration3StageState.Status)
+                {
+                    case PartOIteration3StageStatus.Completed:
+                        result.Complete(partOIteration3StageState.Stage, partOIteration3StageState.Detail, partOIteration3StageState.Artifacts);
+                        break;
+
+                    case PartOIteration3StageStatus.Refused:
+                        result.Refuse(partOIteration3StageState.Stage, partOIteration3StageState.Detail, partOIteration3StageState.Reasons, partOIteration3StageState.Artifacts);
+                        break;
+                }
+            }
+
+            return result;
+        }
+    }
+}

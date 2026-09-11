@@ -72,6 +72,10 @@ namespace SAM.Analytical.UI
 
         private PartOSimulationContext partOSimulationContext;
 
+        //The identities of the ventilation systems the preparation BUILT for this run - see
+        //Guids_VentilationSystem_Prepared.
+        private List<System.Guid> guids_VentilationSystem_Prepared = [];
+
         private string path_TSD;
 
         private System.DateTime dateTime_TSD;
@@ -183,6 +187,35 @@ namespace SAM.Analytical.UI
         /// </para>
         /// </summary>
         public PartOSimulationContext SimulationContext => State == PartORunState.WorkflowCompleted ? partOSimulationContext : null;
+
+        /// <summary>
+        /// The identities of the <c>VentilationSystem</c> objects the Part O preparation <b>built</b> for
+        /// this run - <c>PartOIterationPreparation.VentilationSystems</c>, captured at the moment the run
+        /// adopted the preparation. Empty on a run prepared through an overload that states none, and on a
+        /// restored run.
+        ///
+        /// <para><b>Why the identities are captured rather than looked up later</b></para>
+        /// <para>
+        /// A real Approved Document O model carries authored ventilation systems this iteration did not
+        /// build and deliberately did not change - natural ventilation, uncontrolled ventilation, a legacy
+        /// mechanical system - and <c>Modify.PreparePartOIteration</c> preserves all of them, saying so in
+        /// its own notes. The only moment at which "which of these is the design under assessment" is known
+        /// for certain is the moment the preparation hands its systems back. Afterwards there is no rule
+        /// that recovers it: type is not it (a legacy MV system is also mechanical), terminals are not it
+        /// (a competing design may carry them), and the display name is <b>never</b> it. See SAM #114.
+        /// </para>
+        /// <para>
+        /// <b>Read-only, and cleared with everything else.</b> A dropped, reset or restored run carries
+        /// none: a captured identity that outlived the preparation it came from would scope the next run's
+        /// materialisation to the previous run's design.
+        /// </para>
+        /// <para>
+        /// A <b>restored</b> run deliberately has none. The file records what was run, not how this session
+        /// prepared it, so a reopened run may review a completed Iteration 3 record and may not start a new
+        /// Candidate B - the same rule that keeps it out of Iteration 2B.
+        /// </para>
+        /// </summary>
+        public List<System.Guid> Guids_VentilationSystem_Prepared => State == PartORunState.None ? [] : [.. guids_VentilationSystem_Prepared];
 
         /// <summary>
         /// Whether this run has results at all - what the ribbon enables on.
@@ -418,7 +451,18 @@ namespace SAM.Analytical.UI
         /// </param>
         public bool Prepare(PartOIterationPreparation partOIterationPreparation, PartOPreparationContext partOPreparationContext)
         {
-            return Prepare(partOIterationPreparation?.AnalyticalModel, partOIterationPreparation?.OverheatingScenarios, partOPreparationContext, partOIterationPreparation?.Refusal);
+            //THE capture point for the Iteration 3 system scope, and the only one there is. See
+            //Guids_VentilationSystem_Prepared for why it cannot be recovered afterwards.
+            List<System.Guid> guids_VentilationSystem = [];
+            foreach (VentilationSystem ventilationSystem in partOIterationPreparation?.VentilationSystems ?? [])
+            {
+                if (ventilationSystem is not null && ventilationSystem.Guid != System.Guid.Empty)
+                {
+                    guids_VentilationSystem.Add(ventilationSystem.Guid);
+                }
+            }
+
+            return Prepare(partOIterationPreparation?.AnalyticalModel, partOIterationPreparation?.OverheatingScenarios, partOPreparationContext, guids_VentilationSystem, partOIterationPreparation?.Refusal);
         }
 
         /// <summary>
@@ -445,6 +489,21 @@ namespace SAM.Analytical.UI
         /// live but not automatically repeatable.
         /// </param>
         public bool Prepare(AnalyticalModel analyticalModel_Prepared, IEnumerable<OverheatingScenario> overheatingScenarios, PartOPreparationContext partOPreparationContext, string refusal = null)
+        {
+            return Prepare(analyticalModel_Prepared, overheatingScenarios, partOPreparationContext, null, refusal);
+        }
+
+        /// <summary>
+        /// The same transition, additionally capturing the identities of the ventilation systems the
+        /// preparation <b>built</b> - see <see cref="Guids_VentilationSystem_Prepared"/>, which is where
+        /// the whole reason this parameter exists is written down.
+        /// </summary>
+        /// <param name="guids_VentilationSystem">
+        /// <c>PartOIterationPreparation.VentilationSystems</c>' identities. Null or empty is legitimate -
+        /// the natural-ventilation route builds no system - and simply leaves the run with no Iteration 3
+        /// system scope, which it then refuses to start one from.
+        /// </param>
+        public bool Prepare(AnalyticalModel analyticalModel_Prepared, IEnumerable<OverheatingScenario> overheatingScenarios, PartOPreparationContext partOPreparationContext, IEnumerable<System.Guid> guids_VentilationSystem, string refusal = null)
         {
             ResetCore();
 
@@ -477,6 +536,19 @@ namespace SAM.Analytical.UI
             this.analyticalModel_Prepared = analyticalModel_Prepared;
             this.overheatingScenarios = overheatingScenarios_Temp;
             this.partOPreparationContext = partOPreparationContext;
+
+            //Recorded only for a run that is actually going live: a refused preparation returns above, so
+            //its systems - if it even reported any - never become a live run's Iteration 3 scope.
+            List<System.Guid> guids_VentilationSystem_Temp = [];
+            foreach (System.Guid guid in guids_VentilationSystem ?? [])
+            {
+                if (guid != System.Guid.Empty && !guids_VentilationSystem_Temp.Contains(guid))
+                {
+                    guids_VentilationSystem_Temp.Add(guid);
+                }
+            }
+
+            guids_VentilationSystem_Prepared = guids_VentilationSystem_Temp;
 
             State = PartORunState.Prepared;
 
@@ -843,6 +915,12 @@ namespace SAM.Analytical.UI
             //picked up by its successor, which was prepared and simulated differently.
             partOPreparationContext = null;
             partOSimulationContext = null;
+
+            //Cleared with everything else, and for the sharpest version of the same reason: a captured
+            //system identity that outlived its preparation would scope the NEXT run's Iteration 3
+            //materialisation to the PREVIOUS run's design, and every guid in it would resolve, so nothing
+            //downstream could tell.
+            guids_VentilationSystem_Prepared = [];
 
             //Cleared with everything else: a workflow announced to the run that has just been dropped must not
             //be able to complete its successor.

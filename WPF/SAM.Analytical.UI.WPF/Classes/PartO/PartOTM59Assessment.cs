@@ -6,6 +6,7 @@ using SAM.Weather;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 
 namespace SAM.Analytical.UI.WPF
 {
@@ -54,7 +55,7 @@ namespace SAM.Analytical.UI.WPF
     {
         //Internal rather than private so tests can fabricate the assessment the subset-pass guard reads -
         //the production route to one remains Assess, which needs a real TSD.
-        internal PartOTM59Assessment(TM59AssessmentResult tM59AssessmentResult, TM59AssessmentReport tM59AssessmentReport, List<PartOTM59SpaceResult> spaceResults, List<string> associationRefusals, List<Guid> spaceGuids_Unassessed, string refusal)
+        internal PartOTM59Assessment(TM59AssessmentResult tM59AssessmentResult, TM59AssessmentReport tM59AssessmentReport, List<PartOTM59SpaceResult> spaceResults, List<string> associationRefusals, List<Guid> spaceGuids_Unassessed, string refusal, Dictionary<Guid, double[]>? resultantTemperatures = null)
         {
             Result = tM59AssessmentResult;
             Report = tM59AssessmentReport;
@@ -62,7 +63,33 @@ namespace SAM.Analytical.UI.WPF
             AssociationRefusals = associationRefusals ?? [];
             SpaceGuids_Unassessed = spaceGuids_Unassessed ?? [];
             Refusal = refusal;
+            ResultantTemperatures = resultantTemperatures;
         }
+
+        /// <summary>
+        /// The hourly resultant temperature series this assessment actually read, keyed by <b>design</b>
+        /// space guid - or null where the caller did not ask for them.
+        ///
+        /// <para><b>Off by default, and scoped when on</b></para>
+        /// <para>
+        /// Nothing needs these to get a TM59 verdict; they exist so an Approved Document O Iteration 3
+        /// A/B comparison can state how far apart two thermal routes are <b>using the very numbers the two
+        /// assessments were computed from</b>, rather than re-reading the results file through a second
+        /// path that could resolve a room differently. So every existing caller gets null and pays nothing.
+        /// </para>
+        /// <para>
+        /// <b>Why scoping matters rather than being a nicety.</b> A project of five thousand spaces with a
+        /// full annual series is forty-three million doubles - about 350 MB - per case, and a comparison
+        /// holds two. Only the rooms the caller names are captured, which for Iteration 3 is the set bound
+        /// to the explicit ventilation route and nothing else.
+        /// </para>
+        /// <para>
+        /// <b>Keyed through <c>SimulationSpaceMap</c>, exactly as every result on this class is.</b> A
+        /// simulated space that does not resolve to exactly one design space contributes no series, for
+        /// the same reason it contributes no verdict.
+        /// </para>
+        /// </summary>
+        public Dictionary<Guid, double[]>? ResultantTemperatures { get; }
 
         /// <summary>The production assessment result, or null where none could be produced.</summary>
         public TM59AssessmentResult? Result { get; }
@@ -126,7 +153,17 @@ namespace SAM.Analytical.UI.WPF
         /// The scenarios of the preparation this run was built on. They are authoritative over which TM59
         /// criterion applies to which space, and are never derived from an internal condition or a name.
         /// </param>
-        public static PartOTM59Assessment Assess(AnalyticalModel? analyticalModel_Workflow, string? path_TSD, IEnumerable<OverheatingScenario>? overheatingScenarios)
+        /// <param name="captureResultantTemperature">
+        /// Whether to also hand back the hourly resultant temperature series this assessment read - see
+        /// <see cref="ResultantTemperatures"/>. <b>False, the default, is every existing caller</b>, and
+        /// changes nothing about what is calculated or reported.
+        /// </param>
+        /// <param name="spaceGuids_Capture">
+        /// Which DESIGN spaces to capture, where capture is on. Null captures every assessed room, which
+        /// on a large project is a great deal of memory for series nobody asked about - so a caller that
+        /// knows its rooms says so.
+        /// </param>
+        public static PartOTM59Assessment Assess(AnalyticalModel? analyticalModel_Workflow, string? path_TSD, IEnumerable<OverheatingScenario>? overheatingScenarios, bool captureResultantTemperature = false, IEnumerable<Guid>? spaceGuids_Capture = null)
         {
             if (analyticalModel_Workflow is null || string.IsNullOrWhiteSpace(path_TSD))
             {
@@ -250,7 +287,115 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            return new PartOTM59Assessment(tM59AssessmentResult, tM59AssessmentReport, spaceResults, associationRefusals, spaceGuids_Unassessed, null);
+            //Read AFTER the calculation, off the very spaces it ran over and through the very key it read
+            //them with - so the series handed back cannot be a different room's or a different quantity's
+            //than the one the verdict above was computed from. Only where the caller asked.
+            Dictionary<Guid, double[]>? resultantTemperatures = captureResultantTemperature
+                ? CaptureResultantTemperatures(spaces, tM59AssessmentCalculator.SimulationSpaceMap, tM59AssessmentCalculator.ResultantTemperatureSeriesKey, spaceGuids_Capture)
+                : null;
+
+            return new PartOTM59Assessment(tM59AssessmentResult, tM59AssessmentReport, spaceResults, associationRefusals, spaceGuids_Unassessed, null, resultantTemperatures);
+        }
+
+        /// <summary>
+        /// The hourly resultant temperature of each assessed simulated space, keyed to the design space it
+        /// resolves to.
+        ///
+        /// <para><b>The same series, read the same way</b></para>
+        /// <para>
+        /// The key is <c>TM59AssessmentCalculator.ResultantTemperatureSeriesKey</c> - the calculator's own,
+        /// passed in rather than restated here, because a second spelling of it would be a second series.
+        /// Each hour is converted exactly as <c>TMOverheatingCalculator</c> converts it: a value that is
+        /// not a JSON number, or that will not convert, or that is not finite, becomes
+        /// <see cref="double.NaN"/> rather than a zero. A consumer then refuses the room - which is the
+        /// right answer, and the opposite of what silently reading an unknown hour as 0 C would produce.
+        /// </para>
+        /// <para>
+        /// <b>A room is captured once.</b> Two simulated spaces resolving to one design space would be an
+        /// identity failure the map itself refuses; if one reached here, the first is kept and the second
+        /// is dropped rather than overwriting it.
+        /// </para>
+        /// </summary>
+        internal static Dictionary<Guid, double[]> CaptureResultantTemperatures(IEnumerable<Space>? spaces_Simulation, SimulationSpaceMap? simulationSpaceMap, string key, IEnumerable<Guid>? spaceGuids_Capture)
+        {
+            Dictionary<Guid, double[]> result = [];
+
+            HashSet<Guid>? guids_Wanted = spaceGuids_Capture is null ? null : [.. spaceGuids_Capture];
+
+            if (guids_Wanted is not null && guids_Wanted.Count == 0)
+            {
+                return result;
+            }
+
+            foreach (Space space_Simulation in spaces_Simulation ?? [])
+            {
+                if (space_Simulation is null)
+                {
+                    continue;
+                }
+
+                Space? space_Design = simulationSpaceMap?.Design(space_Simulation);
+                if (space_Design is null)
+                {
+                    continue;
+                }
+
+                Guid guid_Design = space_Design.Guid;
+
+                if ((guids_Wanted is not null && !guids_Wanted.Contains(guid_Design)) || result.ContainsKey(guid_Design))
+                {
+                    continue;
+                }
+
+                if (!Core.Query.TryGetValue(space_Simulation, key, out JsonArray jsonArray) || jsonArray is null)
+                {
+                    continue;
+                }
+
+                double[] values = new double[jsonArray.Count];
+
+                for (int i = 0; i < values.Length; i++)
+                {
+                    values[i] = Value(jsonArray[i]);
+                }
+
+                result[guid_Design] = values;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// One hour of a captured series, or <see cref="double.NaN"/>.
+        /// <para>
+        /// The node's own JSON kind is asked FIRST and not only whether it converts: <c>Core.Query.TryConvert</c>
+        /// routes a JSON boolean through its bool-to-double conversion, so <c>true</c> would read as 1 C.
+        /// <c>GetValueKind()</c> is itself guarded because it throws on the NaN and infinity a
+        /// <c>JsonArray</c> can hold - it has to decide how the value would serialize, and those do not.
+        /// This mirrors <c>TMOverheatingCalculator</c>'s own reader deliberately; the two must agree about
+        /// which hours are numbers.
+        /// </para>
+        /// </summary>
+        private static double Value(JsonNode? jsonNode)
+        {
+            if (jsonNode is not JsonValue jsonValue)
+            {
+                return double.NaN;
+            }
+
+            try
+            {
+                if (jsonValue.GetValueKind() != System.Text.Json.JsonValueKind.Number)
+                {
+                    return double.NaN;
+                }
+
+                return Core.Query.TryConvert(jsonValue, out double value) ? value : double.NaN;
+            }
+            catch (ArgumentException)
+            {
+                return double.NaN;
+            }
         }
 
         /// <summary>

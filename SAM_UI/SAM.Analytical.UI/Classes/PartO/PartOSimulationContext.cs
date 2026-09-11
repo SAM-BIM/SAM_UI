@@ -81,6 +81,51 @@ namespace SAM.Analytical.UI
         public bool UpdateConstructionLayersByPanelType { get; set; } = true;
 
         /// <summary>
+        /// This case again, writing somewhere else - the <b>only</b> way an Approved Document O Iteration 3
+        /// Candidate B is allowed to be built.
+        ///
+        /// <para><b>Why a copy, and why it changes only two things</b></para>
+        /// <para>
+        /// Candidate B is a second thermal route over the same design, and the whole point of comparing it
+        /// with Reference A is that any difference in the results is attributable to the route. That
+        /// survives only if every other input is identical: the same weather file, the same solar
+        /// calculation, the same annual day range, the same unmet-hours and sizing behaviour, the same
+        /// aperture-width treatment and the same construction-layer preparation. A field silently left at
+        /// its default here would make the two cases different simulations of different buildings, and the
+        /// A/B statistics would be measuring that instead.
+        /// </para>
+        /// <para>
+        /// So this copies <b>everything</b> and overrides only where the files go and what they are called
+        /// - which must differ, or Candidate B would write over Reference A's own evidence. A reflection
+        /// test asserts that every public property of this type is carried, so a property added later
+        /// cannot quietly fail to be copied.
+        /// </para>
+        /// <para>
+        /// <b>The weather is shared, not cloned.</b> <c>WeatherData</c> is an input both cases read and
+        /// neither writes; handing Candidate B a copy of it would let the two drift apart for no gain and
+        /// would duplicate a year of hourly weather per run.
+        /// </para>
+        /// </summary>
+        /// <param name="projectName">The copy's project name. Null or blank keeps this one's.</param>
+        /// <param name="outputDirectory">Where the copy writes. Null or blank keeps this one's.</param>
+        public PartOSimulationContext Copy(string projectName = null, string outputDirectory = null)
+        {
+            return new PartOSimulationContext(
+                string.IsNullOrWhiteSpace(outputDirectory) ? OutputDirectory : outputDirectory,
+                string.IsNullOrWhiteSpace(projectName) ? ProjectName : projectName,
+                WeatherData,
+                SolarCalculationMethod,
+                SimulateFrom,
+                SimulateTo)
+            {
+                UnmetHours = UnmetHours,
+                Sizing = Sizing,
+                UseWidths = UseWidths,
+                UpdateConstructionLayersByPanelType = UpdateConstructionLayersByPanelType,
+            };
+        }
+
+        /// <summary>
         /// Whether this is the full annual hourly series a TM59 assessment can read. Anything less cannot
         /// complete a Part O run, so an optimisation cannot be started from it either.
         /// </summary>
