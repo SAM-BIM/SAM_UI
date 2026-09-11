@@ -833,5 +833,65 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3-Review.txt")));
             Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3-Review.json")));
         }
+
+        /// <summary>
+        /// A later save that fails part way through - here, because another handle has the .json sibling
+        /// open exclusively, the same symptom a locked or permission-denied file produces - must leave the
+        /// pairing exactly as the earlier successful save left it: not just "a report still exists", but
+        /// the <b>same bytes</b> on <b>both</b> siblings, never one replaced by this attempt's (different)
+        /// content while the other is left from the earlier one.
+        /// <para>
+        /// The second review is given different Reference A/Candidate B temperatures than the run used, so
+        /// its report would be textually different from the run's if it were written - which is what makes
+        /// this test able to tell "overwritten" apart from "untouched". A writer that composed straight
+        /// onto <c>path_Report</c> before attempting <c>path_Report_Json</c> would let this review's
+        /// content land on the first file while the run's content is still on the second - passing a
+        /// "some report still exists" check while failing this one.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void A_locked_destination_leaves_both_siblings_of_the_earlier_successful_report_untouched()
+        {
+            PartORun partORun = Run(out PartOIteration3Result partOIteration3Result_Run, out List<Guid> _);
+
+            string path_Report = partOIteration3Result_Run.Path_Report;
+            string path_Report_Json = partOIteration3Result_Run.Path_Report_Json;
+
+            string text = File.ReadAllText(path_Report);
+            string text_Json = File.ReadAllText(path_Report_Json);
+
+            PartOIteration3Result partOIteration3Result_Review;
+
+            //FileShare.None reproduces, from this same process, exactly what a locked or permission-denied
+            //file looks like to the writer: neither a rename nor a delete of this path can go through while
+            //the handle is open.
+            using (new FileStream(path_Report_Json, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                int count = 0;
+
+                partOIteration3Result_Review = Modify.ReviewPartOIteration3(partORun, new PartOIteration3PipelineReviewOnly
+                {
+                    Func_Assess = guids => Assessment(guids, ++count == 1 ? 20.0 : 25.0),
+                });
+
+                Assert.True(partOIteration3Result_Review.IsComplete);
+
+                //The review itself is genuine - it is only the save that could not complete.
+                Assert.Null(partOIteration3Result_Review.Path_Report);
+                Assert.Null(partOIteration3Result_Review.Path_Report_Json);
+                Assert.NotNull(partOIteration3Result_Review.Refusal_Report);
+            }
+
+            //Both siblings the run wrote are exactly as the run left them - not one of them replaced by
+            //this review's (different) numbers while the lock was held.
+            Assert.Equal(text, File.ReadAllText(path_Report));
+            Assert.Equal(text_Json, File.ReadAllText(path_Report_Json));
+
+            //And no temporary or backup file from the failed attempt was left beside them.
+            Assert.False(File.Exists(path_Report + ".tmp"));
+            Assert.False(File.Exists(path_Report_Json + ".tmp"));
+            Assert.False(File.Exists(path_Report + ".bak"));
+            Assert.False(File.Exists(path_Report_Json + ".bak"));
+        }
     }
 }
