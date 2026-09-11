@@ -5,29 +5,47 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Part O — Iteration 3 (A/B) — explicit TAS Systems ventilation" Height="820" Width="1400" FontFamily="Roboto Light">
+        Title="Part O — Iteration 3 (A/B) — explicit TAS Systems ventilation"
+        Height="820" Width="1400" MinHeight="460" MinWidth="820"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" FontFamily="Roboto Light">
+    <!-- Height/Width are a preference, not a promise: the constructor clamps both to the work area, so
+         125% and 150% display scaling cannot put the action bar below the desktop. Nothing that can grow
+         without limit is in an Auto row - the summary is in a MaxHeight'd scroller and the refusal is in
+         a star row with its own scroller - so long evidence scrolls instead of pushing the bar off the
+         bottom. The grids stay in star rows and are deliberately NOT inside a page-level scroller: that
+         would hand them infinite height and defeat the virtualisation that makes five thousand dwellings
+         openable. -->
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <!-- The refusal and the comparison grid are the two halves of the same space: exactly one of
+                 them is ever shown, so Refresh gives the slack to whichever it is rather than leaving an
+                 empty band where the other would have been. -->
+            <RowDefinition x:Name="rowDefinition_Refusal" Height="0"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*" MinHeight="72"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="170"/>
+            <RowDefinition x:Name="rowDefinition_Comparison" Height="3*" MinHeight="96"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*" MinHeight="54"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="120"/>
-            <RowDefinition Height="30"/>
         </Grid.RowDefinitions>
 
         <TextBlock x:Name="textBlock_Outcome" Grid.Row="0" TextWrapping="Wrap" FontWeight="Bold" Margin="0,0,0,4"/>
-        <TextBlock x:Name="textBlock_Summary" Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#555555"/>
+
+        <ScrollViewer Grid.Row="1" MaxHeight="90" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,8">
+            <TextBlock x:Name="textBlock_Summary" TextWrapping="Wrap" Foreground="#555555"/>
+        </ScrollViewer>
 
         <!-- Shown only on a refusal. It states the stage that refused and the reasons VERBATIM, and it is
              also what the hidden comparison rows below are replaced by: a refused pairing presents no
-             Candidate B numbers at all. -->
-        <TextBlock x:Name="textBlock_Refusal" Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="Firebrick" Visibility="Collapsed"/>
+             Candidate B numbers at all. Bounded and scrollable, because a refusal can carry one line or
+             fifty and neither may cost the reader the buttons at the bottom of the window. -->
+        <ScrollViewer x:Name="scrollViewer_Refusal" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,8" Visibility="Collapsed">
+            <TextBlock x:Name="textBlock_Refusal" TextWrapping="Wrap" Foreground="Firebrick"/>
+        </ScrollViewer>
 
         <Label Grid.Row="3" Content="Stages" Padding="0,0,0,2" FontWeight="Bold"/>
         <DataGrid x:Name="dataGrid_Stage" Grid.Row="4" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="False" HeadersVisibility="Column"
@@ -101,13 +119,28 @@
         <Label x:Name="label_Diagnostics" Grid.Row="8" Content="Notes" Margin="0,10,0,0" Padding="0,0,0,2" FontWeight="Bold"/>
         <TextBox x:Name="textBox_Diagnostics" Grid.Row="9" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
 
-        <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,6,0,4">
-            <Button x:Name="button_ReportA" Width="140" Height="20" Margin="0,0,8,0" Click="button_ReportA_Click" ToolTipService.ShowOnDisabled="True">TM59 report (A)</Button>
-            <Button x:Name="button_ReportB" Width="140" Height="20" Margin="0,0,8,0" Click="button_ReportB_Click" ToolTipService.ShowOnDisabled="True">TM59 report (B)</Button>
-            <Button x:Name="button_OpenFolder" Width="100" Height="20" Click="button_OpenFolder_Click" ToolTipService.ShowOnDisabled="True">Open Folder</Button>
-        </StackPanel>
+        <!-- Always the last Auto row, and nothing above it is unbounded, so the action bar is on screen at
+             every window size MinHeight allows. -->
+        <Grid Grid.Row="10" Margin="0,6,0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-        <Button x:Name="button_CopyAll" Grid.Row="10" Width="70" Height="20" Margin="0,6,80,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_CopyAll_Click">Copy All</Button>
-        <Button x:Name="button_Close" IsCancel="True" Grid.Row="10" Width="60" Height="20" Margin="0,6,10,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="button_Close_Click">Close</Button>
+            <!-- A WrapPanel, not a StackPanel: the window's MinWidth is set so these fit on one line at
+                 the default font metrics, and a system font that measures wider wraps them onto a second
+                 line rather than putting one of them under the Close button. -->
+            <WrapPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                <Button x:Name="button_ReportA" MinWidth="140" Height="20" Margin="0,0,8,0" Click="button_ReportA_Click" ToolTipService.ShowOnDisabled="True">TM59 report (A)</Button>
+                <Button x:Name="button_ReportB" MinWidth="140" Height="20" Margin="0,0,8,0" Click="button_ReportB_Click" ToolTipService.ShowOnDisabled="True">TM59 report (B)</Button>
+                <Button x:Name="button_OpenReport" MinWidth="200" Height="20" Margin="0,0,8,0" Padding="6,0" Click="button_OpenReport_Click" ToolTipService.ShowOnDisabled="True">A/B review report</Button>
+                <Button x:Name="button_OpenFolder" MinWidth="100" Height="20" Margin="0,0,8,0" Click="button_OpenFolder_Click" ToolTipService.ShowOnDisabled="True">Open Folder</Button>
+            </WrapPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button x:Name="button_CopyAll" MinWidth="70" Height="20" Margin="8,0,10,0" Click="button_CopyAll_Click">Copy All</Button>
+                <Button x:Name="button_Close" IsCancel="True" MinWidth="60" Height="20" Click="button_Close_Click">Close</Button>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

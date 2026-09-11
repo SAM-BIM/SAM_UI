@@ -724,7 +724,7 @@ namespace SAM.Analytical.UI.WPF
 
             //The reports offered are the ones the record holds, and the record holds only reports this
             //attempt wrote - see RecordReport.
-            return new PartOIteration3Result(
+            PartOIteration3Result partOIteration3Result = new(
                 partOIteration3Ledger,
                 partOIteration3Record,
                 partOIteration3Comparison,
@@ -735,6 +735,12 @@ namespace SAM.Analytical.UI.WPF
                 path_Record,
                 false,
                 notes);
+
+            //The A/B review report, beside the record. Writes only where the pairing completed, so a
+            //refused attempt cannot replace the last report that described a real comparison.
+            SavePartOIteration3Report(partOIteration3Result);
+
+            return partOIteration3Result;
         }
 
         /// <summary>

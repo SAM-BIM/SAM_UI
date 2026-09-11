@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -27,6 +26,22 @@ namespace SAM.Analytical.UI.WPF
     /// refused ledger - so there is nothing to render even if this code forgot.
     /// </para>
     ///
+    /// <para><b>The last successful report stays reachable, and stays labelled historical</b></para>
+    /// <para>
+    /// Every completed pairing writes its whole review to a file beside the pairing record. When the
+    /// design later moves and Review correctly refuses the pairing, that file is <b>not</b> overwritten
+    /// and <b>not</b> presented as the current answer - the window offers it under its own name, says in
+    /// the refusal text what it is and is not, and leaves the refusal as the only statement about the
+    /// model in front of the user.
+    /// </para>
+    ///
+    /// <para><b>It renders text, it does not compose it</b></para>
+    /// <para>
+    /// Every line here comes from <see cref="PartOIteration3ReportText"/>, which is also what the
+    /// persisted report is assembled from. A window that composed its own wording would be a second
+    /// answer waiting to disagree with the saved one.
+    /// </para>
+    ///
     /// <para><b>Built for five thousand dwellings</b></para>
     /// <para>
     /// Both grids virtualise and recycle, the rows are flat values computed once, the search term is
@@ -42,9 +57,14 @@ namespace SAM.Analytical.UI.WPF
 
         private List<PartOIteration3Row> rows = [];
 
+        /// <summary>The persisted report this window can open, or null where there is none on disk.</summary>
+        private string path_Report_Available;
+
         public PartOIteration3ResultWindow()
         {
             InitializeComponent();
+
+            Fit();
         }
 
         /// <summary>The pairing to present. Setting it rebuilds the whole window.</summary>
@@ -63,6 +83,61 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>
+        /// Keeps the window inside the desktop it opens on.
+        /// <para>
+        /// The XAML asks for 1400x820, which is what this window wants on a 1920x1080 desktop at 100%
+        /// scaling. At 125% that desktop is 825 device-independent pixels tall and at 150% it is 688, so
+        /// the requested height alone would put the action bar below the taskbar with no way to reach it:
+        /// the window is resizable, but a person cannot drag a title bar up past the top of the screen.
+        /// So the request is clamped to the work area and the window is re-centred inside it.
+        /// </para>
+        /// <para>
+        /// <c>SystemParameters.WorkArea</c> is already in device-independent pixels, which is what
+        /// <c>Width</c> and <c>Height</c> are measured in, so no DPI arithmetic belongs here.
+        /// </para>
+        /// </summary>
+        private void Fit()
+        {
+            Rect rect;
+
+            try
+            {
+                rect = SystemParameters.WorkArea;
+            }
+            catch (Exception)
+            {
+                //No desktop to measure - a test host, or a session with no interactive window station.
+                //The XAML's own size stands.
+                return;
+            }
+
+            if (rect.Width <= 0 || rect.Height <= 0)
+            {
+                return;
+            }
+
+            //Allowance for the window chrome, which is outside the client size these properties set.
+            double width = Math.Min(Width, Math.Max(MinWidth, rect.Width - 20));
+            double height = Math.Min(Height, Math.Max(MinHeight, rect.Height - 40));
+
+            bool clamped = width < Width || height < Height;
+
+            Width = width;
+            Height = height;
+
+            if (!clamped)
+            {
+                return;
+            }
+
+            //Re-centred rather than left where CenterOwner would put a window that was taller than the
+            //screen a moment ago.
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = rect.Left + ((rect.Width - width) / 2);
+            Top = rect.Top + ((rect.Height - height) / 2);
+        }
+
         private void Refresh()
         {
             if (partOIteration3Result is null)
@@ -72,23 +147,26 @@ namespace SAM.Analytical.UI.WPF
 
             bool complete = partOIteration3Result.IsComplete;
 
-            textBlock_Outcome.Text = complete
-                ? string.Format(
-                    "Iteration 3 {0} COMPLETE. Reference A {1}; Candidate B {2}.",
-                    partOIteration3Result.IsRestored ? "review" : "run",
-                    Verdict(partOIteration3Result.Assessment_ReferenceA),
-                    Verdict(partOIteration3Result.Assessment_CandidateB))
-                : string.Format(
-                    "Iteration 3 {0} REFUSED at {1}. No Candidate B result is presented.",
-                    partOIteration3Result.IsRestored ? "review" : "run",
-                    partOIteration3Result.Ledger.Stage_Refused.HasValue ? Core.Query.Description(partOIteration3Result.Ledger.Stage_Refused.Value) : "an unrecorded stage");
-
-            textBlock_Summary.Text = Summary();
+            textBlock_Outcome.Text = PartOIteration3ReportText.Outcome(partOIteration3Result);
+            textBlock_Summary.Text = PartOIteration3ReportText.Summary(partOIteration3Result);
 
             dataGrid_Stage.ItemsSource = partOIteration3Result.Ledger.Stages;
 
+            //Resolved before the refusal text is composed, because a refusal that has a historical report
+            //to point at says so, and one that has not must not.
+            path_Report_Available = Path_Report();
+
             textBlock_Refusal.Text = complete ? string.Empty : Refusal();
-            textBlock_Refusal.Visibility = complete ? Visibility.Collapsed : Visibility.Visible;
+            scrollViewer_Refusal.Visibility = complete ? Visibility.Collapsed : Visibility.Visible;
+
+            //Exactly one of the refusal and the comparison grid is ever shown, and the one that is takes
+            //the slack. A star row holding a collapsed control is an empty band in the middle of the
+            //window, and on a refusal that band is where the evidence should have been.
+            rowDefinition_Refusal.Height = complete ? new GridLength(0) : new GridLength(3, GridUnitType.Star);
+            rowDefinition_Refusal.MinHeight = complete ? 0 : 80;
+
+            rowDefinition_Comparison.Height = complete ? new GridLength(3, GridUnitType.Star) : new GridLength(0);
+            rowDefinition_Comparison.MinHeight = complete ? 96 : 0;
 
             Visibility visibility = complete ? Visibility.Visible : Visibility.Collapsed;
 
@@ -98,8 +176,8 @@ namespace SAM.Analytical.UI.WPF
 
             if (complete)
             {
-                textBlock_Comparison.Text = Comparison();
-                textBlock_Dwellings.Text = Dwellings();
+                textBlock_Comparison.Text = PartOIteration3ReportText.Comparison(partOIteration3Result, CultureInfo.CurrentCulture);
+                textBlock_Dwellings.Text = PartOIteration3ReportText.Dwellings(partOIteration3Result, CultureInfo.CurrentCulture);
 
                 rows = PartOIteration3Row.Rows(partOIteration3Result.Comparison);
             }
@@ -113,7 +191,7 @@ namespace SAM.Analytical.UI.WPF
 
             ApplyFilter();
 
-            textBox_Diagnostics.Text = Diagnostics();
+            textBox_Diagnostics.Text = PartOIteration3ReportText.Diagnostics(partOIteration3Result);
 
             button_ReportA.IsEnabled = partOIteration3Result.Assessment_ReferenceA?.ReportText is not null;
             button_ReportA.ToolTip = button_ReportA.IsEnabled
@@ -127,168 +205,100 @@ namespace SAM.Analytical.UI.WPF
 
             button_OpenFolder.IsEnabled = !string.IsNullOrWhiteSpace(Folder());
             button_OpenFolder.ToolTip = button_OpenFolder.IsEnabled ? "Open the folder holding this pairing's files." : "This pairing recorded no folder.";
-        }
 
-        private static string Verdict(PartOIteration3Assessment partOIteration3Assessment)
-        {
-            return partOIteration3Assessment is null || !partOIteration3Assessment.IsAssessed
-                ? "was not assessed"
-                : Core.Query.Description(partOIteration3Assessment.OccupiedSpaceComplianceStatus);
-        }
-
-        private string Summary()
-        {
-            PartOIteration3Record partOIteration3Record = partOIteration3Result.Record;
-
-            StringBuilder stringBuilder = new();
-
-            stringBuilder.Append(partOIteration3Result.IsRestored
-                ? "Reopened from the persisted pairing record. No TAS simulation was run and no TAS file was written."
-                : "Produced in this session.");
-
-            if (partOIteration3Record is not null)
-            {
-                stringBuilder.Append(string.Format(
-                    " Reference A '{0}' against Candidate B '{1}'. Case: {2}.",
-                    partOIteration3Record.ProjectName_ReferenceA ?? "?",
-                    partOIteration3Record.ProjectName_CandidateB ?? "?",
-                    partOIteration3Record.Fingerprint_Scenario ?? "not recorded"));
-
-                if (partOIteration3Record.Count_AirSystem != 0)
-                {
-                    stringBuilder.Append(string.Format(
-                        " {0} physical air system(s), {1} bound room(s), {2} directed leg(s) ({3} supply, {4} extract, {5} transfer).",
-                        partOIteration3Record.Count_AirSystem,
-                        partOIteration3Record.Bindings.Count,
-                        partOIteration3Record.Count_Connection_Supply + partOIteration3Record.Count_Connection_Extract + partOIteration3Record.Count_Connection_Transfer,
-                        partOIteration3Record.Count_Connection_Supply,
-                        partOIteration3Record.Count_Connection_Extract,
-                        partOIteration3Record.Count_Connection_Transfer));
-                }
-
-                if (!string.IsNullOrWhiteSpace(partOIteration3Record.Method_ResultantTemperature))
-                {
-                    stringBuilder.Append(string.Format(" Resultant temperature obtained by: {0}.", partOIteration3Record.Method_ResultantTemperature));
-                }
-            }
-
-            return stringBuilder.ToString();
+            RefreshReportButton(complete);
         }
 
         /// <summary>
-        /// The refusal, in the order a person needs it: what refused, why in the authority's own words,
-        /// what this attempt genuinely produced, and what never ran.
+        /// The report button, which says two different things depending on what it would open.
+        /// <para>
+        /// After a completed review it opens <b>this</b> review's own saved report. After a refusal it
+        /// opens the last successful one, under a name that says so - because the refusal means the
+        /// pairing no longer describes the model in front of the user, and a button labelled the same way
+        /// in both states would be an invitation to read a stale report as a current one.
+        /// </para>
+        /// </summary>
+        private void RefreshReportButton(bool complete)
+        {
+            bool exists = !string.IsNullOrWhiteSpace(path_Report_Available);
+
+            button_OpenReport.IsEnabled = exists;
+
+            if (complete)
+            {
+                button_OpenReport.Content = "Open A/B Review Report";
+
+                button_OpenReport.ToolTip = exists
+                    ? string.Format("Open the full A/B review report this review saved:{0}{1}", Environment.NewLine, path_Report_Available)
+                    : partOIteration3Result?.Refusal_Report ?? "This review saved no A/B report.";
+
+                return;
+            }
+
+            button_OpenReport.Content = "Open Last Successful Report";
+
+            button_OpenReport.ToolTip = exists
+                ? string.Format(
+                    "Open the last A/B review report saved for this pairing:{0}{1}{0}{0}It is HISTORICAL. It describes the pairing as it was when it succeeded, NOT the model in front of you - which is why this review refused.",
+                    Environment.NewLine,
+                    path_Report_Available)
+                : "No successful A/B review report has been saved for this pairing.";
+        }
+
+        /// <summary>
+        /// The refusal as the report authority states it, plus - only where one is actually on disk - a
+        /// statement that a historical report exists, and what it is and is not.
         /// </summary>
         private string Refusal()
         {
-            StringBuilder stringBuilder = new();
+            string refusal = PartOIteration3ReportText.Refusal(partOIteration3Result);
 
-            PartOIteration3Ledger partOIteration3Ledger = partOIteration3Result.Ledger;
-
-            if (partOIteration3Ledger.Stage_Refused.HasValue)
+            if (string.IsNullOrWhiteSpace(path_Report_Available))
             {
-                PartOIteration3StageState partOIteration3StageState = partOIteration3Ledger.State(partOIteration3Ledger.Stage_Refused.Value);
-
-                stringBuilder.AppendLine(string.Format("REFUSED at {0}: {1}", partOIteration3StageState.Name, partOIteration3StageState.Detail));
-
-                foreach (string reason in partOIteration3StageState.Reasons)
-                {
-                    stringBuilder.AppendLine(string.Format("  - {0}", reason));
-                }
+                return refusal;
             }
 
-            List<string> artifacts = partOIteration3Ledger.Artifacts;
-
-            stringBuilder.AppendLine();
-            stringBuilder.AppendLine(artifacts.Count == 0
-                ? "This attempt produced no file. Any Candidate B file in the output folder was left by an earlier attempt and is not evidence of this one."
-                : "Files this attempt created or updated:");
-
-            foreach (string artifact in artifacts)
-            {
-                stringBuilder.AppendLine(string.Format("  - {0}", artifact));
-            }
-
-            List<string> notRun = [];
-            foreach (PartOIteration3StageState partOIteration3StageState in partOIteration3Ledger.Stages)
-            {
-                if (partOIteration3StageState.Status == PartOIteration3StageStatus.NotRun)
-                {
-                    notRun.Add(partOIteration3StageState.Name);
-                }
-            }
-
-            if (notRun.Count != 0)
-            {
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine(string.Format("Not run: {0}.", string.Join(", ", notRun)));
-            }
-
-            return stringBuilder.ToString().TrimEnd();
+            return string.Concat(
+                refusal,
+                Environment.NewLine,
+                Environment.NewLine,
+                string.Format(
+                    "A previously saved A/B review report for this pairing is still on disk at '{0}'. It is HISTORICAL: it describes the pairing as it was when it succeeded, and it does NOT describe the analytical model in front of you. This refusal has not overwritten it, and it is not offered as this attempt's result.",
+                    path_Report_Available));
         }
 
-        private string Comparison()
+        /// <summary>
+        /// The persisted report to offer, or null where there is none.
+        /// <para>
+        /// A completed review names the report it has just written. A refused one names nothing, so the
+        /// path is derived from the pairing record exactly as the writer derives it, and is offered only
+        /// where the file is genuinely there.
+        /// </para>
+        /// </summary>
+        private string Path_Report()
         {
-            PartOIteration3Statistics partOIteration3Statistics = partOIteration3Result.Comparison.Statistics;
+            string path = partOIteration3Result?.Path_Report;
 
-            return string.Format(
-                CultureInfo.CurrentCulture,
-                "{0} room(s), {1} hourly value(s) each side. Mean A {2:0.###} °C, mean B {3:0.###} °C, mean bias B−A {4:0.###} K, RMSE {5:0.###} K, maximum |B−A| {6:0.###} K in '{7}' at hour {8}. {9} TM59 criterion outcome(s) differ.",
-                partOIteration3Statistics.Count_Rooms,
-                partOIteration3Statistics.Count_Values,
-                partOIteration3Statistics.Mean_A,
-                partOIteration3Statistics.Mean_B,
-                partOIteration3Statistics.MeanBias,
-                partOIteration3Statistics.RootMeanSquareError,
-                partOIteration3Statistics.MaximumAbsoluteDifference,
-                partOIteration3Statistics.Name_Space_MaximumAbsoluteDifference ?? "-",
-                partOIteration3Statistics.Hour_MaximumAbsoluteDifference,
-                partOIteration3Result.Comparison.Count_Changed);
-        }
-
-        private string Dwellings()
-        {
-            StringBuilder stringBuilder = new();
-
-            foreach (PartOIteration3DwellingStatistics partOIteration3DwellingStatistics in partOIteration3Result.Comparison.Dwellings)
+            if (string.IsNullOrWhiteSpace(path))
             {
-                if (stringBuilder.Length != 0)
-                {
-                    stringBuilder.Append("   |   ");
-                }
-
-                stringBuilder.Append(string.Format(
-                    CultureInfo.CurrentCulture,
-                    "{0}: bias {1:0.###} K, RMSE {2:0.###} K, max {3:0.###} K",
-                    partOIteration3DwellingStatistics.Name_Dwelling ?? "-",
-                    partOIteration3DwellingStatistics.Statistics.MeanBias,
-                    partOIteration3DwellingStatistics.Statistics.RootMeanSquareError,
-                    partOIteration3DwellingStatistics.Statistics.MaximumAbsoluteDifference));
+                path = PartOIteration3Paths.Path_Report_ForRecord(partOIteration3Result?.Path_Record);
             }
 
-            return stringBuilder.ToString();
-        }
-
-        private string Diagnostics()
-        {
-            StringBuilder stringBuilder = new();
-
-            foreach (string note in partOIteration3Result.Notes)
+            if (string.IsNullOrWhiteSpace(path))
             {
-                stringBuilder.AppendLine(note);
+                return null;
             }
 
-            foreach (string note in partOIteration3Result.Record?.Notes_Scope ?? [])
+            try
             {
-                stringBuilder.AppendLine(note);
+                return System.IO.File.Exists(path) ? path : null;
             }
-
-            if (!string.IsNullOrWhiteSpace(partOIteration3Result.Path_Record))
+            catch (Exception)
             {
-                stringBuilder.AppendLine(string.Format("Pairing record: {0}", partOIteration3Result.Path_Record));
+                //A path that cannot be stat'ed offers nothing, which is the safe direction: a disabled
+                //button is better than one claiming a report exists.
+                return null;
             }
-
-            return stringBuilder.Length == 0 ? "Nothing was recorded." : stringBuilder.ToString();
         }
 
         /// <summary>
@@ -360,89 +370,17 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// The whole window as tab-separated text.
+        /// The whole window as tab-separated text, over the rows currently shown.
         /// <para>
-        /// <b>Deterministic.</b> Invariant culture for every number, the rows in their built order, and
-        /// nothing read off a rendered control - so re-exporting an unchanged completed pairing, in this
-        /// session or after reopening it, produces the same bytes.
+        /// The same composition the persisted report uses, so a copy and the saved file say the same
+        /// things in the same order. They differ in exactly two stated ways: a copy follows the filters a
+        /// person is holding and is formatted for their culture, while the saved report takes every row,
+        /// the invariant culture and the pairing's full provenance.
         /// </para>
         /// </summary>
         internal string CopyAllText()
         {
-            StringBuilder stringBuilder = new();
-
-            stringBuilder.AppendLine(textBlock_Outcome.Text);
-            stringBuilder.AppendLine(textBlock_Summary.Text);
-
-            if (textBlock_Refusal.Visibility == Visibility.Visible)
-            {
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine(textBlock_Refusal.Text);
-            }
-
-            stringBuilder.AppendLine();
-            stringBuilder.AppendLine("Stage\tStatus\tDetail");
-
-            foreach (PartOIteration3StageState partOIteration3StageState in partOIteration3Result?.Ledger.Stages ?? [])
-            {
-                stringBuilder.AppendLine(string.Format("{0}\t{1}\t{2}", partOIteration3StageState.Name, partOIteration3StageState.StatusText, partOIteration3StageState.Detail));
-
-                foreach (string reason in partOIteration3StageState.Reasons)
-                {
-                    stringBuilder.AppendLine(string.Format("\tREFUSED\t{0}", reason));
-                }
-
-                foreach (string artifact in partOIteration3StageState.Artifacts)
-                {
-                    stringBuilder.AppendLine(string.Format("\tARTIFACT\t{0}", artifact));
-                }
-            }
-
-            if (partOIteration3Result?.IsComplete ?? false)
-            {
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine(textBlock_Comparison.Text);
-                stringBuilder.AppendLine(textBlock_Dwellings.Text);
-
-                stringBuilder.AppendLine();
-                stringBuilder.AppendLine("Dwelling\tSpace\tTM59 criterion\tMechanical\tA actual\tA limit\tA status\tB actual\tB limit\tB status\tDelta actual\tHours\tMean A\tMean B\tBias B-A\tRMSE\tMax |B-A|\tat hour");
-
-                foreach (PartOIteration3Row partOIteration3Row in Rows_Visible)
-                {
-                    stringBuilder.AppendLine(string.Format(
-                        CultureInfo.InvariantCulture,
-                        "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\t{12:0.###}\t{13:0.###}\t{14:0.###}\t{15:0.###}\t{16:0.###}\t{17}",
-                        partOIteration3Row.Dwelling,
-                        partOIteration3Row.Space,
-                        partOIteration3Row.Criterion,
-                        partOIteration3Row.Mechanical,
-                        Text(partOIteration3Row.Actual_A),
-                        Text(partOIteration3Row.Limit_A),
-                        partOIteration3Row.Status_A,
-                        Text(partOIteration3Row.Actual_B),
-                        Text(partOIteration3Row.Limit_B),
-                        partOIteration3Row.Status_B,
-                        Text(partOIteration3Row.Delta_Actual),
-                        partOIteration3Row.Count,
-                        partOIteration3Row.Mean_A,
-                        partOIteration3Row.Mean_B,
-                        partOIteration3Row.MeanBias,
-                        partOIteration3Row.RootMeanSquareError,
-                        partOIteration3Row.MaximumAbsoluteDifference,
-                        partOIteration3Row.Hour_MaximumAbsoluteDifference));
-                }
-            }
-
-            stringBuilder.AppendLine();
-            stringBuilder.AppendLine(textBox_Diagnostics.Text);
-
-            return stringBuilder.ToString();
-        }
-
-        /// <summary>A missing count is an em dash, exactly as the grid renders it - so the two agree.</summary>
-        private static string Text(int? value)
-        {
-            return value.HasValue ? value.Value.ToString(CultureInfo.InvariantCulture) : "—";
+            return PartOIteration3ReportText.Text(partOIteration3Result, Rows_Visible, CultureInfo.CurrentCulture);
         }
 
         private string Folder()
@@ -508,6 +446,7 @@ namespace SAM.Analytical.UI.WPF
                 partOIteration3Assessment.Count_Processed,
                 string.IsNullOrWhiteSpace(path_Report) ? "No report file was written." : string.Format("Report: {0}", path_Report));
 
+            //Owned, so the child cannot be lost behind the main application window.
             new System.Windows.Interop.WindowInteropHelper(partOTM59ResultWindow).Owner = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 
             partOTM59ResultWindow.ShowDialog();
@@ -515,20 +454,54 @@ namespace SAM.Analytical.UI.WPF
 
         private void button_OpenFolder_Click(object sender, RoutedEventArgs e)
         {
-            string folder = Folder();
+            Open(Folder());
+        }
 
-            if (string.IsNullOrWhiteSpace(folder) || !System.IO.Directory.Exists(folder))
+        private void button_OpenReport_Click(object sender, RoutedEventArgs e)
+        {
+            //Re-resolved on the click: the file may have been moved or deleted since the window opened,
+            //and handing the shell a path that has gone is an error dialog nobody asked for.
+            string path = Path_Report();
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                path_Report_Available = null;
+
+                RefreshReportButton(partOIteration3Result?.IsComplete ?? false);
+
+                return;
+            }
+
+            Open(path);
+        }
+
+        /// <summary>
+        /// Hands a path to the shell, or does nothing where there is nothing to hand it.
+        /// <para>
+        /// Every failure is a refusal to act, never an exception: a missing file or folder, a path with
+        /// no shell association, and a shell that declines all leave the window exactly as it was, with
+        /// the path still on screen in the notes.
+        /// </para>
+        /// </summary>
+        private static void Open(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return;
             }
 
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+                if (!System.IO.File.Exists(path) && !System.IO.Directory.Exists(path))
+                {
+                    return;
+                }
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             }
-            catch (System.ComponentModel.Win32Exception)
+            catch (Exception)
             {
-                //No shell association, or the shell refused. The path is on screen in the notes either way.
+                //No shell association, a refused launch, or a path the file system would not answer for.
             }
         }
 
@@ -546,7 +519,16 @@ namespace SAM.Analytical.UI.WPF
 
         private void button_Close_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = false;
+            try
+            {
+                DialogResult = false;
+            }
+            catch (InvalidOperationException)
+            {
+                //Shown with Show() rather than ShowDialog() - a host that embeds this window rather than
+                //the production command, which always shows it modally. Closing is the same intent.
+                Close();
+            }
         }
     }
 }

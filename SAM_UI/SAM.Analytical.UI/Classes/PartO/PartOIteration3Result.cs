@@ -96,6 +96,40 @@ namespace SAM.Analytical.UI
         /// <summary>Whether this was reopened from a record rather than produced by a run this session.</summary>
         public bool IsRestored { get; }
 
+        /// <summary>
+        /// Where this review's own human-readable report was written, or null where none was.
+        /// <para>
+        /// Only a <b>completed</b> pairing writes one. A refusal deliberately writes nothing, so this
+        /// pairing's last successful report survives a later refusal instead of being replaced by it -
+        /// see <c>Modify.SavePartOIteration3Report</c>.
+        /// </para>
+        /// </summary>
+        public string Path_Report { get; private set; }
+
+        /// <summary>Its structured sibling, on the same terms.</summary>
+        public string Path_Report_Json { get; private set; }
+
+        /// <summary>
+        /// Why no report was written, where one was expected. Never fatal: the review in front of the
+        /// engineer is already correct, and what a failure loses is a copy of it.
+        /// </summary>
+        public string Refusal_Report { get; private set; }
+
+        /// <summary>
+        /// Records what persisting this review's report did.
+        /// <para>
+        /// Called once, by the attempt that produced this result, immediately after the report is written
+        /// or refused - the same shape as <c>PartOIteration3Record.Adopt</c>, and for the same reason: the
+        /// outcome is only knowable once the thing it describes exists.
+        /// </para>
+        /// </summary>
+        public void RecordReport(string path_Report, string path_Report_Json, string refusal)
+        {
+            Path_Report = path_Report;
+            Path_Report_Json = path_Report_Json;
+            Refusal_Report = refusal;
+        }
+
         /// <summary>What was worth saying that is not a refusal.</summary>
         public List<string> Notes => [.. notes];
 

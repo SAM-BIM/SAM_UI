@@ -209,7 +209,7 @@ namespace SAM.Analytical.UI.WPF
             NoteUnwrittenReport(notes, PartOIteration3Roles.ReferenceA_TM59Report, partOIteration3Assessment_A);
             NoteUnwrittenReport(notes, PartOIteration3Roles.CandidateB_TM59Report, partOIteration3Assessment_B);
 
-            return new PartOIteration3Result(
+            PartOIteration3Result partOIteration3Result = new(
                 partOIteration3Ledger_Recorded,
                 partOIteration3Record,
                 partOIteration3Comparison,
@@ -220,6 +220,13 @@ namespace SAM.Analytical.UI.WPF
                 path_Record,
                 true,
                 notes);
+
+            //A successful review IS a successful A/B result, so it persists its report on the same terms
+            //a run does. Every refusal above returns before reaching this, which is what keeps a refused
+            //review from replacing the report a successful one wrote.
+            SavePartOIteration3Report(partOIteration3Result);
+
+            return partOIteration3Result;
         }
 
         private static void NoteUnwrittenReport(List<string> notes, string role, PartOIteration3Assessment partOIteration3Assessment)

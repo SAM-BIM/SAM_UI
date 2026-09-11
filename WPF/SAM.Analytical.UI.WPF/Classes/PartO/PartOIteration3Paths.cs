@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using System;
 using System.IO;
 
 namespace SAM.Analytical.UI.WPF
@@ -47,6 +48,9 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>What the pairing record adds to Reference A's results file name.</summary>
         public const string Suffix_Record = "-Iteration3";
+
+        /// <summary>What the persisted A/B review report adds to Reference A's results file name.</summary>
+        public const string Suffix_Report = "-Iteration3-Review";
 
         private PartOIteration3Paths(string outputDirectory, string projectName_ReferenceA, string path_TSD_ReferenceA)
         {
@@ -155,6 +159,40 @@ namespace SAM.Analytical.UI.WPF
             return string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName)
                 ? null
                 : Path.Combine(directory, fileName + Suffix_Record + ".json");
+        }
+
+        /// <summary>
+        /// Where this pairing's persisted A/B review report lives, derived from the pairing record's own
+        /// path - so a run, a review, and a later session looking for the last successful report all
+        /// arrive at the same file without holding anything but the record's name.
+        /// </summary>
+        /// <param name="path_Record">The pairing record's path.</param>
+        /// <param name="extension">
+        /// <c>"txt"</c> for the report an engineer reads, <c>"json"</c> for its structured sibling.
+        /// </param>
+        public static string Path_Report_ForRecord(string path_Record, string extension = "txt")
+        {
+            if (string.IsNullOrWhiteSpace(path_Record) || string.IsNullOrWhiteSpace(extension))
+            {
+                return null;
+            }
+
+            string directory = Path.GetDirectoryName(path_Record);
+            string fileName = Path.GetFileNameWithoutExtension(path_Record);
+
+            if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName))
+            {
+                return null;
+            }
+
+            //The record is <run>-Iteration3.json, so the report is <run>-Iteration3-Review.txt. Derived
+            //from the record rather than re-derived from the TSD: one of them moving must move both.
+            if (fileName.EndsWith(Suffix_Record, StringComparison.OrdinalIgnoreCase))
+            {
+                fileName = fileName.Substring(0, fileName.Length - Suffix_Record.Length);
+            }
+
+            return Path.Combine(directory, fileName + Suffix_Report + "." + extension.TrimStart('.'));
         }
     }
 }
