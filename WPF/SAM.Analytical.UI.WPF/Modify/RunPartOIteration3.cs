@@ -114,6 +114,10 @@ namespace SAM.Analytical.UI.WPF
             PartOIteration3Artifacts partOIteration3Artifacts = new(partOIteration3Record.Guid_Run);
             partOIteration3Artifacts.Snapshot(partOIteration3Paths.Paths_CandidateB);
 
+            //Reference A's TM59 report is not Candidate B's to own, but this attempt's own assessment of A
+            //rewrites it - so it is fingerprinted too, and recorded only where that rewrite happened.
+            partOIteration3Artifacts.Snapshot([partOIteration3Paths.Path_TM59Report_ReferenceA]);
+
             //Deleted, not merely fingerprinted. These two are the artifacts a LATER session acts on - one
             //is a reopenable Candidate B model and the other is the pairing record itself - so a failed or
             //abandoned attempt must not leave either of them behind claiming to describe this design.
@@ -650,23 +654,14 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            //The two TM59 reports the assessments wrote. Reference A's is beside A's own results and is
-            //not this attempt's to claim - A wrote it, possibly in an earlier session - so it is recorded
-            //with its current fingerprint and reported as a report rather than as an artifact of this run.
-            if (!string.IsNullOrWhiteSpace(partOIteration3Assessment_A.Path_Report))
-            {
-                partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.ReferenceA_TM59Report, partOIteration3Assessment_A.Path_Report, Length(partOIteration3Assessment_A.Path_Report), Ticks(partOIteration3Assessment_A.Path_Report)));
-            }
-
-            if (!string.IsNullOrWhiteSpace(partOIteration3Assessment_B.Path_Report))
-            {
-                if (partOIteration3Artifacts.TryClaim(partOIteration3Assessment_B.Path_Report, out string artifact_Report, out string _))
-                {
-                    artifacts_Persistence.Add(artifact_Report);
-                }
-
-                partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.CandidateB_TM59Report, partOIteration3Assessment_B.Path_Report, Length(partOIteration3Assessment_B.Path_Report), Ticks(partOIteration3Assessment_B.Path_Report)));
-            }
+            //The two TM59 reports. Each is recorded - and offered - only where THIS attempt demonstrably
+            //wrote it: the assessment names a path only when its save succeeded, and the fingerprint taken
+            //at attempt start proves the file there now is not one an earlier assessment left. A report is
+            //evidence of an assessment rather than an input to the pairing, so a missing one is said and
+            //does not refuse. Reference A's sits beside A's own results and is recorded as a report, never
+            //claimed as an artifact of this run.
+            RecordReport(partOIteration3Artifacts, partOIteration3Record, PartOIteration3Roles.ReferenceA_TM59Report, partOIteration3Assessment_A, null, notes);
+            RecordReport(partOIteration3Artifacts, partOIteration3Record, PartOIteration3Roles.CandidateB_TM59Report, partOIteration3Assessment_B, artifacts_Persistence, notes);
 
             if (refusals_Persistence.Count != 0)
             {
@@ -727,17 +722,71 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
+            //The reports offered are the ones the record holds, and the record holds only reports this
+            //attempt wrote - see RecordReport.
             return new PartOIteration3Result(
                 partOIteration3Ledger,
                 partOIteration3Record,
                 partOIteration3Comparison,
                 partOIteration3Assessment_A,
                 partOIteration3Assessment_B,
-                partOIteration3Assessment_A?.Path_Report,
-                partOIteration3Assessment_B?.Path_Report,
+                partOIteration3Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path,
+                partOIteration3Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path,
                 path_Record,
                 false,
                 notes);
+        }
+
+        /// <summary>
+        /// Records one assessment's TM59 report as part of the pairing where this attempt wrote it, and
+        /// says why not where it did not.
+        /// </summary>
+        /// <param name="artifacts">
+        /// Where a claimed artifact is listed - or null for a report this attempt rewrote but does not own,
+        /// which is checked by the same rule without being claimed.
+        /// </param>
+        private static void RecordReport(
+            PartOIteration3Artifacts partOIteration3Artifacts,
+            PartOIteration3Record partOIteration3Record,
+            string role,
+            PartOIteration3Assessment partOIteration3Assessment,
+            List<string> artifacts,
+            List<string> notes)
+        {
+            string path = partOIteration3Assessment?.Path_Report;
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                notes.Add(string.Format("No {0} was written by this attempt, so none is recorded for this pairing. {1}", role, partOIteration3Assessment?.Refusal_Report ?? "The assessment named no report."));
+
+                return;
+            }
+
+            string refusal;
+            bool written;
+
+            if (artifacts is null)
+            {
+                written = partOIteration3Artifacts.IsWritten(path, out refusal);
+            }
+            else
+            {
+                written = partOIteration3Artifacts.TryClaim(path, out string artifact, out refusal);
+
+                if (written)
+                {
+                    artifacts.Add(artifact);
+                }
+            }
+
+            if (!written)
+            {
+                notes.Add(string.Format("The {0} at '{1}' is not recorded for this pairing, because this attempt cannot show that it wrote it. {2}", role, path, refusal));
+
+                return;
+            }
+
+            partOIteration3Record.Add(new PartOIteration3FileRecord(role, path, Length(path), Ticks(path)));
         }
 
         private static void Delete(string path, string description, List<string> refusals, List<string> notes)

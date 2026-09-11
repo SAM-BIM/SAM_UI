@@ -31,7 +31,10 @@ namespace SAM.Analytical.UI.WPF
         /// record copied from its own provenance, so the pairing is not being shown against a design that
         /// has moved.</item>
         /// <item>Every Candidate B file the record names is still exactly the file it recorded - present,
-        /// same length, same write time. A changed or missing one refuses <b>by name</b>.</item>
+        /// same length, same write time. A changed or missing one refuses <b>by name</b>. The two TM59
+        /// reports are the exception: every assessment rewrites its report, this review's included, so they
+        /// are lineage rather than comparison authority. They are neither validated nor offered from the
+        /// record - a review offers only the reports its own assessments wrote.</item>
         /// <item>Candidate B's persisted model records its provenance to the <b>bridge</b> results, which
         /// is where its resultant temperatures were read from.</item>
         /// </list>
@@ -96,17 +99,7 @@ namespace SAM.Analytical.UI.WPF
                 //are different statements and a reader must not have them merged.
                 partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "This Iteration 3 pairing can no longer be shown.", refusals);
 
-                return new PartOIteration3Result(
-                    partOIteration3Ledger,
-                    partOIteration3Record,
-                    null,
-                    null,
-                    null,
-                    partOIteration3Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path,
-                    partOIteration3Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path,
-                    path_Record,
-                    true,
-                    notes);
+                return new PartOIteration3Result(partOIteration3Ledger, partOIteration3Record, null, null, null, null, null, path_Record, true, notes);
             }
 
             if (!partOIteration3Record.IsComplete)
@@ -114,17 +107,7 @@ namespace SAM.Analytical.UI.WPF
                 //The recorded attempt refused. Its ledger IS the answer, and nothing is read.
                 notes.Add("This Approved Document O Iteration 3 attempt refused, so it produced no comparison. Its stage ledger is the record of what happened and how far it got.");
 
-                return new PartOIteration3Result(
-                    partOIteration3Ledger_Recorded,
-                    partOIteration3Record,
-                    null,
-                    null,
-                    null,
-                    partOIteration3Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path,
-                    partOIteration3Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path,
-                    path_Record,
-                    true,
-                    notes);
+                return new PartOIteration3Result(partOIteration3Ledger_Recorded, partOIteration3Record, null, null, null, null, null, path_Record, true, notes);
             }
 
             //---------------------------------------------------------------------------------------------
@@ -220,17 +203,31 @@ namespace SAM.Analytical.UI.WPF
                 path_TSD_ReferenceA,
                 path_TSD_CandidateB));
 
+            //Only the reports THIS review's assessments wrote. The record's report entries are lineage the
+            //review did not validate, so they are never offered in place of a report this review failed
+            //to write.
+            NoteUnwrittenReport(notes, PartOIteration3Roles.ReferenceA_TM59Report, partOIteration3Assessment_A);
+            NoteUnwrittenReport(notes, PartOIteration3Roles.CandidateB_TM59Report, partOIteration3Assessment_B);
+
             return new PartOIteration3Result(
                 partOIteration3Ledger_Recorded,
                 partOIteration3Record,
                 partOIteration3Comparison,
                 partOIteration3Assessment_A,
                 partOIteration3Assessment_B,
-                partOIteration3Assessment_A.Path_Report ?? partOIteration3Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path,
-                partOIteration3Assessment_B.Path_Report ?? partOIteration3Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path,
+                partOIteration3Assessment_A.Path_Report,
+                partOIteration3Assessment_B.Path_Report,
                 path_Record,
                 true,
                 notes);
+        }
+
+        private static void NoteUnwrittenReport(List<string> notes, string role, PartOIteration3Assessment partOIteration3Assessment)
+        {
+            if (string.IsNullOrWhiteSpace(partOIteration3Assessment.Path_Report))
+            {
+                notes.Add(string.Format("This review wrote no {0}, so none is offered. {1}", role, partOIteration3Assessment.Refusal_Report ?? "The assessment named no report."));
+            }
         }
 
         /// <summary>

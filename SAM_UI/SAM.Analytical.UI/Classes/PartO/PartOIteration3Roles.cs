@@ -39,5 +39,22 @@ namespace SAM.Analytical.UI
 
         /// <summary>The pairing record itself.</summary>
         public const string Record = "Iteration 3 pairing record";
+
+        /// <summary>
+        /// Whether a role names a file that every assessment of its results rewrites - the two TM59
+        /// reports.
+        /// <para>
+        /// Such a file is lineage, not comparison authority. A review reassesses both results files
+        /// through the production TM59 path, and that path rewrites both reports, so holding a review to
+        /// the reports' recorded fingerprints makes the next review of an unchanged pairing refuse as
+        /// stale. What defines the comparison is the simulation artifacts and Candidate B's model, and
+        /// every one of those stays validated.
+        /// </para>
+        /// </summary>
+        public static bool IsRegeneratedByAssessment(string role)
+        {
+            return string.Equals(role, ReferenceA_TM59Report, System.StringComparison.Ordinal)
+                || string.Equals(role, CandidateB_TM59Report, System.StringComparison.Ordinal);
+        }
     }
 }

@@ -469,20 +469,24 @@ namespace SAM.Analytical.UI.WPF
 
         private void button_ReportA_Click(object sender, RoutedEventArgs e)
         {
-            ShowReport(partOIteration3Result?.Assessment_ReferenceA, "Reference A");
+            ShowReport(partOIteration3Result?.Assessment_ReferenceA, partOIteration3Result?.Path_TM59Report_ReferenceA, "Reference A");
         }
 
         private void button_ReportB_Click(object sender, RoutedEventArgs e)
         {
-            ShowReport(partOIteration3Result?.Assessment_CandidateB, "Candidate B");
+            ShowReport(partOIteration3Result?.Assessment_CandidateB, partOIteration3Result?.Path_TM59Report_CandidateB, "Candidate B");
         }
 
         /// <summary>
         /// The existing TM59 result window, over the production report text this assessment produced -
         /// the same window the ordinary Review Results command shows, so there is one place a TM59 report
         /// is read.
+        /// <para>
+        /// The report file named is the result's, not the assessment's: the result names only a report
+        /// this run or this review demonstrably wrote.
+        /// </para>
         /// </summary>
-        private void ShowReport(PartOIteration3Assessment partOIteration3Assessment, string description)
+        private void ShowReport(PartOIteration3Assessment partOIteration3Assessment, string path_Report, string description)
         {
             if (partOIteration3Assessment?.ReportText is null)
             {
@@ -502,7 +506,7 @@ namespace SAM.Analytical.UI.WPF
                 description,
                 Core.Query.Description(partOIteration3Assessment.OccupiedSpaceComplianceStatus),
                 partOIteration3Assessment.Count_Processed,
-                string.IsNullOrWhiteSpace(partOIteration3Assessment.Path_Report) ? "No report file was written." : string.Format("Report: {0}", partOIteration3Assessment.Path_Report));
+                string.IsNullOrWhiteSpace(path_Report) ? "No report file was written." : string.Format("Report: {0}", path_Report));
 
             new System.Windows.Interop.WindowInteropHelper(partOTM59ResultWindow).Owner = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 

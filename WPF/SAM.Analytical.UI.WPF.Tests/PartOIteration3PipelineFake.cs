@@ -85,6 +85,48 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         internal string Note_Persist { get; set; }
 
+        /// <summary>
+        /// Whether <see cref="Assess"/> writes a TM59 report beside the results it assessed and names it,
+        /// as the production member does whenever its save succeeds.
+        /// </summary>
+        internal bool Write_Reports { get; set; }
+
+        private static int count_Reports;
+
+        /// <summary>
+        /// Writes a TM59 report where production writes one - beside the results, at the one naming
+        /// authority's path - and answers that path.
+        /// <para>
+        /// Every write is a different length, so a rewrite is visible in the file's fingerprint however
+        /// close together two writes land on the clock.
+        /// </para>
+        /// </summary>
+        internal static string WriteReport(string path_TSD)
+        {
+            string path = Query.Path_TM59Report(path_TSD);
+
+            File.WriteAllText(path, string.Format("TM59 report {0}", new string('#', Interlocked.Increment(ref count_Reports))));
+
+            return path;
+        }
+
+        /// <summary>The same assessment, naming the given report path.</summary>
+        internal static PartOIteration3Assessment WithReport(PartOIteration3Assessment partOIteration3Assessment, string path_Report)
+        {
+            return new PartOIteration3Assessment(
+                partOIteration3Assessment.IsAssessed,
+                partOIteration3Assessment.Refusal,
+                partOIteration3Assessment.OccupiedSpaceComplianceStatus,
+                partOIteration3Assessment.SpaceResults,
+                partOIteration3Assessment.AssociationRefusals,
+                partOIteration3Assessment.VentilationStrategyRefusals,
+                partOIteration3Assessment.SpaceGuids_Unassessed,
+                partOIteration3Assessment.ResultantTemperatures,
+                partOIteration3Assessment.ReportText,
+                path_Report,
+                partOIteration3Assessment.Count_Processed);
+        }
+
         /// <summary>What <see cref="Assess"/> was asked to capture, in call order - the capture scope.</summary>
         internal List<List<Guid>> Captured { get; } = [];
 
@@ -158,7 +200,9 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Captured.Add(guids);
 
-            return Captured.Count == 1 ? Assessment_ReferenceA : Assessment_CandidateB;
+            PartOIteration3Assessment result = Captured.Count == 1 ? Assessment_ReferenceA : Assessment_CandidateB;
+
+            return Write_Reports && result is not null && result.IsAssessed ? WithReport(result, WriteReport(path_TSD)) : result;
         }
 
         public bool Persist(AnalyticalModel analyticalModel, string path_TSD, string path_TBD, out string note)

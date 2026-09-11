@@ -451,18 +451,31 @@ namespace SAM.Analytical.UI
         /// </param>
         public bool Prepare(PartOIterationPreparation partOIterationPreparation, PartOPreparationContext partOPreparationContext)
         {
-            //THE capture point for the Iteration 3 system scope, and the only one there is. See
-            //Guids_VentilationSystem_Prepared for why it cannot be recovered afterwards.
-            List<System.Guid> guids_VentilationSystem = [];
+            return Prepare(partOIterationPreparation?.AnalyticalModel, partOIterationPreparation?.OverheatingScenarios, partOPreparationContext, Guids_VentilationSystem(partOIterationPreparation), partOIterationPreparation?.Refusal);
+        }
+
+        /// <summary>
+        /// The identities of the ventilation systems a preparation <b>built</b> - what every adoption of a
+        /// preparation hands to <see cref="Prepare(AnalyticalModel, IEnumerable{OverheatingScenario}, PartOPreparationContext, IEnumerable{System.Guid}, string)"/>.
+        /// <para>
+        /// THE capture point for the Iteration 3 system scope, and the only one there is: see
+        /// <see cref="Guids_VentilationSystem_Prepared"/> for why it cannot be recovered afterwards. Stated
+        /// once, so a caller that adopts a model other than the preparation's own - the Prepare &amp; Run
+        /// dialog rebuilds it after an equipment edit - still captures exactly the same identities.
+        /// </para>
+        /// </summary>
+        public static List<System.Guid> Guids_VentilationSystem(PartOIterationPreparation partOIterationPreparation)
+        {
+            List<System.Guid> result = [];
             foreach (VentilationSystem ventilationSystem in partOIterationPreparation?.VentilationSystems ?? [])
             {
                 if (ventilationSystem is not null && ventilationSystem.Guid != System.Guid.Empty)
                 {
-                    guids_VentilationSystem.Add(ventilationSystem.Guid);
+                    result.Add(ventilationSystem.Guid);
                 }
             }
 
-            return Prepare(partOIterationPreparation?.AnalyticalModel, partOIterationPreparation?.OverheatingScenarios, partOPreparationContext, guids_VentilationSystem, partOIterationPreparation?.Refusal);
+            return result;
         }
 
         /// <summary>

@@ -48,13 +48,15 @@ namespace SAM.Analytical.UI
             IDictionary<Guid, double[]> resultantTemperatures,
             string reportText,
             string path_Report,
-            int count_Processed)
+            int count_Processed,
+            string refusal_Report = null)
         {
             IsAssessed = assessed && refusal is null;
             Refusal = refusal;
             OccupiedSpaceComplianceStatus = occupiedSpaceComplianceStatus;
             ReportText = reportText;
             Path_Report = path_Report;
+            Refusal_Report = refusal_Report;
             Count_Processed = count_Processed;
 
             foreach (PartOTM59SpaceResult partOTM59SpaceResult in spaceResults ?? [])
@@ -125,8 +127,14 @@ namespace SAM.Analytical.UI
         /// <summary>The production report an engineer reads, verbatim.</summary>
         public string ReportText { get; }
 
-        /// <summary>Where that report was written, or null where it could not be.</summary>
+        /// <summary>
+        /// Where THIS assessment wrote that report, or null where it did not. Never the path of a write
+        /// that failed: an earlier file still sitting there is not this assessment's report.
+        /// </summary>
         public string Path_Report { get; }
+
+        /// <summary>Why no report was written, in the writer's own words, or null.</summary>
+        public string Refusal_Report { get; }
 
         /// <summary>How many simulated spaces the calculation ran over.</summary>
         public int Count_Processed { get; }

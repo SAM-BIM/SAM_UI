@@ -64,6 +64,12 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             internal int Count_Assess { get; private set; }
 
+            /// <summary>
+            /// Whether each assessment rewrites its TM59 report, as the production one does - which is
+            /// what a review that fingerprinted the reports tripped over on the next review.
+            /// </summary>
+            internal bool Write_Reports { get; set; }
+
             public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces)
             {
                 throw new InvalidOperationException("A review must not materialise anything.");
@@ -88,7 +94,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             {
                 Count_Assess++;
 
-                return Func_Assess(spaceGuids_Capture);
+                PartOIteration3Assessment result = Func_Assess(spaceGuids_Capture);
+
+                return Write_Reports && result is not null && result.IsAssessed
+                    ? PartOIteration3PipelineFake.WithReport(result, PartOIteration3PipelineFake.WriteReport(path_TSD))
+                    : result;
             }
 
             public bool Persist(AnalyticalModel analyticalModel, string path_TSD, string path_TBD, out string note)
@@ -101,7 +111,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         //A completed pairing, produced once and then reopened
         //-------------------------------------------------------------------------------------------------
 
-        private PartORun Run(out PartOIteration3Result partOIteration3Result, out List<Guid> guids_Bound)
+        private PartORun Run(out PartOIteration3Result partOIteration3Result, out List<Guid> guids_Bound, bool writeReports = false)
         {
             adjacencyCluster = PartOIteration3Fixture.Design(out guids_VentilationSystem, out zones);
 
@@ -205,6 +215,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Assessment_ReferenceA = Assessment(guids_Space_Dwelling, 20.0),
                 Assessment_CandidateB = Assessment(guids_Bound, 21.0),
                 Persist_ForReal = true,
+                Write_Reports = writeReports,
             };
 
             partOIteration3PipelineFake.Paths_ThermalSource.Add(Path.Combine(directory, "Flat-It3B.tbd"));
@@ -459,6 +470,157 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             //Nothing was read.
             Assert.Equal(0, partOIteration3PipelineReviewOnly.Count_Assess);
+        }
+
+        //-------------------------------------------------------------------------------------------------
+        //The TM59 reports a review regenerates
+        //-------------------------------------------------------------------------------------------------
+
+        /// <summary>The fingerprint of every file that defines the comparison - everything but the reports.</summary>
+        private static Dictionary<string, (long Length, long Ticks)> Fingerprints_Defining(PartOIteration3Record partOIteration3Record)
+        {
+            Dictionary<string, (long, long)> result = [];
+
+            foreach (PartOIteration3FileRecord partOIteration3FileRecord in partOIteration3Record.Files)
+            {
+                if (partOIteration3FileRecord.Role == PartOIteration3Roles.ReferenceA_TM59Report || partOIteration3FileRecord.Role == PartOIteration3Roles.CandidateB_TM59Report)
+                {
+                    continue;
+                }
+
+                Assert.True(PartOIteration3Artifacts.TryRead(partOIteration3FileRecord.Path, out long length, out long ticks));
+
+                result[partOIteration3FileRecord.Role] = (length, ticks);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// A review reassesses both results files through the production TM59 path, and that path writes
+        /// each report beside its results. A review that fingerprinted the reports therefore made the NEXT
+        /// review of the same, unchanged pairing refuse as stale (Codex P1 on <c>bdc48ef</c>). The reports
+        /// are regenerated evidence; the comparison is defined by the simulation artifacts and the model.
+        /// </summary>
+        [Fact]
+        public void An_unchanged_pairing_reviews_repeatedly_although_each_review_regenerates_its_TM59_reports()
+        {
+            PartORun partORun = Run(out PartOIteration3Result partOIteration3Result_Run, out List<Guid> _, true);
+
+            //The run recorded both reports, so there is something a review could wrongly hold it to.
+            string path_Report_A = partOIteration3Result_Run.Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path;
+            string path_Report_B = partOIteration3Result_Run.Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path;
+
+            Assert.NotNull(path_Report_A);
+            Assert.NotNull(path_Report_B);
+
+            Dictionary<string, (long Length, long Ticks)> fingerprints_Defining = Fingerprints_Defining(partOIteration3Result_Run.Record);
+
+            Assert.Equal(6, fingerprints_Defining.Count);
+
+            for (int i = 1; i <= 3; i++)
+            {
+                long length_Before = new FileInfo(path_Report_B).Length;
+
+                int count = 0;
+
+                PartOIteration3PipelineReviewOnly partOIteration3PipelineReviewOnly = new()
+                {
+                    Write_Reports = true,
+                    Func_Assess = guids => Assessment(guids, ++count == 1 ? 20.0 : 21.0),
+                };
+
+                PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, partOIteration3PipelineReviewOnly);
+
+                Assert.True(partOIteration3Result.IsComplete, string.Format("Review {0} refused: {1}", i, string.Join(" | ", partOIteration3Result.Reasons)));
+                Assert.NotNull(partOIteration3Result.Comparison);
+                Assert.Equal(1.0, partOIteration3Result.Comparison.Statistics.MeanBias, 12);
+
+                //Only the two assessments were reached; every TAS member throws.
+                Assert.Equal(2, partOIteration3PipelineReviewOnly.Count_Assess);
+
+                //This review genuinely regenerated the reports - and offers the ones it wrote.
+                Assert.NotEqual(length_Before, new FileInfo(path_Report_B).Length);
+                Assert.Equal(path_Report_A, partOIteration3Result.Path_TM59Report_ReferenceA);
+                Assert.Equal(path_Report_B, partOIteration3Result.Path_TM59Report_CandidateB);
+            }
+
+            //And not one comparison-defining artifact moved in three reviews.
+            Assert.Equal(fingerprints_Defining, Fingerprints_Defining(partOIteration3Result_Run.Record));
+        }
+
+        /// <summary>
+        /// Leaving the reports out of the freshness check leaves every other file in it: after a review has
+        /// regenerated the reports, touching any one comparison-defining artifact still refuses, by name,
+        /// before anything is read.
+        /// </summary>
+        [Theory]
+        [InlineData(PartOIteration3Roles.ThermalSource_TBD)]
+        [InlineData(PartOIteration3Roles.ThermalSource_TSD)]
+        [InlineData(PartOIteration3Roles.Systems_TPD)]
+        [InlineData(PartOIteration3Roles.Bridge_TBD)]
+        [InlineData(PartOIteration3Roles.Bridge_TSD)]
+        [InlineData(PartOIteration3Roles.CandidateB_Model)]
+        public void After_a_review_regenerated_the_reports_a_touched_comparison_artifact_still_refuses_by_name(string role)
+        {
+            PartORun partORun = Run(out PartOIteration3Result partOIteration3Result_Run, out List<Guid> _, true);
+
+            int count = 0;
+
+            Assert.True(Modify.ReviewPartOIteration3(partORun, new PartOIteration3PipelineReviewOnly
+            {
+                Write_Reports = true,
+                Func_Assess = guids => Assessment(guids, ++count == 1 ? 20.0 : 21.0),
+            }).IsComplete);
+
+            string path = partOIteration3Result_Run.Record.File(role).Path;
+
+            File.SetLastWriteTimeUtc(path, File.GetLastWriteTimeUtc(path).AddHours(1));
+
+            PartOIteration3PipelineReviewOnly partOIteration3PipelineReviewOnly = new()
+            {
+                Write_Reports = true,
+                Func_Assess = guids => Assessment(guids, 20.0),
+            };
+
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, partOIteration3PipelineReviewOnly);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Null(partOIteration3Result.Comparison);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains(string.Format("Iteration 3 {0} at '{1}'", role, path)) && x.Contains("rewritten"));
+
+            //Refused before either results file was read.
+            Assert.Equal(0, partOIteration3PipelineReviewOnly.Count_Assess);
+
+            //And a refused review offers no report as though it described this pairing.
+            Assert.Null(partOIteration3Result.Path_TM59Report_ReferenceA);
+            Assert.Null(partOIteration3Result.Path_TM59Report_CandidateB);
+        }
+
+        /// <summary>
+        /// The reports a record names are lineage, not something the review validated - so a review offers
+        /// only the reports ITS OWN assessments wrote, and none where they wrote none.
+        /// </summary>
+        [Fact]
+        public void A_review_offers_only_the_TM59_reports_it_wrote_itself()
+        {
+            PartORun partORun = Run(out PartOIteration3Result partOIteration3Result_Run, out List<Guid> _, true);
+
+            Assert.NotNull(partOIteration3Result_Run.Record.File(PartOIteration3Roles.ReferenceA_TM59Report));
+            Assert.NotNull(partOIteration3Result_Run.Record.File(PartOIteration3Roles.CandidateB_TM59Report));
+
+            int count = 0;
+
+            //Assesses, and writes no report - the state a locked or read-only report leaves behind.
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, new PartOIteration3PipelineReviewOnly
+            {
+                Func_Assess = guids => Assessment(guids, ++count == 1 ? 20.0 : 21.0),
+            });
+
+            Assert.True(partOIteration3Result.IsComplete);
+
+            Assert.Null(partOIteration3Result.Path_TM59Report_ReferenceA);
+            Assert.Null(partOIteration3Result.Path_TM59Report_CandidateB);
         }
     }
 }

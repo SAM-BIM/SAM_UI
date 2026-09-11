@@ -629,5 +629,181 @@ namespace SAM.Analytical.UI.WPF.Tests
             //And nothing stale is reported as evidence of this attempt.
             Assert.Empty(partOIteration3Result.Ledger.Artifacts);
         }
+
+        //-------------------------------------------------------------------------------------------------
+        //The TM59 reports
+        //-------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// A report is recorded, and offered, only where THIS attempt wrote it. On <c>bdc48ef</c> a failed
+        /// <c>SavePartOTM59Report</c> still handed back the path it would have written, and the run then
+        /// recorded whatever file an earlier assessment had left there as this pairing's report (Codex P2).
+        /// The assessment below names exactly that: a path, and an old file at it, that nobody wrote now.
+        /// </summary>
+        [Fact]
+        public void A_TM59_report_this_attempt_did_not_write_is_never_recorded_or_offered()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3PipelineFake partOIteration3PipelineFake = Pipeline_Complete(out List<Guid> _);
+
+            string path_Report_A = Query.Path_TM59Report(path_TSD_ReferenceA);
+            string path_Report_B = Query.Path_TM59Report(Path.Combine(directory, "Flat-It3B-Bridge.tsd"));
+
+            File.WriteAllText(path_Report_A, "an earlier assessment's Reference A report");
+            File.WriteAllText(path_Report_B, "an earlier attempt's Candidate B report");
+
+            partOIteration3PipelineFake.Assessment_ReferenceA = PartOIteration3PipelineFake.WithReport(partOIteration3PipelineFake.Assessment_ReferenceA, path_Report_A);
+            partOIteration3PipelineFake.Assessment_CandidateB = PartOIteration3PipelineFake.WithReport(partOIteration3PipelineFake.Assessment_CandidateB, path_Report_B);
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, partOIteration3PipelineFake);
+
+            //A report is evidence of an assessment, not an input to the pairing, so the pairing stands.
+            Assert.True(partOIteration3Result.IsComplete);
+
+            //Neither old file is recorded, offered or listed as this attempt's.
+            Assert.Null(partOIteration3Result.Record.File(PartOIteration3Roles.ReferenceA_TM59Report));
+            Assert.Null(partOIteration3Result.Record.File(PartOIteration3Roles.CandidateB_TM59Report));
+            Assert.Null(partOIteration3Result.Path_TM59Report_ReferenceA);
+            Assert.Null(partOIteration3Result.Path_TM59Report_CandidateB);
+            Assert.DoesNotContain(partOIteration3Result.Ledger.Artifacts, x => x.Contains(path_Report_A, StringComparison.OrdinalIgnoreCase) || x.Contains(path_Report_B, StringComparison.OrdinalIgnoreCase));
+
+            //Nor by the record a later session reopens.
+            PartOIteration3Record partOIteration3Record = Query.PartOIteration3PairingRecord(partOIteration3Result.Path_Record);
+
+            Assert.Null(partOIteration3Record.File(PartOIteration3Roles.ReferenceA_TM59Report));
+            Assert.Null(partOIteration3Record.File(PartOIteration3Roles.CandidateB_TM59Report));
+
+            //Said, not silent - by role and by path.
+            Assert.Contains(partOIteration3Result.Notes, x => x.Contains(PartOIteration3Roles.ReferenceA_TM59Report) && x.Contains(path_Report_A));
+            Assert.Contains(partOIteration3Result.Notes, x => x.Contains(PartOIteration3Roles.CandidateB_TM59Report) && x.Contains(path_Report_B));
+
+            //And the old files were left exactly as they were.
+            Assert.Equal("an earlier assessment's Reference A report", File.ReadAllText(path_Report_A));
+            Assert.Equal("an earlier attempt's Candidate B report", File.ReadAllText(path_Report_B));
+        }
+
+        /// <summary>
+        /// Ownership is decided by change, not by absence: an old report at the same path that this
+        /// attempt genuinely overwrote IS this attempt's, and is recorded and offered.
+        /// </summary>
+        [Fact]
+        public void The_TM59_reports_this_attempt_wrote_are_recorded_and_offered_even_over_old_files()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3PipelineFake partOIteration3PipelineFake = Pipeline_Complete(out List<Guid> _);
+
+            partOIteration3PipelineFake.Write_Reports = true;
+
+            string path_Report_A = Query.Path_TM59Report(path_TSD_ReferenceA);
+            string path_Report_B = Query.Path_TM59Report(Path.Combine(directory, "Flat-It3B-Bridge.tsd"));
+
+            File.WriteAllText(path_Report_A, "an earlier assessment's Reference A report");
+            File.WriteAllText(path_Report_B, "an earlier attempt's Candidate B report");
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, partOIteration3PipelineFake);
+
+            Assert.True(partOIteration3Result.IsComplete);
+
+            Assert.Equal(path_Report_A, partOIteration3Result.Path_TM59Report_ReferenceA);
+            Assert.Equal(path_Report_B, partOIteration3Result.Path_TM59Report_CandidateB);
+
+            Assert.Equal(path_Report_A, partOIteration3Result.Record.File(PartOIteration3Roles.ReferenceA_TM59Report)?.Path);
+            Assert.Equal(path_Report_B, partOIteration3Result.Record.File(PartOIteration3Roles.CandidateB_TM59Report)?.Path);
+
+            //Candidate B's is claimed as an artifact of this attempt; Reference A's is recorded as a report.
+            Assert.Contains(partOIteration3Result.Ledger.Artifacts, x => x.StartsWith(path_Report_B, StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(partOIteration3Result.Ledger.Artifacts, x => x.StartsWith(path_Report_A, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// The production pipeline's report save, against the lock technique the persistence tests use: a
+        /// report that could not be written is handed back as NO path, with the reason - never as the path
+        /// of the old file still sitting there.
+        /// </summary>
+        [Fact]
+        public void The_pipeline_hands_back_no_report_path_when_the_report_could_not_be_written()
+        {
+            string path_TSD = Path.Combine(directory, "Locked-It3B-Bridge.tsd");
+            string path_Report = Query.Path_TM59Report(path_TSD);
+
+            File.WriteAllText(path_Report, "an earlier attempt's report");
+
+            TM59AssessmentReport tM59AssessmentReport = new((IEnumerable<Space>)null, null, null, null, null, path_TSD);
+
+            using (FileStream fileStream = new(path_Report, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                Assert.Null(PartOIteration3Pipeline.Report(path_TSD, tM59AssessmentReport, out string refusal));
+                Assert.Contains(path_Report, refusal);
+            }
+
+            Assert.Equal("an earlier attempt's report", File.ReadAllText(path_Report));
+
+            //Once it can be written, it is - and only then is its path handed back.
+            Assert.Equal(path_Report, PartOIteration3Pipeline.Report(path_TSD, tM59AssessmentReport, out string refusal_None));
+            Assert.Null(refusal_None);
+            Assert.Equal(tM59AssessmentReport.ToString(), File.ReadAllText(path_Report));
+        }
+
+        //-------------------------------------------------------------------------------------------------
+        //The Prepare & Run adoption
+        //-------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Prepare &amp; Run adopts a preparation through the dialog's own adoption step - over a model of its
+        /// own rather than the preparation's, because it rebuilds one after an equipment edit. On
+        /// <c>bdc48ef</c> that step dropped the systems the preparation built, so a run prepared from the
+        /// dialog could never start Iteration 3 ("preparation built no ventilation system") however
+        /// completely it simulated. Found by the licensed UI acceptance; a headless run never reaches it.
+        /// </summary>
+        [Fact]
+        public void The_Prepare_and_Run_adoption_captures_the_systems_the_preparation_built()
+        {
+            adjacencyCluster = PartOIteration3Fixture.Design(out guids_VentilationSystem, out zones);
+
+            PartOIterationPreparation partOIterationPreparation = new();
+            partOIterationPreparation.OverheatingScenarios.AddRange(PartOIteration3Fixture.Scenarios());
+
+            foreach (Guid guid in guids_VentilationSystem)
+            {
+                partOIterationPreparation.VentilationSystems.Add(adjacencyCluster.GetObject<VentilationSystem>(guid));
+            }
+
+            PartORun partORun = new();
+
+            Assert.True(Modify.AdoptPartOPreparation(
+                partORun,
+                PartOIteration3Fixture.Model(new AdjacencyCluster(adjacencyCluster)),
+                partOIterationPreparation,
+                new PartOPreparationContext(PartOIteration.BasePassive, zones, null, null)));
+
+            List<Guid> guids_Expected = [.. guids_VentilationSystem];
+            guids_Expected.Sort();
+
+            List<Guid> guids_Captured = partORun.Guids_VentilationSystem_Prepared;
+            guids_Captured.Sort();
+
+            Assert.NotEmpty(guids_Captured);
+            Assert.Equal(guids_Expected, guids_Captured);
+
+            //And the run that follows is one Iteration 3 can start from.
+            path_TSD_ReferenceA = Path.Combine(directory, "Flat.tsd");
+
+            Assert.True(partORun.ExpectResults(path_TSD_ReferenceA));
+
+            File.WriteAllText(path_TSD_ReferenceA, "reference A results");
+
+            AnalyticalModel analyticalModel_Workflow = PartOIteration3Fixture.Model(new AdjacencyCluster(adjacencyCluster), "Flat");
+
+            analyticalModel_Workflow.SetValue(Analytical.AnalyticalModelParameter.OverheatingScenarios, new Core.SAMCollection<OverheatingScenario>(partORun.OverheatingScenarios));
+            analyticalModel_Workflow.SetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, new SimulationResultProvenance(analyticalModel_Workflow, path_TSD_ReferenceA));
+
+            Assert.True(partORun.Complete(analyticalModel_Workflow, path_TSD_ReferenceA, PartOIteration3Fixture.SimulationContext(directory), out string _));
+
+            PartOIteration3Eligibility partOIteration3Eligibility = Query.PartOIteration3Eligibility(partORun, partORun.IsAssessable(out string refusal_Assessable), refusal_Assessable);
+
+            Assert.True(partOIteration3Eligibility.CanRun, partOIteration3Eligibility.Refusal_Run);
+        }
     }
 }

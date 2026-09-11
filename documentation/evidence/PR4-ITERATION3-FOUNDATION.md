@@ -328,3 +328,161 @@ PR4 this branch — licensed acceptance passed except the pre-existing reopen de
 SAM #111 stays **open** for PR5 manufacturer-aware behaviour. SAM #114's production resolution is
 implemented and demonstrated on the canonical fixture; it should be recorded and closed only after this
 PR is reviewed and merged.
+
+---
+
+## 9. Follow-up — the Codex round on `bdc48ef`, and the licensed acceptance through the real UI
+
+Second laptop, licensed TAS. Upstream unchanged: SAM `413215cc`, SAM_Systems `89cf1399`, SAM_Tas
+`1d62f380` (rebuilt from source with VS MSBuild before SAM_UI).
+
+### 9.1 Codex P1 — a review no longer refuses because the previous review ran
+
+A review reassesses both results files through the production TM59 path, and that path rewrites each
+TM59 report beside its results. `Query.PartOIteration3ReviewRefusals` held the review to the reports'
+recorded fingerprints, so the **second** review of an unchanged pairing refused as stale — reproduced
+before the fix as `Review 2 refused: The Iteration 3 Reference A TM59 report … has been rewritten`.
+
+- The two TM59 report roles are lineage, not comparison authority:
+  `PartOIteration3Roles.IsRegeneratedByAssessment`, skipped by the freshness loop and nothing else.
+- Every comparison-defining artifact stays validated by length and write time: both no-IZAM files, the
+  TPD, both bridge files and Candidate B's model.
+- A review offers **only** the reports its own assessments wrote — never the record's unvalidated entry,
+  and none at all on a refused review.
+
+### 9.2 Codex P2 — a report is claimed only when this attempt wrote it
+
+`SavePartOTM59Report` states the path it would have written even when the write fails; the pipeline
+handed that path on regardless, and the run recorded whatever earlier file sat there.
+
+- `PartOIteration3Pipeline.Report` answers a path only when the save succeeded, with the writer's reason
+  otherwise (`PartOIteration3Assessment.Refusal_Report`).
+- `RunPartOIteration3` records a report only where the attempt-start fingerprint proves this attempt
+  wrote it: Candidate B's is claimed as an artifact, Reference A's is checked by the same rule
+  (`PartOIteration3Artifacts.IsWritten`) and recorded as a report. The result offers only what the
+  record holds. A report that could not be written is **said**, by role and path, and does not refuse:
+  a report is evidence of an assessment, not an input to the pairing.
+
+### 9.3 Found by the UI acceptance — Prepare &amp; Run dropped the #114 identities
+
+The first fresh Iteration 1a run through the real dialog left **Iteration 3 (A/B) disabled**, refused by
+`Query.PartOIteration3Eligibility` at exactly one gate:
+
+```text
+This Part O run's preparation built no ventilation system, so there is no mechanical ventilation
+design for the explicit TAS Systems route to materialise.
+```
+
+The dialog adopts a preparation over its own prepared model (rebuilt after an equipment edit) through
+the model overload of `PartORun.Prepare`, which forwarded **no** system identities. The headless
+acceptance called the capturing overload directly and so never reached this path. Fixed by adopting
+through `Modify.AdoptPartOPreparation`, which hands over `PartORun.Guids_VentilationSystem(preparation)`
+— the one extraction both adoption paths now share.
+
+### 9.4 Tests
+
+`SAM.Analytical.UI.WPF.Tests`: **961 passed, 0 failed** — 949 as before plus 12, each seen failing on
+the unfixed code first:
+
+| test | pins |
+| --- | --- |
+| `An_unchanged_pairing_reviews_repeatedly_although_each_review_regenerates_its_TM59_reports` | P1: three reviews in a row, each rewriting both reports, all complete; no comparison-defining fingerprint moves |
+| `After_a_review_regenerated_the_reports_a_touched_comparison_artifact_still_refuses_by_name` (×6) | P1: each of the six comparison-defining roles, touched after a review, refuses by name before anything is read |
+| `A_review_offers_only_the_TM59_reports_it_wrote_itself` | P1/P2: no fallback to the record's report entries |
+| `A_TM59_report_this_attempt_did_not_write_is_never_recorded_or_offered` | P2: stale report paths for A and B are neither recorded, offered nor listed, and are noted by role and path |
+| `The_TM59_reports_this_attempt_wrote_are_recorded_and_offered_even_over_old_files` | P2: ownership is by change, not absence |
+| `The_pipeline_hands_back_no_report_path_when_the_report_could_not_be_written` | P2: locked report file (`FileShare.None`) → no path, the reason, the old file untouched |
+| `The_Prepare_and_Run_adoption_captures_the_systems_the_preparation_built` | 9.3: identities captured, and the completed run passes the Iteration 3 run gate |
+
+### 9.5 An environment trap, not a code defect
+
+The first Candidate B press from the UI terminated the application:
+`FileNotFoundException: Could not load file or assembly 'SAM.Analytical.Tas.TPD'`. The DLL was beside
+the executable; the application's own `SAM Analytical.deps.json` was dated **before** PR4 added the
+reference, because an incremental build does not regenerate an application's dependency file when only
+a referenced project's HintPath references change. Rebuilding the application project regenerated it
+with `SAM.Analytical.Tas.TPD`, `SAM.Analytical.Systems` and `SAM.Core.Systems`. A clean build is
+unaffected; a build folder produced before PR4 and only built incrementally since needs one rebuild.
+
+### 9.6 Licensed acceptance through the real application — Candidate B
+
+Driven through `SAM Analytical.exe` itself (no headless harness), fresh session, clean output folder
+`C:\TasOut\pr4h`, canonical fixture SHA-256 verified.
+
+**Weather.** The fixture embeds `Z1_DSY1_2050s_HIGH90_CIBSE_v1.1`, and the Part O Simulate dialog takes
+the model's weather by design. The accepted case is `Leeds_TRY` from `CIBSE Weather 2021.twd`, so it was
+chosen in the dialog; the run's own `.sam` records `Leeds_TRY` (53.836 N). On the embedded DSY weather
+Reference A is a TM59 FAIL (6 of 8), so the weather choice is load-bearing for any comparison with
+section 5.
+
+**Step A — Reference A.** Part O — Prepare &amp; Run → *Iteration 1a — MVHR design duty (no manufacturer
+unit)* → all 3 eligible dwellings → Prepare &amp; Run → preview (3 dwelling systems, 156.0 l/s supply and
+extract) → Simulate (project name, days 1–365, simulate on, sizing off — all locked) → TAS 2.2 min →
+existing TM59: **PASS**, per-room >26 °C hours 13 / 4 / 3 / 4 / 0 / 2 / 4 / 0, identical to section 5's A
+column. The hub reopened with Simulation READY and Results READY, and **Iteration 3 (A/B) ENABLED**
+(`Run the explicit TAS Systems ventilation route against this Iteration 1a reference…`). "Ventilation
+design: NEEDS PREPARATION" is still shown: it describes what a new Prepare &amp; Run would build on the
+loaded model, is produced by the untouched `PartOWorkflowInspection`, and is not an Iteration 3 gate.
+
+**Step B — Iteration 3 (A/B), no pairing yet → RUN.** 8.4 min. `Iteration 3 run COMPLETE. Reference A
+Pass; Candidate B Pass.` All **14** stages `Completed` in the persisted record.
+
+| gate | measured |
+| --- | --- |
+| physical MVHR air systems | **3** |
+| bound rooms | **8**, `Corridor_1` not bound |
+| directed legs | **14** — 3 supply / 6 extract / 5 transfer |
+| airflow reconciliation | every design flow matched on its native carrier; bound duties equal the prepared terminals |
+| ZoneTemperature / ResultantTemperature | **8 × 8760 finite** each, hours 0..8759 |
+| provider vs Result TSD | **identical over 70 080 values** |
+| fans | `HeatGainFactor 0`, factor 1.0 on yearly schedule **`Part O continuous operation`**, 8760 of 8760 hours |
+| #114 | 3 MVHR retained; `NV`, `UV`, `MV` excluded, each carrying no design terminal |
+| TAS | each of the 3 air systems answered `Done` |
+| TM59 reports | both recorded as written by this attempt (9.2) |
+
+```text
+8 rooms, 70 080 values each side: mean A 16.108 °C, mean B 16.481 °C, bias B−A +0.373 K,
+RMSE 0.834 K, max |B−A| 2.909 K in 'Ensuite_8' at hour 5299. 0 TM59 criterion outcomes differ.
+Flat 1: bias 0.39 K, RMSE 0.748 K, max 2.455 K | Flat 2: bias 0.455 K, RMSE 0.882 K, max 2.634 K |
+Flat 3: bias 0.279 K, RMSE 0.837 K, max 2.909 K
+```
+
+Bias, RMSE and the maximum reproduce section 5; the hour at which the maximum falls differs (5299 against
+5491). These are descriptive diagnostics; no parity threshold exists.
+
+### 9.7 Review — the upstream provenance defect blocks it, in the same session too
+
+With the pairing recorded, the same button becomes **Review**. Pressed twice in a row:
+
+| | TAS processes started | files changed in the output folder | outcome |
+| --- | --- | --- | --- |
+| Review #1 | **none** | **none** | REFUSED at Input |
+| Review #2 | **none** | **none** | REFUSED at Input — identical |
+
+Both refusals carry exactly one reason:
+
+```text
+Candidate B's model does not belong to its recorded results. The model has changed since the
+simulation results at '…-It3B-Bridge.tsd' were produced from it …
+```
+
+Every check before it passed: schema, Reference A's results path, design-state and scenario
+fingerprints, and all six comparison-defining file fingerprints. The report roles no longer take part
+(9.1), and no report-staleness reason appears. What refuses is section 5.6's defect: the review must reload
+Candidate B's persisted model to establish which bridge results it belongs to, and
+`SimulationResultProvenance.Fingerprint(AnalyticalModel)` does not survive that reload. Measured with
+SAM's own function on these files:
+
+```text
+Candidate B .sam   recorded 3bcc2e4290b64820   reopened 1db30690e0864580 (twice)
+Reference A .sam   recorded 12689ed18fe447b3   reopened 71717d8092b2ccd7 (twice)
+raw fixture        no provenance               reopened 61a33821ae200c09 (as in 5.6)
+```
+
+So a review cannot show a comparison on this fixture until the SAM fingerprint is made stable for a
+model carrying TAS result series — the same follow-up 5.6 names. It fails closed, by name, with no
+Candidate B number. The repeated-review behaviour that 9.1 fixes is pinned COM-free by the tests in 9.4.
+
+**Negative test.** With the bridge TSD's write time moved forward one hour, the review refused **by
+name** before any model was read — `The Iteration 3 Candidate B bridge TSD at '…' has been rewritten
+since the run produced it` — with no comparison and no TAS process. The write time was then restored.

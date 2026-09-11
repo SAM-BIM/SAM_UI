@@ -199,10 +199,10 @@ namespace SAM.Analytical.UI.WPF
                     0);
             }
 
-            //The durable artifact, written whether the pairing goes on to complete or not - a failure to
-            //write is carried as the report path being null and never fails the assessment, which is
-            //already done.
-            Modify.SavePartOTM59Report(path_TSD, partOTM59Assessment.Report, out string path_TM59Report, out string _);
+            //The durable artifact, written whether the pairing goes on to complete or not. A failure to
+            //write is carried as NO report path plus the writer's reason, and never fails the assessment,
+            //which is already done.
+            string path_TM59Report = Report(path_TSD, partOTM59Assessment.Report, out string refusal_Report);
 
             return new PartOIteration3Assessment(
                 true,
@@ -215,7 +215,22 @@ namespace SAM.Analytical.UI.WPF
                 partOTM59Assessment.ResultantTemperatures,
                 partOTM59Assessment.Report.ToString(),
                 path_TM59Report,
-                partOTM59Assessment.Result?.Spaces?.Count ?? 0);
+                partOTM59Assessment.Result?.Spaces?.Count ?? 0,
+                refusal_Report);
+        }
+
+        /// <summary>
+        /// Writes one assessment's TM59 report beside its results and answers where - or <b>null</b>, with
+        /// the writer's reason, where it could not.
+        /// <para>
+        /// <c>Modify.SavePartOTM59Report</c> states the path it would have written even when the write
+        /// fails, which its own callers read together with its answer. Handing that path on regardless
+        /// would name whatever earlier report is still sitting there as this assessment's.
+        /// </para>
+        /// </summary>
+        internal static string Report(string path_TSD, TM59AssessmentReport tM59AssessmentReport, out string refusal)
+        {
+            return Modify.SavePartOTM59Report(path_TSD, tM59AssessmentReport, out string path_TM59Report, out refusal) ? path_TM59Report : null;
         }
 
         /// <summary>

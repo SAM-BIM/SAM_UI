@@ -21,6 +21,9 @@ namespace SAM.Analytical.UI.WPF
         /// re-asks all three - the run being reviewed is the Reference A the record names, Reference A's
         /// design and scenarios still match the fingerprints the record copied from its own provenance,
         /// and every Candidate B file is still byte-length and write-time identical to what was recorded.
+        /// The two TM59 reports are the exception, and deliberately: every assessment of the results
+        /// rewrites them, a review's included, so they are lineage rather than comparison authority - see
+        /// <see cref="PartOIteration3Roles.IsRegeneratedByAssessment"/>.
         /// </para>
         /// <para>
         /// <b>Refused by name.</b> Each failure says which file or which fingerprint, because "this
@@ -118,6 +121,14 @@ namespace SAM.Analytical.UI.WPF
             //-------------------------------------------------------------------------------------------
             foreach (PartOIteration3FileRecord partOIteration3FileRecord in partOIteration3Record.Files)
             {
+                //A TM59 report is rewritten by every assessment of its results - this review's own
+                //included - so it is lineage and not what the comparison is built from. Validating it would
+                //make the second review of an unchanged pairing refuse because the first one ran.
+                if (PartOIteration3Roles.IsRegeneratedByAssessment(partOIteration3FileRecord.Role))
+                {
+                    continue;
+                }
+
                 if (!partOIteration3FileRecord.Current(out string refusal))
                 {
                     result.Add(refusal);

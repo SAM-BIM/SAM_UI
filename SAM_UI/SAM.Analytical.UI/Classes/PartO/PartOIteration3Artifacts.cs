@@ -87,6 +87,26 @@ namespace SAM.Analytical.UI
         public bool TryClaim(string path, out string artifact, out string refusal)
         {
             artifact = null;
+
+            if (!IsWritten(path, out refusal))
+            {
+                return false;
+            }
+
+            artifact = string.Format("{0} ({1})", path, fingerprints[path].Exists ? "updated" : "created");
+
+            claimed.Add(artifact);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Whether this attempt demonstrably wrote a path - the same rule <see cref="TryClaim(string, out string, out string)"/>
+        /// applies, without claiming the file as an artifact. For a file this attempt rewrites but does
+        /// not own, such as Reference A's TM59 report beside Reference A's own results.
+        /// </summary>
+        public bool IsWritten(string path, out string refusal)
+        {
             refusal = null;
 
             if (string.IsNullOrWhiteSpace(path))
@@ -122,10 +142,6 @@ namespace SAM.Analytical.UI
 
                 return false;
             }
-
-            artifact = string.Format("{0} ({1})", path, fingerprint.Exists ? "updated" : "created");
-
-            claimed.Add(artifact);
 
             return true;
         }
