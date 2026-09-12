@@ -70,7 +70,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             /// </summary>
             internal bool Write_Reports { get; set; }
 
-            public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces)
+            public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null)
             {
                 throw new InvalidOperationException("A review must not materialise anything.");
             }
@@ -80,7 +80,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 throw new InvalidOperationException("A review must not run TAS.");
             }
 
-            public SystemVentilationRoute Route(NoIzamThermalSource noIzamThermalSource, MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation, string path_TPD, int startHour, int endHour)
+            public SystemVentilationRoute Route(NoIzamThermalSource noIzamThermalSource, MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation, string path_TPD, int startHour, int endHour, SystemVentilationFanHeatGainPolicy fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.ClearToZero)
             {
                 throw new InvalidOperationException("A review must not convert or simulate anything.");
             }
@@ -392,6 +392,39 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(partOIteration3Result.IsRefused);
             Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("schema"));
+        }
+
+        [Fact]
+        public void A_record_with_an_unknown_equipment_behaviour_refuses_before_reading_results()
+        {
+            PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
+
+            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            File.WriteAllText(path_Record, File.ReadAllText(path_Record).Replace("\"BehaviourMode\": \"Parity\"", "\"BehaviourMode\": \"Unknown\""));
+
+            PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, pipeline);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("supported ventilation equipment behaviour"));
+            Assert.Equal(0, pipeline.Count_Assess);
+        }
+
+        [Fact]
+        public void A_completed_selected_product_record_without_catalogue_or_equipment_provenance_refuses()
+        {
+            PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
+
+            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            File.WriteAllText(path_Record, File.ReadAllText(path_Record).Replace("\"BehaviourMode\": \"Parity\"", "\"BehaviourMode\": \"SelectedProduct\""));
+
+            PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, pipeline);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("catalogue directory, file, schema and SHA-256"));
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("equipment row"));
+            Assert.Equal(0, pipeline.Count_Assess);
         }
 
         [Fact]

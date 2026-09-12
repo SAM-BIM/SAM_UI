@@ -26,6 +26,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartOIteration3Stage.ReferenceA,
             PartOIteration3Stage.ReferenceATM59,
             PartOIteration3Stage.SystemScope,
+            PartOIteration3Stage.EquipmentResolution,
             PartOIteration3Stage.Materialisation,
             PartOIteration3Stage.ThermalSource,
             PartOIteration3Stage.SystemsConversion,

@@ -70,7 +70,13 @@ namespace SAM.Analytical.UI.WPF
         /// <param name="partORun">The completed, eligible Iteration 1a run this pairing is built on.</param>
         /// <param name="iPartOIteration3Pipeline">Who does the work - see <see cref="IPartOIteration3Pipeline"/>.</param>
         /// <param name="cancellationToken">Aborts the TAS steps between stages.</param>
-        public static PartOIteration3Result RunPartOIteration3(PartORun partORun, IPartOIteration3Pipeline iPartOIteration3Pipeline, CancellationToken cancellationToken = default)
+        /// <param name="partOIteration3BehaviourMode">
+        /// PR5A (SAM#111 plan §J): <c>Parity</c> (the default - the foundation control, B0) or
+        /// <c>SelectedProduct</c>, which resolves every scoped air handling unit's already-selected
+        /// product before materialising. Placed after <paramref name="cancellationToken"/>, both optional,
+        /// so every existing positional call site - which passes at most three arguments - is unaffected.
+        /// </param>
+        public static PartOIteration3Result RunPartOIteration3(PartORun partORun, IPartOIteration3Pipeline iPartOIteration3Pipeline, CancellationToken cancellationToken = default, PartOIteration3BehaviourMode partOIteration3BehaviourMode = PartOIteration3BehaviourMode.Parity)
         {
             PartOIteration3Ledger partOIteration3Ledger = new();
 
@@ -78,6 +84,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 Guid_Run = Guid.NewGuid(),
                 Ticks_Utc = DateTime.UtcNow.Ticks,
+                BehaviourMode = partOIteration3BehaviourMode,
             };
 
             List<string> notes = [];
@@ -88,6 +95,16 @@ namespace SAM.Analytical.UI.WPF
             if (partORun is null || iPartOIteration3Pipeline is null)
             {
                 partOIteration3Ledger.Refuse(PartOIteration3Stage.Input, "No Part O run or no pipeline was supplied.", ["No Part O run or no pipeline was supplied, so no Approved Document O Iteration 3 pairing could be attempted."]);
+
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, null, notes);
+            }
+
+            if (!Enum.IsDefined(typeof(PartOIteration3BehaviourMode), partOIteration3BehaviourMode))
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.Input,
+                    "The requested ventilation equipment behaviour is not supported.",
+                    [string.Format("Ventilation equipment behaviour value '{0}' is not defined, so no Candidate B was attempted.", (int)partOIteration3BehaviourMode)]);
 
                 return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, null, notes);
             }
@@ -246,6 +263,52 @@ namespace SAM.Analytical.UI.WPF
                     partOIteration3SystemScope.Guids_Removed.Count));
 
             //=================================================================================================
+            //Equipment resolution - PR5A (SAM#111 plan §J). A no-op in Parity mode.
+            //=================================================================================================
+            Dictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = [];
+            List<PartOIteration3EquipmentEvidence> equipment = [];
+            SystemVentilationFanHeatGainPolicy fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.ClearToZero;
+
+            if (partOIteration3BehaviourMode == PartOIteration3BehaviourMode.Parity)
+            {
+                partOIteration3Ledger.Complete(PartOIteration3Stage.EquipmentResolution, "Parity mode: Candidate B0, unchanged. No product was resolved.");
+            }
+            else
+            {
+                VentilationUnitCatalogue ventilationUnitCatalogue = VentilationUnitCatalogue.Read();
+
+                partOIteration3Record.Directory_VentilationUnitCatalogue = ventilationUnitCatalogue.Directory;
+                partOIteration3Record.Path_VentilationUnitCatalogue = ventilationUnitCatalogue.Path;
+                partOIteration3Record.Schema_VentilationUnitCatalogue = ventilationUnitCatalogue.Schema;
+                partOIteration3Record.Sha256_VentilationUnitCatalogue = ventilationUnitCatalogue.Sha256;
+
+                List<string> refusals_Equipment = Query.PartOIteration3EquipmentResolution(
+                    partOIteration3SystemScope.AdjacencyCluster,
+                    ventilationUnitCatalogue,
+                    out unitSettings,
+                    out equipment,
+                    out List<string> notes_Equipment);
+
+                if (refusals_Equipment.Count != 0)
+                {
+                    partOIteration3Ledger.Refuse(
+                        PartOIteration3Stage.EquipmentResolution,
+                        "The selected products could not all be resolved to certified manufacturer data.",
+                        refusals_Equipment);
+
+                    return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+                }
+
+                AddNotes(notes, notes_Equipment);
+
+                fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.FromSystemsGraph;
+
+                partOIteration3Ledger.Complete(
+                    PartOIteration3Stage.EquipmentResolution,
+                    string.Format("{0} air handling unit(s) resolved to a selected product's certified heat-recovery efficiency and specific fan power.", equipment.Count));
+            }
+
+            //=================================================================================================
             //Materialisation - SAM_Systems
             //=================================================================================================
             List<Space> spaces_Scope = [];
@@ -259,7 +322,7 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation = iPartOIteration3Pipeline.Materialise(partOIteration3SystemScope.AdjacencyCluster, spaces_Scope);
+            MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation = iPartOIteration3Pipeline.Materialise(partOIteration3SystemScope.AdjacencyCluster, spaces_Scope, unitSettings);
 
             if (mechanicalVentilationMaterialisation is null || !mechanicalVentilationMaterialisation.IsMaterialised)
             {
@@ -269,6 +332,26 @@ namespace SAM.Analytical.UI.WPF
                     mechanicalVentilationMaterialisation?.Refusals ?? ["The mechanical ventilation materialisation produced nothing and said nothing about why."]);
 
                 return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
+            if (equipment.Count != 0)
+            {
+                List<string> refusals_EquipmentBinding = Query.PartOIteration3EquipmentBindings(equipment, mechanicalVentilationMaterialisation.Bindings);
+
+                if (refusals_EquipmentBinding.Count != 0)
+                {
+                    partOIteration3Ledger.Refuse(
+                        PartOIteration3Stage.Materialisation,
+                        "The manufacturer-aware equipment evidence could not be bound to the materialised systems.",
+                        refusals_EquipmentBinding);
+
+                    return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+                }
+
+                foreach (PartOIteration3EquipmentEvidence partOIteration3EquipmentEvidence in equipment)
+                {
+                    partOIteration3Record.Add(partOIteration3EquipmentEvidence);
+                }
             }
 
             partOIteration3Ledger.Complete(
@@ -350,7 +433,7 @@ namespace SAM.Analytical.UI.WPF
             int startHour = 0;
             int endHour = PartOSimulationContext.HourCount_FullYear - 1;
 
-            SystemVentilationRoute systemVentilationRoute = iPartOIteration3Pipeline.Route(noIzamThermalSource, mechanicalVentilationMaterialisation, partOIteration3Paths.Path_TPD, startHour, endHour);
+            SystemVentilationRoute systemVentilationRoute = iPartOIteration3Pipeline.Route(noIzamThermalSource, mechanicalVentilationMaterialisation, partOIteration3Paths.Path_TPD, startHour, endHour, fanHeatGainPolicy);
 
             if (systemVentilationRoute is null || !systemVentilationRoute.IsComplete)
             {

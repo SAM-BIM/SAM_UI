@@ -139,12 +139,19 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// <summary>The rooms the materialisation was scoped to.</summary>
         internal List<Space> Spaces_Materialised { get; private set; }
 
-        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces)
+        /// <summary>PR5A: the unit settings <see cref="Materialise"/> was actually handed, null meaning none was passed at all.</summary>
+        internal IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> UnitSettings_Materialised { get; private set; }
+
+        /// <summary>PR5A: the fan heat gain policy <see cref="Route"/> was actually handed.</summary>
+        internal SystemVentilationFanHeatGainPolicy FanHeatGainPolicy_Route { get; private set; }
+
+        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null)
         {
             Called.Add(nameof(Materialise));
 
             AdjacencyCluster_Materialised = adjacencyCluster;
             Spaces_Materialised = [.. spaces ?? []];
+            UnitSettings_Materialised = unitSettings;
 
             return Materialisation;
         }
@@ -173,9 +180,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             return NoIzamThermalSource;
         }
 
-        public SystemVentilationRoute Route(NoIzamThermalSource noIzamThermalSource, MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation, string path_TPD, int startHour, int endHour)
+        public SystemVentilationRoute Route(NoIzamThermalSource noIzamThermalSource, MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation, string path_TPD, int startHour, int endHour, SystemVentilationFanHeatGainPolicy fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.ClearToZero)
         {
             Called.Add(nameof(Route));
+
+            FanHeatGainPolicy_Route = fanHeatGainPolicy;
 
             Write(Paths_Route);
 

@@ -41,7 +41,7 @@ namespace SAM.Analytical.UI.WPF
     public static class PartOIteration3ReportText
     {
         /// <summary>The schema the persisted report states, in both its text header and its JSON.</summary>
-        public const string CurrentSchema = "PartOIteration3Report:v1";
+        public const string CurrentSchema = "PartOIteration3Report:v2";
 
         /// <summary>What an empty provenance table says, so a blank section is never read as a lost one.</summary>
         private const string None = "\tNONE RECORDED";
@@ -91,6 +91,15 @@ namespace SAM.Analytical.UI.WPF
                     partOIteration3Record.ProjectName_ReferenceA ?? "?",
                     partOIteration3Record.ProjectName_CandidateB ?? "?",
                     partOIteration3Record.Fingerprint_Scenario ?? "not recorded"));
+
+                stringBuilder.Append(string.Format(
+                    " Ventilation equipment behaviour: {0}.",
+                    Core.Query.Description(partOIteration3Record.BehaviourMode)));
+
+                if (partOIteration3Record.Equipment.Count != 0)
+                {
+                    stringBuilder.Append(string.Format(" {0} selected product(s) resolved and recorded.", partOIteration3Record.Equipment.Count));
+                }
 
                 if (partOIteration3Record.Count_AirSystem != 0)
                 {
@@ -242,6 +251,20 @@ namespace SAM.Analytical.UI.WPF
             foreach (string note in partOIteration3Result.Record?.Notes_Scope ?? [])
             {
                 stringBuilder.AppendLine(note);
+            }
+
+            if (partOIteration3Result.Record is not null)
+            {
+                stringBuilder.AppendLine(string.Format(
+                    "Ventilation equipment behaviour: {0}",
+                    Core.Query.Description(partOIteration3Result.Record.BehaviourMode)));
+
+                foreach (PartOIteration3EquipmentEvidence partOIteration3EquipmentEvidence in partOIteration3Result.Record.Equipment)
+                {
+                    stringBuilder.AppendLine(string.Format("Equipment: {0}", partOIteration3EquipmentEvidence));
+                    stringBuilder.AppendLine(string.Format("  Fan-power mapping: {0}", partOIteration3EquipmentEvidence.FanPowerSplitRule));
+                    stringBuilder.AppendLine(string.Format("  Fan-heat assumption: {0}", partOIteration3EquipmentEvidence.FanHeatGainAssumption));
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(partOIteration3Result.Path_Record))
@@ -408,6 +431,7 @@ namespace SAM.Analytical.UI.WPF
             stringBuilder.AppendLine(string.Format("Reference A TM59\t{0}", Core.Query.Description(partOIteration3Record.Status_ReferenceA)));
 
             stringBuilder.AppendLine(string.Format("Candidate B project\t{0}", partOIteration3Record.ProjectName_CandidateB ?? "<none>"));
+            stringBuilder.AppendLine(string.Format("Ventilation equipment behaviour\t{0}", Core.Query.Description(partOIteration3Record.BehaviourMode)));
             stringBuilder.AppendLine(string.Format("Candidate B TM59\t{0}", Core.Query.Description(partOIteration3Record.Status_CandidateB)));
             stringBuilder.AppendLine(string.Format("Resultant temperature\t{0}", partOIteration3Record.Method_ResultantTemperature ?? "<none>"));
             stringBuilder.AppendLine(string.Format("Provider matches its result file\t{0}", partOIteration3Record.ProviderMatchesResultFile));
@@ -417,6 +441,11 @@ namespace SAM.Analytical.UI.WPF
 
             stringBuilder.AppendLine(string.Format("No-IZAM source: IZAMs removed\t{0}", partOIteration3Record.RemovedIZAMs));
             stringBuilder.AppendLine(string.Format("No-IZAM source: mechanical ventilation gains removed\t{0}", partOIteration3Record.RemovedMechanicalVentilationGains));
+
+            stringBuilder.AppendLine(string.Format("Ventilation catalogue directory\t{0}", partOIteration3Record.Directory_VentilationUnitCatalogue ?? "<none - Parity mode>"));
+            stringBuilder.AppendLine(string.Format("Ventilation catalogue file\t{0}", partOIteration3Record.Path_VentilationUnitCatalogue ?? "<none - Parity mode>"));
+            stringBuilder.AppendLine(string.Format("Ventilation catalogue schema\t{0}", partOIteration3Record.Schema_VentilationUnitCatalogue ?? "<none - Parity mode>"));
+            stringBuilder.AppendLine(string.Format("Ventilation catalogue SHA-256\t{0}", partOIteration3Record.Sha256_VentilationUnitCatalogue ?? "<none - Parity mode>"));
 
             stringBuilder.AppendLine(string.Format("Air systems\t{0}", partOIteration3Record.Count_AirSystem));
             stringBuilder.AppendLine(string.Format(
@@ -448,6 +477,46 @@ namespace SAM.Analytical.UI.WPF
             foreach (string note in partOIteration3Record.Notes_Scope)
             {
                 stringBuilder.AppendLine(string.Format("\tNOTE\t{0}", note));
+            }
+
+            stringBuilder.AppendLine();
+            stringBuilder.AppendLine("Equipment\tAHU guid\tAir system guid\tAHU\tManufacturer\tModel\tReference\tSource\tCapacity SUP/EXT (l/s)\tPart F SUP/EXT (l/s)\tDesign SUP/EXT (l/s)\tOperating basis\tHR efficiency\tHR basis\tSFP W/(l/s)\tSFP basis\tFan pressure SUP/EXT (Pa)\tFan efficiency\tHeat gain SUP/EXT\tAssumptions");
+
+            if (partOIteration3Record.Equipment.Count == 0)
+            {
+                stringBuilder.AppendLine(None);
+            }
+
+            foreach (PartOIteration3EquipmentEvidence partOIteration3EquipmentEvidence in partOIteration3Record.Equipment)
+            {
+                stringBuilder.AppendLine(string.Format(
+                    cultureInfo,
+                    "\t{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:0.###} / {8:0.###}\t{9} / {10}\t{11:0.###} / {12:0.###}\t{13}\t{14}\t{15}\t{16}\t{17}\t{18} / {19}\t{20}\t{21} / {22}\t{23}; {24}",
+                    partOIteration3EquipmentEvidence.Guid_AirHandlingUnit,
+                    partOIteration3EquipmentEvidence.Guid_AirSystem,
+                    partOIteration3EquipmentEvidence.Name_AirHandlingUnit,
+                    partOIteration3EquipmentEvidence.Manufacturer,
+                    partOIteration3EquipmentEvidence.Model,
+                    partOIteration3EquipmentEvidence.Reference,
+                    partOIteration3EquipmentEvidence.Source,
+                    partOIteration3EquipmentEvidence.MaximumSupplyFlowRate_Lps,
+                    partOIteration3EquipmentEvidence.MaximumExtractFlowRate_Lps,
+                    Number(partOIteration3EquipmentEvidence.PartFRequiredSupplyFlowRate_Lps, cultureInfo),
+                    Number(partOIteration3EquipmentEvidence.PartFRequiredExtractFlowRate_Lps, cultureInfo),
+                    partOIteration3EquipmentEvidence.DesignSupplyFlowRate_Lps,
+                    partOIteration3EquipmentEvidence.DesignExtractFlowRate_Lps,
+                    partOIteration3EquipmentEvidence.OperatingAirFlowBasis,
+                    Number(partOIteration3EquipmentEvidence.SensibleHeatRecoveryEfficiency, cultureInfo),
+                    partOIteration3EquipmentEvidence.HeatRecoveryEfficiencyBasis,
+                    Number(partOIteration3EquipmentEvidence.SpecificFanPower_WPerLps, cultureInfo),
+                    partOIteration3EquipmentEvidence.SpecificFanPowerBasis,
+                    Number(partOIteration3EquipmentEvidence.SupplyFanPressure_Pa, cultureInfo),
+                    Number(partOIteration3EquipmentEvidence.ExtractFanPressure_Pa, cultureInfo),
+                    Number(partOIteration3EquipmentEvidence.FanOverallEfficiency, cultureInfo),
+                    Number(partOIteration3EquipmentEvidence.SupplyFanHeatGainFactor, cultureInfo),
+                    Number(partOIteration3EquipmentEvidence.ExtractFanHeatGainFactor, cultureInfo),
+                    partOIteration3EquipmentEvidence.FanPowerSplitRule,
+                    partOIteration3EquipmentEvidence.FanHeatGainAssumption));
             }
 
             stringBuilder.AppendLine();

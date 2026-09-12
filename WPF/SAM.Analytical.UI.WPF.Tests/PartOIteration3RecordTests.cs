@@ -24,6 +24,10 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         private static readonly Guid guid_Dwelling = new("11111111-1111-1111-1111-111111111111");
 
+        private static readonly Guid guid_AirHandlingUnit = new("33333333-3333-3333-3333-333333333333");
+
+        private static readonly Guid guid_AirSystem = new("44444444-4444-4444-4444-444444444444");
+
         private static PartOIteration3Record Record()
         {
             PartOIteration3Ledger partOIteration3Ledger = new();
@@ -43,6 +47,11 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Fingerprint_Scenario = "weather=CIBSE 2021 Leeds_TRY | solar=TAS | days 1-365",
                 ProjectName_ReferenceA = "Flat",
                 ProjectName_CandidateB = "Flat-It3B",
+                BehaviourMode = PartOIteration3BehaviourMode.SelectedProduct,
+                Directory_VentilationUnitCatalogue = "C:\\SAM\\VentilationUnits",
+                Path_VentilationUnitCatalogue = "C:\\SAM\\VentilationUnits\\VentilationUnitCatalogue.JSON",
+                Schema_VentilationUnitCatalogue = "VentilationUnitCatalogue:v2",
+                Sha256_VentilationUnitCatalogue = new string('A', 64),
                 Count_Connection_Supply = 6,
                 Count_Connection_Extract = 4,
                 Count_Connection_Transfer = 4,
@@ -62,6 +71,40 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             result.Add(new PartOIteration3BindingRecord(guid_Space, "Bedroom 2", guid_Dwelling, "Flat 1", Guid.NewGuid(), Guid.NewGuid(), "zone-1", 13.0, null));
             result.Add(new PartOIteration3FileRecord(PartOIteration3Roles.Bridge_TSD, "C:\\out\\Flat-It3B-Bridge.tsd", 12345L, 638_100_000_000_000_000L));
+
+            PartOIteration3EquipmentEvidence equipmentEvidence = new(
+                guid_AirHandlingUnit,
+                "MVHR-01",
+                "Manufacturer",
+                "Model",
+                "Revision",
+                "Certified source",
+                60.0,
+                0.86,
+                "SupplyTemperatureEfficiency",
+                false,
+                null,
+                0.62,
+                "TotalBothFans",
+                false,
+                null,
+                150.0,
+                150.0,
+                60.0,
+                60.0,
+                50.0,
+                55.0,
+                "DesignAirFlow × constant yearly schedule 1.0",
+                310.0,
+                310.0,
+                1.0,
+                1.0,
+                1.0,
+                "Certified total-both-fans SFP split equally",
+                "Declared fan heat assumption");
+
+            Assert.True(equipmentEvidence.BindAirSystem(guid_AirSystem));
+            result.Add(equipmentEvidence);
 
             result.Adopt(partOIteration3Ledger);
 
@@ -87,6 +130,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(partOIteration3Record.Fingerprint_Scenario, result.Fingerprint_Scenario);
             Assert.Equal(partOIteration3Record.ProjectName_ReferenceA, result.ProjectName_ReferenceA);
             Assert.Equal(partOIteration3Record.ProjectName_CandidateB, result.ProjectName_CandidateB);
+            Assert.Equal(partOIteration3Record.BehaviourMode, result.BehaviourMode);
+            Assert.Equal(partOIteration3Record.Directory_VentilationUnitCatalogue, result.Directory_VentilationUnitCatalogue);
+            Assert.Equal(partOIteration3Record.Path_VentilationUnitCatalogue, result.Path_VentilationUnitCatalogue);
+            Assert.Equal(partOIteration3Record.Schema_VentilationUnitCatalogue, result.Schema_VentilationUnitCatalogue);
+            Assert.Equal(partOIteration3Record.Sha256_VentilationUnitCatalogue, result.Sha256_VentilationUnitCatalogue);
             Assert.Equal(partOIteration3Record.Count_Connection_Supply, result.Count_Connection_Supply);
             Assert.Equal(partOIteration3Record.Count_Connection_Extract, result.Count_Connection_Extract);
             Assert.Equal(partOIteration3Record.Count_Connection_Transfer, result.Count_Connection_Transfer);
@@ -103,6 +151,27 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(partOIteration3Record.Notes_Scope, result.Notes_Scope);
             Assert.Equal(partOIteration3Record.Stage_Refused, result.Stage_Refused);
             Assert.Equal(partOIteration3Record.IsComplete, result.IsComplete);
+
+            PartOIteration3EquipmentEvidence equipmentEvidence = Assert.Single(result.Equipment);
+            Assert.Equal(guid_AirHandlingUnit, equipmentEvidence.Guid_AirHandlingUnit);
+            Assert.Equal(guid_AirSystem, equipmentEvidence.Guid_AirSystem);
+            Assert.Equal(150.0, equipmentEvidence.MaximumSupplyFlowRate_Lps);
+            Assert.Equal(60.0, equipmentEvidence.DesignSupplyFlowRate_Lps);
+            Assert.Equal(50.0, equipmentEvidence.PartFRequiredSupplyFlowRate_Lps);
+            Assert.Equal(310.0, equipmentEvidence.SupplyFanPressure_Pa);
+            Assert.Equal("Declared fan heat assumption", equipmentEvidence.FanHeatGainAssumption);
+            Assert.True(equipmentEvidence.IsComplete);
+        }
+
+        [Fact]
+        public void A_v2_record_with_no_behaviour_mode_does_not_silently_become_parity()
+        {
+            string text = Record().ToString().Replace("\"BehaviourMode\": \"SelectedProduct\",", string.Empty);
+
+            PartOIteration3Record result = PartOIteration3Record.Parse(text);
+
+            Assert.NotNull(result);
+            Assert.False(Enum.IsDefined(typeof(PartOIteration3BehaviourMode), result.BehaviourMode));
         }
 
         [Fact]
@@ -147,7 +216,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             List<PartOIteration3StageState> stages = partOIteration3Record.Stages;
 
-            Assert.Equal(14, stages.Count);
+            Assert.Equal(15, stages.Count);
 
             Assert.Equal(PartOIteration3StageStatus.Completed, stages[0].Status);
             Assert.Equal(["C:\\out\\Flat-It3B.tbd (created)"], stages[0].Artifacts);
@@ -155,7 +224,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(PartOIteration3StageStatus.Refused, stages[2].Status);
             Assert.Equal(["Reference A could not be assessed."], stages[2].Reasons);
 
-            Assert.All(stages.GetRange(3, 11), x => Assert.Equal(PartOIteration3StageStatus.NotRun, x.Status));
+            Assert.All(stages.GetRange(3, 12), x => Assert.Equal(PartOIteration3StageStatus.NotRun, x.Status));
         }
 
         [Fact]

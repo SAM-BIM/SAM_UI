@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text.Json.Nodes;
 
 namespace SAM.Analytical.UI.WPF
 {
@@ -34,15 +38,49 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public class VentilationUnitCatalogue
     {
-        private VentilationUnitCatalogue(VentilationUnitCatalogueState state, List<VentilationUnitCapacityDescriptor> capacityDescriptors, List<KeyValuePair<VentilationUnitTemplate, string>> unselectableTemplates)
+        private VentilationUnitCatalogue(
+            VentilationUnitCatalogueState state,
+            List<VentilationUnitCapacityDescriptor> capacityDescriptors,
+            List<KeyValuePair<VentilationUnitTemplate, string>> unselectableTemplates,
+            List<VentilationUnitTemplate> templates,
+            string directory,
+            string path,
+            string schema,
+            string sha256)
         {
             State = state;
             CapacityDescriptors = capacityDescriptors ?? [];
             UnselectableTemplates = unselectableTemplates ?? [];
+            Templates = templates ?? [];
+            Directory = directory;
+            Path = path;
+            Schema = schema;
+            Sha256 = sha256;
         }
 
         /// <summary>Which of the three outcomes the read landed in.</summary>
         public VentilationUnitCatalogueState State { get; }
+
+        /// <summary>
+        /// Every template this catalogue holds, selectable or not - PR5A (SAM#111 plan §K.1). A resolver
+        /// that needs a selected product's certified data (<c>SAM.Analytical.Query.VentilationUnitOperatingParameters</c>)
+        /// needs the whole template, not the capacity-only descriptor <see cref="CapacityDescriptors"/>
+        /// carries; this is read-only, exactly as <see cref="CapacityDescriptors"/> is - nothing here
+        /// chooses a unit, and nothing here is a second selection authority.
+        /// </summary>
+        public List<VentilationUnitTemplate> Templates { get; }
+
+        /// <summary>The resolved directory actually read, never a display label or an unresolved setting.</summary>
+        public string Directory { get; }
+
+        /// <summary>The exact catalogue file read.</summary>
+        public string Path { get; }
+
+        /// <summary>The schema tag stated by that file. Null where the catalogue could not be parsed.</summary>
+        public string Schema { get; }
+
+        /// <summary>SHA-256 of the exact catalogue bytes, in uppercase hexadecimal. Null where unavailable.</summary>
+        public string Sha256 { get; }
 
         /// <summary>
         /// The products selection may choose from. Empty unless <see cref="State"/> is
@@ -99,13 +137,41 @@ namespace SAM.Analytical.UI.WPF
         /// </param>
         public static VentilationUnitCatalogue Read(string directory = null)
         {
+            string directory_Resolved = string.IsNullOrWhiteSpace(directory)
+                ? Analytical.Systems.Query.DefaultVentilationUnitDirectory()
+                : System.IO.Path.GetFullPath(directory);
+
+            string path = string.IsNullOrWhiteSpace(directory_Resolved)
+                ? null
+                : System.IO.Path.Combine(directory_Resolved, Analytical.Systems.Query.VentilationUnitCatalogueFileName);
+
+            string schema = null;
+            string sha256 = null;
+
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                try
+                {
+                    using (SHA256 algorithm = SHA256.Create())
+                    {
+                        sha256 = BitConverter.ToString(algorithm.ComputeHash(File.ReadAllBytes(path))).Replace("-", string.Empty);
+                    }
+                    schema = (Analytical.Systems.Query.VentilationUnitCatalogue(directory_Resolved)?["Schema"] as JsonValue)?.GetValue<string>();
+                }
+                catch
+                {
+                    //The catalogue reader below remains the one validity authority. Metadata is evidence
+                    //only, and an unreadable file will be reported as Unavailable by that reader.
+                }
+            }
+
             //Null is the reader's own "missing, unreadable or unusable" answer, including a schema it does not
             //accept. It is deliberately NOT collapsed with an empty template list below: one means nothing is
             //known, the other means nothing is offered.
-            List<VentilationUnitTemplate> ventilationUnitTemplates = Analytical.Systems.Query.VentilationUnitTemplates(directory);
+            List<VentilationUnitTemplate> ventilationUnitTemplates = Analytical.Systems.Query.VentilationUnitTemplates(directory_Resolved);
             if (ventilationUnitTemplates is null)
             {
-                return new VentilationUnitCatalogue(VentilationUnitCatalogueState.Unavailable, null, null);
+                return new VentilationUnitCatalogue(VentilationUnitCatalogueState.Unavailable, null, null, null, directory_Resolved, path, schema, sha256);
             }
 
             //Qualified: SAM.Analytical.UI.WPF declares a Query of its own.
@@ -117,7 +183,12 @@ namespace SAM.Analytical.UI.WPF
             return new VentilationUnitCatalogue(
                 capacityDescriptors is null || capacityDescriptors.Count == 0 ? VentilationUnitCatalogueState.NoneSelectable : VentilationUnitCatalogueState.Selectable,
                 capacityDescriptors,
-                unselectableTemplates);
+                unselectableTemplates,
+                ventilationUnitTemplates,
+                directory_Resolved,
+                path,
+                schema,
+                sha256);
         }
     }
 }

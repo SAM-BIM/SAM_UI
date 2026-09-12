@@ -18,11 +18,20 @@ namespace SAM.Analytical.UI.WPF
     ///
     /// <para><b>What is deliberately not here</b></para>
     /// <para>
-    /// No airflow is computed, balanced or substituted; no heat recovery, fan heat, equipment selection,
-    /// capacity or manufacturer behaviour is configured; no IZAM decision is taken; no TM59 criterion is
-    /// evaluated. The parity configuration this run needs - continuous operation at a factor of 1.0 -
-    /// arrives as a schedule on the materialisation settings, and everything else about the topology is
-    /// the shipped <c>MV.json</c>'s, which is read and never written.
+    /// No airflow is computed, balanced or substituted; no equipment is selected or capacity read as an
+    /// airflow; no IZAM decision is taken; no TM59 criterion is evaluated. The parity configuration this
+    /// run needs - continuous operation at a factor of 1.0 - arrives as a schedule on the materialisation
+    /// settings, and everything else about the topology is the shipped template's, which is read and never
+    /// written.
+    /// </para>
+    /// <para>
+    /// <b>PR5A (SAM#111 plan §J) - the one thing that is here.</b> <see cref="Materialise"/> chooses
+    /// between the shipped <c>MV.json</c> (no unit settings - the B0 control) and <c>MVRE.json</c>
+    /// (manufacturer-aware unit settings resolved) purely on whether it was handed any - it does not
+    /// resolve a product, read a selection, or compute a certified figure itself; that resolution is
+    /// <c>Query.PartOIteration3EquipmentResolution</c>'s, called by the orchestrator before this pipeline
+    /// is reached. This class only carries the resolved numbers the rest of the way, exactly as it already
+    /// carries the schedule.
     /// </para>
     /// </summary>
     public class PartOIteration3Pipeline : IPartOIteration3Pipeline
@@ -53,15 +62,28 @@ namespace SAM.Analytical.UI.WPF
         /// for and did not exist in Reference A.
         /// </para>
         /// </summary>
-        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces)
+        /// <summary>
+        /// PR5A (SAM#111 plan §J): the topology template a manufacturer-aware unit settings dictionary
+        /// materialises onto - the existing shipped MVHR topology, per <c>CapabilityIndex.JSON</c>. Read
+        /// only, exactly as <see cref="Ventilation_Template"/> is; <see cref="Materialise"/> chooses between
+        /// the two solely on whether <paramref name="unitSettings"/> is non-empty, never on a name a caller
+        /// passes in.
+        /// </summary>
+        public const string Ventilation_Template_ManufacturerAware = "MVRE";
+
+        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null)
         {
-            SystemEnergyCentre systemEnergyCentre = new SystemTemplate(Ventilation_Template, null, null, null, null, null).SystemEnergyCentre();
+            bool hasUnitSettings = unitSettings is not null && unitSettings.Count != 0;
+
+            string ventilationTemplate = hasUnitSettings ? Ventilation_Template_ManufacturerAware : Ventilation_Template;
+
+            SystemEnergyCentre systemEnergyCentre = new SystemTemplate(ventilationTemplate, null, null, null, null, null).SystemEnergyCentre();
 
             if (systemEnergyCentre is null)
             {
                 return new MechanicalVentilationMaterialisation(
                     null,
-                    [string.Format("The installed mechanical ventilation topology template '{0}' could not be resolved, so there is nothing to materialise the explicit Part O ventilation onto.", Ventilation_Template)],
+                    [string.Format("The installed mechanical ventilation topology template '{0}' could not be resolved, so there is nothing to materialise the explicit Part O ventilation onto.", ventilationTemplate)],
                     null,
                     null);
             }
@@ -71,6 +93,7 @@ namespace SAM.Analytical.UI.WPF
                 Schedule = Query.PartOIteration3OperatingSchedule(),
                 Name = Name_SystemEnergyCentre,
                 MaterialiseSystemSpaceComponents = false,
+                UnitSettings = unitSettings,
             };
 
             return adjacencyCluster.MechanicalVentilation(systemEnergyCentre, mechanicalVentilationSettings, spaces);
@@ -155,9 +178,10 @@ namespace SAM.Analytical.UI.WPF
             MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation,
             string path_TPD,
             int startHour,
-            int endHour)
+            int endHour,
+            SystemVentilationFanHeatGainPolicy fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.ClearToZero)
         {
-            return Analytical.Tas.TPD.Create.SystemVentilationRoute(noIzamThermalSource, mechanicalVentilationMaterialisation, path_TPD, startHour, endHour);
+            return Analytical.Tas.TPD.Create.SystemVentilationRoute(noIzamThermalSource, mechanicalVentilationMaterialisation, path_TPD, startHour, endHour, fanHeatGainPolicy);
         }
 
         /// <summary>

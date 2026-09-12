@@ -52,7 +52,11 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         /// <param name="adjacencyCluster">The scoped working copy - see <c>Query.PartOIteration3SystemScope</c>.</param>
         /// <param name="spaces">The Part O dwelling design scope.</param>
-        MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces);
+        /// <param name="unitSettings">
+        /// PR5A (SAM#111 plan §J): each scoped air handling unit's resolved manufacturer-aware behaviour,
+        /// keyed by its guid. Null or empty materialises exactly as before PR5A existed - the B0 control.
+        /// </param>
+        MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null);
 
         /// <summary>
         /// Runs Candidate B's dedicated no-IZAM thermal case - the same TAS case as Reference A, writing
@@ -81,12 +85,18 @@ namespace SAM.Analytical.UI.WPF
             out string refusal);
 
         /// <summary>Converts the explicit systems to TAS Systems, simulates them and reads ZoneTemperature.</summary>
+        /// <param name="fanHeatGainPolicy">
+        /// PR5A (SAM#111 plan §D/§K.3): <c>ClearToZero</c> (the default - the B0 control) or
+        /// <c>FromSystemsGraph</c>, which leaves a fan's <c>HeatGainFactor</c> exactly as
+        /// <paramref name="mechanicalVentilationMaterialisation"/>'s unit settings resolved it.
+        /// </param>
         SystemVentilationRoute Route(
             NoIzamThermalSource noIzamThermalSource,
             MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation,
             string path_TPD,
             int startHour,
-            int endHour);
+            int endHour,
+            SystemVentilationFanHeatGainPolicy fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.ClearToZero);
 
         /// <summary>
         /// The current <c>IResultantTemperatureProvider</c>'s answer for the route.
