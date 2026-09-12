@@ -182,7 +182,10 @@ namespace SAM.Analytical.UI
             && IsFiniteNonNegative(MaximumExtractFlowRate_Lps)
             && IsFinitePositive(DesignSupplyFlowRate_Lps)
             && IsFinitePositive(DesignExtractFlowRate_Lps)
+            && IsFinitePositive(DesignAirFlowRate_Lps)
             && !string.IsNullOrWhiteSpace(OperatingAirFlowBasis)
+            && IsStatedBasis(HeatRecoveryEfficiencyBasis)
+            && IsStatedBasis(SpecificFanPowerBasis)
             && IsResolved
             && IsFiniteNonNegative(SupplyFanPressure_Pa)
             && IsFiniteNonNegative(ExtractFanPressure_Pa)
@@ -191,6 +194,15 @@ namespace SAM.Analytical.UI
             && IsFiniteNonNegative(ExtractFanHeatGainFactor)
             && !string.IsNullOrWhiteSpace(FanPowerSplitRule)
             && !string.IsNullOrWhiteSpace(FanHeatGainAssumption);
+
+        /// <summary>
+        /// Whether a certified figure states what it is a ratio of. A figure without a basis - or with the
+        /// resolver's own "Undefined" - cannot be read, so a row carrying one is not complete.
+        /// </summary>
+        private static bool IsStatedBasis(string basis)
+        {
+            return !string.IsNullOrWhiteSpace(basis) && !string.Equals(basis, "Undefined", StringComparison.Ordinal);
+        }
 
         /// <summary>Attaches the deterministic SAM_Systems lineage after materialisation.</summary>
         public bool BindAirSystem(Guid guid_AirSystem)

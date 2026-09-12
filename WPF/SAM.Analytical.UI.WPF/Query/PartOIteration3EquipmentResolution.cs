@@ -86,9 +86,24 @@ namespace SAM.Analytical.UI.WPF
             airHandlingUnits.RemoveAll(x => x is null);
             airHandlingUnits.Sort((x, y) => x.Guid.CompareTo(y.Guid));
 
+            //SAM #114 scope removes a scoped-out ventilation system from the working copy but leaves its
+            //AirHandlingUnit object behind. SAM_Systems materialises only the units a RETAINED ventilation
+            //system names as its supply unit, and refuses settings for any other - so exactly those units
+            //are resolved here. A scoped-out unit is neither required to carry a selection nor given
+            //settings; it is named in the notes so its absence is visible.
+            List<AirHandlingUnit> airHandlingUnits_NotMaterialised = airHandlingUnits.FindAll(x => adjacencyCluster.VentilationSystems(x).Count == 0);
+            airHandlingUnits.RemoveAll(x => airHandlingUnits_NotMaterialised.Contains(x));
+
+            foreach (AirHandlingUnit airHandlingUnit_NotMaterialised in airHandlingUnits_NotMaterialised)
+            {
+                notes.Add(string.Format(
+                    "Air handling unit '{0}' is not named by any retained ventilation system, so it is not materialised and no product was resolved for it.",
+                    airHandlingUnit_NotMaterialised.Name));
+            }
+
             if (airHandlingUnits.Count == 0)
             {
-                refusals.Add("The scoped design carries no air handling unit, so no selected product could be resolved.");
+                refusals.Add("The scoped design carries no air handling unit that a retained ventilation system names, so no selected product could be resolved.");
                 return refusals;
             }
 

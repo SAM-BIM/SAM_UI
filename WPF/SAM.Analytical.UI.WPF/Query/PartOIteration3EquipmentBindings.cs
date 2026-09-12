@@ -19,6 +19,7 @@ namespace SAM.Analytical.UI.WPF
             IEnumerable<MechanicalVentilationBinding> bindings)
         {
             Dictionary<Guid, Guid> airSystemByAirHandlingUnit = [];
+            Dictionary<Guid, Guid> airHandlingUnitByAirSystem = [];
             List<string> result = [];
 
             foreach (MechanicalVentilationBinding mechanicalVentilationBinding in bindings ?? [])
@@ -39,7 +40,23 @@ namespace SAM.Analytical.UI.WPF
                     continue;
                 }
 
+                //The reverse, too: one physical air system carrying two units' equipment evidence is not one
+                //row per physical unit, and is refused here - before any simulation - rather than only on a
+                //later review.
+                if (airHandlingUnitByAirSystem.TryGetValue(mechanicalVentilationBinding.Guid_Systems, out Guid guid_AirHandlingUnit)
+                    && guid_AirHandlingUnit != mechanicalVentilationBinding.Guid_Analytical)
+                {
+                    result.Add(string.Format(
+                        "Materialised air system {0} was bound to more than one air handling unit ({1} and {2}), so it cannot carry either unit's equipment evidence.",
+                        mechanicalVentilationBinding.Guid_Systems,
+                        guid_AirHandlingUnit,
+                        mechanicalVentilationBinding.Guid_Analytical));
+
+                    continue;
+                }
+
                 airSystemByAirHandlingUnit[mechanicalVentilationBinding.Guid_Analytical] = mechanicalVentilationBinding.Guid_Systems;
+                airHandlingUnitByAirSystem[mechanicalVentilationBinding.Guid_Systems] = mechanicalVentilationBinding.Guid_Analytical;
             }
 
             foreach (PartOIteration3EquipmentEvidence partOIteration3EquipmentEvidence in equipment ?? [])

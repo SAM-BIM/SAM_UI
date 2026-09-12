@@ -414,6 +414,81 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Contains(refusals, x => x.Contains("MVHR-02") && x.Contains("no single"));
         }
 
+        /// <summary>
+        /// SAM #114 scope leaves a scoped-out system's AirHandlingUnit object in the working copy. Only the
+        /// units a retained ventilation system names are materialised, so only they are resolved - a
+        /// scoped-out unit with no selection neither refuses the attempt nor receives settings.
+        /// </summary>
+        [Fact]
+        public void A_unit_no_retained_ventilation_system_names_is_neither_required_nor_configured()
+        {
+            AdjacencyCluster adjacencyCluster = new();
+
+            AirHandlingUnit airHandlingUnit = Unit(adjacencyCluster, "MVHR-01");
+            Select(adjacencyCluster, airHandlingUnit, new VentilationUnitReference(manufacturer, model, null));
+
+            AirHandlingUnit airHandlingUnit_ScopedOut = Analytical.Create.AirHandlingUnit("MVHR-SCOPED-OUT");
+            adjacencyCluster.AddObject(airHandlingUnit_ScopedOut);
+
+            List<string> refusals = Query.PartOIteration3EquipmentResolution(adjacencyCluster, VentilationUnitCatalogue.Read(Catalogue()), out Dictionary<Guid, MechanicalVentilationUnitSettings> unitSettings, out List<PartOIteration3EquipmentEvidence> equipment, out List<string> notes);
+
+            Assert.Empty(refusals);
+            Assert.Equal(airHandlingUnit.Guid, Assert.Single(unitSettings).Key);
+            Assert.Equal(airHandlingUnit.Guid, Assert.Single(equipment).Guid_AirHandlingUnit);
+            Assert.DoesNotContain(airHandlingUnit_ScopedOut.Guid, unitSettings.Keys);
+            Assert.Contains(notes, x => x.Contains("MVHR-SCOPED-OUT") && x.Contains("not materialised"));
+        }
+
+        [Fact]
+        public void One_air_system_bound_by_two_AHUs_refuses_before_simulation()
+        {
+            Guid guid_AirHandlingUnit_1 = Guid.NewGuid();
+            Guid guid_AirHandlingUnit_2 = Guid.NewGuid();
+            Guid guid_AirSystem_Shared = Guid.NewGuid();
+
+            List<string> refusals = Query.PartOIteration3EquipmentBindings(
+                [Evidence(guid_AirHandlingUnit_1, "MVHR-01"), Evidence(guid_AirHandlingUnit_2, "MVHR-02")],
+                [
+                    new MechanicalVentilationBinding(MechanicalVentilationBindingType.AirSystem, guid_AirHandlingUnit_1, guid_AirSystem_Shared),
+                    new MechanicalVentilationBinding(MechanicalVentilationBindingType.AirSystem, guid_AirHandlingUnit_2, guid_AirSystem_Shared),
+                ]);
+
+            Assert.Contains(refusals, x => x.Contains(guid_AirSystem_Shared.ToString()) && x.Contains("more than one air handling unit"));
+        }
+
+        private static PartOIteration3EquipmentEvidence Evidence_Complete(double designAirFlowRate_Lps, string heatRecoveryEfficiencyBasis, string specificFanPowerBasis)
+        {
+            PartOIteration3EquipmentEvidence result = new(
+                Guid.NewGuid(), "MVHR-01", manufacturer, model, null, source,
+                designAirFlowRate_Lps, 0.86, heatRecoveryEfficiencyBasis, false, null,
+                0.62, specificFanPowerBasis, false, null,
+                150.0, 150.0, 60.0, 60.0, null, null,
+                "DesignAirFlow × constant yearly schedule 1.0",
+                310.0, 310.0, 1.0, 1.0, 1.0,
+                "Certified total-both-fans SFP split equally",
+                "Declared assumption");
+
+            Assert.True(result.BindAirSystem(Guid.NewGuid()));
+
+            return result;
+        }
+
+        /// <summary>
+        /// A persisted row that has lost its lookup coordinate or the basis of either certified figure cannot
+        /// state what its numbers mean, so it is not complete - and a review refuses it.
+        /// </summary>
+        [Fact]
+        public void Evidence_without_its_lookup_coordinate_or_bases_is_not_complete()
+        {
+            Assert.True(Evidence_Complete(60.0, "SupplyTemperatureEfficiency", "TotalBothFans").IsComplete);
+
+            Assert.False(Evidence_Complete(double.NaN, "SupplyTemperatureEfficiency", "TotalBothFans").IsComplete);
+            Assert.False(Evidence_Complete(60.0, null, "TotalBothFans").IsComplete);
+            Assert.False(Evidence_Complete(60.0, "SupplyTemperatureEfficiency", null).IsComplete);
+            Assert.False(Evidence_Complete(60.0, "Undefined", "TotalBothFans").IsComplete);
+            Assert.False(Evidence_Complete(60.0, "SupplyTemperatureEfficiency", "Undefined").IsComplete);
+        }
+
         [Fact]
         public void Two_units_of_the_same_selected_product_both_resolve_independently()
         {

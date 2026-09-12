@@ -65,12 +65,24 @@ stage that v1 never had.
 - For v1 only, the review replays the missing `EquipmentResolution` stage as the Parity no-op, so the
   recorded ledger is shown whole. Review stays simulation-free.
 
+The automated review of the amended head raised three findings in this slice's own code, all fixed:
+
+- **Scope (P1).** Resolution enumerated every `AirHandlingUnit` in the scoped working copy. SAM #114
+  scope removes a scoped-out ventilation system but leaves its unit behind, so Selected product would
+  refuse, or SAM_Systems would reject settings for a unit it does not materialise. Now only the units a
+  retained ventilation system names are resolved; a scoped-out unit is named in the notes.
+- **Lineage (P1).** Equipment binding checked uniqueness per unit only. One materialised air system bound by
+  two units now refuses at materialisation, before any simulation.
+- **Completeness (P2).** A persisted row is complete only when it states its lookup airflow and both bases
+  (not missing, not `Undefined`).
+
 Amendment verification (against the merged SAM `b4a1283f`, SAM_Systems `5213ba9c` and SAM_Tas `0f7f59e0`
 builds):
 
-- Full `SAM.Analytical.UI.WPF.Tests`: 1009/1009 passed (1002 before, plus 7 new: readable schemas, v1 read
+- Full `SAM.Analytical.UI.WPF.Tests`: 1012/1012 passed (1002 before, plus 10 new: readable schemas, v1 read
   as Parity, v1 reviewable, v1 reopened whole with no TAS call, v1 with selected-product or catalogue
-  evidence refused, v2 without a mode refused).
+  evidence refused, v2 without a mode refused, scoped-out unit neither required nor configured, shared
+  air-system lineage refused, incomplete lookup coordinate/bases not complete).
 - `SAM_UI.sln` Release build with Visual Studio MSBuild: 0 errors.
 - `git diff --check`: clean.
 

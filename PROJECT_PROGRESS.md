@@ -36,8 +36,11 @@ Review amendment: pre-PR5A `PartOIteration3Record:v1` pairings (the PR4/PR5A acc
 reviewable as the historical Parity/B0 route. v2 is still the only schema written; a v1 record carrying
 selected-product evidence refuses. Phase 0 current state (Selected product = B2-style, no B1 yet, B3 =
 exchanger Setpoint not BypassFactor, displacement normalised in SAM_Systems #23, plant-room read-back
-still a gate) is noted in the plan companion and the evidence doc. Amendment validation: full
-`SAM.Analytical.UI.WPF.Tests` **1009/1009** (+7), `SAM_UI.sln` Release 0 errors, `git diff --check` clean.
+still a gate) is noted in the plan companion and the evidence doc. The automated review of the amended
+head found three defects in this slice, fixed: resolution now covers only units a retained ventilation
+system names (SAM #114 scope), one air system bound by two units refuses before simulation, and an
+evidence row is complete only with its lookup airflow and both bases. Amendment validation: full
+`SAM.Analytical.UI.WPF.Tests` **1012/1012** (+10), `SAM_UI.sln` Release 0 errors, `git diff --check` clean.
 
 ### Files changed
 
