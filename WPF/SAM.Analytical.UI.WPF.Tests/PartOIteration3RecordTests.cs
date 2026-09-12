@@ -5,6 +5,7 @@ using SAM.Analytical.UI;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace SAM.Analytical.UI.WPF.Tests
@@ -249,6 +250,51 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.NotNull(result);
             Assert.NotEqual(PartOIteration3Record.CurrentSchema, result.Schema);
+            Assert.False(PartOIteration3Record.IsReadableSchema(result.Schema));
+        }
+
+        /// <summary>
+        /// Exactly two schemas are readable: the one this writer produces and the pre-PR5A one every
+        /// existing acceptance pairing carries. Nothing else - older, newer or unnamed.
+        /// </summary>
+        [Fact]
+        public void Only_v1_and_v2_are_readable_schemas()
+        {
+            Assert.True(PartOIteration3Record.IsReadableSchema(PartOIteration3Record.CurrentSchema));
+            Assert.True(PartOIteration3Record.IsReadableSchema(PartOIteration3Record.LegacySchema_V1));
+
+            Assert.False(PartOIteration3Record.IsReadableSchema("PartOIteration3Record:v0"));
+            Assert.False(PartOIteration3Record.IsReadableSchema("PartOIteration3Record:v3"));
+            Assert.False(PartOIteration3Record.IsReadableSchema(null));
+
+            //A new record is always written at the current schema, never at the legacy one.
+            Assert.Equal(PartOIteration3Record.CurrentSchema, new PartOIteration3Record().Schema);
+        }
+
+        /// <summary>
+        /// A pairing written before PR5A carries no behaviour mode at all, because the foundation control
+        /// was the only behaviour there was. It reads back as Parity, with nothing selected-product about it.
+        /// </summary>
+        [Fact]
+        public void A_v1_record_written_before_PR5A_reads_back_as_parity()
+        {
+            JsonObject jsonObject = JsonNode.Parse(Record().ToString()).AsObject();
+
+            jsonObject["Schema"] = PartOIteration3Record.LegacySchema_V1;
+
+            foreach (string key in new[] { "BehaviourMode", "Directory_VentilationUnitCatalogue", "Path_VentilationUnitCatalogue", "Schema_VentilationUnitCatalogue", "Sha256_VentilationUnitCatalogue", "Equipment" })
+            {
+                jsonObject.Remove(key);
+            }
+
+            PartOIteration3Record result = PartOIteration3Record.Parse(jsonObject.ToJsonString());
+
+            Assert.NotNull(result);
+            Assert.True(result.IsLegacy_V1);
+            Assert.True(PartOIteration3Record.IsReadableSchema(result.Schema));
+            Assert.Equal(PartOIteration3BehaviourMode.Parity, result.BehaviourMode);
+            Assert.Empty(result.Equipment);
+            Assert.Null(result.Sha256_VentilationUnitCatalogue);
         }
 
         /// <summary>The record a run writes is the record a review reads - through a real file.</summary>

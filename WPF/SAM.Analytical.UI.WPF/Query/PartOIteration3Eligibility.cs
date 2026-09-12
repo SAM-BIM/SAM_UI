@@ -78,13 +78,14 @@ namespace SAM.Analytical.UI.WPF
                 {
                     refusal_Review = string.Format("The Iteration 3 pairing record at '{0}' could not be read.", path_Record);
                 }
-                else if (!string.Equals(partOIteration3Record.Schema, UI.PartOIteration3Record.CurrentSchema, System.StringComparison.Ordinal))
+                else if (!UI.PartOIteration3Record.IsReadableSchema(partOIteration3Record.Schema))
                 {
                     refusal_Review = string.Format(
-                        "The Iteration 3 pairing record at '{0}' states schema '{1}' and this build writes '{2}', so it cannot be read as one.",
+                        "The Iteration 3 pairing record at '{0}' states schema '{1}' and this build reads only '{2}' or '{3}', so it cannot be read as one.",
                         path_Record,
                         partOIteration3Record.Schema ?? "<none>",
-                        UI.PartOIteration3Record.CurrentSchema);
+                        UI.PartOIteration3Record.CurrentSchema,
+                        UI.PartOIteration3Record.LegacySchema_V1);
                 }
                 else
                 {

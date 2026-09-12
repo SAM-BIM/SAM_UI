@@ -45,12 +45,36 @@ namespace SAM.Analytical.UI
         /// validate.
         /// <para>
         /// <b>v2 (PR5A, SAM#111 plan §I/§J):</b> adds <see cref="BehaviourMode"/>, catalogue provenance,
-        /// and <see cref="Equipment"/>. They are purely additive - every v1 field keeps its name and meaning
-        /// unchanged, and a v1 reader reading a v2-shaped file (or vice versa) only ever sees these two as
-        /// absent/empty, never as a wrong value silently substituted for a right one.
+        /// and <see cref="Equipment"/>. Every v1 field keeps its name and meaning unchanged. This writer
+        /// only ever writes v2; a review also reads <see cref="LegacySchema_V1"/> - see
+        /// <see cref="IsReadableSchema"/>.
         /// </para>
         /// </summary>
         public const string CurrentSchema = "PartOIteration3Record:v2";
+
+        /// <summary>
+        /// The schema every pairing written before PR5A carries - the PR4 foundation and its acceptance
+        /// pairings. It predates <see cref="BehaviourMode"/>, the catalogue provenance, <see cref="Equipment"/>
+        /// and the <c>EquipmentResolution</c> stage, and the only behaviour that existed then was the
+        /// foundation control. A v1 record is therefore read as <see cref="PartOIteration3BehaviourMode.Parity"/>
+        /// (Candidate B0) and never as anything else; one that carries selected-product evidence contradicts
+        /// its own schema and is refused on review.
+        /// </summary>
+        public const string LegacySchema_V1 = "PartOIteration3Record:v1";
+
+        /// <summary>
+        /// Whether a review may read a record of this schema: <see cref="CurrentSchema"/> or
+        /// <see cref="LegacySchema_V1"/>, exactly. Anything else - older, newer or unnamed - is refused
+        /// rather than read optimistically.
+        /// </summary>
+        public static bool IsReadableSchema(string schema)
+        {
+            return string.Equals(schema, CurrentSchema, StringComparison.Ordinal)
+                || string.Equals(schema, LegacySchema_V1, StringComparison.Ordinal);
+        }
+
+        /// <summary>Whether this record was written before PR5A - see <see cref="LegacySchema_V1"/>.</summary>
+        public bool IsLegacy_V1 => string.Equals(Schema, LegacySchema_V1, StringComparison.Ordinal);
 
         private readonly List<Guid> guids_VentilationSystem_Prepared = [];
 
@@ -429,11 +453,21 @@ namespace SAM.Analytical.UI
                 IsComplete = PartOIteration3Json.Boolean(jsonObject, "IsComplete", false),
             };
 
+            //A v1 record predates the field, and the foundation control was the only behaviour there was,
+            //so an absent mode on v1 IS Parity. On v2 an absent or unknown mode stays undefined, which a
+            //review refuses rather than silently reading as Parity.
             string text_BehaviourMode = PartOIteration3Json.Text(jsonObject, "BehaviourMode");
-            result.BehaviourMode = Enum.TryParse(text_BehaviourMode, false, out PartOIteration3BehaviourMode partOIteration3BehaviourMode)
-                && Enum.IsDefined(typeof(PartOIteration3BehaviourMode), partOIteration3BehaviourMode)
-                ? partOIteration3BehaviourMode
-                : (PartOIteration3BehaviourMode)(-1);
+            if (result.IsLegacy_V1 && string.IsNullOrWhiteSpace(text_BehaviourMode))
+            {
+                result.BehaviourMode = PartOIteration3BehaviourMode.Parity;
+            }
+            else
+            {
+                result.BehaviourMode = Enum.TryParse(text_BehaviourMode, false, out PartOIteration3BehaviourMode partOIteration3BehaviourMode)
+                    && Enum.IsDefined(typeof(PartOIteration3BehaviourMode), partOIteration3BehaviourMode)
+                    ? partOIteration3BehaviourMode
+                    : (PartOIteration3BehaviourMode)(-1);
+            }
 
             result.AddPreparedSystems(PartOIteration3Json.Guids(jsonObject, "Guids_VentilationSystem_Prepared"));
             result.AddScopedOutSystems(PartOIteration3Json.Guids(jsonObject, "Guids_VentilationSystem_ScopedOut"));

@@ -49,3 +49,41 @@ independent and were not changed by this slice.
 Exact next step: obtain traceable certified E1/E2 performance data for the canonical product, review and
 transcribe it into catalogue v2 with provenance, then run the frozen licensed operating-point and annual
 B0/B1/B2 acceptance sequence. Do not begin PR5B.
+
+## Review amendment — pre-PR5A pairings (added 2026-09-12)
+
+Before merge, the collision/gap audit found that the v2 schema bump made every existing
+`PartOIteration3Record:v1` pairing unreviewable, including the PR4 and PR5A acceptance pairings in
+`C:\TasOut\pr4h` and `C:\TasOut\pr5a`. Two things caused this: eligibility and review required the
+exact current schema, and review's ledger replay dropped every stage after the `EquipmentResolution`
+stage that v1 never had.
+
+- Writers still write v2 only. Review and eligibility read exactly v1 and v2; any other schema still refuses.
+- A v1 record with no behaviour mode is the historical Parity / Candidate B0 route. A v1 record carrying
+  selected-product behaviour, equipment or catalogue evidence is refused as contradictory.
+- A v2 record without a valid explicit mode still refuses.
+- For v1 only, the review replays the missing `EquipmentResolution` stage as the Parity no-op, so the
+  recorded ledger is shown whole. Review stays simulation-free.
+
+Amendment verification (against the merged SAM `b4a1283f`, SAM_Systems `5213ba9c` and SAM_Tas `0f7f59e0`
+builds):
+
+- Full `SAM.Analytical.UI.WPF.Tests`: 1009/1009 passed (1002 before, plus 7 new: readable schemas, v1 read
+  as Parity, v1 reviewable, v1 reopened whole with no TAS call, v1 with selected-product or catalogue
+  evidence refused, v2 without a mode refused).
+- `SAM_UI.sln` Release build with Visual Studio MSBuild: 0 errors.
+- `git diff --check`: clean.
+
+## Phase 0 supersession — current state (added 2026-09-12)
+
+The sections above were written before the Phase 0 conclusions were applied to this slice, and are kept
+as written. Current state:
+
+- `Selected product` is B2-style behaviour (fan layer + heat-recovery layer). B1 is not yet separately
+  producible, so no `B2 − B1` attribution is claimed.
+- B3 is the exchanger supply-air `Setpoint`, not `BypassFactor`, which is measured as having no effect. B3
+  is not implemented.
+- The displacement-ventilation normalisation (`true`, B0's value) is implemented in SAM_Systems #23. The
+  licensed re-check of MVRE at ε 0 equal to B0 on the merged heads is still due.
+- Plant-room / duct detailed read-back is still an evidence gate before any exchanger-outcome claim. This
+  slice claims none.

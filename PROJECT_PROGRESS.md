@@ -32,6 +32,13 @@ simulation-free and refuses unsupported modes, contradictory parity evidence, in
 incomplete equipment rows or duplicate physical lineage. The result window and persisted report share
 the same text authority; no new equipment selection UI or authority was added.
 
+Review amendment: pre-PR5A `PartOIteration3Record:v1` pairings (the PR4/PR5A acceptance pairings) stay
+reviewable as the historical Parity/B0 route. v2 is still the only schema written; a v1 record carrying
+selected-product evidence refuses. Phase 0 current state (Selected product = B2-style, no B1 yet, B3 =
+exchanger Setpoint not BypassFactor, displacement normalised in SAM_Systems #23, plant-room read-back
+still a gate) is noted in the plan companion and the evidence doc. Amendment validation: full
+`SAM.Analytical.UI.WPF.Tests` **1009/1009** (+7), `SAM_UI.sln` Release 0 errors, `git diff --check` clean.
+
 ### Files changed
 
 - Part O record/equipment schema, behaviour enum and pipeline stage in `SAM_UI/SAM.Analytical.UI`.

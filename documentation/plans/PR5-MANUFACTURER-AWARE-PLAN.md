@@ -5,6 +5,34 @@ The complete planning record and its 16 resolved questions are the tracker comme
 `PR5 PLANNING — investigation complete (no code)`. This checked-in companion records the decisions
 that govern the code in this repository so another machine or agent does not need conversation history.
 
+## Phase 0 supersession — current state (added 2026-09-12)
+
+Everything below this section is the frozen plan **as written before the licensed PR5A Phase 0 evidence**
+(SAM #111 comment "PR5A Phase 0: licensed TAS capability evidence", record
+`C:\TasOut\p0\PR5A-PHASE0-EVIDENCE.md`). It is kept unchanged as the historical plan. Where it and this
+note differ, this note is the current state:
+
+- **`Selected product` is B2-style behaviour**: the fan layer and the heat-recovery layer together, in one
+  mode. **B1 (fan layer only) is not yet separately producible.** When it is added, it has to set the
+  exchanger efficiency to 0 explicitly — leaving it unset inherits `MVRE.json`'s own 0.7 — and until then
+  no `B2 − B1` attribution can be claimed.
+- **B3 uses the exchanger supply-air `Setpoint`** (`SetpointMethod = On`), measured as a direction-aware
+  supply target. **`BypassFactor` has no effect on this route and is not a B3 mechanism.** B3 is not
+  implemented; `HeatRecoverySupplyLimit_C` is carried on the SAM_Systems unit settings but applied nowhere.
+- **The displacement-ventilation normalisation is already implemented in SAM_Systems #23**: every
+  materialised zone states `DisplacementVentilation = true` (B0's `MV.json` value), so MV → MVRE no
+  longer changes zone physics. This repository does nothing further for it. MVRE at ε 0 equals B0 exactly
+  once the flag is aligned (Phase 0, 384 zone-hours). A licensed re-check on the merged heads is still due.
+- **Plant-room / duct read-back remains an evidence gate.** Exchanger outlet temperature, recovered load
+  and effective ε are not exposed by TAS's per-system simulate or by the existing SAM_Tas exchanger and
+  fan readers. They need a plant-room `SimulateEx` detailed pass and a duct-by-port reader, which do not
+  exist yet. Nothing in this repository claims exchanger outcomes: its records and reports carry resolved
+  inputs only.
+- **Unbalanced heat recovery** is refused at the design duty by SAM's resolver (supply ≠ extract beyond
+  0.001 l/s). The native unbalanced semantics remain unknown.
+- **Pre-PR5A pairing records** (`PartOIteration3Record:v1`) stay reviewable as the historical Parity / B0
+  route. This build writes v2 only.
+
 ## Scope and repository order
 
 PR5A adds generic manufacturer-aware MVHR behaviour. PR5B is separate and must not begin until PR5A's

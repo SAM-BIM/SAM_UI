@@ -56,12 +56,30 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
-            if (!string.Equals(partOIteration3Record.Schema, PartOIteration3Record.CurrentSchema, StringComparison.Ordinal))
+            if (!PartOIteration3Record.IsReadableSchema(partOIteration3Record.Schema))
             {
                 result.Add(string.Format(
-                    "The Iteration 3 pairing record states schema '{0}' and this build writes '{1}', so it cannot be read as one.",
+                    "The Iteration 3 pairing record states schema '{0}' and this build reads only '{1}' or '{2}', so it cannot be read as one.",
                     partOIteration3Record.Schema ?? "<none>",
-                    PartOIteration3Record.CurrentSchema));
+                    PartOIteration3Record.CurrentSchema,
+                    PartOIteration3Record.LegacySchema_V1));
+
+                return result;
+            }
+
+            //A pre-PR5A (v1) pairing can only ever be the foundation control: selected-product behaviour
+            //did not exist when it was written. One that says otherwise is corrupt, not historical.
+            if (partOIteration3Record.IsLegacy_V1
+                && (partOIteration3Record.BehaviourMode != PartOIteration3BehaviourMode.Parity
+                    || partOIteration3Record.Equipment.Count != 0
+                    || !string.IsNullOrWhiteSpace(partOIteration3Record.Directory_VentilationUnitCatalogue)
+                    || !string.IsNullOrWhiteSpace(partOIteration3Record.Path_VentilationUnitCatalogue)
+                    || !string.IsNullOrWhiteSpace(partOIteration3Record.Schema_VentilationUnitCatalogue)
+                    || !string.IsNullOrWhiteSpace(partOIteration3Record.Sha256_VentilationUnitCatalogue)))
+            {
+                result.Add(string.Format(
+                    "This Iteration 3 pairing record states the pre-PR5A schema '{0}', which only ever described the Parity foundation control, but it carries selected-product behaviour or catalogue evidence, so the record contradicts itself.",
+                    PartOIteration3Record.LegacySchema_V1));
 
                 return result;
             }
