@@ -2,6 +2,7 @@
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Core.UI.WPF;
+using System;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -24,7 +25,7 @@ namespace SAM.Analytical.UI.WPF
         /// <para>
         /// It constructs the production pipeline, hosts a progress dialog for the run, and shows the
         /// result window. Every stage, refusal, statistic and verdict belongs to
-        /// <see cref="RunPartOIteration3(PartORun, IPartOIteration3Pipeline, CancellationToken)"/> and
+        /// <see cref="RunPartOIteration3(PartORun, IPartOIteration3Pipeline, CancellationToken, PartOIteration3BehaviourMode)"/> and
         /// <see cref="ReviewPartOIteration3"/>.
         /// </para>
         /// <para>
@@ -66,10 +67,29 @@ namespace SAM.Analytical.UI.WPF
             }
             else
             {
+                ComboBoxWindow<PartOIteration3BehaviourMode> comboBoxWindow = new(
+                    "Part O Iteration 3",
+                    [PartOIteration3BehaviourMode.Parity, PartOIteration3BehaviourMode.SelectedProduct],
+                    x => Core.Query.Description((Enum)(object)x),
+                    PartOIteration3BehaviourMode.Parity)
+                {
+                    Description = "Ventilation equipment behaviour:",
+                };
+
+                if (owner is not null)
+                {
+                    new System.Windows.Interop.WindowInteropHelper(comboBoxWindow).Owner = owner.Handle;
+                }
+
+                if (comboBoxWindow.ShowDialog() != true)
+                {
+                    return;
+                }
+
                 //The TAS steps host their own cancellable progress dialogs - the no-IZAM workflow's and
                 //the bridge's - so this adds none of its own around them. What it does add is the token,
                 //so one Cancel aborts the whole pairing rather than one of its simulations.
-                partOIteration3Result = RunPartOIteration3(partORun, iPartOIteration3Pipeline, CancellationToken.None);
+                partOIteration3Result = RunPartOIteration3(partORun, iPartOIteration3Pipeline, CancellationToken.None, comboBoxWindow.SelectedItem);
             }
 
             PartOIteration3ResultWindow partOIteration3ResultWindow = new()

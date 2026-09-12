@@ -9,6 +9,8 @@ using SAM.Core.Tas;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using Xunit;
 
@@ -70,7 +72,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             /// </summary>
             internal bool Write_Reports { get; set; }
 
-            public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces)
+            public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null)
             {
                 throw new InvalidOperationException("A review must not materialise anything.");
             }
@@ -80,7 +82,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 throw new InvalidOperationException("A review must not run TAS.");
             }
 
-            public SystemVentilationRoute Route(NoIzamThermalSource noIzamThermalSource, MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation, string path_TPD, int startHour, int endHour)
+            public SystemVentilationRoute Route(NoIzamThermalSource noIzamThermalSource, MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation, string path_TPD, int startHour, int endHour, SystemVentilationFanHeatGainPolicy fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.ClearToZero)
             {
                 throw new InvalidOperationException("A review must not convert or simulate anything.");
             }
@@ -392,6 +394,162 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(partOIteration3Result.IsRefused);
             Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("schema"));
+        }
+
+        //-------------------------------------------------------------------------------------------------
+        //Pre-PR5A (v1) pairings - the PR4 foundation and its acceptance pairings - stay reviewable as the
+        //historical Parity / Candidate B0 route.
+        //-------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Rewrites the record on disk exactly as a pre-PR5A build wrote it: the v1 schema, no behaviour
+        /// mode, no catalogue provenance, no equipment and no <c>EquipmentResolution</c> stage.
+        /// </summary>
+        private static void Write_V1(string path_Record, Action<JsonObject> modify = null)
+        {
+            JsonObject jsonObject = JsonNode.Parse(File.ReadAllText(path_Record)).AsObject();
+
+            jsonObject["Schema"] = PartOIteration3Record.LegacySchema_V1;
+
+            foreach (string key in new[] { "BehaviourMode", "Directory_VentilationUnitCatalogue", "Path_VentilationUnitCatalogue", "Schema_VentilationUnitCatalogue", "Sha256_VentilationUnitCatalogue", "Equipment" })
+            {
+                jsonObject.Remove(key);
+            }
+
+            JsonArray jsonArray_Stages = jsonObject["Stages"].AsArray();
+            for (int i = jsonArray_Stages.Count - 1; i >= 0; i--)
+            {
+                if ((string)jsonArray_Stages[i]["Stage"] == nameof(PartOIteration3Stage.EquipmentResolution))
+                {
+                    jsonArray_Stages.RemoveAt(i);
+                }
+            }
+
+            modify?.Invoke(jsonObject);
+
+            File.WriteAllText(path_Record, jsonObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        [Fact]
+        public void A_pre_PR5A_v1_pairing_reopens_as_parity_with_its_whole_ledger_and_without_running_TAS()
+        {
+            PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
+
+            Write_V1(Path.Combine(directory, "Flat-Iteration3.json"));
+
+            int count = 0;
+
+            PartOIteration3PipelineReviewOnly pipeline = new()
+            {
+                Func_Assess = guids => Assessment(guids, ++count == 1 ? 20.0 : 21.0),
+            };
+
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, pipeline);
+
+            Assert.False(partOIteration3Result.IsRefused, string.Join(" | ", partOIteration3Result.Reasons));
+            Assert.True(partOIteration3Result.IsRestored);
+            Assert.True(partOIteration3Result.IsComplete);
+            Assert.NotNull(partOIteration3Result.Comparison);
+            Assert.Equal(guids_Bound.Count, partOIteration3Result.Comparison.Statistics.Count_Rooms);
+
+            Assert.True(partOIteration3Result.Record.IsLegacy_V1);
+            Assert.Equal(PartOIteration3BehaviourMode.Parity, partOIteration3Result.Record.BehaviourMode);
+            Assert.Empty(partOIteration3Result.Record.Equipment);
+
+            //Every recorded stage survives the replay - the one v1 never had is shown as the Parity no-op
+            //it would have been, and nothing after it is dropped by the ordering rule.
+            Assert.All(partOIteration3Result.Ledger.Stages, x => Assert.Equal(PartOIteration3StageStatus.Completed, x.Status));
+            Assert.Contains("before PR5A", partOIteration3Result.Ledger.State(PartOIteration3Stage.EquipmentResolution).Detail);
+
+            //Only the two assessments were reached; every TAS member throws.
+            Assert.Equal(2, pipeline.Count_Assess);
+            Assert.Contains(partOIteration3Result.Notes, x => x.Contains("No TAS simulation was run and no TAS file was written."));
+        }
+
+        [Fact]
+        public void A_v1_record_claiming_selected_product_behaviour_refuses_as_contradictory()
+        {
+            PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
+
+            Write_V1(Path.Combine(directory, "Flat-Iteration3.json"), x => x["BehaviourMode"] = nameof(PartOIteration3BehaviourMode.SelectedProduct));
+
+            PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, pipeline);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("contradicts itself") && x.Contains(PartOIteration3Record.LegacySchema_V1));
+            Assert.Equal(0, pipeline.Count_Assess);
+        }
+
+        [Fact]
+        public void A_v1_record_carrying_catalogue_evidence_refuses_as_contradictory()
+        {
+            PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
+
+            Write_V1(Path.Combine(directory, "Flat-Iteration3.json"), x => x["Sha256_VentilationUnitCatalogue"] = new string('A', 64));
+
+            PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, pipeline);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("contradicts itself"));
+            Assert.Equal(0, pipeline.Count_Assess);
+        }
+
+        /// <summary>
+        /// Only v1 may omit the mode. A v2 record without one is not silently read as Parity.
+        /// </summary>
+        [Fact]
+        public void A_v2_record_with_no_behaviour_mode_refuses_before_reading_results()
+        {
+            PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
+
+            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+
+            JsonObject jsonObject = JsonNode.Parse(File.ReadAllText(path_Record)).AsObject();
+            Assert.Equal(PartOIteration3Record.CurrentSchema, (string)jsonObject["Schema"]);
+            Assert.True(jsonObject.Remove("BehaviourMode"));
+            File.WriteAllText(path_Record, jsonObject.ToJsonString());
+
+            PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, pipeline);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("supported ventilation equipment behaviour"));
+            Assert.Equal(0, pipeline.Count_Assess);
+        }
+
+        [Fact]
+        public void A_record_with_an_unknown_equipment_behaviour_refuses_before_reading_results()
+        {
+            PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
+
+            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            File.WriteAllText(path_Record, File.ReadAllText(path_Record).Replace("\"BehaviourMode\": \"Parity\"", "\"BehaviourMode\": \"Unknown\""));
+
+            PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, pipeline);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("supported ventilation equipment behaviour"));
+            Assert.Equal(0, pipeline.Count_Assess);
+        }
+
+        [Fact]
+        public void A_completed_selected_product_record_without_catalogue_or_equipment_provenance_refuses()
+        {
+            PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
+
+            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            File.WriteAllText(path_Record, File.ReadAllText(path_Record).Replace("\"BehaviourMode\": \"Parity\"", "\"BehaviourMode\": \"SelectedProduct\""));
+
+            PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
+            PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, pipeline);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("catalogue directory, file, schema and SHA-256"));
+            Assert.Contains(partOIteration3Result.Reasons, x => x.Contains("equipment row"));
+            Assert.Equal(0, pipeline.Count_Assess);
         }
 
         [Fact]

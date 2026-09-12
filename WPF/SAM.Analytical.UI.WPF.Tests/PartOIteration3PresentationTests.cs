@@ -67,7 +67,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             return PartOIteration3Comparison.Create(rooms, series_A, series_B, criteria, out List<string> _);
         }
 
-        private static PartOIteration3Result Result_Complete()
+        private static PartOIteration3Result Result_Complete(bool selectedProduct = false)
         {
             PartOIteration3Ledger partOIteration3Ledger = new();
 
@@ -87,6 +87,28 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Count_Connection_Transfer = 4,
                 Method_ResultantTemperature = "the Approved Document O thermostat bridge",
             };
+
+            if (selectedProduct)
+            {
+                partOIteration3Record.BehaviourMode = PartOIteration3BehaviourMode.SelectedProduct;
+                partOIteration3Record.Directory_VentilationUnitCatalogue = "C:\\SAM\\VentilationUnits";
+                partOIteration3Record.Path_VentilationUnitCatalogue = "C:\\SAM\\VentilationUnits\\VentilationUnitCatalogue.JSON";
+                partOIteration3Record.Schema_VentilationUnitCatalogue = "VentilationUnitCatalogue:v2";
+                partOIteration3Record.Sha256_VentilationUnitCatalogue = new string('A', 64);
+
+                PartOIteration3EquipmentEvidence equipmentEvidence = new(
+                    Guid.NewGuid(), "MVHR-01", "Manufacturer", "Model", "Revision", "Certified source",
+                    60.0, 0.86, "SupplyTemperatureEfficiency", false, null,
+                    0.62, "TotalBothFans", false, null,
+                    150.0, 150.0, 60.0, 60.0, 50.0, 55.0,
+                    "DesignAirFlow × constant yearly schedule 1.0",
+                    310.0, 310.0, 1.0, 1.0, 1.0,
+                    "Certified total-both-fans SFP split equally",
+                    "Declared assumption: all simulated fan load enters the air stream");
+
+                Assert.True(equipmentEvidence.BindAirSystem(Guid.NewGuid()));
+                partOIteration3Record.Add(equipmentEvidence);
+            }
 
             partOIteration3Record.Adopt(partOIteration3Ledger);
 
@@ -149,6 +171,31 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Contains("Bedroom 2", text);
             Assert.Contains("TM59 Criterion A", text);
             Assert.Contains("TM59 Criterion B", text);
+        }
+
+        [WpfFact]
+        public void A_selected_product_pairing_names_its_product_values_assumptions_and_catalogue_provenance()
+        {
+            PartOIteration3Result partOIteration3Result = Result_Complete(selectedProduct: true);
+            PartOIteration3ResultWindow partOIteration3ResultWindow = new()
+            {
+                Result = partOIteration3Result,
+            };
+
+            string text = partOIteration3ResultWindow.CopyAllText();
+            string report = PartOIteration3ReportText.Text(partOIteration3Result, partOIteration3ResultWindow.Rows_Visible, System.Globalization.CultureInfo.InvariantCulture, provenance: true);
+
+            Assert.Contains("Selected product", text);
+            Assert.Contains("Manufacturer / Model / Revision", text);
+            Assert.Contains("HR 0.86", text);
+            Assert.Contains("SFP 0.62", text);
+            Assert.Contains("Declared assumption", text);
+
+            Assert.Contains("VentilationUnitCatalogue:v2", report);
+            Assert.Contains(new string('A', 64), report);
+            Assert.Contains("Certified source", report);
+            Assert.Contains("150", report);
+            Assert.Contains("310", report);
         }
 
         /// <summary>

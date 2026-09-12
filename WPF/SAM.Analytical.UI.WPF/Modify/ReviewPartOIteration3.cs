@@ -245,13 +245,31 @@ namespace SAM.Analytical.UI.WPF
         /// so the ordering rule that governed the run governs what is shown: a record claiming a stage
         /// completed after a refusal is rejected here exactly as it would have been there.
         /// </para>
+        /// <para>
+        /// <b>A pre-PR5A (v1) record has no <c>EquipmentResolution</c> stage</b>, because the stage did not
+        /// exist - and the ordering rule would otherwise drop every stage after it. For v1 only, the stage
+        /// is replayed as what it would have said, the Parity no-op, immediately after a completed
+        /// <c>SystemScope</c>. Nothing else is inferred, and a v2 record is replayed exactly as written.
+        /// </para>
         /// </summary>
         private static PartOIteration3Ledger Recorded(PartOIteration3Record partOIteration3Record)
         {
             PartOIteration3Ledger result = new();
 
+            bool isLegacy_V1 = partOIteration3Record?.IsLegacy_V1 ?? false;
+
             foreach (PartOIteration3StageState partOIteration3StageState in partOIteration3Record?.Stages ?? [])
             {
+                if (isLegacy_V1
+                    && partOIteration3StageState.Stage != PartOIteration3Stage.EquipmentResolution
+                    && result.State(PartOIteration3Stage.SystemScope).IsCompleted
+                    && result.State(PartOIteration3Stage.EquipmentResolution).Status == PartOIteration3StageStatus.NotRun)
+                {
+                    result.Complete(
+                        PartOIteration3Stage.EquipmentResolution,
+                        string.Format("Recorded before PR5A ('{0}'): Parity mode, Candidate B0. No product was resolved.", PartOIteration3Record.LegacySchema_V1));
+                }
+
                 switch (partOIteration3StageState.Status)
                 {
                     case PartOIteration3StageStatus.Completed:

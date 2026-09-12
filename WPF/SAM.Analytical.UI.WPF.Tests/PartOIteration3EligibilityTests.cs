@@ -220,6 +220,30 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Contains("schema", partOIteration3Eligibility.Refusal_Review);
         }
 
+        /// <summary>
+        /// A pairing written before PR5A - every existing acceptance pairing - is still offered for review.
+        /// Whether its content is still true is the review's own question, asked again there.
+        /// </summary>
+        [Fact]
+        public void A_pre_PR5A_v1_record_is_still_reviewable()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3Record partOIteration3Record = new()
+            {
+                Schema = PartOIteration3Record.LegacySchema_V1,
+            };
+
+            partOIteration3Record.Adopt(new PartOIteration3Ledger());
+
+            File.WriteAllText(Path.Combine(directory, "Flat-Iteration3.json"), partOIteration3Record.ToString());
+
+            PartOIteration3Eligibility partOIteration3Eligibility = Eligibility(partORun);
+
+            Assert.True(partOIteration3Eligibility.CanReview, partOIteration3Eligibility.Refusal_Review);
+            Assert.True(partOIteration3Eligibility.Review);
+        }
+
         [Fact]
         public void A_file_that_is_not_a_record_is_not_reviewable()
         {

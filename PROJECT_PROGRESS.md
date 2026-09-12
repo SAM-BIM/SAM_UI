@@ -1,9 +1,8 @@
 # Project Progress
 
 ## Branch
-`sow/2026-Q3`. The Approved Document O **Iteration 3 (A/B) foundation** is the current work - see the
-*Latest* entry immediately below. PR #99 (`ui/part-o-consistency-polish`), a presentation-only polish
-pass over the Part O UI family, is merged and is the entry beneath it.
+`codex/parto-pr5a-ui`, based on `sow/2026-Q3`. The fail-closed PR5A SAM_UI slice is the current work -
+see the *Latest* entry immediately below.
 
 PR #98 (`feature/parto-equipment-selection-ux`) is merged and the Approved Document O iteration
 programme is **FROZEN** - see `PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN` below, which remains the
@@ -11,6 +10,66 @@ authority for the engineering state.
 
 Everything below the *Latest* entry is superseded history retained for context, and its forward-looking
 claims (branch names, "next step" lists) are historical rather than current.
+
+## LATEST - PART O ITERATION 3 PR5A SAM_UI GENERIC/FAIL-CLOSED SLICE (2026-09-12)
+
+### Current status
+
+Branch `codex/parto-pr5a-ui`, ready to commit/open against `sow/2026-Q3`. SAM #111's ordered lower
+layers are already merged: SAM #117 at merge `b4a1283f` (reviewed head `f6b0d3f9`, 2151/2151),
+SAM_Systems #23 at merge `5213ba9c` (head `3772fc3`, 176/176), and SAM_Tas #56 at merge `0f7f59e0`
+(head `de7a7a9`, 890/890). No repository other than SAM_UI is changed by this checkpoint.
+
+The generic PR5A path is implemented and deliberately fail-closed. Parity remains the default frozen B0
+and sends no unit settings with `ClearToZero`. Selected product reads Iteration 2's authoritative AHU
+selection, resolves every scoped unit or refuses the whole attempt, rechecks capacity without reselection,
+uses MVRE materialisation with per-AHU settings, and routes fan heat as `FromSystemsGraph`.
+
+The v2 pairing record/report persists behaviour, exact catalogue directory/file/schema/SHA-256,
+selected identity/source/capacity, separate design and Part F duties, operating basis, resolved HR/SFP,
+generic fan mappings, declared assumptions and deterministic AHU-to-AirSystem lineage. Review remains
+simulation-free and refuses unsupported modes, contradictory parity evidence, incomplete provenance,
+incomplete equipment rows or duplicate physical lineage. The result window and persisted report share
+the same text authority; no new equipment selection UI or authority was added.
+
+Review amendment: pre-PR5A `PartOIteration3Record:v1` pairings (the PR4/PR5A acceptance pairings) stay
+reviewable as the historical Parity/B0 route. v2 is still the only schema written; a v1 record carrying
+selected-product evidence refuses. Phase 0 current state (Selected product = B2-style, no B1 yet, B3 =
+exchanger Setpoint not BypassFactor, displacement normalised in SAM_Systems #23, plant-room read-back
+still a gate) is noted in the plan companion and the evidence doc. The automated review of the amended
+head found three defects in this slice, fixed: resolution now covers only units a retained ventilation
+system names (SAM #114 scope), one air system bound by two units refuses before simulation, and an
+evidence row is complete only with its lookup airflow and both bases. Amendment validation: full
+`SAM.Analytical.UI.WPF.Tests` **1012/1012** (+10), `SAM_UI.sln` Release 0 errors, `git diff --check` clean.
+
+### Files changed
+
+- Part O record/equipment schema, behaviour enum and pipeline stage in `SAM_UI/SAM.Analytical.UI`.
+- Iteration 3 command, orchestration, pipeline, resolver/binding queries, review gate and report text in
+  `WPF/SAM.Analytical.UI.WPF`.
+- Iteration 3 resolver, run, record, review, ledger and presentation tests.
+- `documentation/plans/PR5-MANUFACTURER-AWARE-PLAN.md` and
+  `documentation/evidence/PR5A-SAMUI-FAIL-CLOSED.md`.
+
+### Validation
+
+- Focused equipment resolver 15/15; record 8/8; review 24/24; presentation 8/8.
+- Full `SAM.Analytical.UI.WPF.Tests`: **1002/1002 passed**.
+- Visual Studio MSBuild `SAM_UI.sln` Release restore/build: **0 errors** (existing dependency/nullability/
+  architecture warnings remain).
+- `git diff --check`: clean; new C# files carry SPDX/copyright headers.
+
+### Evidence boundary, risks and exact next step
+
+Certified E1/E2 curves for Nuaire `MRXBOXAB-ECO5-AECV` (`MR-ECO-COOL-V`) remain unsourced. No product
+figures were invented, and no real selected-product annual run was attempted. SAM_Tas proved the merged
+`ExchCalcType` and fan-HGF policies on licensed native objects, but the complete frozen operating-point
+A-D matrix and annual B1/B2 exit gate remain blocked on E1/E2; B3 supply-limit semantics remain
+uninterpreted. #113/#115 remain independent. PR5B has not started.
+
+Exact next step: commit/push this SAM_UI slice, open/review/merge its PR and update SAM #111. Then obtain
+traceable certified E1/E2 data, review/transcribe it into catalogue v2, and run the frozen licensed
+operating-point plus annual B0/B1/B2 acceptance. Do not start PR5B.
 
 ## LATEST - PART O ITERATION 3 (A/B) FOUNDATION - PR4 (2026-09-11)
 

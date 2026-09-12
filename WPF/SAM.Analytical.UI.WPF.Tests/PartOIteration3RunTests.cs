@@ -805,5 +805,94 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(partOIteration3Eligibility.CanRun, partOIteration3Eligibility.Refusal_Run);
         }
+
+        //-------------------------------------------------------------------------------------------------
+        //PR5A (SAM#111 plan §J) - Parity stays the default and the B0 control; Selected-product resolves
+        //every scoped air handling unit's already-selected product before materialising, and refuses the
+        //whole attempt rather than materialising some units at parity if any one of them cannot resolve.
+        //-------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// The default - no mode named at all - is Parity, and it is byte-for-byte what this pipeline did
+        /// before PR5A existed: no unit settings reach <c>Materialise</c>, and <c>Route</c> gets
+        /// <c>ClearToZero</c>.
+        /// </summary>
+        [Fact]
+        public void Parity_is_the_default_and_reaches_materialise_with_no_unit_settings_and_clear_to_zero()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3PipelineFake partOIteration3PipelineFake = Pipeline_Complete(out List<Guid> _);
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, partOIteration3PipelineFake);
+
+            Assert.False(partOIteration3Result.IsRefused);
+            Assert.True(partOIteration3Result.IsComplete);
+
+            Assert.Equal(PartOIteration3BehaviourMode.Parity, partOIteration3Result.Record.BehaviourMode);
+            Assert.Empty(partOIteration3Result.Record.Equipment);
+
+            Assert.True(
+                partOIteration3PipelineFake.UnitSettings_Materialised is null || partOIteration3PipelineFake.UnitSettings_Materialised.Count == 0,
+                "Parity mode must not hand Materialise any unit settings.");
+
+            Assert.Equal(SystemVentilationFanHeatGainPolicy.ClearToZero, partOIteration3PipelineFake.FanHeatGainPolicy_Route);
+        }
+
+        /// <summary>
+        /// Naming Parity explicitly is the same run as naming nothing - the parameter is additive, and no
+        /// existing caller's behaviour moves by a single instruction.
+        /// </summary>
+        [Fact]
+        public void Naming_parity_explicitly_produces_the_same_ledger_as_naming_nothing()
+        {
+            PartORun partORun_Default = Run();
+            PartOIteration3Result result_Default = Modify.RunPartOIteration3(partORun_Default, Pipeline_Complete(out List<Guid> _));
+
+            PartORun partORun_Explicit = Run();
+            PartOIteration3Result result_Explicit = Modify.RunPartOIteration3(partORun_Explicit, Pipeline_Complete(out List<Guid> _), default, PartOIteration3BehaviourMode.Parity);
+
+            Assert.Equal(result_Default.IsComplete, result_Explicit.IsComplete);
+            Assert.Equal(result_Default.Ledger.Stages.Count, result_Explicit.Ledger.Stages.Count);
+            Assert.All(result_Explicit.Ledger.Stages, x => Assert.Equal(PartOIteration3StageStatus.Completed, x.Status));
+        }
+
+        /// <summary>
+        /// Selected-product mode refuses the WHOLE attempt when even one scoped air handling unit has no
+        /// selected product - the fixture design's units carry none - and nothing after the equipment
+        /// resolution stage is ever reached: not materialisation, not the thermal source, nothing.
+        /// <para>
+        /// This is the all-or-nothing rule PR5A's plan states explicitly: a partially configured
+        /// Candidate B (some units resolved, some silently left at parity) is never produced.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public void SelectedProduct_mode_refuses_the_whole_attempt_when_a_unit_has_no_selected_product()
+        {
+            PartORun partORun = Run();
+
+            //A pipeline that is otherwise fully wired to succeed - so that a defect letting Materialise or
+            //anything after it run would prove itself immediately, rather than being masked by a fake that
+            //would have refused there anyway.
+            PartOIteration3PipelineFake partOIteration3PipelineFake = Pipeline_Complete(out List<Guid> _);
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, partOIteration3PipelineFake, default, PartOIteration3BehaviourMode.SelectedProduct);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.False(partOIteration3Result.IsComplete);
+            Assert.Equal(PartOIteration3Stage.EquipmentResolution, partOIteration3Result.Ledger.Stage_Refused);
+
+            Assert.Equal(PartOIteration3BehaviourMode.SelectedProduct, partOIteration3Result.Record.BehaviourMode);
+            Assert.Empty(partOIteration3Result.Record.Equipment);
+
+            //Reference A's own TM59 assessment runs before equipment resolution even reaches the ledger,
+            //so "Assess" is called exactly once - for Reference A - and is deliberately not asserted here.
+            partOIteration3PipelineFake.AssertNeverCalled(nameof(IPartOIteration3Pipeline.Materialise), nameof(IPartOIteration3Pipeline.ThermalSource), nameof(IPartOIteration3Pipeline.Route), nameof(IPartOIteration3Pipeline.ResultantTemperatures), nameof(IPartOIteration3Pipeline.Persist));
+
+            Assert.Equal(["Assess"], partOIteration3PipelineFake.Called);
+
+            //Every reason names the unit by identity, never a substituted product.
+            Assert.All(partOIteration3Result.Ledger.Reasons, x => Assert.Contains("no selected ventilation unit product", x));
+        }
     }
 }

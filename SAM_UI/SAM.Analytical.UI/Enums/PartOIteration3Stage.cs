@@ -36,6 +36,13 @@ namespace SAM.Analytical.UI
         /// <summary>Which authored ventilation systems are the design under assessment - see SAM #114.</summary>
         [Description("System scope")] SystemScope,
 
+        /// <summary>
+        /// PR5A (SAM#111 plan §J): in Selected-product mode, resolves every scoped air handling unit's
+        /// selected product to its certified heat-recovery efficiency and specific fan power. A no-op in
+        /// Parity mode - it always completes with nothing resolved, which is what materialises B0.
+        /// </summary>
+        [Description("Equipment resolution")] EquipmentResolution,
+
         /// <summary>SAM_Systems materialises the explicit MVHR systems from the analytical design.</summary>
         [Description("Materialisation")] Materialisation,
 

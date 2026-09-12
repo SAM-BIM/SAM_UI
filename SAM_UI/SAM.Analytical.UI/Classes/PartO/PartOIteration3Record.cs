@@ -43,8 +43,38 @@ namespace SAM.Analytical.UI
         /// The schema this writer produces. A record written by a different schema is refused on review
         /// rather than read optimistically - a field that moved would otherwise be read as a default and
         /// validate.
+        /// <para>
+        /// <b>v2 (PR5A, SAM#111 plan §I/§J):</b> adds <see cref="BehaviourMode"/>, catalogue provenance,
+        /// and <see cref="Equipment"/>. Every v1 field keeps its name and meaning unchanged. This writer
+        /// only ever writes v2; a review also reads <see cref="LegacySchema_V1"/> - see
+        /// <see cref="IsReadableSchema"/>.
+        /// </para>
         /// </summary>
-        public const string CurrentSchema = "PartOIteration3Record:v1";
+        public const string CurrentSchema = "PartOIteration3Record:v2";
+
+        /// <summary>
+        /// The schema every pairing written before PR5A carries - the PR4 foundation and its acceptance
+        /// pairings. It predates <see cref="BehaviourMode"/>, the catalogue provenance, <see cref="Equipment"/>
+        /// and the <c>EquipmentResolution</c> stage, and the only behaviour that existed then was the
+        /// foundation control. A v1 record is therefore read as <see cref="PartOIteration3BehaviourMode.Parity"/>
+        /// (Candidate B0) and never as anything else; one that carries selected-product evidence contradicts
+        /// its own schema and is refused on review.
+        /// </summary>
+        public const string LegacySchema_V1 = "PartOIteration3Record:v1";
+
+        /// <summary>
+        /// Whether a review may read a record of this schema: <see cref="CurrentSchema"/> or
+        /// <see cref="LegacySchema_V1"/>, exactly. Anything else - older, newer or unnamed - is refused
+        /// rather than read optimistically.
+        /// </summary>
+        public static bool IsReadableSchema(string schema)
+        {
+            return string.Equals(schema, CurrentSchema, StringComparison.Ordinal)
+                || string.Equals(schema, LegacySchema_V1, StringComparison.Ordinal);
+        }
+
+        /// <summary>Whether this record was written before PR5A - see <see cref="LegacySchema_V1"/>.</summary>
+        public bool IsLegacy_V1 => string.Equals(Schema, LegacySchema_V1, StringComparison.Ordinal);
 
         private readonly List<Guid> guids_VentilationSystem_Prepared = [];
 
@@ -57,6 +87,8 @@ namespace SAM.Analytical.UI
         private readonly List<PartOIteration3FileRecord> files = [];
 
         private readonly List<PartOIteration3StageState> stages = [];
+
+        private readonly List<PartOIteration3EquipmentEvidence> equipment = [];
 
         public PartOIteration3Record()
         {
@@ -106,6 +138,35 @@ namespace SAM.Analytical.UI
 
         /// <summary>Candidate B's project name - what makes its files its own.</summary>
         public string ProjectName_CandidateB { get; set; }
+
+        //---------------------------------------------------------------------------------------------
+        //Equipment behaviour - PR5A (SAM#111 plan §I/§J)
+        //---------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Which ventilation equipment behaviour this attempt materialised Candidate B with.
+        /// <c>PartOIteration3BehaviourMode.Parity</c> by default - the foundation control, B0.
+        /// </summary>
+        public PartOIteration3BehaviourMode BehaviourMode { get; set; } = PartOIteration3BehaviourMode.Parity;
+
+        /// <summary>The exact catalogue directory used for Selected-product resolution.</summary>
+        public string Directory_VentilationUnitCatalogue { get; set; }
+
+        /// <summary>The exact catalogue file used for Selected-product resolution.</summary>
+        public string Path_VentilationUnitCatalogue { get; set; }
+
+        /// <summary>The catalogue's own schema tag.</summary>
+        public string Schema_VentilationUnitCatalogue { get; set; }
+
+        /// <summary>SHA-256 of the exact catalogue bytes used for the resolution.</summary>
+        public string Sha256_VentilationUnitCatalogue { get; set; }
+
+        /// <summary>
+        /// One row per scoped air handling unit, in Selected-product mode: its selected product's identity
+        /// and the certified figures resolved for it. Empty in Parity mode - there is nothing to resolve
+        /// for B0.
+        /// </summary>
+        public List<PartOIteration3EquipmentEvidence> Equipment => [.. equipment];
 
         //---------------------------------------------------------------------------------------------
         //Scope - SAM #114
@@ -201,6 +262,14 @@ namespace SAM.Analytical.UI
             if (partOIteration3BindingRecord is not null)
             {
                 bindings.Add(partOIteration3BindingRecord);
+            }
+        }
+
+        public void Add(PartOIteration3EquipmentEvidence partOIteration3EquipmentEvidence)
+        {
+            if (partOIteration3EquipmentEvidence is not null)
+            {
+                equipment.Add(partOIteration3EquipmentEvidence);
             }
         }
 
@@ -301,6 +370,12 @@ namespace SAM.Analytical.UI
                 });
             }
 
+            JsonArray jsonArray_Equipment = [];
+            foreach (PartOIteration3EquipmentEvidence partOIteration3EquipmentEvidence in equipment)
+            {
+                jsonArray_Equipment.Add(partOIteration3EquipmentEvidence.ToJsonObject());
+            }
+
             return new JsonObject
             {
                 { "Schema", Schema },
@@ -313,6 +388,12 @@ namespace SAM.Analytical.UI
                 { "Fingerprint_Scenario", Fingerprint_Scenario },
                 { "ProjectName_ReferenceA", ProjectName_ReferenceA },
                 { "ProjectName_CandidateB", ProjectName_CandidateB },
+                { "BehaviourMode", BehaviourMode.ToString() },
+                { "Directory_VentilationUnitCatalogue", Directory_VentilationUnitCatalogue },
+                { "Path_VentilationUnitCatalogue", Path_VentilationUnitCatalogue },
+                { "Schema_VentilationUnitCatalogue", Schema_VentilationUnitCatalogue },
+                { "Sha256_VentilationUnitCatalogue", Sha256_VentilationUnitCatalogue },
+                { "Equipment", jsonArray_Equipment },
                 { "Guids_VentilationSystem_Prepared", PartOIteration3Json.Array(guids_VentilationSystem_Prepared) },
                 { "Guids_VentilationSystem_ScopedOut", PartOIteration3Json.Array(guids_VentilationSystem_ScopedOut) },
                 { "Notes_Scope", PartOIteration3Json.Array(notes_Scope) },
@@ -354,6 +435,10 @@ namespace SAM.Analytical.UI
                 Fingerprint_Scenario = PartOIteration3Json.Text(jsonObject, "Fingerprint_Scenario"),
                 ProjectName_ReferenceA = PartOIteration3Json.Text(jsonObject, "ProjectName_ReferenceA"),
                 ProjectName_CandidateB = PartOIteration3Json.Text(jsonObject, "ProjectName_CandidateB"),
+                Directory_VentilationUnitCatalogue = PartOIteration3Json.Text(jsonObject, "Directory_VentilationUnitCatalogue"),
+                Path_VentilationUnitCatalogue = PartOIteration3Json.Text(jsonObject, "Path_VentilationUnitCatalogue"),
+                Schema_VentilationUnitCatalogue = PartOIteration3Json.Text(jsonObject, "Schema_VentilationUnitCatalogue"),
+                Sha256_VentilationUnitCatalogue = PartOIteration3Json.Text(jsonObject, "Sha256_VentilationUnitCatalogue"),
                 Count_Connection_Supply = PartOIteration3Json.Count(jsonObject, "Count_Connection_Supply", 0),
                 Count_Connection_Extract = PartOIteration3Json.Count(jsonObject, "Count_Connection_Extract", 0),
                 Count_Connection_Transfer = PartOIteration3Json.Count(jsonObject, "Count_Connection_Transfer", 0),
@@ -368,6 +453,22 @@ namespace SAM.Analytical.UI
                 IsComplete = PartOIteration3Json.Boolean(jsonObject, "IsComplete", false),
             };
 
+            //A v1 record predates the field, and the foundation control was the only behaviour there was,
+            //so an absent mode on v1 IS Parity. On v2 an absent or unknown mode stays undefined, which a
+            //review refuses rather than silently reading as Parity.
+            string text_BehaviourMode = PartOIteration3Json.Text(jsonObject, "BehaviourMode");
+            if (result.IsLegacy_V1 && string.IsNullOrWhiteSpace(text_BehaviourMode))
+            {
+                result.BehaviourMode = PartOIteration3BehaviourMode.Parity;
+            }
+            else
+            {
+                result.BehaviourMode = Enum.TryParse(text_BehaviourMode, false, out PartOIteration3BehaviourMode partOIteration3BehaviourMode)
+                    && Enum.IsDefined(typeof(PartOIteration3BehaviourMode), partOIteration3BehaviourMode)
+                    ? partOIteration3BehaviourMode
+                    : (PartOIteration3BehaviourMode)(-1);
+            }
+
             result.AddPreparedSystems(PartOIteration3Json.Guids(jsonObject, "Guids_VentilationSystem_Prepared"));
             result.AddScopedOutSystems(PartOIteration3Json.Guids(jsonObject, "Guids_VentilationSystem_ScopedOut"));
             result.AddScopeNotes(PartOIteration3Json.Texts(jsonObject, "Notes_Scope"));
@@ -380,6 +481,11 @@ namespace SAM.Analytical.UI
             foreach (JsonObject jsonObject_File in PartOIteration3Json.Objects(jsonObject, "Files"))
             {
                 result.Add(PartOIteration3FileRecord.FromJsonObject(jsonObject_File));
+            }
+
+            foreach (JsonObject jsonObject_Equipment in PartOIteration3Json.Objects(jsonObject, "Equipment"))
+            {
+                result.Add(PartOIteration3EquipmentEvidence.FromJsonObject(jsonObject_Equipment));
             }
 
             foreach (JsonObject jsonObject_Stage in PartOIteration3Json.Objects(jsonObject, "Stages"))

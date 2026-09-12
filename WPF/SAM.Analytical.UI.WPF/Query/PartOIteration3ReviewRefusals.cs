@@ -56,14 +56,92 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
-            if (!string.Equals(partOIteration3Record.Schema, PartOIteration3Record.CurrentSchema, StringComparison.Ordinal))
+            if (!PartOIteration3Record.IsReadableSchema(partOIteration3Record.Schema))
             {
                 result.Add(string.Format(
-                    "The Iteration 3 pairing record states schema '{0}' and this build writes '{1}', so it cannot be read as one.",
+                    "The Iteration 3 pairing record states schema '{0}' and this build reads only '{1}' or '{2}', so it cannot be read as one.",
                     partOIteration3Record.Schema ?? "<none>",
-                    PartOIteration3Record.CurrentSchema));
+                    PartOIteration3Record.CurrentSchema,
+                    PartOIteration3Record.LegacySchema_V1));
 
                 return result;
+            }
+
+            //A pre-PR5A (v1) pairing can only ever be the foundation control: selected-product behaviour
+            //did not exist when it was written. One that says otherwise is corrupt, not historical.
+            if (partOIteration3Record.IsLegacy_V1
+                && (partOIteration3Record.BehaviourMode != PartOIteration3BehaviourMode.Parity
+                    || partOIteration3Record.Equipment.Count != 0
+                    || !string.IsNullOrWhiteSpace(partOIteration3Record.Directory_VentilationUnitCatalogue)
+                    || !string.IsNullOrWhiteSpace(partOIteration3Record.Path_VentilationUnitCatalogue)
+                    || !string.IsNullOrWhiteSpace(partOIteration3Record.Schema_VentilationUnitCatalogue)
+                    || !string.IsNullOrWhiteSpace(partOIteration3Record.Sha256_VentilationUnitCatalogue)))
+            {
+                result.Add(string.Format(
+                    "This Iteration 3 pairing record states the pre-PR5A schema '{0}', which only ever described the Parity foundation control, but it carries selected-product behaviour or catalogue evidence, so the record contradicts itself.",
+                    PartOIteration3Record.LegacySchema_V1));
+
+                return result;
+            }
+
+            if (!Enum.IsDefined(typeof(PartOIteration3BehaviourMode), partOIteration3Record.BehaviourMode))
+            {
+                result.Add("The Iteration 3 pairing record does not name a supported ventilation equipment behaviour, so it cannot be interpreted safely.");
+
+                return result;
+            }
+
+            if (partOIteration3Record.BehaviourMode == PartOIteration3BehaviourMode.Parity)
+            {
+                if (partOIteration3Record.Equipment.Count != 0)
+                {
+                    result.Add("This pairing calls itself the Parity foundation control but records selected-product equipment behaviour, so the record contradicts itself.");
+
+                    return result;
+                }
+            }
+            else if (partOIteration3Record.IsComplete)
+            {
+                if (string.IsNullOrWhiteSpace(partOIteration3Record.Directory_VentilationUnitCatalogue)
+                    || string.IsNullOrWhiteSpace(partOIteration3Record.Path_VentilationUnitCatalogue)
+                    || string.IsNullOrWhiteSpace(partOIteration3Record.Schema_VentilationUnitCatalogue)
+                    || string.IsNullOrWhiteSpace(partOIteration3Record.Sha256_VentilationUnitCatalogue))
+                {
+                    result.Add("This completed Selected-product pairing does not record the catalogue directory, file, schema and SHA-256 it resolved, so its manufacturer data has no complete provenance.");
+                }
+
+                List<PartOIteration3EquipmentEvidence> equipment = partOIteration3Record.Equipment;
+                if (equipment.Count == 0 || equipment.Count != partOIteration3Record.Count_AirSystem)
+                {
+                    result.Add(string.Format(
+                        "This completed Selected-product pairing records {0} equipment row(s) for {1} air system(s), so the selected behaviour is not accounted for one system at a time.",
+                        equipment.Count,
+                        partOIteration3Record.Count_AirSystem));
+                }
+
+                HashSet<Guid> guids_AirHandlingUnit = [];
+                HashSet<Guid> guids_AirSystem = [];
+
+                foreach (PartOIteration3EquipmentEvidence partOIteration3EquipmentEvidence in equipment)
+                {
+                    if (!partOIteration3EquipmentEvidence.IsComplete)
+                    {
+                        result.Add(string.Format(
+                            "The selected-product equipment row for air handling unit {0} is incomplete, so its identity, values, assumptions and materialised lineage cannot all be audited.",
+                            partOIteration3EquipmentEvidence.Guid_AirHandlingUnit));
+                    }
+
+                    if (!guids_AirHandlingUnit.Add(partOIteration3EquipmentEvidence.Guid_AirHandlingUnit)
+                        || !guids_AirSystem.Add(partOIteration3EquipmentEvidence.Guid_AirSystem))
+                    {
+                        result.Add("The selected-product equipment evidence repeats an air handling unit or an air system, so it is not one row per physical unit.");
+                    }
+                }
+
+                if (result.Count != 0)
+                {
+                    return result;
+                }
             }
 
             //-------------------------------------------------------------------------------------------
