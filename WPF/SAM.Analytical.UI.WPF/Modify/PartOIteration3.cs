@@ -69,7 +69,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 ComboBoxWindow<PartOIteration3BehaviourMode> comboBoxWindow = new(
                     "Part O Iteration 3",
-                    [PartOIteration3BehaviourMode.Parity, PartOIteration3BehaviourMode.SelectedProduct],
+                    [PartOIteration3BehaviourMode.Parity, PartOIteration3BehaviourMode.SelectedProduct, PartOIteration3BehaviourMode.SelectedProductCooling],
                     x => Core.Query.Description((Enum)(object)x),
                     PartOIteration3BehaviourMode.Parity)
                 {

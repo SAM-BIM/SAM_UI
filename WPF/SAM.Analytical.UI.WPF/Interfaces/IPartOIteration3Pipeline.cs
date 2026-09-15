@@ -56,7 +56,12 @@ namespace SAM.Analytical.UI.WPF
         /// PR5A (SAM#111 plan §J): each scoped air handling unit's resolved manufacturer-aware behaviour,
         /// keyed by its guid. Null or empty materialises exactly as before PR5A existed - the B0 control.
         /// </param>
-        MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null);
+        /// <param name="coolingSettings">
+        /// PR5B (SAM#111): each scoped air handling unit's resolved cooling module, keyed by its guid,
+        /// materialised as an internal recirculation branch in the unit's own air system. Null or empty
+        /// materialises no cooling - the B0 control.
+        /// </param>
+        MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = null);
 
         /// <summary>
         /// Runs Candidate B's dedicated no-IZAM thermal case - the same TAS case as Reference A, writing

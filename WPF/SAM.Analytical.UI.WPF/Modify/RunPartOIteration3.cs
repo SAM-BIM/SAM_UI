@@ -126,7 +126,7 @@ namespace SAM.Analytical.UI.WPF
 
             string path_TSD_ReferenceA = partORun.Path_TSD;
 
-            PartOIteration3Paths partOIteration3Paths = PartOIteration3Paths.Create(partOSimulationContext, path_TSD_ReferenceA);
+            PartOIteration3Paths partOIteration3Paths = PartOIteration3Paths.Create(partOSimulationContext, path_TSD_ReferenceA, partOIteration3BehaviourMode);
 
             PartOIteration3Artifacts partOIteration3Artifacts = new(partOIteration3Record.Guid_Run);
             partOIteration3Artifacts.Snapshot(partOIteration3Paths.Paths_CandidateB);
@@ -267,11 +267,48 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             Dictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = [];
             List<PartOIteration3EquipmentEvidence> equipment = [];
+            Dictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = [];
+            List<PartOIteration3CoolingEvidence> cooling = [];
             SystemVentilationFanHeatGainPolicy fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.ClearToZero;
 
             if (partOIteration3BehaviourMode == PartOIteration3BehaviourMode.Parity)
             {
                 partOIteration3Ledger.Complete(PartOIteration3Stage.EquipmentResolution, "Parity mode: Candidate B0, unchanged. No product was resolved.");
+            }
+            else if (partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductCooling)
+            {
+                //PR5B (SAM#111): B0 plus the selected product's cooling module. The ventilation is the
+                //foundation control's own - MV.json, no unit settings, ClearToZero - so B4 - B0 is the cooling
+                //layer alone; only the cooling module is resolved.
+                VentilationUnitCatalogue ventilationUnitCatalogue = VentilationUnitCatalogue.Read();
+
+                partOIteration3Record.Directory_VentilationUnitCatalogue = ventilationUnitCatalogue.Directory;
+                partOIteration3Record.Path_VentilationUnitCatalogue = ventilationUnitCatalogue.Path;
+                partOIteration3Record.Schema_VentilationUnitCatalogue = ventilationUnitCatalogue.Schema;
+                partOIteration3Record.Sha256_VentilationUnitCatalogue = ventilationUnitCatalogue.Sha256;
+
+                List<string> refusals_Cooling = Query.PartOIteration3CoolingResolution(
+                    partOIteration3SystemScope.AdjacencyCluster,
+                    ventilationUnitCatalogue,
+                    out coolingSettings,
+                    out cooling,
+                    out List<string> notes_Cooling);
+
+                if (refusals_Cooling.Count != 0)
+                {
+                    partOIteration3Ledger.Refuse(
+                        PartOIteration3Stage.EquipmentResolution,
+                        "The selected products' cooling modules could not all be resolved.",
+                        refusals_Cooling);
+
+                    return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+                }
+
+                AddNotes(notes, notes_Cooling);
+
+                partOIteration3Ledger.Complete(
+                    PartOIteration3Stage.EquipmentResolution,
+                    string.Format("{0} air handling unit(s) resolved to a selected product's published cooling module; ventilation stays the Parity foundation control.", cooling.Count));
             }
             else
             {
@@ -322,7 +359,7 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation = iPartOIteration3Pipeline.Materialise(partOIteration3SystemScope.AdjacencyCluster, spaces_Scope, unitSettings);
+            MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation = iPartOIteration3Pipeline.Materialise(partOIteration3SystemScope.AdjacencyCluster, spaces_Scope, unitSettings, coolingSettings);
 
             if (mechanicalVentilationMaterialisation is null || !mechanicalVentilationMaterialisation.IsMaterialised)
             {
@@ -351,6 +388,23 @@ namespace SAM.Analytical.UI.WPF
                 foreach (PartOIteration3EquipmentEvidence partOIteration3EquipmentEvidence in equipment)
                 {
                     partOIteration3Record.Add(partOIteration3EquipmentEvidence);
+                }
+            }
+
+            //PR5B: every resolved cooling module has to have become exactly one branch, inside its own unit's
+            //air system - bound here by identity before any TAS work is spent on it.
+            if (cooling.Count != 0)
+            {
+                List<string> refusals_CoolingBinding = Query.PartOIteration3CoolingBindings(cooling, mechanicalVentilationMaterialisation);
+
+                if (refusals_CoolingBinding.Count != 0)
+                {
+                    partOIteration3Ledger.Refuse(
+                        PartOIteration3Stage.Materialisation,
+                        "The resolved cooling modules could not be bound to the materialised systems.",
+                        refusals_CoolingBinding);
+
+                    return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
                 }
             }
 
@@ -540,6 +594,49 @@ namespace SAM.Analytical.UI.WPF
                 string.Format("The TAS Systems simulation is evidenced as complete. {0}", systemVentilationRoute.SimulationEvidence?.NativeDiagnostic is string diagnostic && !string.IsNullOrWhiteSpace(diagnostic) ? string.Format("TAS said: {0}", diagnostic) : "TAS reported no diagnostic."));
 
             SystemZoneTemperatureResults systemZoneTemperatureResults = systemVentilationRoute.SystemZoneTemperatureResults;
+
+            //PR5B: each unit's cooling outcome, verbatim from the route's own checked evidence, and the hourly
+            //OperatingAirFlow history persisted beside the TPD - kept apart from every DesignAirFlow.
+            if (cooling.Count != 0)
+            {
+                List<string> refusals_CoolingOutcome = Query.PartOIteration3CoolingOutcomes(cooling, systemVentilationRoute.RecirculationCoolingResults);
+                List<string> artifacts_OperatingAirFlow = [];
+
+                if (refusals_CoolingOutcome.Count == 0)
+                {
+                    try
+                    {
+                        File.WriteAllText(partOIteration3Paths.Path_OperatingAirFlow, Query.PartOIteration3OperatingAirFlowCsv(systemVentilationRoute.RecirculationCoolingResults, cooling));
+
+                        if (partOIteration3Artifacts.TryClaim(partOIteration3Paths.Path_OperatingAirFlow, out string artifact_OperatingAirFlow, out string refusal_OperatingAirFlow))
+                        {
+                            artifacts_OperatingAirFlow.Add(artifact_OperatingAirFlow);
+                            partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.OperatingAirFlow, partOIteration3Paths.Path_OperatingAirFlow, Length(partOIteration3Paths.Path_OperatingAirFlow), Ticks(partOIteration3Paths.Path_OperatingAirFlow)));
+                        }
+                        else
+                        {
+                            refusals_CoolingOutcome.Add(refusal_OperatingAirFlow);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        refusals_CoolingOutcome.Add(string.Format("The OperatingAirFlow history could not be written to '{0}'. ({1})", partOIteration3Paths.Path_OperatingAirFlow, exception.Message));
+                    }
+                }
+
+                if (refusals_CoolingOutcome.Count != 0)
+                {
+                    partOIteration3Ledger.Refuse(PartOIteration3Stage.ZoneTemperature, "The cooling modules' behaviour could not be recorded.", refusals_CoolingOutcome, artifacts_OperatingAirFlow);
+
+                    return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+                }
+
+                foreach (PartOIteration3CoolingEvidence partOIteration3CoolingEvidence in cooling)
+                {
+                    partOIteration3Record.Add(partOIteration3CoolingEvidence);
+                    AddNotes(notes, [string.Format("Cooling: {0}", partOIteration3CoolingEvidence)]);
+                }
+            }
 
             partOIteration3Ledger.Complete(
                 PartOIteration3Stage.ZoneTemperature,

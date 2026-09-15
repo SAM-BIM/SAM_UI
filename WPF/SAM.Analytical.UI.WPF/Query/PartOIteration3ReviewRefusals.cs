@@ -91,6 +91,15 @@ namespace SAM.Analytical.UI.WPF
                 return result;
             }
 
+            //PR5B: a cooling module belongs only to the cooling mode, and the cooling mode's ventilation is the
+            //foundation control's - it resolves no selected-product fan or heat-recovery behaviour.
+            if (partOIteration3Record.BehaviourMode != PartOIteration3BehaviourMode.SelectedProductCooling && partOIteration3Record.Cooling.Count != 0)
+            {
+                result.Add("This pairing records a cooling module but does not call itself the selected-product cooling mode, so the record contradicts itself.");
+
+                return result;
+            }
+
             if (partOIteration3Record.BehaviourMode == PartOIteration3BehaviourMode.Parity)
             {
                 if (partOIteration3Record.Equipment.Count != 0)
@@ -98,6 +107,59 @@ namespace SAM.Analytical.UI.WPF
                     result.Add("This pairing calls itself the Parity foundation control but records selected-product equipment behaviour, so the record contradicts itself.");
 
                     return result;
+                }
+            }
+            else if (partOIteration3Record.BehaviourMode == PartOIteration3BehaviourMode.SelectedProductCooling)
+            {
+                if (partOIteration3Record.Equipment.Count != 0)
+                {
+                    result.Add("This pairing calls itself B0 plus the selected product's cooling module but records selected-product fan or heat-recovery behaviour, so the record contradicts itself.");
+
+                    return result;
+                }
+
+                if (partOIteration3Record.IsComplete)
+                {
+                    if (string.IsNullOrWhiteSpace(partOIteration3Record.Directory_VentilationUnitCatalogue)
+                        || string.IsNullOrWhiteSpace(partOIteration3Record.Path_VentilationUnitCatalogue)
+                        || string.IsNullOrWhiteSpace(partOIteration3Record.Schema_VentilationUnitCatalogue)
+                        || string.IsNullOrWhiteSpace(partOIteration3Record.Sha256_VentilationUnitCatalogue))
+                    {
+                        result.Add("This completed cooling pairing does not record the catalogue directory, file, schema and SHA-256 it resolved, so its cooling data has no complete provenance.");
+                    }
+
+                    List<PartOIteration3CoolingEvidence> cooling = partOIteration3Record.Cooling;
+                    if (cooling.Count == 0 || cooling.Count != partOIteration3Record.Count_AirSystem)
+                    {
+                        result.Add(string.Format(
+                            "This completed cooling pairing records {0} cooling row(s) for {1} air system(s), so the cooling module is not accounted for one system at a time.",
+                            cooling.Count,
+                            partOIteration3Record.Count_AirSystem));
+                    }
+
+                    HashSet<Guid> guids_AirHandlingUnit_Cooling = [];
+                    HashSet<Guid> guids_AirSystem_Cooling = [];
+
+                    foreach (PartOIteration3CoolingEvidence partOIteration3CoolingEvidence in cooling)
+                    {
+                        if (!partOIteration3CoolingEvidence.IsComplete)
+                        {
+                            result.Add(string.Format(
+                                "The cooling row for air handling unit {0} is incomplete or records refused behaviour (heating, cooling below its gate, or recirculation outside its law), so it cannot be audited as a valid cooling module.",
+                                partOIteration3CoolingEvidence.Guid_AirHandlingUnit));
+                        }
+
+                        if (!guids_AirHandlingUnit_Cooling.Add(partOIteration3CoolingEvidence.Guid_AirHandlingUnit)
+                            || !guids_AirSystem_Cooling.Add(partOIteration3CoolingEvidence.Guid_AirSystem))
+                        {
+                            result.Add("The cooling evidence repeats an air handling unit or an air system, so it is not one row per physical unit.");
+                        }
+                    }
+
+                    if (result.Count != 0)
+                    {
+                        return result;
+                    }
                 }
             }
             else if (partOIteration3Record.IsComplete)

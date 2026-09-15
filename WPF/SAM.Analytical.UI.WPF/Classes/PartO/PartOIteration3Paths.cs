@@ -52,13 +52,24 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>What the persisted A/B review report adds to Reference A's results file name.</summary>
         public const string Suffix_Report = "-Iteration3-Review";
 
-        private PartOIteration3Paths(string outputDirectory, string projectName_ReferenceA, string path_TSD_ReferenceA)
+        /// <summary>
+        /// PR5B (SAM#111): what Candidate B's project name adds to Reference A's when it carries the selected
+        /// product's cooling module (B4) - its own documents, so a B4 run never overwrites the B0 control's
+        /// TPD, bridge or model and the two stay side by side for pairing.
+        /// </summary>
+        public const string Suffix_CandidateB_Cooling = "-It3B4";
+
+        /// <summary>PR5B: the hourly OperatingAirFlow history a B4 run persists beside its TPD.</summary>
+        public const string Suffix_OperatingAirFlow = "-OperatingAirFlow";
+
+        private PartOIteration3Paths(string outputDirectory, string projectName_ReferenceA, string path_TSD_ReferenceA, PartOIteration3BehaviourMode partOIteration3BehaviourMode = PartOIteration3BehaviourMode.Parity)
         {
             OutputDirectory = outputDirectory;
             ProjectName_ReferenceA = projectName_ReferenceA;
             Path_TSD_ReferenceA = path_TSD_ReferenceA;
 
-            ProjectName_CandidateB = string.Concat(projectName_ReferenceA, Suffix_CandidateB);
+            ProjectName_CandidateB = string.Concat(projectName_ReferenceA, partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductCooling ? Suffix_CandidateB_Cooling : Suffix_CandidateB);
+            Path_OperatingAirFlow = Path.Combine(outputDirectory, ProjectName_CandidateB + Suffix_OperatingAirFlow + ".csv");
             ProjectName_Bridge = string.Concat(ProjectName_CandidateB, Suffix_Bridge);
 
             Path_TBD_ThermalSource = Path.Combine(outputDirectory, ProjectName_CandidateB + ".tbd");
@@ -108,6 +119,9 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>The pairing record, beside Reference A's results.</summary>
         public string Path_Record { get; }
 
+        /// <summary>PR5B: the hourly recirculation OperatingAirFlow history of a B4 run, beside its TPD. Written only in that mode.</summary>
+        public string Path_OperatingAirFlow { get; }
+
         /// <summary>
         /// Every fixed path this pairing may write, for the attempt-start snapshot. Reference A's own TSD
         /// and its TM59 report are deliberately <b>not</b> here: A is an input, this run does not write it,
@@ -123,6 +137,7 @@ namespace SAM.Analytical.UI.WPF
             Path_Model_CandidateB,
             Path_TM59Report_CandidateB,
             Path_Record,
+            Path_OperatingAirFlow,
         ];
 
         /// <summary>
@@ -130,6 +145,15 @@ namespace SAM.Analytical.UI.WPF
         /// directory, no project name or no results file to derive them from.
         /// </summary>
         public static PartOIteration3Paths Create(PartOSimulationContext partOSimulationContext, string path_TSD_ReferenceA)
+        {
+            return Create(partOSimulationContext, path_TSD_ReferenceA, PartOIteration3BehaviourMode.Parity);
+        }
+
+        /// <summary>
+        /// PR5B: the same, for a stated behaviour mode - the cooling mode's Candidate B writes under
+        /// <see cref="Suffix_CandidateB_Cooling"/>, every other mode under <see cref="Suffix_CandidateB"/>.
+        /// </summary>
+        public static PartOIteration3Paths Create(PartOSimulationContext partOSimulationContext, string path_TSD_ReferenceA, PartOIteration3BehaviourMode partOIteration3BehaviourMode)
         {
             if (partOSimulationContext is null
                 || string.IsNullOrWhiteSpace(partOSimulationContext.OutputDirectory)
@@ -139,7 +163,7 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
-            return new PartOIteration3Paths(partOSimulationContext.OutputDirectory, partOSimulationContext.ProjectName, path_TSD_ReferenceA);
+            return new PartOIteration3Paths(partOSimulationContext.OutputDirectory, partOSimulationContext.ProjectName, path_TSD_ReferenceA, partOIteration3BehaviourMode);
         }
 
         /// <summary>

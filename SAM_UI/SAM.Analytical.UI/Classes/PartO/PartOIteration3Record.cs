@@ -90,6 +90,8 @@ namespace SAM.Analytical.UI
 
         private readonly List<PartOIteration3EquipmentEvidence> equipment = [];
 
+        private readonly List<PartOIteration3CoolingEvidence> cooling = [];
+
         public PartOIteration3Record()
         {
         }
@@ -167,6 +169,12 @@ namespace SAM.Analytical.UI
         /// for B0.
         /// </summary>
         public List<PartOIteration3EquipmentEvidence> Equipment => [.. equipment];
+
+        /// <summary>
+        /// PR5B (SAM#111): one row per scoped air handling unit in Selected-product-cooling mode (B4) - the
+        /// cooling module resolved for it and what its recirculation branch did. Empty in every other mode.
+        /// </summary>
+        public List<PartOIteration3CoolingEvidence> Cooling => [.. cooling];
 
         //---------------------------------------------------------------------------------------------
         //Scope - SAM #114
@@ -273,6 +281,14 @@ namespace SAM.Analytical.UI
             }
         }
 
+        public void Add(PartOIteration3CoolingEvidence partOIteration3CoolingEvidence)
+        {
+            if (partOIteration3CoolingEvidence is not null)
+            {
+                cooling.Add(partOIteration3CoolingEvidence);
+            }
+        }
+
         public void AddPreparedSystems(IEnumerable<Guid> guids)
         {
             foreach (Guid guid in guids ?? [])
@@ -376,6 +392,12 @@ namespace SAM.Analytical.UI
                 jsonArray_Equipment.Add(partOIteration3EquipmentEvidence.ToJsonObject());
             }
 
+            JsonArray jsonArray_Cooling = [];
+            foreach (PartOIteration3CoolingEvidence partOIteration3CoolingEvidence in cooling)
+            {
+                jsonArray_Cooling.Add(partOIteration3CoolingEvidence.ToJsonObject());
+            }
+
             return new JsonObject
             {
                 { "Schema", Schema },
@@ -394,6 +416,7 @@ namespace SAM.Analytical.UI
                 { "Schema_VentilationUnitCatalogue", Schema_VentilationUnitCatalogue },
                 { "Sha256_VentilationUnitCatalogue", Sha256_VentilationUnitCatalogue },
                 { "Equipment", jsonArray_Equipment },
+                { "Cooling", jsonArray_Cooling },
                 { "Guids_VentilationSystem_Prepared", PartOIteration3Json.Array(guids_VentilationSystem_Prepared) },
                 { "Guids_VentilationSystem_ScopedOut", PartOIteration3Json.Array(guids_VentilationSystem_ScopedOut) },
                 { "Notes_Scope", PartOIteration3Json.Array(notes_Scope) },
@@ -486,6 +509,12 @@ namespace SAM.Analytical.UI
             foreach (JsonObject jsonObject_Equipment in PartOIteration3Json.Objects(jsonObject, "Equipment"))
             {
                 result.Add(PartOIteration3EquipmentEvidence.FromJsonObject(jsonObject_Equipment));
+            }
+
+            //PR5B: absent on every record written before the cooling mode existed, which reads as none.
+            foreach (JsonObject jsonObject_Cooling in PartOIteration3Json.Objects(jsonObject, "Cooling"))
+            {
+                result.Add(PartOIteration3CoolingEvidence.FromJsonObject(jsonObject_Cooling));
             }
 
             foreach (JsonObject jsonObject_Stage in PartOIteration3Json.Objects(jsonObject, "Stages"))
