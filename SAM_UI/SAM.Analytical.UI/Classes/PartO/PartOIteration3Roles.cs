@@ -40,6 +40,9 @@ namespace SAM.Analytical.UI
         /// <summary>The pairing record itself.</summary>
         public const string Record = "Iteration 3 pairing record";
 
+        /// <summary>PR5B: a cooling pairing's hourly recirculation OperatingAirFlow history, per unit.</summary>
+        public const string OperatingAirFlow = "Candidate B OperatingAirFlow history";
+
         /// <summary>
         /// Whether a role names a file that every assessment of its results rewrites - the two TM59
         /// reports.

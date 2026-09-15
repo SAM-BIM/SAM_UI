@@ -145,13 +145,17 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// <summary>PR5A: the fan heat gain policy <see cref="Route"/> was actually handed.</summary>
         internal SystemVentilationFanHeatGainPolicy FanHeatGainPolicy_Route { get; private set; }
 
-        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null)
+        /// <summary>PR5B: the cooling settings <see cref="Materialise"/> was actually handed, null meaning none was passed at all.</summary>
+        internal IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> CoolingSettings_Materialised { get; private set; }
+
+        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = null)
         {
             Called.Add(nameof(Materialise));
 
             AdjacencyCluster_Materialised = adjacencyCluster;
             Spaces_Materialised = [.. spaces ?? []];
             UnitSettings_Materialised = unitSettings;
+            CoolingSettings_Materialised = coolingSettings;
 
             return Materialisation;
         }

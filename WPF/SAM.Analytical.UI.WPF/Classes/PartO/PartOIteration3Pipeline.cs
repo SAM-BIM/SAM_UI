@@ -71,7 +71,13 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public const string Ventilation_Template_ManufacturerAware = "MVRE";
 
-        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null)
+        /// <summary>
+        /// PR5B (SAM#111): <paramref name="coolingSettings"/> - each scoped unit's resolved cooling module - is
+        /// carried to SAM_Systems verbatim and never chooses the topology template: B4 is B0's own
+        /// <c>MV.json</c> ventilation plus the cooling branch, so the template still follows
+        /// <paramref name="unitSettings"/> alone.
+        /// </summary>
+        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = null)
         {
             bool hasUnitSettings = unitSettings is not null && unitSettings.Count != 0;
 
@@ -94,6 +100,7 @@ namespace SAM.Analytical.UI.WPF
                 Name = Name_SystemEnergyCentre,
                 MaterialiseSystemSpaceComponents = false,
                 UnitSettings = unitSettings,
+                CoolingSettings = coolingSettings,
             };
 
             return adjacencyCluster.MechanicalVentilation(systemEnergyCentre, mechanicalVentilationSettings, spaces);

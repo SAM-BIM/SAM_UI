@@ -894,5 +894,49 @@ namespace SAM.Analytical.UI.WPF.Tests
             //Every reason names the unit by identity, never a substituted product.
             Assert.All(partOIteration3Result.Ledger.Reasons, x => Assert.Contains("no selected ventilation unit product", x));
         }
+
+        /// <summary>
+        /// PR5B: the selected-product cooling mode (B4) is all-or-nothing in exactly the same way - a unit with
+        /// no selected product refuses the whole attempt at equipment resolution, nothing is materialised or
+        /// simulated, no cooling row is recorded, and no fan or heat-recovery behaviour is resolved either.
+        /// </summary>
+        [Fact]
+        public void SelectedProductCooling_mode_refuses_the_whole_attempt_when_a_unit_has_no_selected_product()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3PipelineFake partOIteration3PipelineFake = Pipeline_Complete(out List<Guid> _);
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, partOIteration3PipelineFake, default, PartOIteration3BehaviourMode.SelectedProductCooling);
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Equal(PartOIteration3Stage.EquipmentResolution, partOIteration3Result.Ledger.Stage_Refused);
+            Assert.Equal(PartOIteration3BehaviourMode.SelectedProductCooling, partOIteration3Result.Record.BehaviourMode);
+            Assert.Empty(partOIteration3Result.Record.Cooling);
+            Assert.Empty(partOIteration3Result.Record.Equipment);
+
+            partOIteration3PipelineFake.AssertNeverCalled(nameof(IPartOIteration3Pipeline.Materialise), nameof(IPartOIteration3Pipeline.ThermalSource), nameof(IPartOIteration3Pipeline.Route), nameof(IPartOIteration3Pipeline.ResultantTemperatures), nameof(IPartOIteration3Pipeline.Persist));
+
+            Assert.All(partOIteration3Result.Ledger.Reasons, x => Assert.Contains("no selected ventilation unit product", x));
+
+            //The B4 attempt writes under its own project name, so it can never overwrite the B0 control's files.
+            Assert.EndsWith(PartOIteration3Paths.Suffix_CandidateB_Cooling, partOIteration3Result.Record.ProjectName_CandidateB);
+        }
+
+        /// <summary>PR5B: Parity and Selected-product runs hand the materialisation no cooling at all - B0 is untouched by the cooling mode existing.</summary>
+        [Fact]
+        public void Parity_mode_hands_the_materialisation_no_cooling_settings()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3PipelineFake partOIteration3PipelineFake = Pipeline_Complete(out List<Guid> _);
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, partOIteration3PipelineFake);
+
+            Assert.True(partOIteration3Result.IsComplete, string.Join("; ", partOIteration3Result.Ledger.Reasons));
+            Assert.True(partOIteration3PipelineFake.CoolingSettings_Materialised is null || partOIteration3PipelineFake.CoolingSettings_Materialised.Count == 0);
+            Assert.Empty(partOIteration3Result.Record.Cooling);
+            Assert.EndsWith(PartOIteration3Paths.Suffix_CandidateB, partOIteration3Result.Record.ProjectName_CandidateB);
+        }
     }
 }

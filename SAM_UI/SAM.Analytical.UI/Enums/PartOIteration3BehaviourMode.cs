@@ -24,6 +24,14 @@ namespace SAM.Analytical.UI
     /// missing certified data (E1/E2) refuses the whole run rather than silently falling back to B0 for
     /// that one unit.
     /// </para>
+    /// <para>
+    /// <b><see cref="SelectedProductCooling"/> (PR5B, B4) is B0 plus the selected product's cooling
+    /// module, and nothing else.</b> The ventilation stays exactly the foundation control - <c>MV.json</c>,
+    /// no unit settings, <c>ClearToZero</c> - and each scoped unit's already-selected product's published
+    /// cooling table and flow-fraction law are materialised as an internal recirculation branch inside that
+    /// unit's own air system, on its own rooms. B4 - B0 is therefore the cooling layer alone. A unit with no
+    /// selection, an unresolvable reference, or no valid cooling data refuses the whole run.
+    /// </para>
     /// </summary>
     public enum PartOIteration3BehaviourMode
     {
@@ -32,5 +40,8 @@ namespace SAM.Analytical.UI
 
         /// <summary>Every scoped air handling unit's selected product, resolved and applied.</summary>
         [Description("Selected product")] SelectedProduct,
+
+        /// <summary>PR5B: the foundation control plus every scoped unit's selected product's cooling module (B4).</summary>
+        [Description("Selected product cooling module (B0 + cooling)")] SelectedProductCooling,
     }
 }

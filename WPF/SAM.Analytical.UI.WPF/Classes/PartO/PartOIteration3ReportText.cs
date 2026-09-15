@@ -101,6 +101,11 @@ namespace SAM.Analytical.UI.WPF
                     stringBuilder.Append(string.Format(" {0} selected product(s) resolved and recorded.", partOIteration3Record.Equipment.Count));
                 }
 
+                if (partOIteration3Record.Cooling.Count != 0)
+                {
+                    stringBuilder.Append(string.Format(" {0} cooling module(s) resolved, materialised as internal recirculation and evidenced hour by hour.", partOIteration3Record.Cooling.Count));
+                }
+
                 if (partOIteration3Record.Count_AirSystem != 0)
                 {
                     stringBuilder.Append(string.Format(
@@ -264,6 +269,13 @@ namespace SAM.Analytical.UI.WPF
                     stringBuilder.AppendLine(string.Format("Equipment: {0}", partOIteration3EquipmentEvidence));
                     stringBuilder.AppendLine(string.Format("  Fan-power mapping: {0}", partOIteration3EquipmentEvidence.FanPowerSplitRule));
                     stringBuilder.AppendLine(string.Format("  Fan-heat assumption: {0}", partOIteration3EquipmentEvidence.FanHeatGainAssumption));
+                }
+
+                foreach (PartOIteration3CoolingEvidence partOIteration3CoolingEvidence in partOIteration3Result.Record.Cooling)
+                {
+                    stringBuilder.AppendLine(string.Format("Cooling: {0}", partOIteration3CoolingEvidence));
+                    stringBuilder.AppendLine(string.Format("  Table: {0}", partOIteration3CoolingEvidence.Table));
+                    stringBuilder.AppendLine(string.Format("  Declared rules: {0}", partOIteration3CoolingEvidence.DeclaredRules));
                 }
             }
 
@@ -517,6 +529,56 @@ namespace SAM.Analytical.UI.WPF
                     Number(partOIteration3EquipmentEvidence.ExtractFanHeatGainFactor, cultureInfo),
                     partOIteration3EquipmentEvidence.FanPowerSplitRule,
                     partOIteration3EquipmentEvidence.FanHeatGainAssumption));
+            }
+
+            //PR5B: the cooling module per unit - the four airflows kept in four columns, never one another.
+            stringBuilder.AppendLine();
+            stringBuilder.AppendLine("Cooling\tAHU guid\tAir system guid\tAHU\tManufacturer\tModel\tReference\tCooling module\tSource\tCapacity SUP/EXT (l/s)\tDesignAirFlow SUP/EXT (l/s)\tCooling ceiling (l/s)\tLaw (C -> fraction)\tGate (C)\tTable\tTable SHA-256\tOperatingAirFlow min/mean/max (l/s)\tCooling h\tHeating h\tBelow gate h\tCooling below gate h\tOut of range h\tOff law h\tIn published domain h\tAir-side sensible (kWh)\tTable error max (K)\tVentilation deviation max (l/s)\tDeclared rules");
+
+            if (partOIteration3Record.Cooling.Count == 0)
+            {
+                stringBuilder.AppendLine(None);
+            }
+
+            foreach (PartOIteration3CoolingEvidence partOIteration3CoolingEvidence in partOIteration3Record.Cooling)
+            {
+                stringBuilder.AppendLine(string.Format(
+                    cultureInfo,
+                    "\t{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8:0.###} / {9:0.###}\t{10:0.###} / {11:0.###}\t{12:0.###}\t{13:0.###} -> {14:0.###}, {15:0.###} -> {16:0.###}\t{17:0.###}\t{18}\t{19}\t{20:0.###} / {21:0.###} / {22:0.###}\t{23}\t{24}\t{25}\t{26}\t{27}\t{28}\t{29}\t{30:0.#}\t{31:0.######}\t{32:0.####}\t{33}",
+                    partOIteration3CoolingEvidence.Guid_AirHandlingUnit,
+                    partOIteration3CoolingEvidence.Guid_AirSystem,
+                    partOIteration3CoolingEvidence.Name_AirHandlingUnit,
+                    partOIteration3CoolingEvidence.Manufacturer,
+                    partOIteration3CoolingEvidence.Model,
+                    partOIteration3CoolingEvidence.Reference,
+                    partOIteration3CoolingEvidence.CoolingModuleModel,
+                    partOIteration3CoolingEvidence.Source,
+                    partOIteration3CoolingEvidence.MaximumSupplyFlowRate_Lps,
+                    partOIteration3CoolingEvidence.MaximumExtractFlowRate_Lps,
+                    partOIteration3CoolingEvidence.DesignSupplyFlowRate_Lps,
+                    partOIteration3CoolingEvidence.DesignExtractFlowRate_Lps,
+                    partOIteration3CoolingEvidence.MaximumOperatingAirFlow_Lps,
+                    partOIteration3CoolingEvidence.ControlTemperature_Low_C,
+                    partOIteration3CoolingEvidence.FlowFraction_Low,
+                    partOIteration3CoolingEvidence.ControlTemperature_High_C,
+                    partOIteration3CoolingEvidence.FlowFraction_High,
+                    partOIteration3CoolingEvidence.CoolingEnableTemperature_C,
+                    partOIteration3CoolingEvidence.Table,
+                    partOIteration3CoolingEvidence.Sha256_Table,
+                    partOIteration3CoolingEvidence.OperatingAirFlowMinimum_Lps,
+                    partOIteration3CoolingEvidence.OperatingAirFlowMean_Lps,
+                    partOIteration3CoolingEvidence.OperatingAirFlowMaximum_Lps,
+                    partOIteration3CoolingEvidence.Count_Cooling,
+                    partOIteration3CoolingEvidence.Count_Heating,
+                    partOIteration3CoolingEvidence.Count_BelowGate,
+                    partOIteration3CoolingEvidence.Count_GateViolation,
+                    partOIteration3CoolingEvidence.Count_OutOfRange,
+                    partOIteration3CoolingEvidence.Count_OffLaw,
+                    partOIteration3CoolingEvidence.Count_InPublishedDomain,
+                    partOIteration3CoolingEvidence.Cooling_kWh,
+                    partOIteration3CoolingEvidence.MaximumTableError_K,
+                    partOIteration3CoolingEvidence.MaximumCanonicalDeviation_Lps,
+                    partOIteration3CoolingEvidence.DeclaredRules));
             }
 
             stringBuilder.AppendLine();
