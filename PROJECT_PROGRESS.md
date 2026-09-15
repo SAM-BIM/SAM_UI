@@ -1,8 +1,8 @@
 # Project Progress
 
 ## Branch
-`codex/parto-pr5a-ui`, based on `sow/2026-Q3`. The fail-closed PR5A SAM_UI slice is the current work -
-see the *Latest* entry immediately below.
+`feature/parto-pr5b-recirculation-cooling`, based on `sow/2026-Q3` `0daa072d`. The PR5B SAM_UI slice
+(selected-product cooling mode, B4) is the current work - see the *Latest* entry immediately below.
 
 PR #98 (`feature/parto-equipment-selection-ux`) is merged and the Approved Document O iteration
 programme is **FROZEN** - see `PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN` below, which remains the
@@ -11,7 +11,38 @@ authority for the engineering state.
 Everything below the *Latest* entry is superseded history retained for context, and its forward-looking
 claims (branch names, "next step" lists) are historical rather than current.
 
-## LATEST - PART O ITERATION 3 PR5A SAM_UI GENERIC/FAIL-CLOSED SLICE (2026-09-12)
+## LATEST - PART O ITERATION 3 PR5B SAM_UI SELECTED-PRODUCT COOLING MODE (B4) (2026-09-15)
+
+Branch `feature/parto-pr5b-recirculation-cooling` @ `0d1833ed` (+ this docs commit), PR against
+`sow/2026-Q3`, **not merged**. It depends on the SAM_Systems and SAM_Tas PR5B slices, which have the same
+branch name; merge order is SAM_Systems -> SAM_Tas -> SAM_UI. SAM needs no change.
+
+- `PartOIteration3BehaviourMode.SelectedProductCooling` = **B4 = B0 Parity ventilation (`MV.json`, no unit
+  settings, `ClearToZero`) + the selected product's cooling module**, so B4 - B0 is the cooling layer alone.
+  - This is deliberate: the ventilation layers (E1/E2, EDSL) stay evidence-blocked, and the frozen branch
+    no longer sits on the MVRE path.
+  - `documentation/evidence/PR5B-PRODUCTION-ACCEPTANCE.md` §2 has the reconciliation.
+- `Query.PartOIteration3CoolingResolution` resolves the catalogue `PerformanceTable` +
+  `FlowFractionByControlTemperature` into these values:
+  - ceiling = the table's airflow-axis maximum, refused above capacity;
+  - gate = the law's lower temperature.
+  - It is all-or-nothing and never reselects.
+- `PartOIteration3CoolingBindings` binds each row to one branch by AHU guid; `PartOIteration3CoolingOutcomes`
+  records each outcome verbatim from the route's checked evidence.
+- A per-unit `PartOIteration3CoolingEvidence` row is kept in the record, and the report prints it.
+- The `-It3B4` path suffix and an OperatingAirFlow CSV preserve B0's documents.
+- Review refuses: contradictory records, missing provenance, rows not one-per-system, and refused behaviour.
+- The mode is added to the UI picker.
+- Tests: `SAM.Analytical.UI.WPF.Tests` 1027/1027 (+15).
+- Licensed paired annual acceptance through SAM_UI's production resolution:
+  - B0/B4 TM59 8/8 Pass, 0/8 outcome changes;
+  - B0 reproduces PR4's frozen per-room hours;
+  - 0 h cooling below the 22 C gate, 0 h heating;
+  - OperatingAirFlow 36..120 l/s;
+  - B4 vs re-keyed B4 bit-identical.
+  - Full results are in the evidence doc.
+
+## PREVIOUS - PART O ITERATION 3 PR5A SAM_UI GENERIC/FAIL-CLOSED SLICE (2026-09-12)
 
 ### Current status
 
