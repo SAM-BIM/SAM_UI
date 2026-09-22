@@ -30,8 +30,6 @@
     <Reference Include="SAM.Weather.Mollier">
       <HintPath>..\..\..\SAM_Mollier\build\SAM.Weather.Mollier.dll</HintPath>
     </Reference>
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Grasshopper">
