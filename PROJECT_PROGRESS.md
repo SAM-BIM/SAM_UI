@@ -1,8 +1,8 @@
 # Project Progress
 
 ## Branch
-`feature/parto-pr5b-recirculation-cooling`, based on `sow/2026-Q3` `0daa072d`. The PR5B SAM_UI slice
-(selected-product cooling mode, B4) is the current work - see the *Latest* entry immediately below.
+`build/netfx-cleanup-closeout`, based on `sow/2026-Q3` `9f515c4` (PR5B, #103, is merged). See the *Latest* entry
+immediately below; the PR5B SAM_UI slice entry after it is merged history.
 
 PR #98 (`feature/parto-equipment-selection-ux`) is merged and the Approved Document O iteration
 programme is **FROZEN** - see `PART O ITERATIONS 1a / 1b / 2 / 2B - FROZEN` below, which remains the
@@ -11,7 +11,24 @@ authority for the engineering state.
 Everything below the *Latest* entry is superseded history retained for context, and its forward-looking
 claims (branch names, "next step" lists) are historical rather than current.
 
-## LATEST - PART O ITERATION 3 PR5B SAM_UI SELECTED-PRODUCT COOLING MODE (B4) (2026-09-15)
+## LATEST - BUILD: .NET FRAMEWORK LEFTOVER CLEANUP CLOSEOUT (2026-09-22)
+
+Branch `build/netfx-cleanup-closeout`, PR against `sow/2026-Q3`. This closes out the repo-family .NET Framework leftover cleanup ([SAM#126](https://github.com/SAM-BIM/SAM/pull/126) + 17 siblings, merged 2026-09-22).
+
+- Dropped bare framework references from 13 net8.0-windows projects (`Application/*`, `Grasshopper/*`, `SAM_UI/*`, `WPF/*`):
+  - `<Reference Include="System.Data.DataSetExtensions" />` (13 projects) and `<Reference Include="Microsoft.CSharp" />` (13).
+  - `<Reference Include="System.IO.Compression" />` from `SAM_UI/SAM.Geometry.UI` and `WPF/SAM.Analytical.UI.WPF`.
+  - `<Reference Include="PresentationFramework.Aero2" />` from `WPF/SAM.Core.UI.WPF` (`UseWPF` supplies it).
+
+  All of these come from the .NET 8 shared framework, so the bare references were redundant. They caused every MSB3243
+  "no way to resolve conflict" warning in SAM_UI in the full BuildAlls.
+- **Kept on purpose:** the 4 `Application/*/App.config` files. They belong to WinExe applications, the only place an app config is read. The matching `SAM Analytical.dll.config`-style files in `%APPDATA%\SAM` are expected.
+- Validation: full `BuildAlls_v4.bat` clean rebuild with the closeout branches after the `System.Data.DataSetExtensions` /
+  `System.IO.Compression` removal - exit 0, 0 errors, MSB3243 30 -> 15. The remaining 15 were exactly the
+  `Microsoft.CSharp` / `Aero2` references removed afterwards. Re-run after that second removal: exit 0, 0 errors, **0 MSB3243**.
+- Next step: none for this cleanup. The Part O state below is unchanged.
+
+## PREVIOUS - PART O ITERATION 3 PR5B SAM_UI SELECTED-PRODUCT COOLING MODE (B4) (2026-09-15)
 
 Branch `feature/parto-pr5b-recirculation-cooling` @ `0d1833ed` (+ this docs commit), PR against
 `sow/2026-Q3`, **not merged**. It depends on the SAM_Systems and SAM_Tas PR5B slices, which have the same
