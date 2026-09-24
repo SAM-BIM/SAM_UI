@@ -2,7 +2,7 @@
 
 ## Current: Nuaire reply (24 Sep 2026) - exchanger then DX drop, 13 C floor
 
-**Status.** On `feature/parto-nuaire-reply-2026-09-24`. PRs, merged in order: SAM-BIM/SAM#133 -> SAM-BIM/SAM_Systems#29 ->
+**Status.** On `feature/parto-nuaire-reply-2026-09-24`. PRs OPEN (not merged yet; merge in this order): SAM-BIM/SAM#133 -> SAM-BIM/SAM_Systems#29 ->
 SAM-BIM/SAM_Tas#65 -> SAM-BIM/SAM_UI#107. The full cross-repo record (evidence, decisions, TAS probes, MG
 acceptance, residual uncertainties) is in SAM's `PROJECT_PROGRESS.md`, *Current* entry.
 
