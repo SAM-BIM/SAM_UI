@@ -57,7 +57,7 @@ namespace SAM.Analytical.UI.WPF
                 partOPreparationContext.Zones.ForEach(x => { if (x is not null) partORunResume.Guids_Zone.Add(x.Guid); });
                 partORunResume.Guids_VentilationSystem.AddRange(partORun.Guids_VentilationSystem_Prepared);
 
-                File.WriteAllText(path_Resume, partORunResume.ToJsonObject().ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                File.WriteAllText(path_Resume, partORunResume.ToJsonObject().ToJsonString());
             }
             catch (Exception exception)
             {
