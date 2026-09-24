@@ -99,7 +99,7 @@ namespace SAM.Analytical.UI.WPF
 
                 notes.Add(string.Format(
                     CultureInfo.InvariantCulture,
-                    "MANUFACTURER GUIDANCE (provisional, not certified performance): '{0}' uses {1}{2}. Design (Part F requirement carried as design) {3:0.###} l/s supply / {4:0.###} l/s extract; equipment capacity {5:0.###} / {6:0.###} l/s; elevated operating airflow while cooling {7:0.###} l/s each side (stated range {8:0.###}-{9:0.###} l/s). Cooling switched by the {10} above {11:0.###} C; supply while cooling = intake - {12:0.###} K ({13}); bypass/recovery on the extract; exchanger topology MVRE with a supply DX coil.",
+                    "MANUFACTURER GUIDANCE (provisional, not certified performance): '{0}' uses {1}{2}. Design (Part F requirement carried as design) {3:0.###} l/s supply / {4:0.###} l/s extract; equipment capacity {5:0.###} / {6:0.###} l/s; elevated operating airflow while cooling {7:0.###} l/s each side (stated range {8:0.###}-{9:0.###} l/s). Cooling switched by the {10} above {11:0.###} C; supply while cooling = {13}, at {7:0.###} l/s exchanger fraction {12:0.####} (unless bypassed), net coil drop {14:0.###} K, not below {15:0.###} C; bypass/recovery on the unit's own intake and extract sensors, independent of the cooling-stat; exchanger topology MVRE with a supply DX coil.",
                     airHandlingUnit.Name,
                     ventilationUnitReference_Selected,
                     string.IsNullOrWhiteSpace(ventilationUnitTemplate.CoolingModuleModel) ? string.Empty : " + " + ventilationUnitTemplate.CoolingModuleModel,
@@ -112,8 +112,10 @@ namespace SAM.Analytical.UI.WPF
                     strategy.MaximumElevatedAirFlow_Lps,
                     Core.Query.Description(strategy.CoolingActivationSignal).ToLowerInvariant(),
                     strategy.CoolingActivationTemperature_C,
-                    strategy.CoolingSupplyTemperatureRule.IntakeOffset_K(elevated_Lps),
-                    strategy.CoolingSupplyTemperatureRule));
+                    strategy.CoolingSupplyTemperatureRule.ExchangerExtractFraction(elevated_Lps),
+                    strategy.CoolingSupplyTemperatureRule,
+                    strategy.CoolingSupplyTemperatureRule.CoilNetTemperatureDrop_K(elevated_Lps),
+                    strategy.CoolingSupplyTemperatureRule.MinimumSupplyTemperature_C));
             }
 
             return refusals;
