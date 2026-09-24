@@ -269,11 +269,46 @@ namespace SAM.Analytical.UI.WPF
             List<PartOIteration3EquipmentEvidence> equipment = [];
             Dictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = [];
             List<PartOIteration3CoolingEvidence> cooling = [];
+            Dictionary<Guid, MechanicalVentilationGuidanceSettings> guidanceSettings = [];
             SystemVentilationFanHeatGainPolicy fanHeatGainPolicy = SystemVentilationFanHeatGainPolicy.ClearToZero;
 
             if (partOIteration3BehaviourMode == PartOIteration3BehaviourMode.Parity)
             {
                 partOIteration3Ledger.Complete(PartOIteration3Stage.EquipmentResolution, "Parity mode: Candidate B0, unchanged. No product was resolved.");
+            }
+            else if (partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance)
+            {
+                //SAM#123: the selected product operated to its manufacturer's guidance. Everything product-
+                //specific is the catalogue's; the fans stay heat-gain free (ClearToZero) as in B0.
+                VentilationUnitCatalogue ventilationUnitCatalogue = VentilationUnitCatalogue.Read();
+
+                partOIteration3Record.Directory_VentilationUnitCatalogue = ventilationUnitCatalogue.Directory;
+                partOIteration3Record.Path_VentilationUnitCatalogue = ventilationUnitCatalogue.Path;
+                partOIteration3Record.Schema_VentilationUnitCatalogue = ventilationUnitCatalogue.Schema;
+                partOIteration3Record.Sha256_VentilationUnitCatalogue = ventilationUnitCatalogue.Sha256;
+
+                List<string> refusals_Guidance = Query.PartOIteration3GuidanceResolution(
+                    partOIteration3SystemScope.AdjacencyCluster,
+                    ventilationUnitCatalogue,
+                    out guidanceSettings,
+                    out List<string> notes_Guidance);
+
+                if (refusals_Guidance.Count != 0)
+                {
+                    partOIteration3Ledger.Refuse(
+                        PartOIteration3Stage.EquipmentResolution,
+                        "The selected products' manufacturer guidance could not all be resolved.",
+                        refusals_Guidance);
+
+                    return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+                }
+
+                AddNotes(notes, notes_Guidance);
+                partOIteration3Record.AddScopeNotes(notes_Guidance);
+
+                partOIteration3Ledger.Complete(
+                    PartOIteration3Stage.EquipmentResolution,
+                    string.Format("{0} air handling unit(s) resolved to a selected product's manufacturer guidance (provisional, not certified performance).", guidanceSettings.Count));
             }
             else if (partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductCooling)
             {
@@ -359,7 +394,7 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation = iPartOIteration3Pipeline.Materialise(partOIteration3SystemScope.AdjacencyCluster, spaces_Scope, unitSettings, coolingSettings);
+            MechanicalVentilationMaterialisation mechanicalVentilationMaterialisation = iPartOIteration3Pipeline.Materialise(partOIteration3SystemScope.AdjacencyCluster, spaces_Scope, unitSettings, coolingSettings, guidanceSettings);
 
             if (mechanicalVentilationMaterialisation is null || !mechanicalVentilationMaterialisation.IsMaterialised)
             {
@@ -636,6 +671,56 @@ namespace SAM.Analytical.UI.WPF
                     partOIteration3Record.Add(partOIteration3CoolingEvidence);
                     AddNotes(notes, [string.Format("Cooling: {0}", partOIteration3CoolingEvidence)]);
                 }
+            }
+
+            //SAM#123: what each manufacturer-guidance unit did, hour by hour, read back from TAS by the route,
+            //persisted beside the TPD, and summarised into the record so a reopened pairing still states it.
+            if (guidanceSettings.Count != 0)
+            {
+                GuidanceCoolingResults guidanceCoolingResults = systemVentilationRoute.GuidanceCoolingResults;
+                List<string> refusals_Guidance = [];
+                List<string> artifacts_Guidance = [];
+
+                if (guidanceCoolingResults is null || !guidanceCoolingResults.IsComplete || guidanceCoolingResults.Results.Count != guidanceSettings.Count)
+                {
+                    refusals_Guidance.Add(string.Format(
+                        "The route returned {0} manufacturer-guidance operation record(s) for {1} unit(s).",
+                        guidanceCoolingResults?.Results.Count ?? 0,
+                        guidanceSettings.Count));
+                    refusals_Guidance.AddRange(guidanceCoolingResults?.Refusals ?? []);
+                }
+                else
+                {
+                    try
+                    {
+                        File.WriteAllText(partOIteration3Paths.Path_OperatingAirFlow, guidanceCoolingResults.ToCsv());
+
+                        if (partOIteration3Artifacts.TryClaim(partOIteration3Paths.Path_OperatingAirFlow, out string artifact_Guidance, out string refusal_Guidance))
+                        {
+                            artifacts_Guidance.Add(artifact_Guidance);
+                            partOIteration3Record.Add(new PartOIteration3FileRecord(PartOIteration3Roles.GuidanceOperation, partOIteration3Paths.Path_OperatingAirFlow, Length(partOIteration3Paths.Path_OperatingAirFlow), Ticks(partOIteration3Paths.Path_OperatingAirFlow)));
+                        }
+                        else
+                        {
+                            refusals_Guidance.Add(refusal_Guidance);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        refusals_Guidance.Add(string.Format("The manufacturer-guidance operation history could not be written to '{0}'. ({1})", partOIteration3Paths.Path_OperatingAirFlow, exception.Message));
+                    }
+                }
+
+                if (refusals_Guidance.Count != 0)
+                {
+                    partOIteration3Ledger.Refuse(PartOIteration3Stage.ZoneTemperature, "The manufacturer-guidance units' operation could not be recorded.", refusals_Guidance, artifacts_Guidance);
+
+                    return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+                }
+
+                List<string> notes_Operation = guidanceCoolingResults.Results.ConvertAll(x => "MANUFACTURER GUIDANCE operation (TAS read-back): " + x.Summary());
+                AddNotes(notes, notes_Operation);
+                partOIteration3Record.AddScopeNotes(notes_Operation);
             }
 
             partOIteration3Ledger.Complete(

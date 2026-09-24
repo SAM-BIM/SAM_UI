@@ -148,7 +148,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// <summary>PR5B: the cooling settings <see cref="Materialise"/> was actually handed, null meaning none was passed at all.</summary>
         internal IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> CoolingSettings_Materialised { get; private set; }
 
-        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = null)
+        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationGuidanceSettings> guidanceSettings = null)
         {
             Called.Add(nameof(Materialise));
 

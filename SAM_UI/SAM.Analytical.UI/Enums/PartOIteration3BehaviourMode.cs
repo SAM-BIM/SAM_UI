@@ -43,5 +43,14 @@ namespace SAM.Analytical.UI
 
         /// <summary>PR5B: the foundation control plus every scoped unit's selected product's cooling module (B4).</summary>
         [Description("Selected product cooling module (B0 + cooling)")] SelectedProductCooling,
+
+        /// <summary>
+        /// SAM#123: every scoped unit's selected product operated to its manufacturer's modelling guidance -
+        /// the product's own arrangement (exchanger + supply DX coil, MVRE topology), its cooling-stat, its
+        /// elevated supply and extract airflow while cooling and its stated supply-temperature rule, all read
+        /// from the catalogue and grounded natively in TAS. <b>Manufacturer guidance, provisional, not
+        /// certified performance.</b> B0 and B4 are unchanged; this is paired against Reference A like them.
+        /// </summary>
+        [Description("Selected product \u2013 manufacturer guidance")] SelectedProductManufacturerGuidance,
     }
 }

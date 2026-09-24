@@ -59,6 +59,12 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public const string Suffix_CandidateB_Cooling = "-It3B4";
 
+        /// <summary>
+        /// SAM#123: what Candidate B's project name adds to Reference A's when it runs the selected product to its
+        /// manufacturer's guidance - its own documents, beside B0's and B4's.
+        /// </summary>
+        public const string Suffix_CandidateB_ManufacturerGuidance = "-It3BMG";
+
         /// <summary>PR5B: the hourly OperatingAirFlow history a B4 run persists beside its TPD.</summary>
         public const string Suffix_OperatingAirFlow = "-OperatingAirFlow";
 
@@ -68,7 +74,11 @@ namespace SAM.Analytical.UI.WPF
             ProjectName_ReferenceA = projectName_ReferenceA;
             Path_TSD_ReferenceA = path_TSD_ReferenceA;
 
-            ProjectName_CandidateB = string.Concat(projectName_ReferenceA, partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductCooling ? Suffix_CandidateB_Cooling : Suffix_CandidateB);
+            ProjectName_CandidateB = string.Concat(
+                projectName_ReferenceA,
+                partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductCooling ? Suffix_CandidateB_Cooling
+                : partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance ? Suffix_CandidateB_ManufacturerGuidance
+                : Suffix_CandidateB);
             Path_OperatingAirFlow = Path.Combine(outputDirectory, ProjectName_CandidateB + Suffix_OperatingAirFlow + ".csv");
             ProjectName_Bridge = string.Concat(ProjectName_CandidateB, Suffix_Bridge);
 

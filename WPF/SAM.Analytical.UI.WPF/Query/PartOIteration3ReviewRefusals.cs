@@ -162,6 +162,27 @@ namespace SAM.Analytical.UI.WPF
                     }
                 }
             }
+            else if (partOIteration3Record.BehaviourMode == PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance)
+            {
+                //SAM#123: manufacturer guidance resolves no certified fan or heat-recovery figure and no B4 module.
+                if (partOIteration3Record.Equipment.Count != 0)
+                {
+                    result.Add("This pairing calls itself the selected product to manufacturer guidance but records certified fan or heat-recovery behaviour, so the record contradicts itself.");
+
+                    return result;
+                }
+
+                if (partOIteration3Record.IsComplete
+                    && (string.IsNullOrWhiteSpace(partOIteration3Record.Directory_VentilationUnitCatalogue)
+                        || string.IsNullOrWhiteSpace(partOIteration3Record.Path_VentilationUnitCatalogue)
+                        || string.IsNullOrWhiteSpace(partOIteration3Record.Schema_VentilationUnitCatalogue)
+                        || string.IsNullOrWhiteSpace(partOIteration3Record.Sha256_VentilationUnitCatalogue)))
+                {
+                    result.Add("This completed manufacturer-guidance pairing does not record the catalogue directory, file, schema and SHA-256 it resolved, so its guidance has no complete provenance.");
+
+                    return result;
+                }
+            }
             else if (partOIteration3Record.IsComplete)
             {
                 if (string.IsNullOrWhiteSpace(partOIteration3Record.Directory_VentilationUnitCatalogue)

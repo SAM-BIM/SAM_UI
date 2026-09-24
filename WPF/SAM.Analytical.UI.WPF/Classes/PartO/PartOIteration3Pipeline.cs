@@ -77,11 +77,13 @@ namespace SAM.Analytical.UI.WPF
         /// <c>MV.json</c> ventilation plus the cooling branch, so the template still follows
         /// <paramref name="unitSettings"/> alone.
         /// </summary>
-        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = null)
+        public MechanicalVentilationMaterialisation Materialise(AdjacencyCluster adjacencyCluster, IEnumerable<Space> spaces, IReadOnlyDictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = null, IReadOnlyDictionary<Guid, MechanicalVentilationGuidanceSettings> guidanceSettings = null)
         {
             bool hasUnitSettings = unitSettings is not null && unitSettings.Count != 0;
+            bool hasGuidanceSettings = guidanceSettings is not null && guidanceSettings.Count != 0;
 
-            string ventilationTemplate = hasUnitSettings ? Ventilation_Template_ManufacturerAware : Ventilation_Template;
+            //SAM#123: a manufacturer-guidance unit is the product's own arrangement, which has an exchanger.
+            string ventilationTemplate = hasUnitSettings || hasGuidanceSettings ? Ventilation_Template_ManufacturerAware : Ventilation_Template;
 
             SystemEnergyCentre systemEnergyCentre = new SystemTemplate(ventilationTemplate, null, null, null, null, null).SystemEnergyCentre();
 
@@ -101,6 +103,7 @@ namespace SAM.Analytical.UI.WPF
                 MaterialiseSystemSpaceComponents = false,
                 UnitSettings = unitSettings,
                 CoolingSettings = coolingSettings,
+                GuidanceSettings = guidanceSettings,
             };
 
             return adjacencyCluster.MechanicalVentilation(systemEnergyCentre, mechanicalVentilationSettings, spaces);
