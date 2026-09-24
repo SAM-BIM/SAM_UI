@@ -43,6 +43,9 @@ namespace SAM.Analytical.UI
         /// <summary>PR5B: a cooling pairing's hourly recirculation OperatingAirFlow history, per unit.</summary>
         public const string OperatingAirFlow = "Candidate B OperatingAirFlow history";
 
+        /// <summary>SAM#123: a manufacturer-guidance pairing's hourly operation read back from TAS, per unit.</summary>
+        public const string GuidanceOperation = "Candidate B manufacturer-guidance operation history";
+
         /// <summary>
         /// Whether a role names a file that every assessment of its results rewrites - the two TM59
         /// reports.

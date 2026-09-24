@@ -1,5 +1,105 @@
 # Project Progress
 
+## Current: SAM#123 manufacturer guidance - Iteration 3 mode "Selected product - manufacturer guidance" (2026-09-24)
+
+**Final integration review (2026-09-24, before merge).** One consolidated review of all four branches
+against `sow/2026-Q3`; no blockers, no code changed at review.
+- Each branch merges into current `sow/2026-Q3` without conflicts. The diffs are limited to the #123 guidance
+  scope. The new public surface is additive, and a template, settings or route without guidance serialises
+  and materialises as before.
+- Local tests on the branch heads: SAM.Tests 2218/2218, SAM.Analytical.Systems.Tests 251/251,
+  SAM.Analytical.Tas.TM59.Tests 938/938 (7 guidance-cooling), SAM.Analytical.UI.WPF.Tests 1031/1031.
+  SAM#125 and SAM_Systems#25 CI green.
+- Evidence re-checked on disk:
+  - B0 TM59 reports equal the 2026-09-23 ones except the `Source:` path line.
+  - The Resume MG TM59 report equals the in-session MG one except the path line. The hourly comparison agrees
+    to 3 d.p. (bias 0.5672 vs 0.5674 K). It is not bit-identical, because Resume ran a fresh 1a.
+- Non-blocking findings (JSON edge cases, read-back strictness, stale comments, test gaps) are in
+  [SAM#130](https://github.com/SAM-BIM/SAM/issues/130). They were deliberately not fixed, so that the merged code is
+  the accepted code.
+- The DisplacementVent wet-room issue is [SAM#129](https://github.com/SAM-BIM/SAM/issues/129). It is not changed here.
+- Wording: "certified" appears only in negations; values stay PROVISIONAL pending Nuaire.
+
+**Status.** The work is implemented and accepted on the representative model. All values are provisional
+Nuaire guidance; Nuaire was emailed and has not yet confirmed. Nothing is merged. The branch is
+`feature/parto-nuaire-manufacturer-guidance` in SAM (PR #125), SAM_Systems (PR #25), SAM_Tas (new) and
+SAM_UI (new). Merge order: SAM -> SAM_Systems -> SAM_Tas -> SAM_UI.
+
+**Where it came from.**
+- The Stage 11 TAS prototype passed. Its evidence is under
+  `C:\TasOut\nuaire-guidance\REVIEW2\resume-2026-09-23\evidence\stage11\`.
+- Stage 11b, the production correction, was found on the real model:
+  - Controlled dampers do not converge when a supplied room's only outlet is a transfer damper
+    (MVHR-02/03: more than 20 min for one day, against 3 s with the controllers pinned).
+  - The elevated airflow is now carried on the fans, with the dampers uncontrolled at their elevated share.
+    Room-stat controllers drive the supply and extract fans with Min = (design/elevated)^2, because a
+    controlled fan's airflow goes as the square root of its signal.
+
+**Per repo.**
+- **SAM:**
+  - `SupplyTemperatureRule.IntakeOffset`: `to - X(Q)`, Refuse outside the stated airflows, with reported
+    domain use.
+  - `CoolingActivationSignal` (room / extract).
+  - A room-stat bypass keeps the rule's extract <= activation condition.
+- **SAM_Systems:**
+  - The Nuaire entry uses IntakeOffset 70/80/90/100/110 -> 15/14.5/14/13.5/13 K. There is no 16 C floor
+    (Nuaire, 13 Aug 2025), activation is on the room stat, and the entry is marked PROVISIONAL.
+  - `GuidanceSettings` materialisation: MVRE plus a supply DX coil after the exchanger.
+  - `MechanicalVentilationGuidanceCooling` is the record the TAS grounding reads.
+  - `Query.MechanicalVentilationGuidanceSettings`: the elevated airflow is the midpoint of the stated range
+    (80 l/s), refused above unit capacity.
+- **SAM_Tas:**
+  - `Modify.GroundGuidanceCooling` writes and reads back:
+    - DX room-stat controller: Studio/Bedroom zone, `SensorArc1`, 22.05 / 0.1 K;
+    - fan controllers;
+    - uncontrolled exchanger with an (ODB, EDB2, EFlow) state table;
+    - DX: finite 2200 W (the table's max combined capacity), no gates, `MinimumOffcoil = to - 14.5`.
+  - A disagreement refuses the grounding.
+  - `Modify.GuidanceCoolingResults` gives the hourly read-back.
+- **SAM_UI:**
+  - New mode `SelectedProductManufacturerGuidance`, with `-It3BMG` files, a resolution step with no product
+    constants, and the operation CSV and summaries persisted in the record.
+  - Review-consistency branch for the mode.
+  - Separately: Iteration 3 can start from a completed 1a reopened in a later session.
+    `<project>.prepared.sam` and `<project>.partorun.json` are bound to the TSD, so there is no need to
+    re-run Prepare & Run.
+
+**Acceptance (2026-09-24, real `SAM Analytical.exe`, `SAM_zoningAM-CIBSEfutureZ1.sam` a7e09a25, DSY1 2050s).**
+Evidence is in `C:\TasOut\parto-guidance-2026-09-24\`, outside git.
+- **B0 on the new binaries:** COMPLETE. Both TM59 reports are byte-identical to 2026-09-23; bias 0.05 K,
+  RMSE 0.736 K. So B0 is unchanged.
+- **MG:** COMPLETE in 11.7 min, A Fail / B Fail. TM59 >26 C hours against A:
+  - Studio -68 and bedrooms -101 / -96, where B0 is -6 / +8 / +12;
+  - kitchens -38;
+  - wet rooms -284 to -471 (Bathroom_2 becomes a Pass).
+  - Annual mean bias +0.57 K, RMSE 1.48 K, from heat recovery outside cooling. The DisplacementVent-inflated
+    extract (3.5-6 kh extract > 22 C while room <= 22 C) suppresses bypass. It is a model-hygiene decision
+    and not changed here.
+- **MG TAS read-back, per unit (design -> elevated):**
+  - MVHR-01: 30 -> 80 l/s, supply = extract (< 0.02 l/s). `to - 14.5` is exact in 849/849 full-flow cooling
+    hours that are not capacity-limited. 122 h are at the 2.2 kW total-duty bound.
+  - MVHR-02/03: 63 -> 80 l/s. The law holds in 699/700 and 692/693 such hours; 85 h are capacity-limited.
+  - All units: minimum supply 7.3 C; the stat room peaks at 36.9-39.3 C in a 40 C intake heatwave, with the
+    supply at exactly `to - 14.5`.
+- **Reopen:** a new session opened the saved 1a run and reviewed the MG pairing in 10.8 s with no simulation.
+- **Resume:** a fresh 1a wrote its sidecar. A new session then opened that saved 1a run and ran Iteration 3
+  (MG) with no Prepare & Run, COMPLETE in 14.0 min. The comparison matches the in-session MG run to 3 d.p.
+  (bias 0.567 K, RMSE 1.477 K, max 4.121 K). Evidence: `C:\TasOut\parto-guidance-2026-09-24\03-Resume\`.
+- **Installed state changed on this machine:**
+  - `Documents\SAM\resources\...\VentilationUnitCatalogue.JSON` is now the v3 feature catalogue. The v1
+    backup is at `C:\TasOut\parto-guidance-2026-09-24\catalogue-backup\documents-SAM-before.json`. Restore it
+    before running `sow` binaries.
+  - `%APPDATA%\SAM\SAM.Analytical.dll`/`SAM.Core.dll` and `SAM.ghlink` were overwritten by a `SAM.sln`
+    build on 2026-09-24 09:44. Redeploy from `sow` to restore Grasshopper.
+
+**Exact next step.**
+1. Review the four `feature/parto-nuaire-manufacturer-guidance` branches.
+2. Merge in order: SAM#125 -> SAM_Systems#25 -> SAM_Tas -> SAM_UI. SAM_Tas and SAM_UI have no PR yet;
+   open them against `sow/2026-Q3`.
+3. Hold any "certified" wording until Nuaire replies (stat location, X vs airflow, low-ambient behaviour,
+   30 l/s).
+4. Separately decide the DisplacementVent hygiene for transfer-fed wet rooms (it affects every mode).
+
 ## Branch
 `build/netfx-cleanup-closeout`, based on `sow/2026-Q3` `9f515c4` (PR5B, #103, is merged). See the *Latest* entry
 immediately below; the PR5B SAM_UI slice entry after it is merged history.
