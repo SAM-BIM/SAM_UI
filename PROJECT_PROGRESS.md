@@ -2,8 +2,8 @@
 
 ## Current: Nuaire reply (24 Sep 2026) - exchanger then DX drop, 13 C floor
 
-**Status.** On `feature/parto-nuaire-reply-2026-09-24`. PRs OPEN (not merged yet; merge in this order): SAM-BIM/SAM#133 -> SAM-BIM/SAM_Systems#29 ->
-SAM-BIM/SAM_Tas#65 -> SAM-BIM/SAM_UI#107. The full cross-repo record (evidence, decisions, TAS probes, MG
+**Status.** MERGED into `sow/2026-Q3` on 2026-09-24, in order: SAM-BIM/SAM#133 (`54c43438`) -> SAM-BIM/SAM_Systems#29 (`c88c9b37`) -> SAM-BIM/SAM_Tas#65 (`1b659756`) -> SAM-BIM/SAM_UI#107 (`8f58144c`). CI green and Codex review clean (all findings fixed and answered) on every PR. The `feature/parto-nuaire-reply-2026-09-24` branches are deleted.
+The full cross-repo record (evidence, decisions, TAS probes, MG
 acceptance, residual uncertainties) is in SAM's `PROJECT_PROGRESS.md`, *Current* entry.
 
 **What Nuaire's reply (A. Nash, 24 Sep 2026) changed.**
@@ -30,7 +30,7 @@ in all four repos.
   12.0 C, background hours) and extracts above 45 C (none in the MG).
 - This is manufacturer modelling guidance; Nuaire has not called it certified or approved.
 
-**Next step.** After merge, delete the branches and bump the SAM_Deploy pointers. Remaining manufacturer questions
+**Next step.** Bump the SAM_Deploy pointers to the merge commits above. Remaining manufacturer questions
 are listed in SAM's `PROJECT_PROGRESS.md`.
 
 
