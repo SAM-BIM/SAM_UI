@@ -111,9 +111,9 @@ namespace SAM.Analytical.UI.WPF
             {
                 refusal_Run = resultsRefusal ?? "This Part O run's results are no longer available, so there is no Reference A to compare against.";
             }
-            else if (partORun.IsRestored)
+            else if (partORun.IsRestored && !partORun.CanResumeIteration3)
             {
-                refusal_Run = "This Part O run was reopened from a saved model, so it records what was run but not how this session prepared it - there is no thermal case to reproduce and no record of which ventilation systems the iteration built. A reopened run can review an existing Iteration 3 pairing but cannot start a new one. Prepare and run Iteration 1a in this session to produce one.";
+                refusal_Run = "This Part O run was reopened from a saved model without a usable saved preparation beside it, so there is no thermal case to reproduce and no record of which ventilation systems the iteration built. A reopened run can review an existing Iteration 3 pairing but cannot start a new one. " + (partORun.ResumeRefusal ?? "Prepare and run Iteration 1a to produce one.");
             }
             else if (partORun.SimulationContext is null)
             {

@@ -237,6 +237,16 @@ namespace SAM.Analytical.UI
         public bool IsRestored { get; private set; }
 
         /// <summary>
+        /// Whether this restored run also carries, beside its results, how it was prepared and the case it ran as
+        /// (a <see cref="PartORunResume"/> bound to these results and a matching prepared model) - so Iteration 3
+        /// can be started from it without re-running Prepare &amp; Run. Iteration 2B stays unavailable.
+        /// </summary>
+        public bool CanResumeIteration3 { get; private set; }
+
+        /// <summary>Why a restored run could not be resumed for Iteration 3, or null.</summary>
+        public string ResumeRefusal { get; private set; }
+
+        /// <summary>
         /// Announces that the next model replacement is this run's own, so it is not read as an outside edit.
         /// One shot: it is consumed by the next <see cref="NotifyModified"/> and must be re-armed for the next
         /// write.
@@ -838,7 +848,101 @@ namespace SAM.Analytical.UI
             IsRestored = true;
             InvalidationReason = null;
 
+            CanResumeIteration3 = TryResume(analyticalModel, simulationResultProvenance, path_TSD, out string refusal_Resume);
+            ResumeRefusal = refusal_Resume;
+
             OnStateChanged();
+
+            return true;
+        }
+
+        /// <summary>
+        /// Adopts the preparation and case a completed run saved beside its results, where they are provably this
+        /// run's: the sidecar names these results' TSD by length and write time, and the prepared model beside it
+        /// still has the fingerprint it was saved with. Anything else leaves the run review-only, with the reason.
+        /// </summary>
+        private bool TryResume(AnalyticalModel analyticalModel, SimulationResultProvenance simulationResultProvenance, string path_TSD, out string refusal)
+        {
+            refusal = null;
+
+            PartORunResume partORunResume = PartORunResume.Read(PartORunResume.Path_Resume(path_TSD));
+            if (partORunResume is null)
+            {
+                refusal = "No saved preparation was found beside these results (runs completed before this was recorded, or on another build), so Iteration 3 needs Iteration 1a prepared and run in this session.";
+                return false;
+            }
+
+            if (partORunResume.Length_TSD != simulationResultProvenance.Length_TSD || partORunResume.Timestamp_TSD != simulationResultProvenance.Timestamp_TSD)
+            {
+                refusal = "The saved preparation beside these results belongs to a different simulation of them, so it is not used.";
+                return false;
+            }
+
+            string path_Prepared = PartORunResume.Path_PreparedModel(path_TSD);
+            AnalyticalModel analyticalModel_Prepared_Temp = null;
+            try
+            {
+                List<AnalyticalModel> analyticalModels = System.IO.File.Exists(path_Prepared) ? Core.Convert.ToSAM<AnalyticalModel>(path_Prepared) : null;
+                analyticalModel_Prepared_Temp = analyticalModels is not null && analyticalModels.Count == 1 ? analyticalModels[0] : null;
+            }
+            catch
+            {
+                analyticalModel_Prepared_Temp = null;
+            }
+
+            if (analyticalModel_Prepared_Temp is null || SimulationResultProvenance.Fingerprint(analyticalModel_Prepared_Temp) != partORunResume.Fingerprint_PreparedModel)
+            {
+                refusal = string.Format("The prepared model saved beside these results ('{0}') is missing or no longer the one they were prepared from, so it is not used.", path_Prepared);
+                return false;
+            }
+
+            AdjacencyCluster adjacencyCluster = analyticalModel_Prepared_Temp.AdjacencyCluster;
+            List<Zone> zones = [];
+            foreach (System.Guid guid in partORunResume.Guids_Zone)
+            {
+                Zone zone = adjacencyCluster?.GetObject<Zone>(guid);
+                if (zone is null)
+                {
+                    refusal = "A dwelling zone the saved preparation names is not in the saved prepared model, so it is not used.";
+                    return false;
+                }
+
+                zones.Add(zone);
+            }
+
+            foreach (System.Guid guid in partORunResume.Guids_VentilationSystem)
+            {
+                if (adjacencyCluster?.GetObject<VentilationSystem>(guid) is null)
+                {
+                    refusal = "A ventilation system the saved preparation built is not in the saved prepared model, so it is not used.";
+                    return false;
+                }
+            }
+
+            if (!System.Enum.TryParse(partORunResume.SolarCalculationMethod, out SolarCalculationMethod solarCalculationMethod))
+            {
+                refusal = "The saved case states a solar calculation method this build does not know, so it is not used.";
+                return false;
+            }
+
+            analyticalModel.TryGetValue(Analytical.AnalyticalModelParameter.WeatherData, out Weather.WeatherData weatherData);
+
+            analyticalModel_Prepared = analyticalModel_Prepared_Temp;
+            guids_VentilationSystem_Prepared = [.. partORunResume.Guids_VentilationSystem];
+            partOPreparationContext = new PartOPreparationContext(partORunResume.PartOIteration, zones, [], null);
+            partOSimulationContext = new PartOSimulationContext(
+                System.IO.Path.GetDirectoryName(path_TSD),
+                System.IO.Path.GetFileNameWithoutExtension(path_TSD),
+                weatherData,
+                solarCalculationMethod,
+                partORunResume.SimulateFrom,
+                partORunResume.SimulateTo)
+            {
+                UnmetHours = partORunResume.UnmetHours,
+                Sizing = partORunResume.Sizing,
+                UseWidths = partORunResume.UseWidths,
+                UpdateConstructionLayersByPanelType = partORunResume.UpdateConstructionLayersByPanelType,
+            };
 
             return true;
         }
@@ -923,6 +1027,8 @@ namespace SAM.Analytical.UI
             dateTime_TSD = default;
             modificationExpected = false;
             IsRestored = false;
+            CanResumeIteration3 = false;
+            ResumeRefusal = null;
 
             //Cleared with everything else: a dropped run's preparation inputs and TAS case must not be
             //picked up by its successor, which was prepared and simulated differently.

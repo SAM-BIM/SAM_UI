@@ -536,6 +536,16 @@ namespace SAM.Analytical.UI.WPF
                     {
                         notes.Add(note_Persistence);
                     }
+
+                    //And what a later session needs to start Iteration 3 from these results without re-running
+                    //Prepare & Run - the prepared model and a sidecar bound to these results (PartORunResume).
+                    result.TryGetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, out SimulationResultProvenance simulationResultProvenance_Resume);
+                    Modify.PersistPartORunResume(partORun, partOSimulationContext, simulationResultProvenance_Resume, path_TSD, out string note_Resume);
+
+                    if (!string.IsNullOrWhiteSpace(note_Resume))
+                    {
+                        notes.Add(note_Resume);
+                    }
                 }
             }
 
