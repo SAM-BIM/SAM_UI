@@ -3,7 +3,7 @@
 Branch `feature/parto-review-iteration-2026-09-25`, from `sow/2026-Q3` `a3b38ee`. Real exe
 (`SAM_UI\build\SAM Analytical.exe`), fresh copy of `SAM_zoningAM-CIBSEfutureZ1.sam` (3 dwellings, 8 spaces), driven by
 UI Automation + PrintWindow. Driver: `C:\TasOut\parto-review-iteration-2026-09-25\scripts\review.ps1` (outside git;
-adapted from the journey-review driver). Full log: `live-acceptance.log`.
+adapted from the journey-review driver). Full log, outside git: `C:\TasOut\parto-review-iteration-2026-09-25\journey-prepare.log`.
 
 **No TAS run was started.** Each route went Hub → Prepare & Run → Review iteration → captured → **Cancel**. The
 production path after "Accept & Run TAS" is covered by `PartOReviewIterationTests.Accept_follows_the_production_adoption`
