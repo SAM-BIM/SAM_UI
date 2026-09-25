@@ -1,0 +1,59 @@
+<Window x:Class="SAM.Analytical.UI.WPF.PartOProgressWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Part O" Width="520" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="True"
+        FontFamily="Roboto Light" WindowStartupLocation="CenterScreen">
+    <!-- One window for the whole of a long Part O operation. It lives on its own UI thread, so it keeps
+         painting and its elapsed time keeps ticking while TAS holds the application's own thread for
+         minutes. It shows what is actually known - which stage is running, which finished and how long each
+         took - and never a percentage: TAS reports none. -->
+    <Grid Margin="14,12,14,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="textBlock_Heading" Grid.Row="0" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock x:Name="textBlock_Subheading" Grid.Row="1" Margin="0,2,0,0" Foreground="#555555" TextWrapping="Wrap"/>
+
+        <ItemsControl x:Name="itemsControl_Stages" Grid.Row="2" Margin="0,12,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="0,2,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="22"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding Glyph}" Foreground="{Binding Foreground}" FontWeight="Bold"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{Binding Foreground}" FontWeight="{Binding FontWeight}"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Duration}" Foreground="#666666"/>
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock x:Name="textBlock_Detail" Grid.Row="3" Margin="22,4,0,0" Foreground="#555555" FontStyle="Italic" TextWrapping="Wrap"/>
+
+        <ProgressBar x:Name="progressBar" Grid.Row="4" Height="4" Margin="0,10,0,0" IsIndeterminate="True"/>
+
+        <Grid Grid.Row="5" Margin="0,6,0,0">
+            <TextBlock x:Name="textBlock_Elapsed" HorizontalAlignment="Left" Foreground="#333333"/>
+        </Grid>
+
+        <Grid Grid.Row="6" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="textBlock_Note" Grid.Column="0" TextWrapping="Wrap" Foreground="#777777" FontSize="11" Margin="0,0,10,0"
+                       Text="TAS does not report progress inside a simulation, so no percentage is shown. Cancel stops before the next stage; a TAS simulation already running finishes first."/>
+            <Button x:Name="button_Cancel" Grid.Column="1" MinWidth="80" Height="24" Padding="8,0" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
+        </Grid>
+    </Grid>
+</Window>

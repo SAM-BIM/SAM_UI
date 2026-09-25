@@ -76,9 +76,40 @@ namespace SAM.Analytical.UI.WPF
         /// product before materialising. Placed after <paramref name="cancellationToken"/>, both optional,
         /// so every existing positional call site - which passes at most three arguments - is unaffected.
         /// </param>
-        public static PartOIteration3Result RunPartOIteration3(PartORun partORun, IPartOIteration3Pipeline iPartOIteration3Pipeline, CancellationToken cancellationToken = default, PartOIteration3BehaviourMode partOIteration3BehaviourMode = PartOIteration3BehaviourMode.Parity)
+        /// <param name="stageStarting">
+        /// Told which ledger stage is about to start - for a progress window, which is the only reason it
+        /// exists. It observes; nothing it does can change the run.
+        /// <para>
+        /// <b>Cancellation is between stages</b>, and only there: <paramref name="cancellationToken"/> is
+        /// checked as each of the long stages is about to start (the thermal source, the Systems route, the
+        /// resultant temperature and Candidate B's assessment). A TAS call already in flight is never
+        /// interrupted. A cancelled run is a refusal at the stage it did not start, recorded like any other,
+        /// so it never makes the method reviewable and can simply be run again.
+        /// </para>
+        /// </param>
+        public static PartOIteration3Result RunPartOIteration3(PartORun partORun, IPartOIteration3Pipeline iPartOIteration3Pipeline, CancellationToken cancellationToken = default, PartOIteration3BehaviourMode partOIteration3BehaviourMode = PartOIteration3BehaviourMode.Parity, Action<PartOIteration3Stage> stageStarting = null)
         {
             PartOIteration3Ledger partOIteration3Ledger = new();
+
+            //Announces a stage and, for the long ones, honours a cancel requested before it starts.
+            bool Starting(PartOIteration3Stage partOIteration3Stage, bool cancellable = false)
+            {
+                stageStarting?.Invoke(partOIteration3Stage);
+
+                if (!cancellable || !cancellationToken.IsCancellationRequested)
+                {
+                    return true;
+                }
+
+                partOIteration3Ledger.Refuse(
+                    partOIteration3Stage,
+                    "Cancelled.",
+                    [string.Format("The run was cancelled before '{0}' started, so no comparison was produced. It can be run again.", Core.Query.Description(partOIteration3Stage))]);
+
+                return false;
+            }
+
+            stageStarting?.Invoke(PartOIteration3Stage.Input);
 
             PartOIteration3Record partOIteration3Record = new()
             {
@@ -170,6 +201,8 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Reference A
             //=================================================================================================
+            Starting(PartOIteration3Stage.ReferenceA);
+
             if (!analyticalModel_ReferenceA.TryGetValue(Analytical.AnalyticalModelParameter.SimulationResultProvenance, out SimulationResultProvenance simulationResultProvenance) || simulationResultProvenance is null || !simulationResultProvenance.IsComplete)
             {
                 partOIteration3Ledger.Refuse(
@@ -218,6 +251,8 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Reference A TM59 - the UNCHANGED authority, with its resultant temperatures captured
             //=================================================================================================
+            Starting(PartOIteration3Stage.ReferenceATM59);
+
             PartOIteration3Assessment partOIteration3Assessment_A = iPartOIteration3Pipeline.Assess(analyticalModel_ReferenceA, path_TSD_ReferenceA, overheatingScenarios, guids_Space_Dwelling);
 
             if (partOIteration3Assessment_A is null || !partOIteration3Assessment_A.IsAssessed)
@@ -243,6 +278,8 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //System scope - SAM #114
             //=================================================================================================
+            Starting(PartOIteration3Stage.SystemScope);
+
             PartOIteration3SystemScope partOIteration3SystemScope = Query.PartOIteration3SystemScope(adjacencyCluster_Prepared, partORun.Guids_VentilationSystem_Prepared, guids_Space_Dwelling);
 
             if (!partOIteration3SystemScope.IsScoped)
@@ -265,6 +302,8 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Equipment resolution - PR5A (SAM#111 plan §J). A no-op in Parity mode.
             //=================================================================================================
+            Starting(PartOIteration3Stage.EquipmentResolution);
+
             Dictionary<Guid, MechanicalVentilationUnitSettings> unitSettings = [];
             List<PartOIteration3EquipmentEvidence> equipment = [];
             Dictionary<Guid, MechanicalVentilationCoolingSettings> coolingSettings = [];
@@ -291,7 +330,8 @@ namespace SAM.Analytical.UI.WPF
                     partOIteration3SystemScope.AdjacencyCluster,
                     ventilationUnitCatalogue,
                     out guidanceSettings,
-                    out List<string> notes_Guidance);
+                    out List<string> notes_Guidance,
+                    out List<PartOIteration3GuidanceEvidence> guidanceEvidence);
 
                 if (refusals_Guidance.Count != 0)
                 {
@@ -305,6 +345,11 @@ namespace SAM.Analytical.UI.WPF
 
                 AddNotes(notes, notes_Guidance);
                 partOIteration3Record.AddScopeNotes(notes_Guidance);
+
+                foreach (PartOIteration3GuidanceEvidence partOIteration3GuidanceEvidence in guidanceEvidence)
+                {
+                    partOIteration3Record.Add(partOIteration3GuidanceEvidence);
+                }
 
                 partOIteration3Ledger.Complete(
                     PartOIteration3Stage.EquipmentResolution,
@@ -383,6 +428,8 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Materialisation - SAM_Systems
             //=================================================================================================
+            Starting(PartOIteration3Stage.Materialisation);
+
             List<Space> spaces_Scope = [];
             foreach (Guid guid in guids_Space_Dwelling)
             {
@@ -450,6 +497,11 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Thermal source - SAM_Tas, the same case as Reference A with no mechanical ventilation of its own
             //=================================================================================================
+            if (!Starting(PartOIteration3Stage.ThermalSource, true))
+            {
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
             PartOSimulationContext partOSimulationContext_CandidateB = partOSimulationContext.Copy(partOIteration3Paths.ProjectName_CandidateB);
 
             NoIzamThermalSource noIzamThermalSource = iPartOIteration3Pipeline.ThermalSource(
@@ -519,6 +571,11 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Systems conversion, simulation and zone temperature - SAM_Tas, one call, three stages
             //=================================================================================================
+            if (!Starting(PartOIteration3Stage.SystemsConversion, true))
+            {
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
             int startHour = 0;
             int endHour = PartOSimulationContext.HourCount_FullYear - 1;
 
@@ -734,6 +791,11 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Resultant temperature - SAM_Tas' replaceable provider
             //=================================================================================================
+            if (!Starting(PartOIteration3Stage.ResultantTemperature, true))
+            {
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
             ResultantTemperatureResults resultantTemperatureResults = iPartOIteration3Pipeline.ResultantTemperatures(systemVentilationRoute, partOIteration3Paths.Path_TBD_Bridge);
 
             if (resultantTemperatureResults is null || !resultantTemperatureResults.IsComplete)
@@ -774,6 +836,11 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Candidate B TM59 - the SAME unchanged authority, over the bridge results
             //=================================================================================================
+            if (!Starting(PartOIteration3Stage.CandidateBTM59, true))
+            {
+                return Result(partOIteration3Ledger, partOIteration3Record, null, null, null, partOIteration3Paths, notes);
+            }
+
             List<Guid> guids_Space_Bound = [];
             foreach (SystemVentilationBinding systemVentilationBinding in systemVentilationBindings)
             {
@@ -822,6 +889,8 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Reconciliation - guid only, fail closed
             //=================================================================================================
+            Starting(PartOIteration3Stage.Reconciliation);
+
             List<string> refusals_Reconciliation = Query.PartOIteration3ReconciliationRefusals(
                 adjacencyCluster_Prepared,
                 partOIteration3SystemScope,
@@ -868,6 +937,8 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Comparison - descriptive statistics, no parity threshold
             //=================================================================================================
+            Starting(PartOIteration3Stage.Comparison);
+
             PartOIteration3Comparison partOIteration3Comparison = PartOIteration3Comparison.Create(
                 rooms_Comparable,
                 partOIteration3Assessment_A.ResultantTemperatures,
@@ -889,6 +960,8 @@ namespace SAM.Analytical.UI.WPF
             //=================================================================================================
             //Persistence
             //=================================================================================================
+            Starting(PartOIteration3Stage.Persistence);
+
             List<string> refusals_Persistence = [];
             List<string> artifacts_Persistence = [];
 

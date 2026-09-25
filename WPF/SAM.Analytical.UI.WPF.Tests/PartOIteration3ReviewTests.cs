@@ -369,11 +369,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
 
             //The design state fingerprint the record copied no longer describes the model in front of us.
-            PartOIteration3Record partOIteration3Record = Query.PartOIteration3PairingRecord(Path.Combine(directory, "Flat-Iteration3.json"));
+            PartOIteration3Record partOIteration3Record = Query.PartOIteration3PairingRecord(Path.Combine(directory, "Flat-Iteration3-B0.json"));
 
             string text = partOIteration3Record.ToString().Replace(partOIteration3Record.Fingerprint_Model_ReferenceA, "0000000000000000");
 
-            File.WriteAllText(Path.Combine(directory, "Flat-Iteration3.json"), text);
+            File.WriteAllText(Path.Combine(directory, "Flat-Iteration3-B0.json"), text);
 
             PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, ReviewPipeline(guids_Bound));
 
@@ -386,7 +386,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
 
-            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            string path_Record = Path.Combine(directory, "Flat-Iteration3-B0.json");
 
             File.WriteAllText(path_Record, File.ReadAllText(path_Record).Replace(PartOIteration3Record.CurrentSchema, "PartOIteration3Record:v0"));
 
@@ -405,9 +405,24 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// Rewrites the record on disk exactly as a pre-PR5A build wrote it: the v1 schema, no behaviour
         /// mode, no catalogue provenance, no equipment and no <c>EquipmentResolution</c> stage.
         /// </summary>
+        /// <summary>
+        /// Rewrites the run's own record as a pre-PR5A (v1) record at <paramref name="path_Record"/> - the
+        /// mode-independent <c>&lt;run&gt;-Iteration3.json</c> every v1 record was written to - and removes the
+        /// per-method record the run wrote, so a review has to find the legacy file, as it would in a later
+        /// session over an old pairing.
+        /// </summary>
         private static void Write_V1(string path_Record, Action<JsonObject> modify = null)
         {
-            JsonObject jsonObject = JsonNode.Parse(File.ReadAllText(path_Record)).AsObject();
+            string path_Record_Run = path_Record.EndsWith("-Iteration3.json", StringComparison.OrdinalIgnoreCase)
+                ? path_Record.Substring(0, path_Record.Length - ".json".Length) + "-B0.json"
+                : path_Record;
+
+            JsonObject jsonObject = JsonNode.Parse(File.ReadAllText(path_Record_Run)).AsObject();
+
+            if (!string.Equals(path_Record_Run, path_Record, StringComparison.OrdinalIgnoreCase))
+            {
+                File.Delete(path_Record_Run);
+            }
 
             jsonObject["Schema"] = PartOIteration3Record.LegacySchema_V1;
 
@@ -504,7 +519,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
 
-            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            string path_Record = Path.Combine(directory, "Flat-Iteration3-B0.json");
 
             JsonObject jsonObject = JsonNode.Parse(File.ReadAllText(path_Record)).AsObject();
             Assert.Equal(PartOIteration3Record.CurrentSchema, (string)jsonObject["Schema"]);
@@ -524,7 +539,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
 
-            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            string path_Record = Path.Combine(directory, "Flat-Iteration3-B0.json");
             File.WriteAllText(path_Record, File.ReadAllText(path_Record).Replace("\"BehaviourMode\": \"Parity\"", "\"BehaviourMode\": \"Unknown\""));
 
             PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
@@ -540,7 +555,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
 
-            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            string path_Record = Path.Combine(directory, "Flat-Iteration3-B0.json");
             File.WriteAllText(path_Record, File.ReadAllText(path_Record).Replace("\"BehaviourMode\": \"Parity\"", "\"BehaviourMode\": \"SelectedProduct\""));
 
             PartOIteration3PipelineReviewOnly pipeline = ReviewPipeline(guids_Bound);
@@ -557,7 +572,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             PartORun partORun = Run(out PartOIteration3Result _, out List<Guid> guids_Bound);
 
-            File.Delete(Path.Combine(directory, "Flat-Iteration3.json"));
+            File.Delete(Path.Combine(directory, "Flat-Iteration3-B0.json"));
 
             PartOIteration3Result partOIteration3Result = Modify.ReviewPartOIteration3(partORun, ReviewPipeline(guids_Bound));
 
@@ -794,8 +809,8 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             Run(out PartOIteration3Result partOIteration3Result, out List<Guid> _);
 
-            string path_Report = Path.Combine(directory, "Flat-Iteration3-Review.txt");
-            string path_Report_Json = Path.Combine(directory, "Flat-Iteration3-Review.json");
+            string path_Report = Path.Combine(directory, "Flat-Iteration3-B0-Review.txt");
+            string path_Report_Json = Path.Combine(directory, "Flat-Iteration3-B0-Review.json");
 
             Assert.Equal(path_Report, partOIteration3Result.Path_Report);
             Assert.Equal(path_Report_Json, partOIteration3Result.Path_Report_Json);
@@ -915,7 +930,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             long ticks = File.GetLastWriteTimeUtc(path_Report).Ticks;
 
             //The design state the record copied no longer describes the model in front of us.
-            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            string path_Record = Path.Combine(directory, "Flat-Iteration3-B0.json");
 
             PartOIteration3Record partOIteration3Record = Query.PartOIteration3PairingRecord(path_Record);
 
@@ -988,8 +1003,8 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(partOIteration3Result.IsRefused);
             Assert.Null(partOIteration3Result.Path_Report);
-            Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3-Review.txt")));
-            Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3-Review.json")));
+            Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3-B0-Review.txt")));
+            Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3-B0-Review.json")));
         }
 
         /// <summary>

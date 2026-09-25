@@ -65,6 +65,30 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public const string Suffix_CandidateB_ManufacturerGuidance = "-It3BMG";
 
+        /// <summary>
+        /// What Candidate B's project name adds to Reference A's when it runs the selected products' certified
+        /// efficiency and SFP - its own documents, so it no longer overwrites B0's and the two can be kept side by
+        /// side. Records written before this existed name their own files, so they are unaffected.
+        /// </summary>
+        public const string Suffix_CandidateB_SelectedProduct = "-It3BP";
+
+        /// <summary>
+        /// Each behaviour mode's own record tag, so every method run against one Reference A keeps its own
+        /// pairing: <c>&lt;run&gt;-Iteration3-B0.json</c>, <c>-BP</c>, <c>-B4</c>, <c>-MG</c>. The mode-independent
+        /// <c>&lt;run&gt;-Iteration3.json</c> written before this is still read, by the mode recorded inside it -
+        /// see <see cref="Query.PartOIteration3RecordPath"/>. Storage only: never shown to an engineer.
+        /// </summary>
+        public static string Tag(PartOIteration3BehaviourMode partOIteration3BehaviourMode)
+        {
+            return partOIteration3BehaviourMode switch
+            {
+                PartOIteration3BehaviourMode.SelectedProduct => "BP",
+                PartOIteration3BehaviourMode.SelectedProductCooling => "B4",
+                PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance => "MG",
+                _ => "B0",
+            };
+        }
+
         /// <summary>PR5B: the hourly OperatingAirFlow history a B4 run persists beside its TPD.</summary>
         public const string Suffix_OperatingAirFlow = "-OperatingAirFlow";
 
@@ -78,6 +102,7 @@ namespace SAM.Analytical.UI.WPF
                 projectName_ReferenceA,
                 partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductCooling ? Suffix_CandidateB_Cooling
                 : partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance ? Suffix_CandidateB_ManufacturerGuidance
+                : partOIteration3BehaviourMode == PartOIteration3BehaviourMode.SelectedProduct ? Suffix_CandidateB_SelectedProduct
                 : Suffix_CandidateB);
             Path_OperatingAirFlow = Path.Combine(outputDirectory, ProjectName_CandidateB + Suffix_OperatingAirFlow + ".csv");
             ProjectName_Bridge = string.Concat(ProjectName_CandidateB, Suffix_Bridge);
@@ -92,10 +117,16 @@ namespace SAM.Analytical.UI.WPF
             Path_TM59Report_CandidateB = Query.Path_TM59Report(Path_TSD_Bridge);
             Path_TM59Report_ReferenceA = Query.Path_TM59Report(path_TSD_ReferenceA);
 
+            BehaviourMode = partOIteration3BehaviourMode;
+
+            //This mode's own record. The legacy mode-independent record is read, never written.
             Path_Record = Path.Combine(
                 Path.GetDirectoryName(path_TSD_ReferenceA) ?? outputDirectory,
-                Path.GetFileNameWithoutExtension(path_TSD_ReferenceA) + Suffix_Record + ".json");
+                Path.GetFileNameWithoutExtension(path_TSD_ReferenceA) + Suffix_Record + "-" + Tag(partOIteration3BehaviourMode) + ".json");
         }
+
+        /// <summary>The behaviour mode these paths are for.</summary>
+        public PartOIteration3BehaviourMode BehaviourMode { get; }
 
         /// <summary>Where both cases write. Candidate B never writes anywhere Reference A did not.</summary>
         public string OutputDirectory { get; }
@@ -177,10 +208,20 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// The record's path for a results file alone - what a <b>review</b> uses, which has only the
-        /// reopened run's TSD and no simulation context at all.
+        /// The LEGACY, mode-independent record path for a results file - <c>&lt;run&gt;-Iteration3.json</c>,
+        /// which every pairing written before per-mode records used. Still read, by the mode recorded inside
+        /// it; never written. See <see cref="Query.PartOIteration3RecordPath"/>.
         /// </summary>
         public static string Path_Record_ForResults(string path_TSD)
+        {
+            return Path_Record_ForResults(path_TSD, null);
+        }
+
+        /// <summary>
+        /// One behaviour mode's own record path for a results file alone - what a <b>review</b> uses, which
+        /// has only the reopened run's TSD and no simulation context at all. Null mode is the legacy path.
+        /// </summary>
+        public static string Path_Record_ForResults(string path_TSD, PartOIteration3BehaviourMode? partOIteration3BehaviourMode)
         {
             if (string.IsNullOrWhiteSpace(path_TSD))
             {
@@ -190,8 +231,13 @@ namespace SAM.Analytical.UI.WPF
             string directory = Path.GetDirectoryName(path_TSD);
             string fileName = Path.GetFileNameWithoutExtension(path_TSD);
 
-            return string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName)
-                ? null
+            if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName))
+            {
+                return null;
+            }
+
+            return partOIteration3BehaviourMode.HasValue
+                ? Path.Combine(directory, fileName + Suffix_Record + "-" + Tag(partOIteration3BehaviourMode.Value) + ".json")
                 : Path.Combine(directory, fileName + Suffix_Record + ".json");
         }
 
@@ -219,11 +265,22 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
-            //The record is <run>-Iteration3.json, so the report is <run>-Iteration3-Review.txt. Derived
-            //from the record rather than re-derived from the TSD: one of them moving must move both.
+            //The record is <run>-Iteration3.json, so the report is <run>-Iteration3-Review.txt; a per-mode
+            //record <run>-Iteration3-MG.json reports to <run>-Iteration3-MG-Review.txt. Derived from the record
+            //rather than re-derived from the TSD: one of them moving must move both.
             if (fileName.EndsWith(Suffix_Record, StringComparison.OrdinalIgnoreCase))
             {
                 fileName = fileName.Substring(0, fileName.Length - Suffix_Record.Length);
+
+                return Path.Combine(directory, fileName + Suffix_Report + "." + extension.TrimStart('.'));
+            }
+
+            foreach (PartOIteration3BehaviourMode partOIteration3BehaviourMode in Enum.GetValues(typeof(PartOIteration3BehaviourMode)))
+            {
+                if (fileName.EndsWith(Suffix_Record + "-" + Tag(partOIteration3BehaviourMode), StringComparison.OrdinalIgnoreCase))
+                {
+                    return Path.Combine(directory, fileName + "-Review." + extension.TrimStart('.'));
+                }
             }
 
             return Path.Combine(directory, fileName + Suffix_Report + "." + extension.TrimStart('.'));

@@ -306,14 +306,19 @@ namespace SAM.Analytical.UI.WPF.Tests
             //B0 exactly as before the cooling mode existed.
             Assert.Equal("Flat1" + PartOIteration3Paths.Suffix_CandidateB, paths_B0.ProjectName_CandidateB);
             Assert.Equal("C:\\out\\Flat1-It3B.tpd", paths_B0.Path_TPD);
-            Assert.Equal(paths_B0.Path_TPD, PartOIteration3Paths.Create(PartOIteration3Fixture.SimulationContext("C:\\out", "Flat1"), "C:\\out\\Flat1.tsd", PartOIteration3BehaviourMode.SelectedProduct).Path_TPD);
+
+            //The selected-product method has its own documents too, so it no longer overwrites B0's and the two
+            //results can be kept side by side.
+            Assert.Equal("C:\\out\\Flat1-It3BP.tpd", PartOIteration3Paths.Create(PartOIteration3Fixture.SimulationContext("C:\\out", "Flat1"), "C:\\out\\Flat1.tsd", PartOIteration3BehaviourMode.SelectedProduct).Path_TPD);
 
             Assert.Equal("Flat1" + PartOIteration3Paths.Suffix_CandidateB_Cooling, paths_B4.ProjectName_CandidateB);
             Assert.Equal("C:\\out\\Flat1-It3B4-OperatingAirFlow.csv", paths_B4.Path_OperatingAirFlow);
             Assert.Contains(paths_B4.Path_OperatingAirFlow, paths_B4.Paths_CandidateB);
 
-            //No Candidate B document is shared between the two - only the one pairing record per Reference A is.
-            foreach (string path in new[] { paths_B4.Path_TBD_ThermalSource, paths_B4.Path_TSD_ThermalSource, paths_B4.Path_TPD, paths_B4.Path_TBD_Bridge, paths_B4.Path_TSD_Bridge, paths_B4.Path_Model_CandidateB, paths_B4.Path_TM59Report_CandidateB })
+            //No Candidate B document is shared between the two - and neither is the record: each method keeps its own.
+            Assert.NotEqual(paths_B0.Path_Record, paths_B4.Path_Record);
+
+            foreach (string path in new[] { paths_B4.Path_TBD_ThermalSource, paths_B4.Path_TSD_ThermalSource, paths_B4.Path_TPD, paths_B4.Path_TBD_Bridge, paths_B4.Path_TSD_Bridge, paths_B4.Path_Model_CandidateB, paths_B4.Path_TM59Report_CandidateB, paths_B4.Path_Record })
             {
                 Assert.DoesNotContain(path, paths_B0.Paths_CandidateB);
             }

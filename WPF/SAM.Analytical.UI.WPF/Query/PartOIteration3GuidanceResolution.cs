@@ -27,8 +27,24 @@ namespace SAM.Analytical.UI.WPF
             out Dictionary<Guid, MechanicalVentilationGuidanceSettings> guidanceSettings,
             out List<string> notes)
         {
+            return PartOIteration3GuidanceResolution(adjacencyCluster, ventilationUnitCatalogue, out guidanceSettings, out notes, out List<PartOIteration3GuidanceEvidence> _);
+        }
+
+        /// <summary>
+        /// The same resolution, also answering each resolved unit's guidance as fields
+        /// (<see cref="PartOIteration3GuidanceEvidence"/>) for presentation. The notes, the settings and the
+        /// refusals are exactly those of the overload above.
+        /// </summary>
+        public static List<string> PartOIteration3GuidanceResolution(
+            AdjacencyCluster adjacencyCluster,
+            VentilationUnitCatalogue ventilationUnitCatalogue,
+            out Dictionary<Guid, MechanicalVentilationGuidanceSettings> guidanceSettings,
+            out List<string> notes,
+            out List<PartOIteration3GuidanceEvidence> evidence)
+        {
             guidanceSettings = [];
             notes = [];
+            evidence = [];
 
             List<string> refusals = [];
 
@@ -114,6 +130,25 @@ namespace SAM.Analytical.UI.WPF
                     strategy.CoolingActivationTemperature_C,
                     strategy.CoolingSupplyTemperatureRule.ExchangerExtractFraction(elevated_Lps),
                     strategy.CoolingSupplyTemperatureRule,
+                    strategy.CoolingSupplyTemperatureRule.CoilNetTemperatureDrop_K(elevated_Lps),
+                    strategy.CoolingSupplyTemperatureRule.MinimumSupplyTemperature_C));
+
+                evidence.Add(new PartOIteration3GuidanceEvidence(
+                    airHandlingUnit.Guid,
+                    airHandlingUnit.Name,
+                    ventilationUnitReference_Selected.ToString(),
+                    string.IsNullOrWhiteSpace(ventilationUnitTemplate.CoolingModuleModel) ? null : ventilationUnitTemplate.CoolingModuleModel,
+                    supplyAirFlowRate_Lps,
+                    extractAirFlowRate_Lps,
+                    ventilationUnitTemplate.MaximumSupplyFlowRate_Lps,
+                    ventilationUnitTemplate.MaximumExtractFlowRate_Lps,
+                    elevated_Lps,
+                    strategy.MinimumElevatedAirFlow_Lps,
+                    strategy.MaximumElevatedAirFlow_Lps,
+                    Core.Query.Description(strategy.CoolingActivationSignal),
+                    strategy.CoolingActivationTemperature_C,
+                    strategy.CoolingSupplyTemperatureRule?.ToString(),
+                    strategy.CoolingSupplyTemperatureRule.ExchangerExtractFraction(elevated_Lps),
                     strategy.CoolingSupplyTemperatureRule.CoilNetTemperatureDrop_K(elevated_Lps),
                     strategy.CoolingSupplyTemperatureRule.MinimumSupplyTemperature_C));
             }

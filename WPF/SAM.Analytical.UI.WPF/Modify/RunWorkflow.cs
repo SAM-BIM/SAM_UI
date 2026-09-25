@@ -62,6 +62,47 @@ namespace SAM.Analytical.UI.WPF
 
             AnalyticalModel? result = analyticalModel;
 
+            //Inside a Part O operation that already shows its own progress window: report the steps there
+            //and take its Cancel, rather than opening a second dialog over it. The workflow, its settings and
+            //its cancellation rules are exactly those below.
+            PartOProgressHost? partOProgressHost = PartOProgressHost.Current;
+            if (partOProgressHost is not null)
+            {
+                using (CancellationTokenSource cancellationTokenSource_PartO = CancellationTokenSource.CreateLinkedTokenSource(externalCancellationToken, partOProgressHost.Token))
+                {
+                    try
+                    {
+                        WorkflowCalculator workflowCalculator = new WorkflowCalculator(workflowSettings)
+                        {
+                            CancellationToken = cancellationTokenSource_PartO.Token
+                        };
+
+                        workflowCalculator.Updating += (s, e) => partOProgressHost.Detail(e.Description);
+
+                        result = workflowCalculator.Calculate(analyticalModel, analyticalModel_Owned);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        cancelled = true;
+                        result = null;
+                    }
+                    finally
+                    {
+                        partOProgressHost.Detail(null);
+                    }
+
+                    //The same final observation as below: a Cancel that landed after the workflow's own last
+                    //check still reports the run as cancelled.
+                    if (!cancelled && cancellationTokenSource_PartO.IsCancellationRequested)
+                    {
+                        cancelled = true;
+                        result = null;
+                    }
+                }
+
+                return result;
+            }
+
             using (CancellationTokenSource cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(externalCancellationToken))
             {
                 // Not a using: the dialog has to be torn down BEFORE the final cancellation check below, and a

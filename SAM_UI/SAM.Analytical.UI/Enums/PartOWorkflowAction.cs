@@ -25,12 +25,17 @@ namespace SAM.Analytical.UI
         [Description("Optimise (2B)")] Optimise,
 
         /// <summary>
-        /// The Approved Document O Iteration 3 A/B pairing - <c>Modify.RunPartOIteration3</c> on an
-        /// eligible in-session run, and <c>Modify.ReviewPartOIteration3</c> where there is a persisted
-        /// record to reopen. One action rather than two: which of the two it is is a property of the state
-        /// the run is in, and asking a person to work that out from two greyed buttons is worse than
-        /// telling them.
+        /// Run the Approved Document O Iteration 3 system case for the chosen method -
+        /// <c>Modify.RunPartOIteration3</c> on an eligible run. The Hub's Iteration 3 panel says, per method,
+        /// whether a completed result already exists, and offers <see cref="Iteration3Review"/> for it.
         /// </summary>
-        [Description("Iteration 3 (A/B)")] Iteration3,
+        [Description("Iteration 3 — run")] Iteration3,
+
+        /// <summary>
+        /// Open the saved Iteration 3 result for the chosen method - <c>Modify.ReviewPartOIteration3</c>,
+        /// which reads existing results and runs no TAS. Also opens a method's last, incomplete attempt, whose
+        /// stage record is the diagnosis.
+        /// </summary>
+        [Description("Iteration 3 — open result")] Iteration3Review,
     }
 }

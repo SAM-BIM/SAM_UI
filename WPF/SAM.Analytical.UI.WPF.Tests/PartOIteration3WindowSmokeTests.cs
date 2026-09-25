@@ -395,7 +395,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Button button = Control<Button>(partOIteration3ResultWindow, "button_OpenReport");
 
             Assert.True(button.IsEnabled);
-            Assert.Equal("Open Last Successful Report", button.Content);
+            Assert.Equal("Last successful report", button.Content);
             Assert.Contains("HISTORICAL", (string)button.ToolTip);
             Assert.Contains(path, (string)button.ToolTip);
 
@@ -447,7 +447,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Button button = Control<Button>(partOIteration3ResultWindow, "button_OpenReport");
 
             Assert.True(button.IsEnabled);
-            Assert.Equal("Open A/B Review Report", button.Content);
+            Assert.Equal("Comparison report", button.Content);
             Assert.DoesNotContain("HISTORICAL", (string)button.ToolTip);
 
             //And the notes name both files, so the path is on screen as well as behind a button.
@@ -479,7 +479,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Click(partOIteration3ResultWindow, "button_OpenReport");
 
             Assert.False(button.IsEnabled);
-            Assert.Equal("Open Last Successful Report", button.Content);
+            Assert.Equal("Last successful report", button.Content);
         }
 
         /// <summary>

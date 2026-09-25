@@ -58,7 +58,14 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         /// <param name="partORun">The Part O run whose results the pairing was written against.</param>
         /// <param name="iPartOIteration3Pipeline">Only <see cref="IPartOIteration3Pipeline.Assess"/> is used.</param>
-        public static PartOIteration3Result ReviewPartOIteration3(PartORun partORun, IPartOIteration3Pipeline iPartOIteration3Pipeline)
+        /// <param name="partOIteration3BehaviourMode">
+        /// Which method's pairing to reopen - resolved by <see cref="Query.PartOIteration3RecordPath"/>, so a
+        /// pairing written before per-method records existed is still found by the mode recorded inside it.
+        /// Null reopens the mode-independent legacy record where there is one, and otherwise the first method
+        /// with a record, in <see cref="Query.PartOIteration3BehaviourModes"/> order.
+        /// </param>
+        /// <param name="step">Told, in words, which step is starting - for a progress window. Optional.</param>
+        public static PartOIteration3Result ReviewPartOIteration3(PartORun partORun, IPartOIteration3Pipeline iPartOIteration3Pipeline, PartOIteration3BehaviourMode? partOIteration3BehaviourMode = null, Action<string> step = null)
         {
             List<string> notes = [];
 
@@ -71,10 +78,23 @@ namespace SAM.Analytical.UI.WPF
                 return new PartOIteration3Result(partOIteration3Ledger, null, null, null, null, null, null, null, true, notes);
             }
 
+            step?.Invoke("Reading the saved Iteration 3 result");
+
             string path_TSD_ReferenceA = partORun.Path_TSD;
-            string path_Record = PartOIteration3Paths.Path_Record_ForResults(path_TSD_ReferenceA);
+            string path_Record = Path_Record_Review(path_TSD_ReferenceA, partOIteration3BehaviourMode);
 
             PartOIteration3Record partOIteration3Record = Query.PartOIteration3PairingRecord(path_Record);
+
+            //A method's own record that names another method is not that method's result.
+            if (partOIteration3Record is not null && partOIteration3BehaviourMode.HasValue && partOIteration3Record.BehaviourMode != partOIteration3BehaviourMode.Value)
+            {
+                partOIteration3Ledger.Refuse(
+                    PartOIteration3Stage.Input,
+                    "The saved Iteration 3 record is for another method.",
+                    [string.Format("The record at '{0}' was written for '{1}', not for '{2}'.", path_Record, partOIteration3Record.BehaviourMode, partOIteration3BehaviourMode.Value)]);
+
+                return new PartOIteration3Result(partOIteration3Ledger, null, null, null, null, null, null, path_Record, true, notes);
+            }
 
             if (partOIteration3Record is null)
             {
@@ -131,6 +151,8 @@ namespace SAM.Analytical.UI.WPF
 
             guids_Space_Bound.Sort();
 
+            step?.Invoke("Re-assessing the reference case from its existing results");
+
             PartOIteration3Assessment partOIteration3Assessment_A = iPartOIteration3Pipeline.Assess(partORun.AnalyticalModel_Assessment, path_TSD_ReferenceA, partORun.OverheatingScenarios, guids_Space_Bound);
 
             List<OverheatingScenario> overheatingScenarios_CandidateB = [];
@@ -144,6 +166,8 @@ namespace SAM.Analytical.UI.WPF
                     }
                 }
             }
+
+            step?.Invoke("Re-assessing the system case from its existing results");
 
             PartOIteration3Assessment partOIteration3Assessment_B = iPartOIteration3Pipeline.Assess(analyticalModel_CandidateB, path_TSD_CandidateB, overheatingScenarios_CandidateB, guids_Space_Bound);
 
@@ -169,6 +193,8 @@ namespace SAM.Analytical.UI.WPF
             //---------------------------------------------------------------------------------------------
             //Rebuild the reconciliation and the comparison from the record's own bindings.
             //---------------------------------------------------------------------------------------------
+            step?.Invoke("Rebuilding the comparison");
+
             List<string> refusals_Reconciliation = Query.PartOIteration3ReviewReconciliationRefusals(
                 partOIteration3Record,
                 partOIteration3Assessment_A,
@@ -227,6 +253,38 @@ namespace SAM.Analytical.UI.WPF
             SavePartOIteration3Report(partOIteration3Result);
 
             return partOIteration3Result;
+        }
+
+        /// <summary>
+        /// The record a review reads. With a method: that method's record, legacy-aware. Without one: the
+        /// legacy mode-independent record where it exists - what every caller of the one-method era meant -
+        /// and otherwise the first method that has a record.
+        /// </summary>
+        private static string Path_Record_Review(string path_TSD, PartOIteration3BehaviourMode? partOIteration3BehaviourMode)
+        {
+            if (partOIteration3BehaviourMode.HasValue)
+            {
+                return Query.PartOIteration3RecordPath(path_TSD, partOIteration3BehaviourMode.Value, out bool _);
+            }
+
+            string path_Legacy = PartOIteration3Paths.Path_Record_ForResults(path_TSD);
+
+            if (!string.IsNullOrWhiteSpace(path_Legacy) && System.IO.File.Exists(path_Legacy))
+            {
+                return path_Legacy;
+            }
+
+            foreach (PartOIteration3BehaviourMode partOIteration3BehaviourMode_Candidate in Query.PartOIteration3BehaviourModes)
+            {
+                string path = PartOIteration3Paths.Path_Record_ForResults(path_TSD, partOIteration3BehaviourMode_Candidate);
+
+                if (!string.IsNullOrWhiteSpace(path) && System.IO.File.Exists(path))
+                {
+                    return path;
+                }
+            }
+
+            return path_Legacy;
         }
 
         private static void NoteUnwrittenReport(List<string> notes, string role, PartOIteration3Assessment partOIteration3Assessment)
