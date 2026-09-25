@@ -518,8 +518,14 @@ namespace SAM.Analytical.UI.WPF.Tests
                 foreach (PartOWorkflowStatusRow partOWorkflowStatusRow in partOWorkflowStatusGroup.Rows)
                 {
                     Assert.Contains(partOWorkflowStatusRow.Name, texts);
-                    Assert.Contains(partOWorkflowStatusRow.StatusText, texts);
+
+                    //The status as drawn: a word AND a glyph, never colour alone.
+                    Assert.Contains(partOWorkflowStatusRow.StatusLabel, texts);
+                    Assert.Contains(partOWorkflowStatusRow.StatusGlyph, texts);
                     Assert.Contains(partOWorkflowStatusRow.ShortDetail, texts);
+
+                    //And the inspection's complete sentence is in the row's own tree, behind Show details.
+                    Assert.Contains(partOWorkflowStatusRow.FullDetail, texts);
                 }
             }
         }

@@ -1,6 +1,98 @@
 # Project Progress
 
-## Current: Part O / TM59 workflow simplification (24-25 Sep 2026) - MERGED
+## Current: Part O Prepare & Run Hub - presentation pass (25 Sep 2026) - PR #111 OPEN
+
+**Status.** On branch `feature/parto-hub-presentation-2026-09-25`, taken from `sow/2026-Q3` `6230d7d`. It is
+pushed after a live acceptance pass in the real exe, and open as SAM-BIM/SAM_UI#111 -> `sow/2026-Q3`. SAM_UI only.
+
+Presentation-only, by owner brief. There is no change to the workflow, scenarios, validation, preparation,
+simulation, provenance, the inspection's stage statuses, or any enable rule.
+
+**What changed.**
+- Layout. `PartOWorkflowWindow.xaml` now runs top to bottom:
+  1. scenario, with one route line;
+  2. scope, with a compact text beside it;
+  3. the workflow strip;
+  4. the last-outcome line;
+  5. "Readiness" (compact rows, with one "Show details" switch);
+  6. blockers;
+  7. equipment (Iteration 2 only), simulation case, 2B (only where `SupportsOptimisation`), Iteration 3 and
+     "Advanced / Details";
+  8. a fixed bottom region with the "Next: ..." line, the Prepare & Run primary button, and captions under the
+     disabled Review ("No results yet") and Optimise ("Iteration 2 only" / "After an Iteration 2 run").
+- Strip. `PartOWorkflowProgress` + `PartOWorkflowStep` (Classes/PartO/PartOWorkflowStep.cs) is a pure mapping
+  from the inspection's statuses.
+  - Steps: Configure -> Prepare model -> **Check & simulate** -> Review (+ Optimise 2B).
+  - Check and simulate are ONE step on purpose: Model check is always Pending in the inspection, and there is
+    no recorded check outcome (owner guardrail: no UI-only state).
+  - Every state is shown as a glyph and a word, not only a colour.
+  - `PartOWorkflowStepStripControl` is the reusable control.
+- Shared styles. `Themes/PartOStyles.xaml` is a small shared dictionary: palette, PrimaryButton, Caption,
+  SectionHeading, StatusGlyph, BooleanToVisibility. Other Part O windows can merge it.
+- Status rows.
+  - `PartOWorkflowStatusRow.StatusLabel` is sentence case, per stage and status: Waiting, Not prepared,
+    Not available, ...
+  - `StatusGlyph` is ✓ ✕ ○ –.
+  - `StatusText` is unchanged.
+  - `ShortDetail` = host summary, else `PartOWorkflowStageState.Summary` (new, optional, set by the
+    inspection from its own counts: "3 dwellings · 8 spaces", "8/8 spaces mapped", "8/8 spaces defined"),
+    else the first-sentence cut.
+  - The per-row "Why?" expanders are replaced by one "Show details" switch
+    (`ShowStatusDetails` DependencyProperty); the full detail is also on each row's tooltip.
+- Plurals. `UI.Query.PartOCount/PartONoun`. Every `(s)` is gone from the inspection details and the Hub's
+  scope and selection text. `Detail` is UI-only; nothing persists it.
+- Equipment is said once, as the route line ("MVHR · Design duty only · No manufacturer unit required").
+  - On 1a/1b the equipment section is collapsed; the control is still compact behind it, so its tests are
+    unchanged.
+  - The N/A Equipment row is not DRAWN (`RenderedStatusGroups`), but it stays in `StatusRows`/`StatusGroups`.
+  - A pointer sits in Advanced / Details.
+- Iteration 3. The whole panel is collapsed unless eligibility `CanRun` or a record exists (the same rule
+  that already drove its inner panel).
+- Simulation case. The header shows weather and solar method only; the output path and the full case are on
+  the tooltip. Fixed: the setter's per-control writes judged a half-written case and auto-expanded the section
+  on every open. They are now judged once, when complete.
+- Fixes from the live pass:
+  - Mixed state (reopened run): the design row's short line becomes "Rebuilt for the next Prepare & Run · the
+    existing results are reviewable as they are" (window `Summary`, only when ResultsAvailable and the design is
+    Prepare). The Prepare-model step's tooltip says the same. The status is unchanged.
+  - The Optimise tooltip on 1a/1b gives the scenario reason (the 2B section's sentence).
+  - Strip steps are hit-testable (transparent background), so their tooltips appear.
+  - An implicit wrapping ToolTip style (MaxWidth 480) in `PartOStyles.xaml`.
+  - `KeepOnScreen`: the Hub is moved up if its bottom is below its monitor's working area. Live, a reopened
+    run opened at y=208 with a height of 910 on a 1080 px display. It runs on first render and again when
+    content-driven growth makes the Hub taller (`OnGrown`; not after a grip resize, `SizeToContent = Manual`).
+    Codex review on #111 found three edge cases, all fixed: `MaxHeight` is capped to 92% of the ACTIVE
+    monitor (it was read from the primary); `MinHeight` comes down with it on a working area shorter than 520;
+    and growth after placement is handled. The arithmetic is the pure `PartOWorkflowWindow.Placement`.
+  - Codex review on #111: with reviewable results open, a blocked Prepare & Run no longer hides Review. The strip
+    marks Review as the current step, and the next-step line leads with Review and states the blocker beside it.
+
+**Validation.**
+- `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): 0 errors.
+- `SAM.Analytical.UI.WPF.Tests`: 1077/1077. The previous count was 1057 (1056 + the new opt-in harness).
+- Live acceptance in the real exe (UI Automation + PrintWindow): 0 message boxes; fresh 1a, 2 and 1b; Show
+  details; Simulation case; tooltips; captions; 700/1200 px widths; move to a second monitor; the reopened 1a
+  run with Iteration 3 shown. Record: `documentation/evidence/parto-hub-presentation/live/LIVE-ACCEPTANCE-2026-09-25.md`.
+  All monitors are at 96 DPI; no non-100% scale was tested (the system setting was not changed).
+  - 7 pins were updated for the wording: plurals, and the template test now asserts label + glyph +
+    ShortDetail + FullDetail.
+  - New: `PartOHubPresentationTests` (20 cases, including 6 placement-theory rows, a real-window growth test, and Review staying next while Run is blocked).
+    Plus one assertion that the Iteration 3 panel is visible with a recorded result.
+- Before/after renders (fresh 1a, and 1a after its run): `documentation/evidence/parto-hub-presentation/`, via
+  the opt-in `PartOWorkflowHubScreenshotHarness` (see its README).
+
+**Known / not done.**
+- Other Part O windows still use `(s)` wording: the Part F report, the project test product, the result
+  reopen summary, and the Iteration 3 pre-flight refusal. Out of scope for this pass.
+- The Iteration 2 route line carries the whole mode description (3 sentences), which tests pin. It could be
+  trimmed in a later pass.
+- A non-100% DPI scale was not tested live.
+
+**Next step.** Merge SAM-BIM/SAM_UI#111 with a merge commit once CI is green on its head and Codex has no
+open finding (GitHub auto-merge is disabled on this repo). Then add a short PROJECT_PROGRESS note with the
+merge commit, as for #110, and bump the SAM_Deploy SAM_UI pointer together with the earlier pending bumps.
+
+## Previous: Part O / TM59 workflow simplification (24-25 Sep 2026) - MERGED
 
 **Status.** MERGED into `sow/2026-Q3` on 2026-09-25: SAM-BIM/SAM_UI#109 -> merge commit `75d7b7cd` (implementation
 `2ab49f1`, live smoke evidence + regression test `4588412`, note `b9acc83`). CI green (build, spdx); Codex review

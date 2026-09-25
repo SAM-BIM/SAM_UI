@@ -100,7 +100,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(PartOWorkflowScope.SelectedDwellings, partOWorkflowWindow.Scope);
             Assert.Equal(guids_Restored.Count, partOWorkflowWindow.Zones_Dwelling.Count);
             Assert.Contains(string.Format("{0} of 12", guids_Restored.Count), partOWorkflowWindow.ScopeDescription, StringComparison.Ordinal);
-            Assert.Contains(string.Format("{0} of 12 eligible dwelling zone(s) in scope", guids_Restored.Count), Stage(partOWorkflowWindow, PartOWorkflowStage.DwellingScope).Detail, StringComparison.Ordinal);
+            Assert.Contains(string.Format("{0} of 12 eligible dwelling zones in scope", guids_Restored.Count), Stage(partOWorkflowWindow, PartOWorkflowStage.DwellingScope).Detail, StringComparison.Ordinal);
         }
 
         /// <summary>

@@ -425,8 +425,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartOWorkflowStageState partOWorkflowStageState = Stage(partOWorkflowInspection, PartOWorkflowStage.DwellingScope);
 
             Assert.Equal(PartOWorkflowStageStatus.Ready, partOWorkflowStageState.Status);
-            Assert.Contains("1 of 2 eligible dwelling zone(s)", partOWorkflowStageState.Detail, StringComparison.Ordinal);
-            Assert.Contains("3 space(s)", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+            Assert.Contains("1 of 2 eligible dwelling zones", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+            Assert.Contains("3 spaces", partOWorkflowStageState.Detail, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -619,7 +619,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(PartOWorkflowStageStatus.Ready, partOWorkflowStageState.Status);
 
             //Two of the three rooms per flat classify; the store does not, and the model still runs.
-            Assert.Contains("4 of 6 space(s)", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+            Assert.Contains("4 of 6 spaces", partOWorkflowStageState.Detail, StringComparison.Ordinal);
 
             Assert.True(partOWorkflowInspection.CanRun);
         }

@@ -216,21 +216,32 @@ namespace SAM.Analytical.UI
             List<Zone> zones_Eligible = Analytical.Query.PartFDwellingZones(zones);
             if (zones_Eligible.Count == 0)
             {
-                return new PartOWorkflowStageState(PartOWorkflowStage.DwellingScope, PartOWorkflowStageStatus.Blocked, string.Format("None of the model's {0} zone(s) is stated as a dwelling, so there is nothing Approved Document O would assess. Mark the dwelling zones first.", zones.Count));
+                return new PartOWorkflowStageState(PartOWorkflowStage.DwellingScope, PartOWorkflowStageStatus.Blocked, string.Format("None of the model's {0} is stated as a dwelling, so there is nothing Approved Document O would assess. Mark the dwelling zones first.", Query.PartOCount(zones.Count, "zone", "zones")));
             }
 
             List<Zone> zones_Selected = partOWorkflowRequest?.Zones_Dwelling ?? [];
             if (zones_Selected.Count == 0)
             {
-                return new PartOWorkflowStageState(PartOWorkflowStage.DwellingScope, PartOWorkflowStageStatus.Blocked, string.Format("No dwelling is selected. {0} dwelling zone(s) are eligible.", zones_Eligible.Count));
+                return new PartOWorkflowStageState(PartOWorkflowStage.DwellingScope, PartOWorkflowStageStatus.Blocked, string.Format("No dwelling is selected. {0} {1} eligible.", Query.PartOCount(zones_Eligible.Count, "dwelling zone", "dwelling zones"), zones_Eligible.Count == 1 ? "is" : "are"));
             }
 
             string detail = string.Format(
-                "{0} of {1} eligible dwelling zone(s) in scope, {2} space(s){3}.",
+                "{0} of {1} eligible {2} in scope, {3}{4}.",
                 zones_Selected.Count,
                 zones_Eligible.Count,
-                spaces_Scope.Count,
+                Query.PartONoun(zones_Eligible.Count, "dwelling zone", "dwelling zones"),
+                Query.PartOCount(spaces_Scope.Count, "space", "spaces"),
                 partOWorkflowRequest.Isolate ? ", simulated as an isolated thermal model" : string.Empty);
+
+            //The same counts, as the first-level line. "3 dwellings" where the whole eligible set is in
+            //scope, "2 of 3 dwellings" where it was narrowed.
+            string summary = string.Format(
+                "{0} · {1}{2}",
+                zones_Selected.Count == zones_Eligible.Count
+                    ? Query.PartOCount(zones_Selected.Count, "dwelling", "dwellings")
+                    : string.Format("{0} of {1}", zones_Selected.Count, Query.PartOCount(zones_Eligible.Count, "dwelling", "dwellings")),
+                Query.PartOCount(spaces_Scope.Count, "space", "spaces"),
+                partOWorkflowRequest.Isolate ? " · isolated" : string.Empty);
 
             //What the MODEL says it already is, as opposed to what this request asks for - stamped by
             //Analytical.Modify.PreparePartOIteration and carried in the .sam, so it survives a reopen and is
@@ -244,7 +255,7 @@ namespace SAM.Analytical.UI
                 detail = string.Format("{0} This model is ALREADY the isolated thermal model of {1}, so it is no longer the whole building it was extracted from.", detail, string.Join(", ", partOIsolationContext.Names_Dwelling));
             }
 
-            return new PartOWorkflowStageState(PartOWorkflowStage.DwellingScope, PartOWorkflowStageStatus.Ready, detail);
+            return new PartOWorkflowStageState(PartOWorkflowStage.DwellingScope, PartOWorkflowStageStatus.Ready, detail, summary);
         }
 
         /// <summary>
@@ -351,21 +362,30 @@ namespace SAM.Analytical.UI
             //authorities. The message says that, rather than implying the rooms are unrecognised.
             if (count_InternalCondition == 0)
             {
-                return new PartOWorkflowStageState(PartOWorkflowStage.InternalConditions, PartOWorkflowStageStatus.Blocked, string.Format("None of the {0} space(s) in scope has an internal condition, so nothing states how they are occupied. A TM59 room name selects which criterion applies but supplies no occupancy: these spaces would simulate unoccupied, and their TM59 verdicts would be judged over an empty set of occupied hours rather than refused. Run Map IC (TM59) first.", spaces_Scope.Count));
+                return new PartOWorkflowStageState(PartOWorkflowStage.InternalConditions, PartOWorkflowStageStatus.Blocked, string.Format("None of the {0} in scope has an internal condition, so nothing states how they are occupied. A TM59 room name selects which criterion applies but supplies no occupancy: these spaces would simulate unoccupied, and their TM59 verdicts would be judged over an empty set of occupied hours rather than refused. Run Map IC (TM59) first.", Query.PartOCount(spaces_Scope.Count, "space", "spaces")));
             }
 
             if (count_Classified == 0)
             {
-                return new PartOWorkflowStageState(PartOWorkflowStage.InternalConditions, PartOWorkflowStageStatus.Blocked, string.Format("None of the {0} space(s) in scope is recognised as a TM59 sleeping, living or cooking room, so the assessment would report nothing. Run Map IC (TM59) first.", spaces_Scope.Count));
+                return new PartOWorkflowStageState(PartOWorkflowStage.InternalConditions, PartOWorkflowStageStatus.Blocked, string.Format("None of the {0} in scope is recognised as a TM59 sleeping, living or cooking room, so the assessment would report nothing. Run Map IC (TM59) first.", Query.PartOCount(spaces_Scope.Count, "space", "spaces")));
             }
 
-            string detail = string.Format(
-                "{0} of {1} space(s) in scope classify as a TM59 sleeping, living or cooking room{2}.",
-                count_Classified,
-                spaces_Scope.Count,
-                count_InternalCondition == spaces_Scope.Count ? string.Empty : string.Format("; {0} space(s) have no internal condition and will not be assessed", spaces_Scope.Count - count_InternalCondition));
+            int count_NoInternalCondition = spaces_Scope.Count - count_InternalCondition;
 
-            return new PartOWorkflowStageState(PartOWorkflowStage.InternalConditions, PartOWorkflowStageStatus.Ready, detail);
+            string detail = string.Format(
+                "{0} of {1} in scope {2} as a TM59 sleeping, living or cooking room{3}.",
+                count_Classified,
+                Query.PartOCount(spaces_Scope.Count, "space", "spaces"),
+                count_Classified == 1 ? "classifies" : "classify",
+                count_NoInternalCondition == 0 ? string.Empty : string.Format("; {0} no internal condition and will not be assessed", count_NoInternalCondition == 1 ? "1 space has" : string.Format("{0} spaces have", count_NoInternalCondition)));
+
+            string summary = string.Format(
+                "{0}/{1} mapped{2}",
+                count_Classified,
+                Query.PartOCount(spaces_Scope.Count, "space", "spaces"),
+                count_NoInternalCondition == 0 ? string.Empty : string.Format(" · {0} without internal condition", count_NoInternalCondition));
+
+            return new PartOWorkflowStageState(PartOWorkflowStage.InternalConditions, PartOWorkflowStageStatus.Ready, detail, summary);
         }
 
         /// <summary>
@@ -427,7 +447,11 @@ namespace SAM.Analytical.UI
                 return new PartOWorkflowStageState(PartOWorkflowStage.PartFRequirements, PartOWorkflowStageStatus.Blocked, string.Format("No space in scope carries a continuous Approved Document F requirement, so the {0} route has no mechanical ventilation to realize. Run AddVent PartF over these dwellings first.", Core.Query.Description(partOVentilationMode)));
             }
 
-            return new PartOWorkflowStageState(PartOWorkflowStage.PartFRequirements, PartOWorkflowStageStatus.Ready, string.Format("{0} of {1} space(s) in scope carry a continuous Approved Document F supply or extract requirement.", count, spaces_Scope.Count));
+            return new PartOWorkflowStageState(
+                PartOWorkflowStage.PartFRequirements,
+                PartOWorkflowStageStatus.Ready,
+                string.Format("{0} of {1} in scope {2} a continuous Approved Document F supply or extract requirement.", count, Query.PartOCount(spaces_Scope.Count, "space", "spaces"), count == 1 ? "carries" : "carry"),
+                string.Format("{0}/{1} defined", count, Query.PartOCount(spaces_Scope.Count, "space", "spaces")));
         }
 
         /// <summary>
@@ -441,15 +465,15 @@ namespace SAM.Analytical.UI
         {
             if (reuse)
             {
-                return new PartOWorkflowStageState(PartOWorkflowStage.VentilationDesign, PartOWorkflowStageStatus.Reused, "An iteration prepared over exactly this base provision and dwelling scope is already loaded, so it is simulated as it stands rather than prepared again.");
+                return new PartOWorkflowStageState(PartOWorkflowStage.VentilationDesign, PartOWorkflowStageStatus.Reused, "An iteration prepared over exactly this base provision and dwelling scope is already loaded, so it is simulated as it stands rather than prepared again.", "Prepared for this scenario and scope · reused");
             }
 
             if (partORun is not null && partORun.State == PartORunState.Prepared)
             {
-                return new PartOWorkflowStageState(PartOWorkflowStage.VentilationDesign, PartOWorkflowStageStatus.Prepare, "An iteration is prepared, but for a different base provision or dwelling scope, so this run prepares it again.");
+                return new PartOWorkflowStageState(PartOWorkflowStage.VentilationDesign, PartOWorkflowStageStatus.Prepare, "An iteration is prepared, but for a different base provision or dwelling scope, so this run prepares it again.", "Prepared for a different scenario or scope · rebuilt by Prepare & Run");
             }
 
-            return new PartOWorkflowStageState(PartOWorkflowStage.VentilationDesign, PartOWorkflowStageStatus.Prepare, "This run builds the design ventilation terminals, one ventilation system and unit per dwelling, and the air movements that carry the design airflow into TAS.");
+            return new PartOWorkflowStageState(PartOWorkflowStage.VentilationDesign, PartOWorkflowStageStatus.Prepare, "This run builds the design ventilation terminals, one ventilation system and unit per dwelling, and the air movements that carry the design airflow into TAS.", "Built by Prepare & Run");
         }
 
         private static PartOWorkflowStageState Equipment(PartOWorkflowRequest partOWorkflowRequest, PartOWorkflowCapabilities partOWorkflowCapabilities)
@@ -479,7 +503,7 @@ namespace SAM.Analytical.UI
         /// </summary>
         private static PartOWorkflowStageState ModelCheck()
         {
-            return new PartOWorkflowStageState(PartOWorkflowStage.ModelCheck, PartOWorkflowStageStatus.Pending, "SAM Check runs over the prepared model immediately before TAS converts it. Errors stop the run; warnings are recorded and do not.");
+            return new PartOWorkflowStageState(PartOWorkflowStage.ModelCheck, PartOWorkflowStageStatus.Pending, "SAM Check runs over the prepared model immediately before TAS converts it. Errors stop the run; warnings are recorded and do not.", "Runs after preparation, before TAS");
         }
 
         private static PartOWorkflowStageState Simulation(PartORun partORun, PartOWorkflowCapabilities partOWorkflowCapabilities)
@@ -495,10 +519,10 @@ namespace SAM.Analytical.UI
 
             if (partORun is not null && partORun.State == PartORunState.Prepared)
             {
-                return new PartOWorkflowStageState(PartOWorkflowStage.Simulation, PartOWorkflowStageStatus.NotRun, "An iteration is prepared and waiting for its full-year TAS simulation.");
+                return new PartOWorkflowStageState(PartOWorkflowStage.Simulation, PartOWorkflowStageStatus.NotRun, "An iteration is prepared and waiting for its full-year TAS simulation.", "Prepared · waiting for the full-year TAS run");
             }
 
-            return new PartOWorkflowStageState(PartOWorkflowStage.Simulation, PartOWorkflowStageStatus.NotRun, "This run converts the prepared model and simulates the full year in TAS.");
+            return new PartOWorkflowStageState(PartOWorkflowStage.Simulation, PartOWorkflowStageStatus.NotRun, "This run converts the prepared model and simulates the full year in TAS.", "Full-year TAS run");
         }
 
         private static PartOWorkflowStageState Results(PartOWorkflowCapabilities partOWorkflowCapabilities)

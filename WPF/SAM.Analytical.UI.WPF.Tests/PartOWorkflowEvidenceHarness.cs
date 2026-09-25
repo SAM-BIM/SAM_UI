@@ -239,7 +239,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>Shows a window at a size, lets it lay out, and writes it to a PNG.</summary>
-        private static void Render(System.Windows.Window window, string path, double width, double height)
+        internal static void Render(System.Windows.Window window, string path, double width, double height)
         {
             window.WindowStartupLocation = WindowStartupLocation.Manual;
             window.Left = 0;
@@ -259,10 +259,17 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             window.ShowActivated = false;
 
+            //A window may cap its own height to its monitor as it first renders (the Hub does); a render
+            //asks for the full content, so the requested ceiling is put back once it has shown.
+            double maxHeight = window.MaxHeight;
+
             if (!window.IsVisible)
             {
                 window.Show();
+                window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             }
+
+            window.MaxHeight = maxHeight;
 
             window.UpdateLayout();
 
