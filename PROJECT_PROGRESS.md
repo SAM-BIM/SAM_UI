@@ -1,9 +1,9 @@
 # Project Progress
 
-## Current: Part O Prepare & Run Hub - presentation pass (25 Sep 2026) - COMMITTED, PR PENDING
+## Current: Part O Prepare & Run Hub - presentation pass (25 Sep 2026) - PR #111 OPEN
 
 **Status.** On branch `feature/parto-hub-presentation-2026-09-25`, taken from `sow/2026-Q3` `6230d7d`. It is
-committed and pushed to origin after a live acceptance pass in the real exe. No PR is open yet. SAM_UI only.
+pushed after a live acceptance pass in the real exe, and open as SAM-BIM/SAM_UI#111 -> `sow/2026-Q3`. SAM_UI only.
 
 Presentation-only, by owner brief. There is no change to the workflow, scenarios, validation, preparation,
 simulation, provenance, the inspection's stage statuses, or any enable rule.
@@ -58,20 +58,24 @@ simulation, provenance, the inspection's stage statuses, or any enable rule.
   - The Optimise tooltip on 1a/1b gives the scenario reason (the 2B section's sentence).
   - Strip steps are hit-testable (transparent background), so their tooltips appear.
   - An implicit wrapping ToolTip style (MaxWidth 480) in `PartOStyles.xaml`.
-  - `KeepOnScreen` in `OnContentRendered`: the Hub is moved up once if its bottom is below its monitor's
-    working area. Live, a reopened run opened at y=208 with a height of 910 on a 1080 px display.
+  - `KeepOnScreen`: the Hub is moved up if its bottom is below its monitor's working area. Live, a reopened
+    run opened at y=208 with a height of 910 on a 1080 px display. It runs on first render and again when
+    content-driven growth makes the Hub taller (`OnGrown`; not after a grip resize, `SizeToContent = Manual`).
+    Codex review on #111 found three edge cases, all fixed: `MaxHeight` is capped to 92% of the ACTIVE
+    monitor (it was read from the primary); `MinHeight` comes down with it on a working area shorter than 520;
+    and growth after placement is handled. The arithmetic is the pure `PartOWorkflowWindow.Placement`.
 
 **Validation.**
 - `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): 0 errors.
-- `SAM.Analytical.UI.WPF.Tests`: 1069/1069. The previous count was 1057 (1056 + the new opt-in harness).
+- `SAM.Analytical.UI.WPF.Tests`: 1076/1076. The previous count was 1057 (1056 + the new opt-in harness).
 - Live acceptance in the real exe (UI Automation + PrintWindow): 0 message boxes; fresh 1a, 2 and 1b; Show
   details; Simulation case; tooltips; captions; 700/1200 px widths; move to a second monitor; the reopened 1a
   run with Iteration 3 shown. Record: `documentation/evidence/parto-hub-presentation/live/LIVE-ACCEPTANCE-2026-09-25.md`.
   All monitors are at 96 DPI; no non-100% scale was tested (the system setting was not changed).
   - 7 pins were updated for the wording: plurals, and the template test now asserts label + glyph +
     ShortDetail + FullDetail.
-  - New: `PartOHubPresentationTests` (11). Plus one assertion that the Iteration 3 panel is visible with a
-    recorded result.
+  - New: `PartOHubPresentationTests` (19 cases, including 6 placement-theory rows and a real-window growth test).
+    Plus one assertion that the Iteration 3 panel is visible with a recorded result.
 - Before/after renders (fresh 1a, and 1a after its run): `documentation/evidence/parto-hub-presentation/`, via
   the opt-in `PartOWorkflowHubScreenshotHarness` (see its README).
 
@@ -82,8 +86,9 @@ simulation, provenance, the inspection's stage statuses, or any enable rule.
   trimmed in a later pass.
 - A non-100% DPI scale was not tested live.
 
-**Next step.** Open the PR `feature/parto-hub-presentation-2026-09-25` -> `sow/2026-Q3`, wait for CI green, then
-merge. Afterwards, bump the SAM_Deploy SAM_UI pointer, together with the earlier pending pointer bumps.
+**Next step.** Merge SAM-BIM/SAM_UI#111 with a merge commit once CI is green on its head and Codex has no
+open finding (GitHub auto-merge is disabled on this repo). Then add a short PROJECT_PROGRESS note with the
+merge commit, as for #110, and bump the SAM_Deploy SAM_UI pointer together with the earlier pending bumps.
 
 ## Previous: Part O / TM59 workflow simplification (24-25 Sep 2026) - MERGED
 
