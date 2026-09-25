@@ -156,15 +156,21 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartOWorkflowOutcome? partOWorkflowOutcome = Modify.ReviewOutcome(summary);
 
             Assert.NotNull(partOWorkflowOutcome);
-            Assert.Equal(string.Format("Reviewed the TM59 results · {0} · no simulation was run", summary.VerdictWord), partOWorkflowOutcome!.Text);
-            Assert.Equal(" · TM59 " + summary.VerdictWord, Modify.TM59OutcomeSuffix(summary));
+            Assert.Equal(string.Format("Results reviewed — TM59 {0}", summary.VerdictText), partOWorkflowOutcome!.Headline);
+            Assert.Equal(summary.Glyph, partOWorkflowOutcome.Glyph);
+            Assert.EndsWith("no simulation was run", partOWorkflowOutcome.Detail);
+
+            //Prepare & Run's closing line is worded from the same instance too.
+            PartOWorkflowOutcome partOWorkflowOutcome_Completed = Modify.CompletedOutcome(PartOWorkflowScenario.Text_Iteration1a, TimeSpan.FromSeconds(53), summary, 0);
+            Assert.EndsWith(" — TM59 " + summary.VerdictText, partOWorkflowOutcome_Completed.Headline);
+            Assert.Equal(summary.Glyph, partOWorkflowOutcome_Completed.Glyph);
 
             //The Hub's word and the window's heading word are the same verdict.
             Assert.Equal(summary.VerdictText, summary.VerdictWord.ToUpperInvariant());
             Assert.EndsWith(summary.VerdictText, partOTM59ResultWindow.VerdictHeading, StringComparison.Ordinal);
 
-            //A pass or fail is information, anything else needs attention.
-            Assert.Equal(summary.HasVerdict ? PartOWorkflowOutcomeKind.Information : PartOWorkflowOutcomeKind.Warning, partOWorkflowOutcome.Kind);
+            //The line's kind follows the verdict: pass, fail, anything else needs attention.
+            Assert.Equal(partOTM59Verdict switch { PartOTM59Verdict.Pass => PartOWorkflowOutcomeKind.Success, PartOTM59Verdict.Fail => PartOWorkflowOutcomeKind.Fail, _ => PartOWorkflowOutcomeKind.Warning }, partOWorkflowOutcome.Kind);
 
             partOTM59ResultWindow.Close();
         }
@@ -173,7 +179,6 @@ namespace SAM.Analytical.UI.WPF.Tests
         public void NoRun_GivesNoHubLine()
         {
             Assert.Null(Modify.ReviewOutcome(null));
-            Assert.Equal(string.Empty, Modify.TM59OutcomeSuffix(null));
         }
 
         /// <summary>

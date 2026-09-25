@@ -178,12 +178,13 @@ namespace SAM.Analytical.UI.WPF
 
                     case PartOWorkflowAction.ReviewResults:
                         //The same summary instance the result window was given - see ReviewOutcome.
-                        partOWorkflowOutcome = ReviewOutcome(ReviewPartOTM59(partORun, owner));
+                        partOWorkflowOutcome = ReviewOutcome(ReviewPartOTM59(partORun, owner), partORun);
                         break;
 
                     case PartOWorkflowAction.Optimise:
-                        RunPartOOptimisation(uIAnalyticalModel, partORun, owner);
-                        partOWorkflowOutcome = null;
+                        //Worded from the run's own stop reason. Null where it was refused before starting:
+                        //that refusal was shown, and the Hub then says what the run itself says.
+                        partOWorkflowOutcome = OptimisationOutcome(RunPartOOptimisationResult(uIAnalyticalModel, partORun, owner));
                         break;
 
                     case PartOWorkflowAction.Iteration3:
@@ -230,10 +231,11 @@ namespace SAM.Analytical.UI.WPF
         /// take it the preparation is rebuilt instead - correctness before saving a preparation.
         /// </para>
         /// </summary>
-        /// <returns>The line the Hub shows about what happened, or null where nothing was started.</returns>
+        /// <returns>The line the Hub shows about what happened (see PartOHubOutcome), or null where nothing was started.</returns>
         private static PartOWorkflowOutcome? PrepareAndRun(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, PartOWorkflowInspection? partOWorkflowInspection, VentilationUnitCatalogue ventilationUnitCatalogue, PartOSimulationCase? partOSimulationCase, PartOWorkflowScenario? partOWorkflowScenario, IWin32Window? owner)
         {
             string iteration = partOWorkflowScenario?.ToString() ?? "Part O iteration";
+            string name = partOWorkflowScenario?.Name ?? iteration;
 
             bool reuse = ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, partOWorkflowInspection?.ReusePreparation ?? false);
 
@@ -325,53 +327,18 @@ namespace SAM.Analytical.UI.WPF
 
             if (partOSimulationOutcome.Cancelled)
             {
-                return new PartOWorkflowOutcome(PartOWorkflowOutcomeKind.Warning, "The simulation was cancelled, so nothing was completed.");
+                return SimulationCancelledOutcome(name);
             }
 
             if (!partORun.CanAssess)
             {
-                return new PartOWorkflowOutcome(PartOWorkflowOutcomeKind.Warning, string.Format("{0} was not completed. {1}", iteration, partOSimulationOutcome.Refusal ?? partOSimulationOutcome.Note_PartORun ?? string.Empty).Trim());
+                return NotCompletedOutcome(name, partOSimulationOutcome.Refusal ?? partOSimulationOutcome.Note_PartORun);
             }
 
-            return new PartOWorkflowOutcome(
-                partOSimulationOutcome.NeedsAttention || (partOTM59ResultSummary is not null && !partOTM59ResultSummary.HasVerdict) ? PartOWorkflowOutcomeKind.Warning : PartOWorkflowOutcomeKind.Success,
-                string.Format(
-                    "✓ {0} complete · TAS simulation {1}{2}{3}",
-                    iteration,
-                    PartOProgressState.Format(elapsed_Simulation ?? partOSimulationOutcome.Elapsed),
-                    TM59OutcomeSuffix(partOTM59ResultSummary),
-                    partOSimulationOutcome.Notes.Count != 0 ? string.Format(" · {0} note(s) were shown", partOSimulationOutcome.Notes.Count) : string.Empty));
+            //The verdict is the summary the result window was given - see CompletedOutcome.
+            return CompletedOutcome(name, elapsed_Simulation ?? partOSimulationOutcome.Elapsed, partOTM59ResultSummary, partOSimulationOutcome.Notes.Count);
         }
 
-        /// <summary>
-        /// The Hub's line after Review Results, worded from the <see cref="PartOTM59ResultSummary"/> that
-        /// <see cref="ReviewPartOTM59"/> built from the assessment and handed to the result window. The Hub never
-        /// reads the window: both are readers of that one object, so they cannot disagree about the verdict.
-        /// Null where there was no run to review.
-        /// </summary>
-        internal static PartOWorkflowOutcome? ReviewOutcome(PartOTM59ResultSummary? partOTM59ResultSummary)
-        {
-            if (partOTM59ResultSummary is null)
-            {
-                return null;
-            }
-
-            return new PartOWorkflowOutcome(
-                partOTM59ResultSummary.HasVerdict ? PartOWorkflowOutcomeKind.Information : PartOWorkflowOutcomeKind.Warning,
-                string.Format("Reviewed the TM59 results · {0} · no simulation was run", partOTM59ResultSummary.VerdictWord));
-        }
-
-        /// <summary>The " · TM59 Fail" part of Prepare &amp; Run's closing line, from the same summary.</summary>
-        internal static string TM59OutcomeSuffix(PartOTM59ResultSummary? partOTM59ResultSummary)
-        {
-            return partOTM59ResultSummary is null ? string.Empty : " · TM59 " + partOTM59ResultSummary.VerdictWord;
-        }
-
-        /// <summary>
-        /// The Hub's line after the engineer cancelled the Review iteration window: a deliberate decline before
-        /// any TAS work, which changed nothing. Not persisted - it is the Hub's last-outcome line, carried only
-        /// to the next showing of the Hub like every other outcome.
-        /// </summary>
         /// <summary>
         /// What Prepare &amp; Run's review promises: acceptance continues into TAS and TM59, which is what
         /// this command does next.
@@ -387,13 +354,6 @@ namespace SAM.Analytical.UI.WPF
         internal static bool ContinuesToSimulation(PartOReviewIntent partOReviewIntent, PartOPreparationResult partOPreparationResult)
         {
             return partOReviewIntent == PartOReviewIntent.PrepareAndRun && partOPreparationResult == PartOPreparationResult.Adopted;
-        }
-
-        internal static PartOWorkflowOutcome DeclinedOutcome(string? iteration)
-        {
-            return new PartOWorkflowOutcome(
-                PartOWorkflowOutcomeKind.Information,
-                string.Format("○ {0}: review cancelled before TAS · no simulation was run and the model is unchanged", string.IsNullOrWhiteSpace(iteration) ? "Part O iteration" : iteration));
         }
 
         /// <summary>

@@ -23,7 +23,11 @@ namespace SAM.Analytical.UI
     /// </summary>
     public class PartORunResume
     {
-        public const string Schema_Current = "PartORunResume:v1";
+        /// <summary>v2 adds <see cref="VentilationUnitCatalogueOffered"/>.</summary>
+        public const string Schema_Current = "PartORunResume:v2";
+
+        /// <summary>Still read: everything v2 holds except whether a catalogue was offered, which it reads as unknown.</summary>
+        public const string Schema_V1 = "PartORunResume:v1";
 
         public const string Suffix_Resume = ".partorun.json";
 
@@ -32,6 +36,12 @@ namespace SAM.Analytical.UI
         public string Schema { get; set; } = Schema_Current;
 
         public PartOIteration PartOIteration { get; set; }
+
+        /// <summary>
+        /// Whether the preparation was offered a product catalogue - what tells Iteration 2 from Iteration 1a
+        /// when the run is named. Null where the sidecar predates it (v1).
+        /// </summary>
+        public bool? VentilationUnitCatalogueOffered { get; set; }
 
         public List<Guid> Guids_Zone { get; set; } = [];
 
@@ -94,6 +104,7 @@ namespace SAM.Analytical.UI
             {
                 ["Schema"] = Schema,
                 ["PartOIteration"] = PartOIteration.ToString(),
+                ["VentilationUnitCatalogueOffered"] = VentilationUnitCatalogueOffered,
                 ["Guids_Zone"] = zones,
                 ["Guids_VentilationSystem"] = systems,
                 ["SolarCalculationMethod"] = SolarCalculationMethod,
@@ -119,7 +130,13 @@ namespace SAM.Analytical.UI
 
             try
             {
-                if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject jsonObject || (string)jsonObject["Schema"] != Schema_Current)
+                if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject jsonObject)
+                {
+                    return null;
+                }
+
+                string schema = (string)jsonObject["Schema"];
+                if (schema != Schema_Current && schema != Schema_V1)
                 {
                     return null;
                 }
@@ -128,6 +145,7 @@ namespace SAM.Analytical.UI
                 {
                     Schema = (string)jsonObject["Schema"],
                     PartOIteration = Enum.TryParse((string)jsonObject["PartOIteration"], out PartOIteration partOIteration) ? partOIteration : default,
+                    VentilationUnitCatalogueOffered = schema == Schema_V1 ? null : (bool?)jsonObject["VentilationUnitCatalogueOffered"],
                     SolarCalculationMethod = (string)jsonObject["SolarCalculationMethod"],
                     SimulateFrom = (int)jsonObject["SimulateFrom"],
                     SimulateTo = (int)jsonObject["SimulateTo"],

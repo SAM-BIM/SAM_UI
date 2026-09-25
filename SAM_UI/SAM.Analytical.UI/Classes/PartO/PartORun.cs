@@ -929,7 +929,9 @@ namespace SAM.Analytical.UI
 
             analyticalModel_Prepared = analyticalModel_Prepared_Temp;
             guids_VentilationSystem_Prepared = [.. partORunResume.Guids_VentilationSystem];
-            partOPreparationContext = new PartOPreparationContext(partORunResume.PartOIteration, zones, [], null);
+            //Resumed, not re-made: no descriptors (Iteration 2B never starts from a restored run), and whether a
+            //catalogue was offered exactly as the sidecar records it - unknown on a v1 sidecar.
+            partOPreparationContext = PartOPreparationContext.Resumed(partORunResume.PartOIteration, zones, partORunResume.VentilationUnitCatalogueOffered);
             partOSimulationContext = new PartOSimulationContext(
                 System.IO.Path.GetDirectoryName(path_TSD),
                 System.IO.Path.GetFileNameWithoutExtension(path_TSD),

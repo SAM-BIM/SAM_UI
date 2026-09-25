@@ -175,7 +175,7 @@ namespace SAM.Analytical.UI.WPF
         /// Whether every status row shows the inspection's complete sentence under its compact line. One
         /// switch for the whole list, rather than a disclosure on every row. Presentation only.
         /// </summary>
-        public static readonly DependencyProperty ShowStatusDetailsProperty = DependencyProperty.Register(nameof(ShowStatusDetails), typeof(bool), typeof(PartOWorkflowWindow), new PropertyMetadata(false));
+        public static readonly DependencyProperty ShowStatusDetailsProperty = DependencyProperty.Register(nameof(ShowStatusDetails), typeof(bool), typeof(PartOWorkflowWindow), new PropertyMetadata(false, (d, e) => ((PartOWorkflowWindow)d).RenderLastOutcome()));
 
         public bool ShowStatusDetails
         {
@@ -310,6 +310,9 @@ namespace SAM.Analytical.UI.WPF
             {
                 partORun = value;
 
+                //Not an inspection input for the line: it reads the run's state, which is cheap and touches no file.
+                RenderLastOutcome();
+
                 Refresh();
             }
         }
@@ -359,6 +362,8 @@ namespace SAM.Analytical.UI.WPF
             set
             {
                 partOWorkflowCapabilities = value ?? new PartOWorkflowCapabilities();
+
+                RenderLastOutcome();
 
                 Refresh();
             }

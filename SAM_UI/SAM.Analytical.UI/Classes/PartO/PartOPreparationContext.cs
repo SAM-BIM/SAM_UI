@@ -89,6 +89,40 @@ namespace SAM.Analytical.UI
         public bool HasVentilationUnitCatalogue => VentilationUnitCapacityDescriptors is not null && VentilationUnitCapacityDescriptors.Count != 0;
 
         /// <summary>
+        /// Whether this run was offered a product catalogue - the Iteration 1a / Iteration 2 distinction - for
+        /// NAMING the run. Null where it is not known.
+        /// <para>
+        /// A live preparation answers from <see cref="HasVentilationUnitCatalogue"/>. A context resumed from a
+        /// saved run carries no descriptors (they are a capability lookup for Iteration 2B, which a resumed run
+        /// never starts), so it answers from what the saved record states - and a record saved before that was
+        /// recorded cannot say, so it answers null rather than reading "no descriptors" as "Iteration 1a".
+        /// </para>
+        /// <para>
+        /// <b>Naming only.</b> Anything that acts on the catalogue reads <see cref="HasVentilationUnitCatalogue"/>
+        /// and the descriptors themselves, which a resumed context never pretends to have.
+        /// </para>
+        /// </summary>
+        public bool? VentilationUnitCatalogueOffered => IsResumed ? ventilationUnitCatalogueOffered_Saved : HasVentilationUnitCatalogue;
+
+        /// <summary>Whether this context was rebuilt from a saved run rather than made by a preparation in this session.</summary>
+        public bool IsResumed { get; private set; }
+
+        private bool? ventilationUnitCatalogueOffered_Saved;
+
+        /// <summary>
+        /// The context a saved run's record describes: its iteration and zones, no routes and no descriptors,
+        /// and whether a catalogue was offered as the record states it (null where the record predates that).
+        /// </summary>
+        public static PartOPreparationContext Resumed(PartOIteration partOIteration, IEnumerable<Zone> zones, bool? ventilationUnitCatalogueOffered)
+        {
+            return new PartOPreparationContext(partOIteration, zones, [], null)
+            {
+                IsResumed = true,
+                ventilationUnitCatalogueOffered_Saved = ventilationUnitCatalogueOffered,
+            };
+        }
+
+        /// <summary>
         /// The Iteration 2B optimisation this run was set up to allow afterwards, or null where none was
         /// asked for.
         /// <para>

@@ -262,8 +262,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartOWorkflowOutcome partOWorkflowOutcome = Modify.DeclinedOutcome(PartOWorkflowScenario.Text_Iteration2);
 
             Assert.Equal(PartOWorkflowOutcomeKind.Information, partOWorkflowOutcome.Kind);
-            Assert.Contains(PartOWorkflowScenario.Text_Iteration2, partOWorkflowOutcome.Text);
-            Assert.Contains("cancelled before TAS", partOWorkflowOutcome.Text);
+            Assert.StartsWith("Iteration 2 review cancelled", partOWorkflowOutcome.Headline);
+            Assert.Contains("Cancelled before TAS", partOWorkflowOutcome.Text);
             Assert.Contains("no simulation was run", partOWorkflowOutcome.Text);
 
             //Never colour alone: the line carries a glyph and words.
@@ -278,7 +278,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 LastOutcome = Modify.DeclinedOutcome(PartOWorkflowScenario.Text_Iteration1a),
             };
 
-            Assert.Contains("review cancelled before TAS", partOWorkflowWindow.LastOutcomeText);
+            Assert.StartsWith("○ Iteration 1a review cancelled — no simulation was run", partOWorkflowWindow.LastOutcomeText);
 
             partOWorkflowWindow.Close();
         }

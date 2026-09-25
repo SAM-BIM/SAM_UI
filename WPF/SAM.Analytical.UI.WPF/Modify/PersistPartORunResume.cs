@@ -42,6 +42,7 @@ namespace SAM.Analytical.UI.WPF
                 PartORunResume partORunResume = new()
                 {
                     PartOIteration = partOPreparationContext.PartOIteration,
+                    VentilationUnitCatalogueOffered = partOPreparationContext.VentilationUnitCatalogueOffered,
                     SolarCalculationMethod = partOSimulationContext.SolarCalculationMethod.ToString(),
                     SimulateFrom = partOSimulationContext.SimulateFrom,
                     SimulateTo = partOSimulationContext.SimulateTo,

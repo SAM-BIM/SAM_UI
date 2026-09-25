@@ -32,9 +32,22 @@ namespace SAM.Analytical.UI.WPF
         /// <param name="owner">Owner window for the dialogs.</param>
         public static void RunPartOOptimisation(this UIAnalyticalModel? uIAnalyticalModel, PartORun? partORun, IWin32Window? owner = null)
         {
+            RunPartOOptimisationResult(uIAnalyticalModel, partORun, owner);
+        }
+
+        /// <summary>
+        /// <see cref="RunPartOOptimisation"/> itself, returning the optimisation it ran so the Prepare &amp; Run Hub
+        /// can word its outcome line from the run's own stop reason. The public command keeps its signature.
+        /// </summary>
+        /// <returns>
+        /// The optimisation that ran, or null where it was refused before starting (that refusal has already
+        /// been shown).
+        /// </returns>
+        internal static PartOOptimisationRun? RunPartOOptimisationResult(UIAnalyticalModel? uIAnalyticalModel, PartORun? partORun, IWin32Window? owner = null)
+        {
             if (uIAnalyticalModel is null || partORun is null)
             {
-                return;
+                return null;
             }
 
             PartOOptimisationSettings? partOOptimisationSettings = partORun.PreparationContext?.OptimisationSettings;
@@ -45,14 +58,14 @@ namespace SAM.Analytical.UI.WPF
             {
                 MessageBox.Show(string.Format("The Part O Iteration 2B optimisation did not run.\n\n{0}", refusal_CanOptimise));
 
-                return;
+                return null;
             }
 
             if (partOOptimisationSettings is null)
             {
                 MessageBox.Show("This Part O run was not prepared with automatic TM59 optimisation enabled, so there is no airflow step or iteration limit to run it at. Prepare the iteration again with 'Automatically optimise TM59 failures' ticked.");
 
-                return;
+                return null;
             }
 
             PartOOptimisationRun? partOOptimisationRun = partORun.OptimisePartOTM59(partOOptimisationSettings, out string? refusal);
@@ -61,7 +74,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 MessageBox.Show(string.Format("The Part O Iteration 2B optimisation did not run.\n\n{0}", refusal));
 
-                return;
+                return null;
             }
 
             PartOOptimisationResultWindow partOOptimisationResultWindow = new()
@@ -79,7 +92,7 @@ namespace SAM.Analytical.UI.WPF
             AnalyticalModel? analyticalModel_LastValid = partOOptimisationRun.AnalyticalModel_LastValid;
             if (analyticalModel_LastValid is null)
             {
-                return;
+                return partOOptimisationRun;
             }
 
             //Armed only where the run holds THIS VERY MODEL as its completed one. State alone is not
@@ -95,6 +108,8 @@ namespace SAM.Analytical.UI.WPF
             }
 
             uIAnalyticalModel.SetJSAMObject(analyticalModel_LastValid, new FullModification());
+
+            return partOOptimisationRun;
         }
     }
 }
