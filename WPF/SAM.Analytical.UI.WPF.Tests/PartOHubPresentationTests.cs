@@ -236,6 +236,31 @@ namespace SAM.Analytical.UI.WPF.Tests
             partOWorkflowWindow.Close();
         }
 
+        /// <summary>
+        /// Codex review on #111: on a monitor shorter than the primary, a Hub taller than that monitor's
+        /// working area could not be moved far enough. The ceiling is capped to the monitor it is on first.
+        /// </summary>
+        [Theory]
+        //Fits already: untouched.
+        [InlineData(100, 500, 2000, 0, 1040, 100, 956.8)]
+        //Opened low on a 1080p secondary: moved up.
+        [InlineData(700, 800, 1300, 0, 1040, 240, 956.8)]
+        //Taller than the secondary's working area (ceiling from a 4K primary): capped, then placed at the top.
+        [InlineData(300, 1300, 1900, 0, 1040, 83.2, 956.8)]
+        //A secondary above-left of the primary, negative coordinates.
+        [InlineData(-200, 900, 1000, -1080, -40, -940, 956.8)]
+        public void The_hub_is_placed_and_capped_against_the_monitor_it_is_on(double top, double height, double maxHeight, double areaTop, double areaBottom, double top_Expected, double maxHeight_Expected)
+        {
+            (double top_Result, double maxHeight_Result) = PartOWorkflowWindow.Placement(top, height, maxHeight, areaTop, areaBottom);
+
+            Assert.Equal(maxHeight_Expected, maxHeight_Result, 3);
+            Assert.Equal(top_Expected, top_Result, 3);
+
+            //The action row - the window's bottom - is inside the working area.
+            Assert.True(top_Result + System.Math.Min(height, maxHeight_Result) <= areaBottom + 1e-9);
+            Assert.True(top_Result >= areaTop - 1e-9);
+        }
+
         // ----- fixture -----------------------------------------------------------------------------------
 
         private static PartOWorkflowScenario Scenario_1a()

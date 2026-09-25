@@ -897,7 +897,13 @@ namespace SAM.Analytical.UI.WPF
         /// Once, when the Hub first renders: where it opened low enough that its bottom - the action row -
         /// would sit below the working area of its monitor (behind the taskbar), it is moved up to fit.
         /// Found live: a reopened run opened at the owner's cascade position with its actions off-screen.
-        /// It never moves a window the person has placed, and never resizes one.
+        /// <para>
+        /// <b>Against the monitor it is actually on.</b> The constructor's height ceiling is read from the
+        /// PRIMARY working area; on a shorter secondary monitor a Hub taller than that monitor could not be
+        /// moved far enough, so the ceiling is lowered to this monitor's first - the content scrolls, and the
+        /// action row sits outside the scroll region. It is never raised, and a window the person has placed
+        /// is never moved again.
+        /// </para>
         /// </summary>
         private void KeepOnScreen()
         {
@@ -914,10 +920,32 @@ namespace SAM.Analytical.UI.WPF
             Point point_Top = matrix.Transform(new Point(rectangle.Left, rectangle.Top));
             Point point_Bottom = matrix.Transform(new Point(rectangle.Right, rectangle.Bottom));
 
-            if (Top + ActualHeight > point_Bottom.Y)
-            {
-                Top = Math.Max(point_Top.Y, point_Bottom.Y - ActualHeight);
-            }
+            (double top, double maxHeight) = Placement(Top, ActualHeight, MaxHeight, point_Top.Y, point_Bottom.Y);
+
+            MaxHeight = maxHeight;
+            Top = top;
+        }
+
+        /// <summary>
+        /// Where a window of <paramref name="height"/> at <paramref name="top"/> goes to fit a working area
+        /// running from <paramref name="areaTop"/> to <paramref name="areaBottom"/>: the height ceiling
+        /// lowered to 92% of that area where it was higher (the constructor's own proportion), and the top
+        /// moved up only as far as the capped height needs. Pure, so the arithmetic is testable without a
+        /// second monitor.
+        /// </summary>
+        internal static (double Top, double MaxHeight) Placement(double top, double height, double maxHeight, double areaTop, double areaBottom)
+        {
+            double maxHeight_Area = (areaBottom - areaTop) * 0.92;
+
+            double maxHeight_Result = double.IsNaN(maxHeight) ? maxHeight_Area : Math.Min(maxHeight, maxHeight_Area);
+
+            double height_Result = Math.Min(height, maxHeight_Result);
+
+            double top_Result = top + height_Result > areaBottom
+                ? Math.Max(areaTop, areaBottom - height_Result)
+                : top;
+
+            return (top_Result, maxHeight_Result);
         }
 
         /// <summary>

@@ -259,10 +259,17 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             window.ShowActivated = false;
 
+            //A window may cap its own height to its monitor as it first renders (the Hub does); a render
+            //asks for the full content, so the requested ceiling is put back once it has shown.
+            double maxHeight = window.MaxHeight;
+
             if (!window.IsVisible)
             {
                 window.Show();
+                window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             }
+
+            window.MaxHeight = maxHeight;
 
             window.UpdateLayout();
 
