@@ -1,9 +1,15 @@
 # Project Progress
 
-## Current: Part O UX pass 2 - TM59 / Overheating result window (25 Sep 2026) - PR open, NOT merged
+## Current: Part O UX pass 2 - TM59 / Overheating result window (25 Sep 2026) - MERGED
 
-**Status.** On `feature/parto-tm59-result-ux-2026-09-25`, from `sow/2026-Q3` `d123f3d` (#113 merged). A PR is open
-against `sow/2026-Q3` and stopped before merge, per the owner brief. SAM_UI only. This is proposal item 2 of the journey
+**Status.** MERGED into `sow/2026-Q3` as SAM-BIM/SAM_UI#114, on the owner's merge order:
+1. SAM-BIM/SAM#137 merged first (`7dbeb2e4`).
+2. Local SAM `sow/2026-Q3` updated to it and rebuilt.
+3. #114 re-checked against that merged SAM build: clean `SAM_UI.sln` Rebuild, 0 errors; focused TM59 tests 85/85;
+   full WPF suite 1129/1129; the test binaries carry the merged `SAM.Analytical.dll`.
+4. #114 merged.
+
+Branched from `sow/2026-Q3` `d123f3d` (#113 merged). SAM_UI only. This is proposal item 2 of the journey
 review (H3, m4, m5). M5, Review Results progress, is **not** in it: the Hub route already reports into the progress host.
 
 The session started with 30 staged changes that exactly reverted #113 (an accident). The owner confirmed they should
@@ -66,12 +72,11 @@ be discarded, and they were (`git restore --staged --worktree :/`) before branch
 - M5 (Review Results progress on the ribbon route) is still the old `ProgressBarWindowManager`.
 - `Modify.PartialAssessment`'s sentence still says "space(s)" (the m1 sweep).
 
-**Local build dependency.** SAM_UI builds against `..\SAM\build` (HintPath). This checkout was built with SAM at
-`feature/parto-tm59-result-ux-2026-09-25` (`fc48f53a`). On another machine, build SAM from that branch, or from
-`sow/2026-Q3` once #137 is merged, before building SAM_UI. `SAM.sln`'s build also refreshes `%APPDATA%\SAM`.
+**Local build dependency.** SAM_UI builds against `..\SAM\build` (HintPath), so it needs SAM `sow/2026-Q3` at or after
+`7dbeb2e4` (#137) for `TM59AssessmentReport.OccupiedSpaces`. Build SAM before SAM_UI. `SAM.sln`'s build also refreshes `%APPDATA%\SAM`.
 
-**Next step.** The owner reviews SAM#137 and SAM_UI#114. **Merge SAM#137 first**, then #114. After that, move
-SAM_Deploy's SAM and SAM_UI pointers. Proposal item 3 next: 2B in the
+**Next step.** Move SAM_Deploy's SAM pointer to `7dbeb2e4` and its SAM_UI pointer to the #114 merge commit. Then
+proposal item 3: 2B in the Part O language (H4). It needs one short TAS acceptance run; ask first. Proposal item 3 next: 2B in the
 Part O language (H4). It needs one short TAS acceptance run; ask first.
 
 ## Previous: Part O UX pass 1 - Review iteration window (25 Sep 2026) - MERGED
