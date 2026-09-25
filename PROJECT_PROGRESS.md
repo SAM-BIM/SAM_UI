@@ -66,7 +66,7 @@ be discarded, and they were (`git restore --staged --worktree :/`) before branch
 - M5 (Review Results progress on the ribbon route) is still the old `ProgressBarWindowManager`.
 - `Modify.PartialAssessment`'s sentence still says "space(s)" (the m1 sweep).
 
-**Local build dependency.** SAM_UI builds against `..\SAMuild` (HintPath). This checkout was built with SAM at
+**Local build dependency.** SAM_UI builds against `..\SAM\build` (HintPath). This checkout was built with SAM at
 `feature/parto-tm59-result-ux-2026-09-25` (`fc48f53a`). On another machine, build SAM from that branch, or from
 `sow/2026-Q3` once #137 is merged, before building SAM_UI. `SAM.sln`'s build also refreshes `%APPDATA%\SAM`.
 
