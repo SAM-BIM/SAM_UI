@@ -1,9 +1,10 @@
 # Project Progress
 
-## Current: Part O / TM59 workflow simplification (24-25 Sep 2026) - implemented, live-smoke-tested, PR open
+## Current: Part O / TM59 workflow simplification (24-25 Sep 2026) - MERGED
 
-**Status.** Implemented (commit `2ab49f1`), live smoke tests passed on 25 Sep (`4588412`), pushed, PR
-SAM-BIM/SAM_UI#109 into `sow/2026-Q3` (open; wait for CI green before merge). Branch `feature/parto-workflow-simplification-2026-09-24` (SAM_UI only, from `sow/2026-Q3` `c7281ca`).
+**Status.** MERGED into `sow/2026-Q3` on 2026-09-25: SAM-BIM/SAM_UI#109 -> merge commit `75d7b7cd` (implementation
+`2ab49f1`, live smoke evidence + regression test `4588412`, note `b9acc83`). CI green (build, spdx); Codex review
+completed with no findings. Feature branch deleted. SAM_UI only, from `sow/2026-Q3` `c7281ca`.
 SAM / SAM_Systems / SAM_Tas unchanged (engineering behaviour frozen after the merged Nuaire work).
 
 **Environment.** All four repos at `origin/sow/2026-Q3` (SAM `80b01052`, SAM_Systems `2213373`, SAM_Tas `39828c6`,
@@ -75,7 +76,10 @@ re-shows (pixels correct - accessibility only). Main window still busy while TAS
 text inside the Iteration 3 TAS calls. Pre-existing 'Reloading' flash on model adoption. 2B history grid builds
 all rows eagerly.
 
-**Next step.** Review and merge the SAM_UI PR (CI green first); then bump SAM_Deploy's SAM_UI pointer.
+**Next step.** Bump SAM_Deploy's pointers - all four are behind `sow/2026-Q3` (SAM_Deploy `83b2c37`, PR #46,
+predates the Nuaire-reply merges): SAM `875655fa`->`80b01052`, SAM_Systems `df5dd332`->`22133736`,
+SAM_Tas `f7d39351`->`39828c69`, SAM_UI `4460dc3a`->`75d7b7cd` (or later, to include this note). Separately: the
+UI Automation accessibility follow-up on the progress window (non-blocking).
 
 ## Previous: Nuaire reply (24 Sep 2026) - exchanger then DX drop, 13 C floor
 
