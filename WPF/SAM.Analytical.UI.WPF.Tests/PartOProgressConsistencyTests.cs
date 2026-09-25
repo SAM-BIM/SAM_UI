@@ -724,6 +724,57 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(expected, partOProgressState.Status(Modify.PartOOptimisationPhase_CapacityEnvelope));
         }
 
+        [Theory]
+        [InlineData(PartOOptimisationStopReason.Passed)]
+        [InlineData(PartOOptimisationStopReason.NoEligibleTargets)]
+        public void A_baseline_that_needs_no_round_leaves_no_stage_reading_as_upcoming(PartOOptimisationStopReason partOOptimisationStopReason)
+        {
+            PartOOptimisationSettings partOOptimisationSettings = new() { CapacityEnvelope = true };
+            PartOProgressState partOProgressState = new(Modify.PartOOptimisationPhases(partOOptimisationSettings));
+
+            //The baseline assessment, and the run stops there.
+            partOProgressState.Start(Modify.PartOOptimisationPhase_Starting);
+
+            Modify.PartOOptimisationProgressEnd(partOProgressState, new PartOOptimisationRun(partOOptimisationSettings) { StopReason = partOOptimisationStopReason });
+
+            Assert.Equal(PartOProgressStageStatus.Completed, partOProgressState.Status(Modify.PartOOptimisationPhase_Starting));
+            Assert.Equal(PartOProgressStageStatus.Skipped, partOProgressState.Status(Modify.PartOOptimisationPhase_Rounds));
+            Assert.Equal(PartOProgressStageStatus.Skipped, partOProgressState.Status(Modify.PartOOptimisationPhase_CapacityEnvelope));
+            Assert.Equal("Not needed: Optimisation rounds", partOProgressState.AccessibleLine(Modify.PartOOptimisationPhase_Rounds));
+        }
+
+        [Fact]
+        public void A_capacity_envelope_declined_before_it_simulated_reads_as_not_needed()
+        {
+            PartOOptimisationSettings partOOptimisationSettings = new() { CapacityEnvelope = true };
+            PartOProgressState partOProgressState = new(Modify.PartOOptimisationPhases(partOOptimisationSettings));
+
+            //Rounds ran; the envelope was asked for but declined, so its stage never started.
+            partOProgressState.Start(Modify.PartOOptimisationPhase_Rounds);
+            partOProgressState.Activity("round 2");
+
+            Modify.PartOOptimisationProgressEnd(partOProgressState, new PartOOptimisationRun(partOOptimisationSettings) { StopReason = PartOOptimisationStopReason.Passed });
+
+            Assert.Equal(PartOProgressStageStatus.Completed, partOProgressState.Status(Modify.PartOOptimisationPhase_Rounds));
+            Assert.Equal(PartOProgressStageStatus.Skipped, partOProgressState.Status(Modify.PartOOptimisationPhase_CapacityEnvelope));
+            Assert.DoesNotContain(partOProgressState.Lines(), x => x.StartsWith("○"));
+        }
+
+        [Fact]
+        public void A_cancelled_run_leaves_the_stages_it_never_reached_alone()
+        {
+            PartOOptimisationSettings partOOptimisationSettings = new() { CapacityEnvelope = true };
+            PartOProgressState partOProgressState = new(Modify.PartOOptimisationPhases(partOOptimisationSettings));
+
+            partOProgressState.Start(Modify.PartOOptimisationPhase_Rounds);
+
+            Modify.PartOOptimisationProgressEnd(partOProgressState, new PartOOptimisationRun(partOOptimisationSettings) { StopReason = PartOOptimisationStopReason.Cancelled });
+
+            //Not "not needed": it did not run because the run was stopped, not because it was unnecessary.
+            Assert.Equal(PartOProgressStageStatus.Failed, partOProgressState.Status(Modify.PartOOptimisationPhase_Rounds));
+            Assert.Equal(PartOProgressStageStatus.Pending, partOProgressState.Status(Modify.PartOOptimisationPhase_CapacityEnvelope));
+        }
+
         [Fact]
         public void A_2B_run_refused_before_it_started_does_not_read_as_completed()
         {

@@ -40,7 +40,8 @@ namespace SAM.Analytical.UI.WPF
         /// completed. The ordinary optimisation completed where it reached a terminal condition (passed, at
         /// capacity, at its limit, nothing left to target) - the same four the Hub calls completed; any other
         /// stop, a cancellation included, did not complete. A capacity envelope that was running completed
-        /// only where its own step says so. Null - refused before anything ran - did not complete.
+        /// only where its own step says so. Null - refused before anything ran - did not complete. A completed
+        /// run's stages that never started are marked not needed, never left reading as upcoming.
         /// </summary>
         internal static void PartOOptimisationProgressEnd(PartOProgressState partOProgressState, PartOOptimisationRun? partOOptimisationRun)
         {
@@ -70,6 +71,11 @@ namespace SAM.Analytical.UI.WPF
             if (completed)
             {
                 partOProgressState.Complete();
+
+                //Ended at its own terminal condition, so what never started - the rounds, where the baseline
+                //needed none; an envelope declined before it simulated - was not needed. Only here: after a
+                //cancellation or a failure a stage that never ran was not "not needed", so it is left alone.
+                partOProgressState.SkipUnstarted();
             }
             else
             {

@@ -258,6 +258,24 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>
+        /// Marks every stage that never started as not needed. For an operation that ended at a condition of
+        /// its own before reaching them - so the last render never lists as upcoming a stage that will not run.
+        /// </summary>
+        public void SkipUnstarted()
+        {
+            lock (@lock)
+            {
+                for (int i = 0; i < names.Count; i++)
+                {
+                    if (statuses[i] == PartOProgressStageStatus.Pending)
+                    {
+                        statuses[i] = PartOProgressStageStatus.Skipped;
+                    }
+                }
+            }
+        }
+
         /// <summary>Fails the running stage (or, where none is running, the first pending one) and ends the clock.</summary>
         public void Fail(string text = null)
         {

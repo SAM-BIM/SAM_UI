@@ -77,6 +77,10 @@ redesign is Pass 5 and is not started.
     completed. Anything else fails, Cancelled included.
   - A running envelope completes only if its own step `IsCompleted`. A null run fails.
   - Before, `Complete()` was unconditional, so a cancelled round could flash "✓" beside "Cancelling…".
+  - Codex P2 on d6a8cf8: a COMPLETED run marks the stages it never started "Not needed"
+    (`PartOProgressState.SkipUnstarted`). That covers a baseline that passes or has no targets, and an
+    envelope declined before it simulated. After a cancel or failure they are left as they are, because "not
+    needed" would not be true.
 
 **Files.** `Classes/PartO/PartOProgressState.cs`, `Classes/PartO/PartOProgressHost.cs`,
 `Windows/PartOProgressWindow.xaml(.cs)`, `Modify/AssessPartOTM59.cs`, `Modify/OptimisePartOTM59.cs`,
@@ -85,7 +89,7 @@ scopes only); tests `PartOProgressConsistencyTests.cs` (new), `PartOWorkflowSimp
 wording pins); evidence `documentation/evidence/parto-progress-consistency/`.
 
 **Validation.**
-- `SAM.Analytical.UI.WPF.Tests`: 1192/1192 (was 1159; 1173 at the first push).
+- `SAM.Analytical.UI.WPF.Tests`: 1196/1196 (was 1159; 1173 at the first push, 1192 at d6a8cf8).
   - The correction's tests: the 2B offer through a whole sequence, the latched request, nested scopes,
     Prepare & Run unchanged, the note, the window refusing a click, the shown window already disabled when the
     scope returns (UIA, no wait), and the end state for every stop reason and for the envelope.
