@@ -30,11 +30,20 @@ namespace SAM.Analytical.UI.WPF
         /// <param name="uIAnalyticalModel">The loaded model. Replaced by the last valid design on success.</param>
         /// <param name="partORun">The session's completed Iteration 2 run.</param>
         /// <param name="owner">Owner window for the dialogs.</param>
+        public static void RunPartOOptimisation(this UIAnalyticalModel? uIAnalyticalModel, PartORun? partORun, IWin32Window? owner = null)
+        {
+            RunPartOOptimisationResult(uIAnalyticalModel, partORun, owner);
+        }
+
+        /// <summary>
+        /// <see cref="RunPartOOptimisation"/> itself, returning the optimisation it ran so the Prepare &amp; Run Hub
+        /// can word its outcome line from the run's own stop reason. The public command keeps its signature.
+        /// </summary>
         /// <returns>
-        /// The optimisation that ran - its stop reason is what the Hub's line is worded from - or null where it
-        /// was refused before starting, with that refusal already shown.
+        /// The optimisation that ran, or null where it was refused before starting (that refusal has already
+        /// been shown).
         /// </returns>
-        public static PartOOptimisationRun? RunPartOOptimisation(this UIAnalyticalModel? uIAnalyticalModel, PartORun? partORun, IWin32Window? owner = null)
+        internal static PartOOptimisationRun? RunPartOOptimisationResult(UIAnalyticalModel? uIAnalyticalModel, PartORun? partORun, IWin32Window? owner = null)
         {
             if (uIAnalyticalModel is null || partORun is null)
             {

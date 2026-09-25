@@ -4,8 +4,10 @@
 
 **Status.** Branch `feature/parto-hub-outcome-2026-09-25` from `sow/2026-Q3` `a13ba4c` (#114 merged). SAM_UI only;
 no SAM change is needed. A PR is open against `sow/2026-Q3`; the owner said to stop before merge. Engineering and
-simulation pathways are unchanged. One public signature changed: `Modify.RunPartOOptimisation` now returns the
-`PartOOptimisationRun?` it already built (void before). Its only other caller, the ribbon, ignores the return value.
+simulation pathways are unchanged. No public signature changed: owner review asked to keep the public
+`void Modify.RunPartOOptimisation(...)`. It is now a wrapper over the internal
+`Modify.RunPartOOptimisationResult(...)`, the same body, which returns the `PartOOptimisationRun?` it already built.
+Only the Hub calls the internal method, to word the 2B line.
 
 **States found, and where each comes from.**
 - Authoritative and persistent (read off `PartORun` / `Modify.Capabilities` at every showing):

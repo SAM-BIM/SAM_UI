@@ -184,7 +184,7 @@ namespace SAM.Analytical.UI.WPF
                     case PartOWorkflowAction.Optimise:
                         //Worded from the run's own stop reason. Null where it was refused before starting:
                         //that refusal was shown, and the Hub then says what the run itself says.
-                        partOWorkflowOutcome = OptimisationOutcome(RunPartOOptimisation(uIAnalyticalModel, partORun, owner));
+                        partOWorkflowOutcome = OptimisationOutcome(RunPartOOptimisationResult(uIAnalyticalModel, partORun, owner));
                         break;
 
                     case PartOWorkflowAction.Iteration3:
