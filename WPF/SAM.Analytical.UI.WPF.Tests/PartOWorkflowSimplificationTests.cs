@@ -345,7 +345,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             string after = ProgressText();
             Assert.Contains("TAS simulation (full year)", after);
-            Assert.Contains("elapsed", after);
+            Assert.Contains("Elapsed ", after);
         }
 
         [WpfFact]
@@ -369,7 +369,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.Equal(2, itemsControl.Items.Count);
             Assert.Equal("Simulating Model", textBlock_Detail.Text);
-            Assert.EndsWith("elapsed", textBlock_Elapsed.Text);
+            Assert.StartsWith("Elapsed ", textBlock_Elapsed.Text);
 
             //Indeterminate: TAS reports no fraction, so none is shown.
             Assert.True(progressBar.IsIndeterminate);

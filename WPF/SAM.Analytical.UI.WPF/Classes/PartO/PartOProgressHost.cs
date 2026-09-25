@@ -9,8 +9,9 @@ using System.Windows.Threading;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// The one progress window of a long Approved Document O operation - Prepare &amp; Run, an Iteration 3
-    /// run, or a review - hosted on its own UI thread for as long as the operation lasts.
+    /// The one progress window of a long Approved Document O operation - Prepare &amp; Run, Review Results, an
+    /// Iteration 2B optimisation, an Iteration 3 run or review - hosted on its own UI thread for as long as the
+    /// operation lasts.
     ///
     /// <para><b>Why its own thread</b></para>
     /// <para>

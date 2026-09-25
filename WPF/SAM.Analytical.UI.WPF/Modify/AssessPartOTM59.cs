@@ -88,28 +88,32 @@ namespace SAM.Analytical.UI.WPF
 
             PartOTM59Assessment partOTM59Assessment;
 
-            if (partOProgressHost is not null)
+            //Reviewed on its own - the Hub's Review Results - the reading gets the same Part O progress window
+            //as every other Part O operation, rather than a generic box. One stage, because it is one call; no
+            //Cancel, because that call observes none.
+            using (PartOProgressHost? partOProgressHost_Review = partOProgressHost is null
+                ? new(
+                    "Checking TM59 results",
+                    string.Format("{0} · reading the saved results; no TAS simulation is run.", Query.PartOIterationText(partORun)),
+                    ["TM59 assessment"],
+                    false)
+                : null)
             {
-                partOProgressHost.Detail("Reading the simulation results and assessing them against CIBSE TM59");
+                PartOProgressHost partOProgressHost_Assessment = partOProgressHost ?? partOProgressHost_Review!;
 
-                //The whole assessment, in the one place that owns it - see below.
+                partOProgressHost_Review?.Start(0);
+
+                partOProgressHost_Assessment.Detail("Reading the simulation results and assessing them against CIBSE TM59");
+
+                //The whole assessment, in the one place that owns it - so this command and the Iteration 2B
+                //optimisation can never disagree about what TM59 said. See PartOTM59Assessment.
                 partOTM59Assessment = PartOTM59Assessment.Assess(analyticalModel_Workflow, path_TSD, partORun.OverheatingScenarios);
 
-                partOProgressHost.Detail(null);
+                partOProgressHost_Assessment.Detail(null);
 
-                //The result window is modal; a topmost window on another thread must not sit over it.
-                partOProgressHost.Hide();
-            }
-            else
-            {
-                using (ProgressBarWindowManager progressBarWindowManager = new("Part O TM59", "Reading simulation results..."))
-                {
-                    //The whole assessment, in the one place that owns it - so this command and the Iteration 2B
-                    //optimisation can never disagree about what TM59 said. See PartOTM59Assessment.
-                    partOTM59Assessment = PartOTM59Assessment.Assess(analyticalModel_Workflow, path_TSD, partORun.OverheatingScenarios);
-
-                    progressBarWindowManager.Text = partOTM59Assessment.IsAssessed ? "Assessing..." : "Failed";
-                }
+                //The result window is modal; a topmost window on another thread must not sit over it. Its own
+                //window closes instead, as the using ends.
+                partOProgressHost?.Hide();
             }
 
             if (!partOTM59Assessment.IsAssessed)

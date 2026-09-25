@@ -68,7 +68,24 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
-            PartOOptimisationRun? partOOptimisationRun = partORun.OptimisePartOTM59(partOOptimisationSettings, out string? refusal);
+            PartOOptimisationRun? partOOptimisationRun;
+            string? refusal;
+
+            //ONE Part O progress window for the whole optimisation, as Prepare & Run and Iteration 3 have.
+            //While it is the ambient host, each round's preparation and TAS workflow report into it and take
+            //its Cancel (see RunPartOSimulation and RunWorkflow) instead of opening a "Preparing Model" and a
+            //"Tas Workflow" dialog of their own per round. The rounds, their stop rules and what a Cancel
+            //does to a round are unchanged: Cancel is observed where it always was, between the steps of a
+            //round's simulation.
+            using (PartOProgressHost partOProgressHost = new(
+                "Iteration 2B — TM59 optimisation",
+                PartOOptimisationProgressSubheading(partOOptimisationSettings),
+                PartOOptimisationPhases(partOOptimisationSettings)))
+            {
+                partOOptimisationRun = partORun.OptimisePartOTM59(partOOptimisationSettings, out refusal);
+
+                partOProgressHost.State.Complete();
+            }
 
             if (partOOptimisationRun is null)
             {

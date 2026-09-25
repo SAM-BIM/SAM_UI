@@ -20,6 +20,8 @@ namespace SAM.Analytical.UI.WPF
 
         private PartOProgressState partOProgressState;
 
+        private bool cancellable = true;
+
         private bool cancelRequested;
 
         public PartOProgressWindow()
@@ -61,13 +63,18 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>
+        /// Shows Cancel. Either way the note stays, because it also answers whether the operation can be
+        /// stopped at all - "It cannot be cancelled" is information, not an absence.
+        /// </summary>
         public bool Cancellable
         {
-            get => button_Cancel.Visibility == Visibility.Visible;
+            get => cancellable;
             set
             {
+                cancellable = value;
                 button_Cancel.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
-                textBlock_Note.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+                Render();
             }
         }
 
@@ -98,8 +105,9 @@ namespace SAM.Analytical.UI.WPF
 
                 rows.Add(new Row(
                     PartOProgressState.Glyph(partOProgressStageStatus),
-                    partOProgressState.Name(i),
+                    partOProgressState.Label(i),
                     duration.HasValue && partOProgressStageStatus != PartOProgressStageStatus.Pending && partOProgressStageStatus != PartOProgressStageStatus.Skipped ? PartOProgressState.Format(duration.Value) : string.Empty,
+                    partOProgressState.AccessibleLine(i, false),
                     partOProgressStageStatus));
             }
 
@@ -109,7 +117,18 @@ namespace SAM.Analytical.UI.WPF
             textBlock_Detail.Text = detail ?? string.Empty;
             textBlock_Detail.Visibility = string.IsNullOrWhiteSpace(detail) ? Visibility.Collapsed : Visibility.Visible;
 
-            textBlock_Elapsed.Text = string.Format("{0} elapsed", PartOProgressState.Format(partOProgressState.Elapsed));
+            //Determinate only on a real count; otherwise the bar moves without claiming a position.
+            double? fraction = partOProgressState.Fraction;
+            progressBar.IsIndeterminate = !fraction.HasValue;
+            progressBar.Value = fraction ?? 0;
+
+            string percent = partOProgressState.Percent;
+            textBlock_Percent.Text = percent ?? string.Empty;
+            textBlock_Percent.Visibility = percent is null ? Visibility.Collapsed : Visibility.Visible;
+
+            textBlock_Elapsed.Text = partOProgressState.ElapsedText;
+
+            textBlock_Note.Text = PartOProgressState.Note(fraction.HasValue, cancellable, cancelRequested);
         }
 
         private void button_Cancel_Click(object sender, RoutedEventArgs e)
@@ -123,18 +142,21 @@ namespace SAM.Analytical.UI.WPF
 
             button_Cancel.IsEnabled = false;
             button_Cancel.Content = "Cancelling…";
-            textBlock_Note.Text = "Cancel requested. The run stops before its next stage; a TAS simulation already running finishes first.";
+
+            Render();
 
             CancelRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private sealed class Row
         {
-            internal Row(string glyph, string name, string duration, PartOProgressStageStatus partOProgressStageStatus)
+            internal Row(string glyph, string name, string duration, string accessibleName, PartOProgressStageStatus partOProgressStageStatus)
             {
                 Glyph = glyph;
                 Name = name;
                 Duration = duration;
+                AccessibleName = accessibleName;
+                StatusText = PartOProgressState.StatusText(partOProgressStageStatus);
 
                 Foreground = partOProgressStageStatus switch
                 {
@@ -153,9 +175,19 @@ namespace SAM.Analytical.UI.WPF
 
             public string Duration { get; }
 
+            public string AccessibleName { get; }
+
+            public string StatusText { get; }
+
             public Brush Foreground { get; }
 
             public FontWeight FontWeight { get; }
+
+            //What the ItemsControl's item peer is named by.
+            public override string ToString()
+            {
+                return AccessibleName;
+            }
         }
     }
 }
