@@ -1,9 +1,9 @@
 # Project Progress
 
-## Current: Part O / TM59 workflow simplification (24 Sep 2026) - implemented, uncommitted
+## Current: Part O / TM59 workflow simplification (24-25 Sep 2026) - implemented, live-smoke-tested, PR open
 
-**Status.** Stage 1 review and Stage 2 implementation done; validation done without running TAS. NOT committed,
-NOT pushed. Branch `feature/parto-workflow-simplification-2026-09-24` (SAM_UI only, from `sow/2026-Q3` `c7281ca`).
+**Status.** Implemented (commit `2ab49f1`), live smoke tests passed on 25 Sep (commit 2), pushed, one PR into
+`sow/2026-Q3`. Branch `feature/parto-workflow-simplification-2026-09-24` (SAM_UI only, from `sow/2026-Q3` `c7281ca`).
 SAM / SAM_Systems / SAM_Tas unchanged (engineering behaviour frozen after the merged Nuaire work).
 
 **Environment.** All four repos at `origin/sow/2026-Q3` (SAM `80b01052`, SAM_Systems `2213373`, SAM_Tas `39828c6`,
@@ -48,7 +48,7 @@ text uses Part O iteration language - "Iteration 3 comparison", Reference case /
   Column MinWidth pins widths (WPF leaves them unresolved when no row is realised).
 - `AssessPartOTM59` now returns the verdict and uses the shared progress window when one is current.
 
-**Validation.** `SAM_UI.sln` Release: 0 errors. `SAM.Analytical.UI.WPF.Tests`: 1055/1055 (1031 before; 22 updated
+**Validation.** `SAM_UI.sln` Release: 0 errors. `SAM.Analytical.UI.WPF.Tests`: 1056/1056 (1031 before; 22 updated
 for the per-method names/labels and the completed-only Review rule; new: `PartOWorkflowSimplificationTests`, run
 tests for per-method record / stage order / cancel-before-TAS, eligibility per-method/legacy/refused).
 5,000-room test: 1000 dwellings x 5 rooms x 3 criteria = 15 000 rows open with <100 rows realised, groups collapsed.
@@ -59,13 +59,23 @@ review 8.8 s, bias 0.567 K / RMSE 1.477 K / max 4.121 K (= acceptance); guidance
 catalogue SHA changed since that run. Report files the review rewrote were restored. Screenshots in the session
 scratchpad only (not in git).
 
-**Not validated / risks.** Prepare & Run and an Iteration 3 run were NOT executed with TAS (by instruction): the
-dialog-free `SimulatePartO` path, the live progress window during TAS, and cancel mid-run are covered by unit tests
-and code reading only. The main window still looks busy while TAS blocks the UI thread (TAS COM stays on it).
-No sub-step text inside the Iteration 3 TAS calls (SAM_Tas exposes none; not added).
+**Live smoke tests (25 Sep, real exe + TAS, UI Automation).** Record:
+`documentation/evidence/parto-workflow-simplification/LIVE-SMOKE-2026-09-25.md` (+ 6 screenshots); raw logs and
+scripts outside git in `C:\TasOut\parto-workflow-smoke-2026-09-25\`.
+- Prepare & Run (1a, acceptance model a7e09a25): Simulation case in the Hub, Review iteration shown, no Simulate
+  dialog, one progress window through the whole TAS run (window watcher + its own pixels), TAS 50-54 s, TM59
+  opened, inline Hub line, 0 message boxes (5 passes).
+- Iteration 3 guidance from that 1a: reference case named, guidance default, pre-flight 3 x Nuaire, no picker,
+  6.7 min with the progress window updating throughout (moved/minimised/restored), comparison +0.52 K / 1.41 K /
+  4.14 K, reopened in-session (12 s) and in a fresh process (14.7 s, TSD reader only, no TBD/TPD).
+- Fixed/added after the smoke: regression test that the progress window keeps its content after Hide/Show.
 
-**Next step.** Owner review in VS; then one real Prepare & Run (1a) and one Iteration 3 MG run to see the progress
-window and the inline completion live; then commit on the branch, push, PR to `sow/2026-Q3`.
+**Known follow-ups (not blocking).** UI Automation exposes no elements for the progress window after it
+re-shows (pixels correct - accessibility only). Main window still busy while TAS holds the UI thread. No sub-step
+text inside the Iteration 3 TAS calls. Pre-existing 'Reloading' flash on model adoption. 2B history grid builds
+all rows eagerly.
+
+**Next step.** Review and merge the SAM_UI PR (CI green first); then bump SAM_Deploy's SAM_UI pointer.
 
 ## Previous: Nuaire reply (24 Sep 2026) - exchanger then DX drop, 13 C floor
 

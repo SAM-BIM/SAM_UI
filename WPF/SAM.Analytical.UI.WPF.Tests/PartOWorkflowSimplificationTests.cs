@@ -296,6 +296,58 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(Modify.PartOIteration3Phases.Count - 1, phase_Previous);
         }
 
+        /// <summary>What the shown progress window says, read through UI Automation as an outside reader would.</summary>
+        private static string ProgressText()
+        {
+            System.Windows.Automation.AutomationElement automationElement = System.Windows.Automation.AutomationElement.RootElement.FindFirst(
+                System.Windows.Automation.TreeScope.Children,
+                new System.Windows.Automation.AndCondition(
+                    new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.ProcessIdProperty, Environment.ProcessId),
+                    new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.NameProperty, "Part O")));
+
+            if (automationElement is null)
+            {
+                return null;
+            }
+
+            List<string> texts = [];
+            foreach (System.Windows.Automation.AutomationElement automationElement_Text in automationElement.FindAll(System.Windows.Automation.TreeScope.Descendants, new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.ControlTypeProperty, System.Windows.Automation.ControlType.Text)))
+            {
+                texts.Add(automationElement_Text.Current.Name);
+            }
+
+            return string.Join(" | ", texts);
+        }
+
+        /// <summary>
+        /// Prepare &amp; Run hides the progress window while the engineer reviews the prepared iteration, and shows
+        /// it again for the simulation. It must come back with its content - stages, elapsed time - not as an
+        /// empty frame.
+        /// </summary>
+        [WpfFact]
+        public void The_progress_window_keeps_its_content_after_standing_aside_for_a_dialog()
+        {
+            using PartOProgressHost partOProgressHost = new("Prepare & Run", null, ["Prepare and review the iteration", "TAS simulation (full year)"]);
+
+            Assert.True(partOProgressHost.IsShown, "no progress window could be shown on this desktop");
+
+            partOProgressHost.Start(0);
+            System.Threading.Thread.Sleep(1500);
+
+            string before = ProgressText();
+            Assert.Contains("Prepare and review the iteration", before);
+
+            partOProgressHost.Hide();
+            System.Threading.Thread.Sleep(500);
+            partOProgressHost.Show();
+            partOProgressHost.Start(1);
+            System.Threading.Thread.Sleep(1500);
+
+            string after = ProgressText();
+            Assert.Contains("TAS simulation (full year)", after);
+            Assert.Contains("elapsed", after);
+        }
+
         [WpfFact]
         public void The_progress_window_shows_the_stages_the_detail_and_the_elapsed_time()
         {
