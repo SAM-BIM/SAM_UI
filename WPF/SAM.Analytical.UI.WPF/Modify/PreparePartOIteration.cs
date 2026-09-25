@@ -137,15 +137,25 @@ namespace SAM.Analytical.UI.WPF
         /// </returns>
         public static bool PreparePartOIteration(this UIAnalyticalModel? uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, VentilationUnitCatalogue ventilationUnitCatalogue, IWin32Window? owner = null)
         {
-            return PrepareAndReviewPartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner) == PartOPreparationResult.Adopted;
+            return PrepareAndReviewPartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, ReviewIntent_PrepareIteration, owner) == PartOPreparationResult.Adopted;
         }
+
+        /// <summary>
+        /// What the Prepare Iteration command's review promises: adoption only. That command ends when the
+        /// model is adopted - it has never started TAS - so its review must not say it will.
+        /// </summary>
+        internal const PartOReviewIntent ReviewIntent_PrepareIteration = PartOReviewIntent.PrepareOnly;
 
         /// <summary>
         /// <see cref="PreparePartOIteration(UIAnalyticalModel, PartORun, PartOWorkflowRequest, VentilationUnitCatalogue, IWin32Window)"/>,
         /// saying HOW it ended - so the Hub can tell an engineer who declined the review apart from a
         /// preparation that refused. Both leave the model and the run untouched; only one was a choice.
         /// </summary>
-        internal static PartOPreparationResult PrepareAndReviewPartOIteration(UIAnalyticalModel? uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, VentilationUnitCatalogue ventilationUnitCatalogue, IWin32Window? owner = null)
+        /// <param name="partOReviewIntent">
+        /// What the calling command does after an accepted review - it sets the review's wording, and nothing
+        /// in this method depends on it.
+        /// </param>
+        internal static PartOPreparationResult PrepareAndReviewPartOIteration(UIAnalyticalModel? uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, VentilationUnitCatalogue ventilationUnitCatalogue, PartOReviewIntent partOReviewIntent, IWin32Window? owner = null)
         {
             AnalyticalModel? analyticalModel = uIAnalyticalModel?.JSAMObject;
 
@@ -294,6 +304,7 @@ namespace SAM.Analytical.UI.WPF
 
             PartOPreparationWindow partOPreparationWindow = new()
             {
+                Intent = partOReviewIntent,
                 ReviewSummary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOWorkflowRequest.SelectVentilationUnit, partOIsolationContext, partOEquipmentAssignmentSet),
                 SpaceRows = (adjacencyCluster_Prepared.GetSpaces() ?? []).ConvertAll(x => new PartOSpaceRow(x, Name_Dwelling(dictionary_DwellingName_Space, x))),
             };

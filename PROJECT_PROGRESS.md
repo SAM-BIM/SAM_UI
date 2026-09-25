@@ -16,8 +16,13 @@ provenance, model mutation, or what happens after acceptance.
   `Text` is what Copy All puts first. On 1a/1b the equipment line no longer leads with the catalogue; the catalogue
   sentence is its tooltip. `PartOEquipmentAssignmentSet.AssignmentSummary` is the counts half of `Description`;
   "dwelling(s)" became a real plural (in `Description` too, not pinned by any test).
-- Decision (H1). "OK" -> primary **Accept & Run TAS** (`PartO.PrimaryButton`, NOT IsDefault, so Enter never starts
-  TAS); Cancel secondary, IsCancel. A caption says what each does.
+- Decision (H1). "OK" -> a primary action worded by the caller's `PartOReviewIntent` (new enum; wording only):
+  Hub `PrepareAndRun` -> **Accept & Run TAS**; legacy Edit > Prepare Iteration `PrepareOnly` (also the default) ->
+  **Accept Preparation**, caption "No TAS simulation is started". NOT IsDefault, so Enter never starts TAS; Cancel
+  secondary, IsCancel. Entry-point constants `Modify.ReviewIntent_PrepareAndRun` / `ReviewIntent_PrepareIteration`;
+  the Hub's gate before `SimulatePartO` is `Modify.ContinuesToSimulation(intent, result)` (true only for
+  PrepareAndRun + Adopted). The legacy command still ends after adoption (Codex P1 round 2: the shared label had
+  promised TAS there).
 - Layout: scenario + run summary -> dwelling assignments -> spaces -> diagnostics -> decision row. Both tables keep
   every column. Merges `Themes/PartOStyles.xaml` (wrapped tooltips, palette, section headings).
 - Diagnostics (M1). One bar "Diagnostics  Warnings (8) · Notes (38)" with "Show details" (same switch as the Hub) and
@@ -38,20 +43,24 @@ provenance, model mutation, or what happens after acceptance.
   calls it on first render. The Hub now delegates to it (same behaviour).
 
 **Validation.**
-- `SAM.Analytical.UI.WPF.Tests`: 1093/1093 (was 1077; +16 in `PartOReviewIterationTests`: headings 1a/1b/2 and no
+- `SAM.Analytical.UI.WPF.Tests`: 1105/1105 (was 1077; +28 in `PartOReviewIterationTests`, of which round 2 added
+  wording per entry point, unconfigured default, the continuation truth table, prepare-only acceptance adopts but
+  does not continue, Hub acceptance continues, Cancel continues neither; round 1: headings 1a/1b/2 and no
   "(s)", Accept & Run TAS wording / not default / Esc cancels, modal Cancel->false Accept->true, Cancel adopts nothing
   and leaves the run unprepared, Accept adopts via the production path, Hub declined line, diagnostics collapsed with
   every line reachable, refusal opens them, UIA toggle, equipment controls only for Iteration 2).
 - `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): 0 errors.
 - Live, real exe, 1a/1b/2 each to Review -> Cancel, no TAS: 0 message boxes, headings correct, counts match lines,
-  Hub line shown. Record + before/after screenshots: `documentation/evidence/parto-review-iteration/`.
+  Hub line shown; re-run after round 2: still "Accept & Run TAS". Legacy Prepare Iteration: "Accept Preparation"
+  shown, ACCEPTED, run prepared (ribbon "prepared but not simulated", Hub "Prepared · waiting for the full-year TAS
+  run"), no TAS process, 0 message boxes. Record + before/after screenshots: `documentation/evidence/parto-review-iteration/`.
 
 **Known / not done.**
-- "Accept & Run TAS" was not pressed live (it would start TAS); covered by the adoption test.
+- The Hub's "Accept & Run TAS" was not pressed live (it would start TAS); covered by the adoption + gate tests.
 - Safe positioning not forced live; isolated scope and refusals only unit-tested; non-100% DPI not tested.
 - Catalogue description still says "product(s)" (other windows share it) - consistency sweep item.
 
-**Next step.** Owner reviews the PR (Codex will review each push). After merge, move SAM_Deploy's SAM_UI pointer.
+**Next step.** Owner reviews the PR after the round-2 push (Codex will review it). After merge, move SAM_Deploy's SAM_UI pointer.
 Proposal item 2 next: TM59 summary band + Review Results progress (H3, M5, m4, m5).
 
 ## Previous: Part O journey review - observe only (25 Sep 2026)

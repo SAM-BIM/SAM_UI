@@ -109,8 +109,8 @@
         <!-- WHAT: the scenario, named exactly as the Hub names it, and the run in five short lines. -->
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock x:Name="textBlock_Scenario" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource PartO.Brush.Text}" TextWrapping="Wrap"/>
-            <TextBlock Style="{StaticResource PartO.Caption}" FontSize="12" Margin="0,2,0,8"
-                       Text="The iteration is prepared. Review it here; nothing is simulated until you accept."/>
+            <!-- Worded by Intent - see PartOPreparationWindow.Intent. -->
+            <TextBlock x:Name="textBlock_Subtitle" Style="{StaticResource PartO.Caption}" FontSize="12" Margin="0,2,0,8"/>
 
             <Border Background="{StaticResource PartO.Brush.Surface}" BorderBrush="{StaticResource PartO.Brush.Border}" BorderThickness="1" CornerRadius="3" Padding="10,6">
                 <Grid>
@@ -272,7 +272,7 @@
              it, and offering twelve flats' historical outsiders as a project-wide choice would offer
              products the project does not permit.
 
-             Nothing is written here. Like every other edit in this window it is staged until Accept & Run TAS. -->
+             Nothing is written here. Like every other edit in this window it is staged until the review is accepted. -->
         <Grid x:Name="grid_Bulk" Grid.Row="4" Margin="0,6,0,0">
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="textBlock_BulkSelection" VerticalAlignment="Center" Foreground="{StaticResource PartO.Brush.Muted}" MinWidth="170"/>
@@ -287,7 +287,7 @@
                 </ComboBox>
                 <Button x:Name="button_ApplyToSelected" Content="Apply to selected" Width="130" Height="24" Margin="6,0,0,0"
                         IsEnabled="False" Click="button_ApplyToSelected_Click" ToolTipService.ShowOnDisabled="True"
-                        ToolTip="Assigns the chosen product to the selected dwellings. Design airflows are unchanged, and nothing is written until Accept &amp; Run TAS."/>
+                        ToolTip="Assigns the chosen product to the selected dwellings. Design airflows are unchanged, and nothing is written until you accept the review."/>
                 <!-- What the last bulk assignment actually did, inline and beside the button that did it.
                      Presentation feedback only: it is cleared by the next selection or authority change and
                      nothing reads it. -->
@@ -353,21 +353,21 @@
         <TextBox x:Name="textBox_Notes" Grid.Row="8" Height="160" Margin="0,4,0,0" Visibility="Collapsed"
                  IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"/>
 
-        <!-- THE DECISION. The consequential action is named for what it does - it adopts this model and starts
-             the full-year TAS simulation - and is the primary button; Cancel is the ordinary secondary one and
-             Esc. Deliberately NOT IsDefault: Enter must never start a TAS run. -->
+        <!-- THE DECISION. The consequential action is named for what it does, and what it does depends on the
+             command that opened this window: Prepare & Run goes on into TAS ("Accept & Run TAS"), the Prepare
+             Iteration command only adopts the model ("Accept Preparation"). The wording, caption and tooltips
+             are set from Intent in code. Cancel is the ordinary secondary button and Esc. Deliberately NOT
+             IsDefault: Enter must never start a TAS run. -->
         <Grid Grid.Row="9" Margin="0,10,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock x:Name="textBlock_Decision" Grid.Column="0" Style="{StaticResource PartO.Caption}" VerticalAlignment="Center" Margin="0,0,12,0"
-                       Text="Accept &amp; Run TAS adopts this prepared model and starts the full-year TAS simulation, then the TM59 assessment. Cancel changes nothing and starts nothing."/>
+            <TextBlock x:Name="textBlock_Decision" Grid.Column="0" Style="{StaticResource PartO.Caption}" VerticalAlignment="Center" Margin="0,0,12,0"/>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="button_Accept" Height="28" MinWidth="150" Style="{StaticResource PartO.PrimaryButton}" Click="button_Accept_Click"
-                        ToolTip="Adopt the prepared model, with the assignments above, and start the full-year TAS simulation. The TM59 assessment follows.">Accept &amp; Run TAS</Button>
+                <Button x:Name="button_Accept" Height="28" MinWidth="150" Style="{StaticResource PartO.PrimaryButton}" Click="button_Accept_Click"/>
                 <Button x:Name="button_Cancel" IsCancel="True" Width="80" Height="28" Margin="8,0,0,0" Click="button_Cancel_Click"
-                        ToolTip="Close without adopting anything. The loaded model is unchanged and TAS is not started.">Cancel</Button>
+                        ToolTip="Close without adopting anything. The loaded model is unchanged and nothing is simulated.">Cancel</Button>
             </StackPanel>
         </Grid>
     </Grid>

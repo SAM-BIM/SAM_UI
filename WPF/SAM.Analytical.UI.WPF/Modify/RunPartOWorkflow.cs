@@ -258,7 +258,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     partOProgressHost.Start(0);
 
-                    PartOPreparationResult partOPreparationResult = PrepareAndReviewPartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner);
+                    PartOPreparationResult partOPreparationResult = PrepareAndReviewPartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, ReviewIntent_PrepareAndRun, owner);
 
                     if (partOPreparationResult == PartOPreparationResult.Declined)
                     {
@@ -267,7 +267,7 @@ namespace SAM.Analytical.UI.WPF
                         return DeclinedOutcome(iteration);
                     }
 
-                    if (partOPreparationResult != PartOPreparationResult.Adopted)
+                    if (!ContinuesToSimulation(ReviewIntent_PrepareAndRun, partOPreparationResult))
                     {
                         //Refused or not adopted. Each of those has already told the user why.
                         return null;
@@ -350,6 +350,23 @@ namespace SAM.Analytical.UI.WPF
         /// any TAS work, which changed nothing. Not persisted - it is the Hub's last-outcome line, carried only
         /// to the next showing of the Hub like every other outcome.
         /// </summary>
+        /// <summary>
+        /// What Prepare &amp; Run's review promises: acceptance continues into TAS and TM59, which is what
+        /// this command does next.
+        /// </summary>
+        internal const PartOReviewIntent ReviewIntent_PrepareAndRun = PartOReviewIntent.PrepareAndRun;
+
+        /// <summary>
+        /// Whether a command goes on into the TAS simulation after its review: only a command whose intent is
+        /// to run, and only where the review was accepted and the model adopted. Prepare &amp; Run's gate before
+        /// <c>SimulatePartO</c>; the Prepare Iteration command has no simulation step at all, and this says why
+        /// it must never grow one to match a label.
+        /// </summary>
+        internal static bool ContinuesToSimulation(PartOReviewIntent partOReviewIntent, PartOPreparationResult partOPreparationResult)
+        {
+            return partOReviewIntent == PartOReviewIntent.PrepareAndRun && partOPreparationResult == PartOPreparationResult.Adopted;
+        }
+
         internal static PartOWorkflowOutcome DeclinedOutcome(string? iteration)
         {
             return new PartOWorkflowOutcome(

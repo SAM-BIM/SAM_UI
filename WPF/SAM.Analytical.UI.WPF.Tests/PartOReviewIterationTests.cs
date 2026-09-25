@@ -84,12 +84,16 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         // ----- the decision ------------------------------------------------------------------------------
 
+        /// <summary>
+        /// From the Prepare &amp; Run Hub, acceptance continues into TAS, and the primary action says so.
+        /// </summary>
         [WpfFact]
-        public void The_action_that_starts_TAS_says_so()
+        public void From_the_Hub_the_action_says_Accept_and_Run_TAS()
         {
-            PartOPreparationWindow partOPreparationWindow = new();
+            PartOPreparationWindow partOPreparationWindow = new() { Intent = Modify.ReviewIntent_PrepareAndRun };
 
             Assert.Equal("Accept & Run TAS", partOPreparationWindow.AcceptActionText);
+            Assert.Contains("starts the full-year TAS simulation", partOPreparationWindow.DecisionCaption);
             Assert.Equal("Cancel", partOPreparationWindow.CancelActionText);
 
             //Enter never starts a TAS run; Esc declines.
@@ -97,6 +101,105 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.True(partOPreparationWindow.IsCancelTheCancelButton);
 
             partOPreparationWindow.Close();
+        }
+
+        /// <summary>
+        /// Codex on #113: the Prepare Iteration ribbon command opens the same window and stops once the model
+        /// is adopted, so "Accept &amp; Run TAS" promised a run that never came. Its review now says
+        /// "Accept Preparation" and states that no simulation is started.
+        /// </summary>
+        [WpfFact]
+        public void From_Prepare_Iteration_the_action_says_Accept_Preparation()
+        {
+            PartOPreparationWindow partOPreparationWindow = new() { Intent = Modify.ReviewIntent_PrepareIteration };
+
+            Assert.Equal("Accept Preparation", partOPreparationWindow.AcceptActionText);
+            Assert.Contains("No TAS simulation is started", partOPreparationWindow.DecisionCaption);
+            Assert.DoesNotContain("Run TAS", partOPreparationWindow.DecisionCaption);
+            Assert.Equal("Cancel", partOPreparationWindow.CancelActionText);
+            Assert.False(partOPreparationWindow.IsAcceptDefault);
+
+            partOPreparationWindow.Close();
+        }
+
+        /// <summary>A window nobody told otherwise never promises TAS.</summary>
+        [WpfFact]
+        public void An_unconfigured_review_does_not_promise_TAS()
+        {
+            PartOPreparationWindow partOPreparationWindow = new();
+
+            Assert.Equal(PartOReviewIntent.PrepareOnly, partOPreparationWindow.Intent);
+            Assert.Equal("Accept Preparation", partOPreparationWindow.AcceptActionText);
+
+            partOPreparationWindow.Close();
+        }
+
+        [Fact]
+        public void Each_entry_point_states_its_own_intent()
+        {
+            Assert.Equal(PartOReviewIntent.PrepareAndRun, Modify.ReviewIntent_PrepareAndRun);
+            Assert.Equal(PartOReviewIntent.PrepareOnly, Modify.ReviewIntent_PrepareIteration);
+        }
+
+        /// <summary>
+        /// The gate before Prepare &amp; Run's <c>SimulatePartO</c>: only a run intent with an adopted model
+        /// continues. A prepare-only acceptance, a decline and a refusal never do.
+        /// </summary>
+        [Theory]
+        [InlineData(PartOReviewIntent.PrepareAndRun, PartOPreparationResult.Adopted, true)]
+        [InlineData(PartOReviewIntent.PrepareAndRun, PartOPreparationResult.Declined, false)]
+        [InlineData(PartOReviewIntent.PrepareAndRun, PartOPreparationResult.NotPrepared, false)]
+        [InlineData(PartOReviewIntent.PrepareOnly, PartOPreparationResult.Adopted, false)]
+        [InlineData(PartOReviewIntent.PrepareOnly, PartOPreparationResult.Declined, false)]
+        [InlineData(PartOReviewIntent.PrepareOnly, PartOPreparationResult.NotPrepared, false)]
+        public void Only_an_accepted_Hub_review_continues_to_TAS(PartOReviewIntent partOReviewIntent, PartOPreparationResult partOPreparationResult, bool expected)
+        {
+            Assert.Equal(expected, Modify.ContinuesToSimulation(partOReviewIntent, partOPreparationResult));
+        }
+
+        /// <summary>
+        /// Prepare Iteration's acceptance adopts and prepares - the run is Prepared and the model replaced -
+        /// and stops there: the gate says no simulation follows, and the run holds no results to assess.
+        /// </summary>
+        [Fact]
+        public void Prepare_only_acceptance_adopts_and_does_not_continue_to_TAS()
+        {
+            Prepared prepared = new();
+
+            int modified = 0;
+            prepared.UIAnalyticalModel.Modified += (s, e) => modified++;
+
+            PartOPreparationResult partOPreparationResult = prepared.Conclude(true);
+
+            Assert.Equal(PartOPreparationResult.Adopted, partOPreparationResult);
+            Assert.Equal(PartORunState.Prepared, prepared.PartORun.State);
+            Assert.Equal(1, modified);
+
+            Assert.False(Modify.ContinuesToSimulation(Modify.ReviewIntent_PrepareIteration, partOPreparationResult));
+            Assert.False(prepared.PartORun.CanAssess);
+        }
+
+        /// <summary>Hub acceptance is the same adoption, and it is the one case the gate lets into TAS.</summary>
+        [Fact]
+        public void Hub_acceptance_adopts_and_continues_to_TAS()
+        {
+            Prepared prepared = new();
+
+            PartOPreparationResult partOPreparationResult = prepared.Conclude(true);
+
+            Assert.Equal(PartOPreparationResult.Adopted, partOPreparationResult);
+            Assert.Equal(PartORunState.Prepared, prepared.PartORun.State);
+            Assert.True(Modify.ContinuesToSimulation(Modify.ReviewIntent_PrepareAndRun, partOPreparationResult));
+        }
+
+        [Fact]
+        public void Cancel_continues_neither_path()
+        {
+            PartOPreparationResult partOPreparationResult = new Prepared().Conclude(false);
+
+            Assert.Equal(PartOPreparationResult.Declined, partOPreparationResult);
+            Assert.False(Modify.ContinuesToSimulation(Modify.ReviewIntent_PrepareAndRun, partOPreparationResult));
+            Assert.False(Modify.ContinuesToSimulation(Modify.ReviewIntent_PrepareIteration, partOPreparationResult));
         }
 
         [WpfFact]

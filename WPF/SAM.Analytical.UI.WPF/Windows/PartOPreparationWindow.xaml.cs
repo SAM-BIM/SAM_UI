@@ -19,7 +19,7 @@ namespace SAM.Analytical.UI.WPF
     /// iteration has been prepared. The previous dialog can state which products are permitted; it cannot
     /// show what any of them would mean for a dwelling. So the pool and the mode are chosen there, and the
     /// assignments - including "Convert to Manual" and every per-dwelling override - are made here, against
-    /// real numbers, before Accept &amp; Run TAS adopts the result.
+    /// real numbers, before the accepted review adopts the result.
     /// </para>
     ///
     /// <para><b>Nothing in this window decides anything</b></para>
@@ -27,15 +27,17 @@ namespace SAM.Analytical.UI.WPF
     /// Every edit is delegated to <see cref="EquipmentAssignmentSet"/>, which owns validation, suggestions
     /// and the single write path. There is no capacity comparison and no selection rule in this file - a
     /// second implementation of either is how a dialog comes to disagree with the engine it is a view of.
-    /// The set writes to a model only when <c>Modify.PreparePartOIteration</c> commits it, after Accept &amp;
-    /// Run TAS.
+    /// The set writes to a model only when <c>Modify.PreparePartOIteration</c> commits it, after the review is
+    /// accepted.
     /// </para>
     ///
     /// <para><b>The decision is named for what it does</b></para>
     /// <para>
-    /// Accepting this window adopts the prepared model and starts the full-year TAS simulation, so the button
-    /// says "Accept &amp; Run TAS" and is the primary action; it was an unlabelled "OK". Cancel declines before
-    /// any TAS work and changes nothing. Neither is the default button: Enter must never start a TAS run.
+    /// It was an unlabelled "OK", and what it does depends on the command that opened the window. From the
+    /// Prepare &amp; Run Hub it adopts the model and the Hub goes on into TAS, so it says "Accept &amp; Run TAS";
+    /// from the Prepare Iteration command it only adopts, so it says "Accept Preparation". See
+    /// <see cref="Intent"/>. Cancel declines and changes nothing. Neither is the default button: Enter must
+    /// never start a TAS run.
     /// </para>
     /// </summary>
     public partial class PartOPreparationWindow : System.Windows.Window
@@ -58,7 +60,65 @@ namespace SAM.Analytical.UI.WPF
             InitializeComponent();
 
             UpdateEquipmentAvailability();
+
+            UpdateDecision();
         }
+
+        private PartOReviewIntent partOReviewIntent = PartOReviewIntent.PrepareOnly;
+
+        /// <summary>
+        /// What accepting this window leads to, as the command that opened it does it - and therefore what the
+        /// primary action, its caption and its tooltip say. Wording only: the caller decides what happens after
+        /// an accepted review, and this window returns the same DialogResult either way. Defaults to
+        /// <see cref="PartOReviewIntent.PrepareOnly"/>, so a window nobody told otherwise never promises TAS.
+        /// </summary>
+        public PartOReviewIntent Intent
+        {
+            get
+            {
+                return partOReviewIntent;
+            }
+            set
+            {
+                partOReviewIntent = value;
+
+                UpdateDecision();
+            }
+        }
+
+        /// <summary>The primary action's text for an intent.</summary>
+        internal static string AcceptText(PartOReviewIntent partOReviewIntent)
+        {
+            return partOReviewIntent == PartOReviewIntent.PrepareAndRun ? "Accept & Run TAS" : "Accept Preparation";
+        }
+
+        /// <summary>The line beside the decision buttons for an intent.</summary>
+        internal static string DecisionText(PartOReviewIntent partOReviewIntent)
+        {
+            return partOReviewIntent == PartOReviewIntent.PrepareAndRun
+                ? "Accept & Run TAS adopts this prepared model and starts the full-year TAS simulation, then the TM59 assessment. Cancel changes nothing and starts nothing."
+                : "Accept Preparation adopts this prepared model. No TAS simulation is started. Cancel changes nothing.";
+        }
+
+        private void UpdateDecision()
+        {
+            bool run = partOReviewIntent == PartOReviewIntent.PrepareAndRun;
+
+            button_Accept.Content = AcceptText(partOReviewIntent);
+
+            button_Accept.ToolTip = run
+                ? "Adopt the prepared model, with the assignments above, and start the full-year TAS simulation. The TM59 assessment follows."
+                : "Adopt the prepared model, with the assignments above. Nothing is simulated.";
+
+            textBlock_Decision.Text = DecisionText(partOReviewIntent);
+
+            textBlock_Subtitle.Text = run
+                ? "The iteration is prepared. Review it here; nothing is simulated until you accept."
+                : "The iteration is prepared. Review it here; accepting adopts it and does not start a simulation.";
+        }
+
+        /// <summary>What the line beside the decision buttons says. For a test to read.</summary>
+        internal string DecisionCaption => textBlock_Decision.Text;
 
         protected override void OnContentRendered(EventArgs e)
         {
@@ -771,8 +831,9 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// Accept &amp; Run TAS: the window's only "yes". The caller adopts the prepared model and starts the
-        /// full-year TAS simulation - exactly what OK did; only the name changed.
+        /// The window's only "yes" - "Accept &amp; Run TAS" or "Accept Preparation" by <see cref="Intent"/>. The
+        /// caller then does exactly what it did after OK: Prepare &amp; Run adopts and simulates, the Prepare
+        /// Iteration command adopts only. Only the name changed.
         /// </summary>
         private void button_Accept_Click(object sender, RoutedEventArgs e)
         {

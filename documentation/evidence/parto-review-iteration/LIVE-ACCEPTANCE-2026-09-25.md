@@ -52,3 +52,34 @@ and its orchestration were unchanged between that build and `a3b38ee`.
 - The isolated-scope detail line and a preparation with refusals (diagnostics open by default) are unit-tested only;
   this model produces neither.
 - Non-100% DPI.
+
+## Round 2 — contextual decision wording (Codex P1 on #113)
+
+Codex found that the same window is opened by the legacy **Prepare Iteration** ribbon command, which adopts the model
+and stops; it never starts TAS. "Accept & Run TAS" was a false promise there. The window now takes a
+`PartOReviewIntent` from its caller. It changes wording only; neither command's behaviour changed.
+
+| Entry point | Intent | Primary action | Caption |
+|---|---|---|---|
+| Prepare & Run Hub | `PrepareAndRun` | Accept & Run TAS | …starts the full-year TAS simulation, then the TM59 assessment… |
+| Edit › Prepare Iteration | `PrepareOnly` (also the default) | Accept Preparation | Accept Preparation adopts this prepared model. No TAS simulation is started. Cancel changes nothing. |
+
+**Live, legacy route** (`scripts\legacy.ps1`, log `journey-legacy.log`; both outside git):
+- Ribbon → picker (project defaults: Iteration 2, catalogue) → OK → Review headed "Iteration 2 — MVHR with
+  manufacturer unit". It showed **Accept Preparation**, the prepare-only subtitle and caption, and the tooltip
+  "…Nothing is simulated."
+- **Accepted.** SAM showed its "Reloading" window as the model was replaced; there was no message box.
+- **Prepared and adopted.** The Results ribbon then read "A Part O iteration is prepared but not simulated. Run the
+  energy simulation first." The Hub's Simulation row read "Prepared · waiting for the full-year TAS run", and its
+  Results row read "prepared but has not been simulated".
+- The Hub opens on its default scenario, 1a, so its Ventilation design row said "Prepared for a different scenario or
+  scope". This is correct, because the legacy run prepared Iteration 2.
+- **No TAS.** No TAS process was seen from acceptance to the end of the run. The driver's name filter also matched
+  Windows' `taskhostw`, which is not TAS.
+
+**Live, Hub routes re-run** after the change (1a, 1b, 2, each declined): all three still showed **Accept & Run TAS**
+and the run caption. Each Cancel produced the Hub line. 0 message boxes.
+
+Screenshots: `legacy-1-picker.png`, `legacy-2-review-accept-preparation.png`, `legacy-3-hub-after-accept.png`.
+The Hub's "Accept & Run TAS" was not pressed live: it would start a full-year TAS run. It stays covered by the
+production-path tests.
