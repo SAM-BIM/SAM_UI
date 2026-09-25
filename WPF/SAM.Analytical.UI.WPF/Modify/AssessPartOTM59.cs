@@ -38,10 +38,24 @@ namespace SAM.Analytical.UI.WPF
         /// </para>
         /// </summary>
         /// <returns>
-        /// The occupied-space verdict of the assessment that was shown, or null where nothing was assessed - so
-        /// the Part O Hub can say inline what it found. Callers that ignore it are unaffected.
+        /// The production occupied-space status of the assessment that was shown, or null where nothing was
+        /// assessed. Callers that ignore it are unaffected.
         /// </returns>
         public static TM59ComplianceStatus? AssessPartOTM59(this PartORun partORun, IWin32Window? owner = null)
+        {
+            return ReviewPartOTM59(partORun, owner)?.ComplianceStatus;
+        }
+
+        /// <summary>
+        /// <see cref="AssessPartOTM59"/>, returning what the result window was headed with - so the Part O Hub
+        /// says inline exactly what the window said, including a pass the window would not report as one.
+        /// <para>
+        /// <b>Every outcome opens the result window.</b> Results that are missing, stale or unreadable open it
+        /// as UNAVAILABLE with the reason, where they used to be a message box - never a pass or a fail.
+        /// </para>
+        /// </summary>
+        /// <returns>The summary shown, or null where there was no run.</returns>
+        internal static PartOTM59ResultSummary? ReviewPartOTM59(PartORun partORun, IWin32Window? owner = null)
         {
             if (partORun is null)
             {
@@ -57,9 +71,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 partOProgressHost?.Hide();
 
-                MessageBox.Show(string.Format("The Part O TM59 assessment did not run.\n\n{0}", refusal));
-
-                return null;
+                return ShowResult(PartOTM59ResultSummary.Unavailable(string.Format("The Part O TM59 assessment did not run. {0}", refusal).Trim(), partORun), null, null, null, null, owner);
             }
 
             AnalyticalModel? analyticalModel_Workflow = partORun.AnalyticalModel_Assessment;
@@ -71,9 +83,7 @@ namespace SAM.Analytical.UI.WPF
                 //here is exactly the substitution this command exists to make impossible.
                 partOProgressHost?.Hide();
 
-                MessageBox.Show("The Part O run reports it can be assessed but carries no workflow model or no results path. Nothing was assessed.");
-
-                return null;
+                return ShowResult(PartOTM59ResultSummary.Unavailable("The Part O run reports it can be assessed but carries no workflow model or no results path. Nothing was assessed.", partORun), null, null, null, null, owner);
             }
 
             PartOTM59Assessment partOTM59Assessment;
@@ -104,9 +114,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (!partOTM59Assessment.IsAssessed)
             {
-                MessageBox.Show(string.Format("The simulation results at '{0}' could not be assessed.\n\n{1}", path_TSD, partOTM59Assessment.Refusal));
-
-                return null;
+                return ShowResult(PartOTM59ResultSummary.Unavailable(string.Format("The simulation results at '{0}' could not be assessed. {1}", path_TSD, partOTM59Assessment.Refusal).Trim(), partORun), null, partOTM59Assessment.AssociationRefusals, null, null, owner);
             }
 
             TM59AssessmentResult tM59AssessmentResult = partOTM59Assessment.Result!;
@@ -117,17 +125,25 @@ namespace SAM.Analytical.UI.WPF
             //write is reported, never silent - but it fails nothing: the assessment itself is already done.
             bool reportSaved = SavePartOTM59Report(path_TSD, tM59AssessmentReport, out string? path_TM59Report, out string? refusal_Report);
 
-            List<string> associationRefusals = partOTM59Assessment.AssociationRefusals;
+            string summary = Summary(partORun, tM59AssessmentResult, reportSaved, path_TM59Report, refusal_Report);
 
+            PartOTM59ResultSummary partOTM59ResultSummary = PartOTM59ResultSummary.Create(partOTM59Assessment, partORun, summary, reportSaved ? path_TM59Report : null, reportSaved ? null : refusal_Report);
+
+            //The production report text, verbatim.
+            return ShowResult(partOTM59ResultSummary, tM59AssessmentReport.ToString(), partOTM59Assessment.AssociationRefusals, tM59AssessmentResult.VentilationStrategyRefusals, summary, owner);
+        }
+
+        private static PartOTM59ResultSummary ShowResult(PartOTM59ResultSummary partOTM59ResultSummary, string? report, IEnumerable<string>? associationRefusals, IEnumerable<string>? ventilationStrategyRefusals, string? summary, IWin32Window? owner)
+        {
             PartOTM59ResultWindow partOTM59ResultWindow = new()
             {
-                //The production report text, verbatim.
-                Report = tM59AssessmentReport.ToString(),
+                Report = report ?? string.Empty,
+                Summary = summary ?? string.Empty,
             };
 
-            partOTM59ResultWindow.SetDiagnostics(associationRefusals, tM59AssessmentResult.VentilationStrategyRefusals);
+            partOTM59ResultWindow.SetDiagnostics(associationRefusals ?? [], ventilationStrategyRefusals ?? []);
 
-            partOTM59ResultWindow.Summary = Summary(partORun, tM59AssessmentResult, reportSaved, path_TM59Report, refusal_Report);
+            partOTM59ResultWindow.ResultSummary = partOTM59ResultSummary;
 
             if (owner is not null)
             {
@@ -136,7 +152,7 @@ namespace SAM.Analytical.UI.WPF
 
             partOTM59ResultWindow.ShowDialog();
 
-            return partOTM59Assessment.OccupiedSpaceComplianceStatus;
+            return partOTM59ResultSummary;
         }
 
         /// <summary>

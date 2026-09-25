@@ -177,10 +177,11 @@ namespace SAM.Analytical.UI.WPF
                         break;
 
                     case PartOWorkflowAction.ReviewResults:
-                        TM59ComplianceStatus? tM59ComplianceStatus = AssessPartOTM59(partORun, owner);
-                        partOWorkflowOutcome = tM59ComplianceStatus.HasValue
-                            ? new PartOWorkflowOutcome(PartOWorkflowOutcomeKind.Information, string.Format("Reviewed the TM59 results · {0} · no simulation was run", Core.Query.Description(tM59ComplianceStatus.Value)))
-                            : null;
+                        //Worded from what the result window was headed with, so the two cannot disagree.
+                        PartOTM59ResultSummary? partOTM59ResultSummary_Review = ReviewPartOTM59(partORun, owner);
+                        partOWorkflowOutcome = partOTM59ResultSummary_Review is null
+                            ? null
+                            : new PartOWorkflowOutcome(partOTM59ResultSummary_Review.HasVerdict ? PartOWorkflowOutcomeKind.Information : PartOWorkflowOutcomeKind.Warning, string.Format("Reviewed the TM59 results · {0} · no simulation was run", partOTM59ResultSummary_Review.VerdictWord));
                         break;
 
                     case PartOWorkflowAction.Optimise:
@@ -240,7 +241,7 @@ namespace SAM.Analytical.UI.WPF
             bool reuse = ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, partOWorkflowInspection?.ReusePreparation ?? false);
 
             PartOSimulationOutcome partOSimulationOutcome;
-            TM59ComplianceStatus? tM59ComplianceStatus = null;
+            PartOTM59ResultSummary? partOTM59ResultSummary = null;
             TimeSpan? elapsed_Simulation;
 
             //ONE progress window for the whole of Prepare & Run. It stands aside for the review of the
@@ -321,7 +322,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     partOProgressHost.Start(2);
 
-                    tM59ComplianceStatus = AssessPartOTM59(partORun, owner);
+                    partOTM59ResultSummary = ReviewPartOTM59(partORun, owner);
                 }
             }
 
@@ -336,12 +337,12 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return new PartOWorkflowOutcome(
-                partOSimulationOutcome.NeedsAttention ? PartOWorkflowOutcomeKind.Warning : PartOWorkflowOutcomeKind.Success,
+                partOSimulationOutcome.NeedsAttention || (partOTM59ResultSummary is not null && !partOTM59ResultSummary.HasVerdict) ? PartOWorkflowOutcomeKind.Warning : PartOWorkflowOutcomeKind.Success,
                 string.Format(
                     "✓ {0} complete · TAS simulation {1}{2}{3}",
                     iteration,
                     PartOProgressState.Format(elapsed_Simulation ?? partOSimulationOutcome.Elapsed),
-                    tM59ComplianceStatus.HasValue ? " · TM59 " + Core.Query.Description(tM59ComplianceStatus.Value) : string.Empty,
+                    partOTM59ResultSummary is not null ? " · TM59 " + partOTM59ResultSummary.VerdictWord : string.Empty,
                     partOSimulationOutcome.Notes.Count != 0 ? string.Format(" · {0} note(s) were shown", partOSimulationOutcome.Notes.Count) : string.Empty));
         }
 

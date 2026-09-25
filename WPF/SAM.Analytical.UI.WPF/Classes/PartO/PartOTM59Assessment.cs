@@ -55,16 +55,31 @@ namespace SAM.Analytical.UI.WPF
     {
         //Internal rather than private so tests can fabricate the assessment the subset-pass guard reads -
         //the production route to one remains Assess, which needs a real TSD.
-        internal PartOTM59Assessment(TM59AssessmentResult tM59AssessmentResult, TM59AssessmentReport tM59AssessmentReport, List<PartOTM59SpaceResult> spaceResults, List<string> associationRefusals, List<Guid> spaceGuids_Unassessed, string refusal, Dictionary<Guid, double[]>? resultantTemperatures = null)
+        internal PartOTM59Assessment(TM59AssessmentResult tM59AssessmentResult, TM59AssessmentReport tM59AssessmentReport, List<PartOTM59SpaceResult> spaceResults, List<string> associationRefusals, List<Guid> spaceGuids_Unassessed, string refusal, Dictionary<Guid, double[]>? resultantTemperatures = null, List<Guid>? spaceGuids_NoResult = null)
         {
             Result = tM59AssessmentResult;
             Report = tM59AssessmentReport;
             SpaceResults = spaceResults ?? [];
             AssociationRefusals = associationRefusals ?? [];
             SpaceGuids_Unassessed = spaceGuids_Unassessed ?? [];
+            SpaceGuids_NoResult = spaceGuids_NoResult ?? [];
             Refusal = refusal;
             ResultantTemperatures = resultantTemperatures;
         }
+
+        /// <summary>
+        /// The <b>design</b> spaces this assessment produced no TM59 result of any kind for: those in
+        /// <see cref="SpaceGuids_Unassessed"/>, plus those that did resolve and were calculated but reached no
+        /// criterion - the corridor no overheating scenario covers, for instance, which the report lists under
+        /// "Spaces not assessed".
+        /// <para>
+        /// <b>Presentation's count, read off the same result.</b> It is what the result window's "not
+        /// assessed" figure is, so that figure is a count of design spaces taken from the calculation's own
+        /// results rather than of the prose sentences explaining them (one space can have two). It decides
+        /// nothing: <see cref="SpaceGuids_Unassessed"/> is still what a pass is guarded on.
+        /// </para>
+        /// </summary>
+        public List<Guid> SpaceGuids_NoResult { get; }
 
         /// <summary>
         /// The hourly resultant temperature series this assessment actually read, keyed by <b>design</b>
@@ -272,6 +287,19 @@ namespace SAM.Analytical.UI.WPF
             //the DESIGN space, because that is the side the scope is expressed in.
             HashSet<Guid> guids_Simulation_Refused = [.. tM59AssessmentResult.SpaceGuids_HourlySeriesRefused];
 
+            //Every simulated space the calculation produced a result for, in any of its three lists - the
+            //same identity (TMResult.Reference) the report groups its rows by.
+            HashSet<string> references_Result = [];
+            foreach (TMResult tMResult in (tM59AssessmentResult.NaturalVentilationResults ?? []).Concat(tM59AssessmentResult.MechanicalVentilationResults ?? []).Concat(tM59AssessmentResult.CorridorResults ?? []))
+            {
+                if (!string.IsNullOrWhiteSpace(tMResult?.Reference))
+                {
+                    references_Result.Add(tMResult!.Reference);
+                }
+            }
+
+            List<Guid> spaceGuids_NoResult = [];
+
             foreach (Space space_Design in analyticalModel_Workflow.GetSpaces() ?? [])
             {
                 if (space_Design is null)
@@ -285,6 +313,11 @@ namespace SAM.Analytical.UI.WPF
                 {
                     spaceGuids_Unassessed.Add(space_Design.Guid);
                 }
+
+                if (space_Simulation is null || !references_Result.Contains(space_Simulation.Guid.ToString()))
+                {
+                    spaceGuids_NoResult.Add(space_Design.Guid);
+                }
             }
 
             //Read AFTER the calculation, off the very spaces it ran over and through the very key it read
@@ -294,7 +327,7 @@ namespace SAM.Analytical.UI.WPF
                 ? CaptureResultantTemperatures(spaces, tM59AssessmentCalculator.SimulationSpaceMap, tM59AssessmentCalculator.ResultantTemperatureSeriesKey, spaceGuids_Capture)
                 : null;
 
-            return new PartOTM59Assessment(tM59AssessmentResult, tM59AssessmentReport, spaceResults, associationRefusals, spaceGuids_Unassessed, null, resultantTemperatures);
+            return new PartOTM59Assessment(tM59AssessmentResult, tM59AssessmentReport, spaceResults, associationRefusals, spaceGuids_Unassessed, null, resultantTemperatures, spaceGuids_NoResult);
         }
 
         /// <summary>
