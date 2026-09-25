@@ -11,6 +11,92 @@ namespace SAM.Analytical.UI.WPF
 {
     public static partial class Modify
     {
+        //The stages of the Iteration 2B progress window, in order. The rounds are ONE stage, labelled with
+        //the round being run, because how many there will be is not known until the optimisation stops.
+        internal const int PartOOptimisationPhase_Starting = 0;
+
+        internal const int PartOOptimisationPhase_Rounds = 1;
+
+        internal const int PartOOptimisationPhase_CapacityEnvelope = 2;
+
+        /// <summary>
+        /// The stage names of the Iteration 2B progress window. The capacity envelope appears only where it
+        /// was asked for - a stage that can never run is not listed.
+        /// </summary>
+        internal static List<string> PartOOptimisationPhases(PartOOptimisationSettings partOOptimisationSettings)
+        {
+            List<string> result = ["Assess the Iteration 2 results (TM59)", "Optimisation rounds"];
+
+            if (partOOptimisationSettings?.CapacityEnvelope == true)
+            {
+                result.Add("Capacity envelope (diagnostic)");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Ends the Iteration 2B progress window's stage list from the run's own record - never simply as
+        /// completed. The ordinary optimisation completed where it reached a terminal condition (passed, at
+        /// capacity, at its limit, nothing left to target) - the same four the Hub calls completed; any other
+        /// stop, a cancellation included, did not complete. A capacity envelope that was running completed
+        /// only where its own step says so. Null - refused before anything ran - did not complete. A completed
+        /// run's stages that never started are marked not needed, never left reading as upcoming.
+        /// </summary>
+        internal static void PartOOptimisationProgressEnd(PartOProgressState partOProgressState, PartOOptimisationRun? partOOptimisationRun)
+        {
+            if (partOProgressState is null)
+            {
+                return;
+            }
+
+            bool completed;
+
+            if (partOOptimisationRun is null)
+            {
+                completed = false;
+            }
+            else if (partOProgressState.Status(PartOOptimisationPhase_CapacityEnvelope) == PartOProgressStageStatus.Running)
+            {
+                completed = partOOptimisationRun.Step_CapacityEnvelope?.IsCompleted == true;
+            }
+            else
+            {
+                completed = partOOptimisationRun.StopReason is PartOOptimisationStopReason.Passed
+                    or PartOOptimisationStopReason.CapacityReached
+                    or PartOOptimisationStopReason.IterationLimitReached
+                    or PartOOptimisationStopReason.NoEligibleTargets;
+            }
+
+            if (completed)
+            {
+                partOProgressState.Complete();
+
+                //Ended at its own terminal condition, so what never started - the rounds, where the baseline
+                //needed none; an envelope declined before it simulated - was not needed. Only here: after a
+                //cancellation or a failure a stage that never ran was not "not needed", so it is left alone.
+                partOProgressState.SkipUnstarted();
+            }
+            else
+            {
+                partOProgressState.Fail();
+            }
+        }
+
+        /// <summary>
+        /// The Iteration 2B progress window's second line. The round limit is the run's own setting - a limit,
+        /// not a total: how many rounds run depends on the results, and it says so.
+        /// </summary>
+        internal static string PartOOptimisationProgressSubheading(PartOOptimisationSettings partOOptimisationSettings)
+        {
+            int maximumIterations = partOOptimisationSettings.MaximumIterations;
+
+            return string.Format(
+                "Each round is a full-year TAS simulation. The limit is {0} {1}; how many run depends on the results.",
+                maximumIterations,
+                maximumIterations == 1 ? "round" : "rounds");
+        }
+
         /// <summary>
         /// Runs the automatic Approved Document O <b>Iteration 2B</b> optimisation over a completed
         /// Iteration 2 run: raise the design airflow of every eligible failing mechanical space by a fixed
@@ -123,6 +209,9 @@ namespace SAM.Analytical.UI.WPF
             AnalyticalModel? analyticalModel_LastValid = partORun.AnalyticalModel_Assessment;
             string? path_TSD_LastValid = partORun.Path_TSD;
             List<OverheatingScenario> overheatingScenarios_LastValid = partORun.OverheatingScenarios;
+
+            //Reported, where the command shows the Part O progress window; nothing below depends on it.
+            PartOProgressHost.Current?.Start(PartOOptimisationPhase_Starting);
 
             PartOTM59Assessment partOTM59Assessment = PartOTM59Assessment.Assess(analyticalModel_LastValid, path_TSD_LastValid, overheatingScenarios_LastValid);
 
@@ -251,6 +340,12 @@ namespace SAM.Analytical.UI.WPF
 
                 result.Steps.Add(partOOptimisationStep);
 
+                //The round's own number - no total, because there is none until the run stops.
+                PartOProgressHost? partOProgressHost = PartOProgressHost.Current;
+                partOProgressHost?.Start(PartOOptimisationPhase_Rounds);
+                partOProgressHost?.State.Activity(string.Format("round {0}", iteration));
+                partOProgressHost?.Detail("Raising the design airflow of the failing spaces and preparing the round");
+
                 partOOptimisationStep.Notes.AddRange(partOOptimisationTargetSelection.NotOptimisable);
 
                 DesignAirFlowRoundCandidate? designAirFlowRoundCandidate = Round(analyticalModel_LastValid, designAirFlowTargets, partOPreparationContext, partOOptimisationSettings, guids_AtCapacity, partOOptimisationStep);
@@ -333,7 +428,11 @@ namespace SAM.Analytical.UI.WPF
 
                 // ---- Production TM59, on the model the workflow returned -------------------------------
 
+                partOProgressHost?.Detail("Reading this round's results and assessing them against CIBSE TM59");
+
                 partOTM59Assessment = PartOTM59Assessment.Assess(partORun.AnalyticalModel_Assessment, partORun.Path_TSD, partORun.OverheatingScenarios);
+
+                partOProgressHost?.Detail(null);
 
                 Record(partOOptimisationStep, partORun.AnalyticalModel_Assessment, partOPreparationContext, partOTM59Assessment);
 
@@ -1120,6 +1219,10 @@ namespace SAM.Analytical.UI.WPF
             //The envelope is one more full-year run of the same building, so it warm starts on exactly the
             //same terms as a round - and is checked on exactly the same terms too.
             PartOCanonicalTBD partOCanonicalTBD_Envelope = WarmStart(partOOptimisationRun.CanonicalTBD, analyticalModel_LastValid, partOSimulationContext, partOOptimisationStep);
+
+            //Started only here, where the envelope really simulates; one declined above leaves its stage
+            //unstarted rather than shown as run.
+            PartOProgressHost.Current?.Start(PartOOptimisationPhase_CapacityEnvelope);
 
             AnalyticalModel analyticalModel_Workflow = RunPartOSimulation(partOIterationPreparation.AnalyticalModel, partOSimulationContext, partOOptimisationStep.ProjectName, partORun_Envelope, cancellationTokenSource.Token, out string _, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes_Simulation, out string refusal_Simulation, partOCanonicalTBD_Envelope);
 

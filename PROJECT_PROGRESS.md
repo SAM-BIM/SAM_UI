@@ -1,9 +1,125 @@
 # Project Progress
 
-## Current: Part O reopened-run naming - check + Hub line (25 Sep 2026) - PR OPEN, not merged
+## Current: Part O UX pass 4 - shared progress window consistency (25 Sep 2026) - PR OPEN, not merged
+
+**Status.** Branch `feature/parto-progress-consistency-2026-09-25` from `sow/2026-Q3` `91aeb43` (#116 merged).
+SAM_UI only. A PR is open against `sow/2026-Q3`; the owner said to stop before merge. There are no engineering,
+TAS, calculation, provenance or saved-run changes, and no public signature changed. The Iteration 2B journey
+redesign is Pass 5 and is not started.
+
+**Inventory (every Part O progress surface).**
+- Prepare & Run: `PartOProgressHost` (the shared Part O window), 3 stages, Cancel.
+  - Nested `RunPartOSimulation` / `RunWorkflow` report into it as detail and link its token.
+- Iteration 3 run: the shared window, 6 phases, Cancel between ledger stages. Iteration 3 Open result: the
+  shared window, 4 stages, no Cancel.
+- Review Results (Hub, no host): **was** the generic `ProgressBarWindowManager("Part O TM59")`. It is
+  indeterminate, has no stages, no elapsed time and no text in UIA, and it set "Assessing..." only after the
+  assessment had finished.
+- Iteration 2B: **was** two generic `ProgressWindowHost` dialogs per round (SAM_Windows).
+  - "Preparing Model (proj)" had max **8**, but only 4 `step()` calls exist, and those only on the SAM-solar
+    path. So its bar showed at most 50% and then closed. That is a fabricated denominator.
+  - "Tas Workflow" is determinate by workflow step count, which is a count of steps, not of time.
+  - The baseline and per-round TM59 assessments showed nothing.
+- SAM Check gate (pre-simulation): no progress UI of its own. Its LogWindow modal already hides the host.
+- Legacy non-Part-O Simulate dialog (`Simulate.cs` "Preparing Model", 8): out of scope, unchanged.
+
+**What changed (the shared pattern).**
+- `PartOProgressState` (pure, clock injected):
+  - `Report(completed, total)`: the only way a percentage exists. It is ignored with no running stage or no
+    total, cleared on every Start/Complete/Fail, and rounded down (`Percent` "63%", never 100% early).
+  - `Activity(text)`: labels a repeating stage ("Optimisation rounds · round 2"). No total is implied.
+  - `ElapsedText` "Elapsed 7m 48s", never a time remaining. `IsFinished`.
+  - `StatusText` / `AccessibleLine`: "Completed / Running now / Upcoming / Not needed / Did not complete".
+  - `Note(determinate, cancellable, cancelRequested)`: one wording, which says whether the number is real and
+    what Cancel really does (the next safe point; a running TAS step finishes first).
+- **No Part O operation calls `Report` today**, because none has an authoritative count. Every Part O window
+  is indeterminate, and says why.
+- `PartOProgressWindow`:
+  - the bar is indeterminate unless there is a fraction, with the percentage text only then;
+  - the note is always shown, so a non-cancellable window says "It cannot be cancelled";
+  - "Cancelling…" disabled plus the cancel note;
+  - each row's UIA name is the status in words (on the name TextBlock, plus the row's `ToString`; a Grid has no
+    automation peer), and the duration is not repeated.
+- Review Results: when no host is current, `ReviewPartOTM59` opens its own shared window: "Checking TM59
+  results", subheading `PartOIterationText` + "no TAS simulation is run", one stage "TM59 assessment", no Cancel.
+  Inside Prepare & Run it still reports into the outer host.
+- Iteration 2B: `RunPartOOptimisationResult` wraps `OptimisePartOTM59` in ONE host.
+  - Stages come from `Modify.PartOOptimisationPhases`: "Assess the Iteration 2 results (TM59)", "Optimisation
+    rounds", and "Capacity envelope (diagnostic)" only where it was asked for.
+  - The subheading comes from `Modify.PartOOptimisationProgressSubheading`: "The limit is N rounds; how many run
+    depends on the results".
+  - The optimiser only calls `PartOProgressHost.Current?.Start/Activity/Detail`. With a host current, the
+    per-round generic dialogs no longer open.
+
+**Cancellation (reviewed; semantics not changed).**
+- Prepare & Run / Iteration 3: the token is latched and observed between workflow steps / ledger stages. A TAS
+  COM call in flight finishes first. Live: stopped about 11 s after the click, at the next step.
+- Review Results / Iteration 3 Open result: not cancellable (single reads), and now said so.
+- 2B: the same observation points as before, in each round's `RunPartOSimulation` `step()` and `RunWorkflow`,
+  through the host token they already link. The optimiser loop was not given a new observation point (that
+  would change stop logic, which is Pass 5).
+- **2B Cancel is offered only where it is observed** (owner review correction, 25 Sep).
+  - The 2B host is built with `cancelOnlyWhileObserved: true`.
+  - Cancel is offered only inside `PartOProgressHost.AllowCancel()` scopes. `RunPartOSimulation` opens one
+    around its preparation steps, and `RunWorkflow` (Part O branch) opens one around `Calculate`.
+  - Each scope is disposed in the finally, BEFORE that code's existing final check. `SetCancelAvailable`
+    waits for the window's thread, so a click either finished first (and the final check sees it), or finds
+    Cancel withdrawn. The click handler also refuses while Cancel is withdrawn.
+  - During the baseline assessment, the rebalancing and each round's TM59 assessment, Cancel is visible,
+    disabled, with a tooltip. The note says "Cancel is offered only while a TAS simulation is being prepared or
+    run; this step does not stop for it."
+  - A request already made keeps "Cancelling…" and its note.
+  - A default host (Prepare & Run, Iteration 3) is unchanged: a scope restores what was offered before.
+  - Remaining gap, documented: a click inside a scope that is followed by a refusal (e.g. the TBD cannot be
+    overwritten) is not acted on as a cancel; the round stops with that refusal instead.
+- **2B stage list ends from the run's own record** (Codex P2 on #117). `Modify.PartOOptimisationProgressEnd`:
+  - Passed / CapacityReached / IterationLimitReached / NoEligibleTargets complete, the same four the Hub calls
+    completed. Anything else fails, Cancelled included.
+  - A running envelope completes only if its own step `IsCompleted`. A null run fails.
+  - Before, `Complete()` was unconditional, so a cancelled round could flash "✓" beside "Cancelling…".
+  - Codex P2 on d6a8cf8: a COMPLETED run marks the stages it never started "Not needed"
+    (`PartOProgressState.SkipUnstarted`). That covers a baseline that passes or has no targets, and an
+    envelope declined before it simulated. After a cancel or failure they are left as they are, because "not
+    needed" would not be true.
+
+**Files.** `Classes/PartO/PartOProgressState.cs`, `Classes/PartO/PartOProgressHost.cs`,
+`Windows/PartOProgressWindow.xaml(.cs)`, `Modify/AssessPartOTM59.cs`, `Modify/OptimisePartOTM59.cs`,
+`Modify/RunPartOOptimisation.cs`, `Modify/RunPartOSimulation.cs` and `Modify/RunWorkflow.cs` (the cancel
+scopes only); tests `PartOProgressConsistencyTests.cs` (new), `PartOWorkflowSimplificationTests.cs` (elapsed
+wording pins); evidence `documentation/evidence/parto-progress-consistency/`.
+
+**Validation.**
+- `SAM.Analytical.UI.WPF.Tests`: 1196/1196 (was 1159; 1173 at the first push, 1192 at d6a8cf8).
+  - The correction's tests: the 2B offer through a whole sequence, the latched request, nested scopes,
+    Prepare & Run unchanged, the note, the window refusing a click, the shown window already disabled when the
+    scope returns (UIA, no wait), and the end state for every stop reason and for the envelope.
+- `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): exit 0, 0 errors.
+- `git diff --check` clean.
+- Live, real exe (`LIVE-ACCEPTANCE-2026-09-25.md`):
+  - before/after Review Results;
+  - Prepare & Run with TAS started, then cancelled (stage hierarchy, elapsed, Cancelling…, Hub "TAS run
+    cancelled"; TAS3D exited);
+  - Iteration 3 Open result.
+  - Iteration 3 mid-run and a 2B round were rendered through the env-gated test
+    `Evidence_renders_the_iteration_3_and_iteration_2B_windows_mid_run` (`SAM_PARTO_PROGRESS_EVIDENCE`).
+- 2B was NOT run live: no saved Iteration 2 run exists, and making one needs full-year TAS.
+
+**Deferred / separate.**
+- Pass 5: the whole Iteration 2B journey (where the choice is made, preparation, decision flow, results,
+  diagnostics, Hub 2B logic, stop rules, and whether the loop should observe Cancel between rounds).
+- Separate defect, not fixed here: `RunPartOSimulation`'s host-less fallback still opens "Preparing Model" with
+  max 8 against at most 4 steps. No Part O route reaches it now.
+- Pre-existing: after a cancelled Prepare & Run, the host is shown again briefly after the "Simulation cancelled"
+  box before it closes.
+- Live acceptance of 2B needs a completed Iteration 2 run.
+
+**Next step.** The owner reviews the correction on PR #117. Check CI and the Codex re-review are clean before
+merge. Then move SAM_Deploy's SAM_UI pointer. A live 2B check fits naturally into Pass 5's acceptance.
+
+## Previous: Part O reopened-run naming - check + Hub line (25 Sep 2026) - MERGED (#116)
 
 **Status.** Branch `fix/parto-reopened-run-scenario-2026-09-25` from `sow/2026-Q3` `ba9bf48` (#115 merged). SAM_UI
-only. A PR is open against `sow/2026-Q3`.
+only. Merged as #116 (91aeb43).
 
 **The reported defect is already fixed on `sow/2026-Q3`.** The report said `PartOTM59ResultSummary.RunFacts` names
 a reopened Iteration 2 run "Iteration 1a". That was true before b224453 (the #115 follow-up, merged). The fix is the

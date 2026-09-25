@@ -6,7 +6,8 @@
     <!-- One window for the whole of a long Part O operation. It lives on its own UI thread, so it keeps
          painting and its elapsed time keeps ticking while TAS holds the application's own thread for
          minutes. It shows what is actually known - which stage is running, which finished and how long each
-         took - and never a percentage: TAS reports none. -->
+         took. The bar is indeterminate unless the work reports a real count (PartOProgressState.Report);
+         TAS reports none, so no Part O operation shows a percentage today, and the note says so. -->
     <Grid Margin="14,12,14,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -21,18 +22,20 @@
         <TextBlock x:Name="textBlock_Heading" Grid.Row="0" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
         <TextBlock x:Name="textBlock_Subheading" Grid.Row="1" Margin="0,2,0,0" Foreground="#555555" TextWrapping="Wrap"/>
 
-        <ItemsControl x:Name="itemsControl_Stages" Grid.Row="2" Margin="0,12,0,0">
+        <ItemsControl x:Name="itemsControl_Stages" Grid.Row="2" Margin="0,12,0,0" Focusable="False">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
+                    <!-- The name is read as one line - "Completed: TAS simulation (full year)" - so the
+                         status is never carried by the glyph or its colour alone. -->
                     <Grid Margin="0,2,0,2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="22"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="{Binding Glyph}" Foreground="{Binding Foreground}" FontWeight="Bold"/>
-                        <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{Binding Foreground}" FontWeight="{Binding FontWeight}"/>
-                        <TextBlock Grid.Column="2" Text="{Binding Duration}" Foreground="#666666"/>
+                        <TextBlock Grid.Column="0" Text="{Binding Glyph}" Foreground="{Binding Foreground}" FontWeight="Bold" ToolTip="{Binding StatusText}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" AutomationProperties.Name="{Binding AccessibleName}" Foreground="{Binding Foreground}" FontWeight="{Binding FontWeight}" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Duration}" Foreground="#666666" Margin="8,0,0,0"/>
                     </Grid>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -40,10 +43,16 @@
 
         <TextBlock x:Name="textBlock_Detail" Grid.Row="3" Margin="22,4,0,0" Foreground="#555555" FontStyle="Italic" TextWrapping="Wrap"/>
 
-        <ProgressBar x:Name="progressBar" Grid.Row="4" Height="4" Margin="0,10,0,0" IsIndeterminate="True"/>
+        <ProgressBar x:Name="progressBar" Grid.Row="4" Height="4" Margin="0,10,0,0" Minimum="0" Maximum="1" IsIndeterminate="True"
+                     AutomationProperties.Name="Progress"/>
 
         <Grid Grid.Row="5" Margin="0,6,0,0">
-            <TextBlock x:Name="textBlock_Elapsed" HorizontalAlignment="Left" Foreground="#333333"/>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="textBlock_Elapsed" Grid.Column="0" HorizontalAlignment="Left" Foreground="#333333"/>
+            <TextBlock x:Name="textBlock_Percent" Grid.Column="1" HorizontalAlignment="Right" Foreground="#333333" Visibility="Collapsed"/>
         </Grid>
 
         <Grid Grid.Row="6" Margin="0,10,0,0">
@@ -51,9 +60,8 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock x:Name="textBlock_Note" Grid.Column="0" TextWrapping="Wrap" Foreground="#777777" FontSize="11" Margin="0,0,10,0"
-                       Text="TAS does not report progress inside a simulation, so no percentage is shown. Cancel stops before the next stage; a TAS simulation already running finishes first."/>
-            <Button x:Name="button_Cancel" Grid.Column="1" MinWidth="80" Height="24" Padding="8,0" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
+            <TextBlock x:Name="textBlock_Note" Grid.Column="0" TextWrapping="Wrap" Foreground="#777777" FontSize="11" Margin="0,0,10,0"/>
+            <Button x:Name="button_Cancel" Grid.Column="1" ToolTipService.ShowOnDisabled="True" MinWidth="80" Height="24" Padding="8,0" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
         </Grid>
     </Grid>
 </Window>

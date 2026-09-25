@@ -70,6 +70,12 @@ namespace SAM.Analytical.UI.WPF
             {
                 using (CancellationTokenSource cancellationTokenSource_PartO = CancellationTokenSource.CreateLinkedTokenSource(externalCancellationToken, partOProgressHost.Token))
                 {
+                    //Cancel is offered while the workflow runs - it observes the token at entry, at every
+                    //step and before returning - and withdrawn in the finally, BEFORE the final check below,
+                    //so no click can land after the last look. Where the host always offers Cancel (Prepare &
+                    //Run) this changes nothing.
+                    IDisposable cancelScope = partOProgressHost.AllowCancel();
+
                     try
                     {
                         WorkflowCalculator workflowCalculator = new WorkflowCalculator(workflowSettings)
@@ -88,6 +94,8 @@ namespace SAM.Analytical.UI.WPF
                     }
                     finally
                     {
+                        cancelScope.Dispose();
+
                         partOProgressHost.Detail(null);
                     }
 

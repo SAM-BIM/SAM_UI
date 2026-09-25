@@ -9,8 +9,9 @@ using System.Windows.Threading;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// The one progress window of a long Approved Document O operation - Prepare &amp; Run, an Iteration 3
-    /// run, or a review - hosted on its own UI thread for as long as the operation lasts.
+    /// The one progress window of a long Approved Document O operation - Prepare &amp; Run, Review Results, an
+    /// Iteration 2B optimisation, an Iteration 3 run or review - hosted on its own UI thread for as long as the
+    /// operation lasts.
     ///
     /// <para><b>Why its own thread</b></para>
     /// <para>
@@ -32,7 +33,8 @@ namespace SAM.Analytical.UI.WPF
     /// <para>
     /// Cancel latches <see cref="Token"/>. The work observes it where it already could - between workflow
     /// steps and between Iteration 3 stages. A TAS call in flight always finishes first, and the window says
-    /// so.
+    /// so. Where an operation also has stretches that never observe it, Cancel is offered only inside
+    /// <see cref="AllowCancel"/> scopes, so it is never accepted and then ignored.
     /// </para>
     ///
     /// <para><b>Never fatal</b></para>
@@ -65,9 +67,18 @@ namespace SAM.Analytical.UI.WPF
         /// <param name="stageNames">The stages, in order.</param>
         /// <param name="cancellable">Shows Cancel.</param>
         /// <param name="show">False builds the state and token only - for tests, and for callers with no desktop.</param>
-        public PartOProgressHost(string heading, string subheading, IEnumerable<string> stageNames, bool cancellable = true, bool show = true)
+        /// <param name="cancelOnlyWhileObserved">
+        /// Offers Cancel only inside <see cref="AllowCancel"/> scopes - the stretches where the work is certain
+        /// to observe the token. For an operation with long stretches that never look at it (the Iteration 2B
+        /// assessments between rounds), where a click could otherwise be accepted and then never acted on.
+        /// </param>
+        public PartOProgressHost(string heading, string subheading, IEnumerable<string> stageNames, bool cancellable = true, bool show = true, bool cancelOnlyWhileObserved = false)
         {
-            State = new PartOProgressState(stageNames);
+            State = new PartOProgressState(stageNames)
+            {
+                CancelAvailable = !cancelOnlyWhileObserved,
+            };
+
             Heading = heading;
 
             previous = current;
@@ -119,6 +130,34 @@ namespace SAM.Analytical.UI.WPF
             catch (ObjectDisposedException)
             {
             }
+        }
+
+        /// <summary>
+        /// Offers Cancel for the life of the scope, then puts back what was offered before. Opened by the code
+        /// that observes the token - the preparation steps of <c>RunPartOSimulation</c>, the workflow of
+        /// <c>RunWorkflow</c> - around exactly the stretch it observes it in, and disposed BEFORE that code's
+        /// final check: <see cref="SetCancelAvailable"/> waits for the window's thread, so a click either
+        /// finished before the scope closed, and the final check sees it, or finds Cancel withdrawn. Where
+        /// Cancel is always offered this changes nothing.
+        /// </summary>
+        public IDisposable AllowCancel()
+        {
+            bool previous_CancelAvailable = State.CancelAvailable;
+
+            SetCancelAvailable(true);
+
+            return new CancelScope(this, previous_CancelAvailable);
+        }
+
+        /// <summary>
+        /// Offers or withdraws Cancel, and waits until the window shows it - so once this returns no click
+        /// can still be in flight against the previous offer.
+        /// </summary>
+        public void SetCancelAvailable(bool cancelAvailable)
+        {
+            State.CancelAvailable = cancelAvailable;
+
+            Post(window => window.Render());
         }
 
         /// <summary>
@@ -288,6 +327,33 @@ namespace SAM.Analytical.UI.WPF
             }
 
             manualResetEventSlim.Dispose();
+        }
+
+        private sealed class CancelScope : IDisposable
+        {
+            private readonly PartOProgressHost partOProgressHost;
+
+            private readonly bool cancelAvailable;
+
+            private bool disposed;
+
+            internal CancelScope(PartOProgressHost partOProgressHost, bool cancelAvailable)
+            {
+                this.partOProgressHost = partOProgressHost;
+                this.cancelAvailable = cancelAvailable;
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                {
+                    return;
+                }
+
+                disposed = true;
+
+                partOProgressHost.SetCancelAvailable(cancelAvailable);
+            }
         }
     }
 }
