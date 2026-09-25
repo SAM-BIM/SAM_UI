@@ -316,6 +316,11 @@ namespace SAM.Analytical.UI.WPF
                     cancellationToken.ThrowIfCancellationRequested();
                 };
 
+                //Cancel is offered while these steps run - each observes the token, and so does the check
+                //after them - and withdrawn in the finally, BEFORE that check, so no click can land after the
+                //last look. Where the host always offers Cancel (Prepare & Run) this changes nothing.
+                IDisposable cancelScope = partOProgressHost?.AllowCancel();
+
                 try
                 {
                     if (progressWindowHost is not null)
@@ -393,6 +398,8 @@ namespace SAM.Analytical.UI.WPF
                 }
                 finally
                 {
+                    cancelScope?.Dispose();
+
                     progressWindowHost?.Dispose();
                 }
 

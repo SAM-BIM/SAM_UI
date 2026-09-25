@@ -128,12 +128,24 @@ namespace SAM.Analytical.UI.WPF
 
             textBlock_Elapsed.Text = partOProgressState.ElapsedText;
 
-            textBlock_Note.Text = PartOProgressState.Note(fraction.HasValue, cancellable, cancelRequested);
+            //Offered only where a click is certain to be acted on. Withdrawn, it stays in view - disabled, with
+            //the note saying when it is offered - so the answer to "can I stop this?" is still on screen.
+            bool cancelAvailable = partOProgressState.CancelAvailable;
+
+            if (!cancelRequested)
+            {
+                button_Cancel.IsEnabled = cancelAvailable;
+                button_Cancel.ToolTip = cancelAvailable ? null : "Offered while a TAS simulation is being prepared or run.";
+            }
+
+            textBlock_Note.Text = PartOProgressState.Note(fraction.HasValue, cancellable, cancelRequested, cancelAvailable);
         }
 
         private void button_Cancel_Click(object sender, RoutedEventArgs e)
         {
-            if (cancelRequested)
+            //Also refused here, not only by the disabled button: a click already queued when Cancel was
+            //withdrawn must not latch a request nothing will observe.
+            if (cancelRequested || partOProgressState is null || !partOProgressState.CancelAvailable)
             {
                 return;
             }

@@ -61,7 +61,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="textBlock_Note" Grid.Column="0" TextWrapping="Wrap" Foreground="#777777" FontSize="11" Margin="0,0,10,0"/>
-            <Button x:Name="button_Cancel" Grid.Column="1" MinWidth="80" Height="24" Padding="8,0" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
+            <Button x:Name="button_Cancel" Grid.Column="1" ToolTipService.ShowOnDisabled="True" MinWidth="80" Height="24" Padding="8,0" VerticalAlignment="Bottom" Click="button_Cancel_Click">Cancel</Button>
         </Grid>
     </Grid>
 </Window>

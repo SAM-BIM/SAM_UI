@@ -77,14 +77,24 @@ namespace SAM.Analytical.UI.WPF
             //"Tas Workflow" dialog of their own per round. The rounds, their stop rules and what a Cancel
             //does to a round are unchanged: Cancel is observed where it always was, between the steps of a
             //round's simulation.
+            //
+            //Because that is the ONLY place it is observed, Cancel is offered only there
+            //(cancelOnlyWhileObserved): during a round's simulation preparation and its TAS workflow, which
+            //open PartOProgressHost.AllowCancel scopes. During the assessments and rebalancing between
+            //simulations it is withdrawn, since a click there could be accepted and never acted on - the
+            //final round's assessment is followed by no further simulation where the run then stops at its
+            //limit with no envelope.
             using (PartOProgressHost partOProgressHost = new(
                 "Iteration 2B — TM59 optimisation",
                 PartOOptimisationProgressSubheading(partOOptimisationSettings),
-                PartOOptimisationPhases(partOOptimisationSettings)))
+                PartOOptimisationPhases(partOOptimisationSettings),
+                cancelOnlyWhileObserved: true))
             {
                 partOOptimisationRun = partORun.OptimisePartOTM59(partOOptimisationSettings, out refusal);
 
-                partOProgressHost.State.Complete();
+                //From the run's own stop reason, as Iteration 3 ends its list from its result: a cancelled or
+                //failed round must not read as completed while the window closes.
+                PartOOptimisationProgressEnd(partOProgressHost.State, partOOptimisationRun);
             }
 
             if (partOOptimisationRun is null)

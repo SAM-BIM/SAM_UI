@@ -36,6 +36,48 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
+        /// Ends the Iteration 2B progress window's stage list from the run's own record - never simply as
+        /// completed. The ordinary optimisation completed where it reached a terminal condition (passed, at
+        /// capacity, at its limit, nothing left to target) - the same four the Hub calls completed; any other
+        /// stop, a cancellation included, did not complete. A capacity envelope that was running completed
+        /// only where its own step says so. Null - refused before anything ran - did not complete.
+        /// </summary>
+        internal static void PartOOptimisationProgressEnd(PartOProgressState partOProgressState, PartOOptimisationRun? partOOptimisationRun)
+        {
+            if (partOProgressState is null)
+            {
+                return;
+            }
+
+            bool completed;
+
+            if (partOOptimisationRun is null)
+            {
+                completed = false;
+            }
+            else if (partOProgressState.Status(PartOOptimisationPhase_CapacityEnvelope) == PartOProgressStageStatus.Running)
+            {
+                completed = partOOptimisationRun.Step_CapacityEnvelope?.IsCompleted == true;
+            }
+            else
+            {
+                completed = partOOptimisationRun.StopReason is PartOOptimisationStopReason.Passed
+                    or PartOOptimisationStopReason.CapacityReached
+                    or PartOOptimisationStopReason.IterationLimitReached
+                    or PartOOptimisationStopReason.NoEligibleTargets;
+            }
+
+            if (completed)
+            {
+                partOProgressState.Complete();
+            }
+            else
+            {
+                partOProgressState.Fail();
+            }
+        }
+
+        /// <summary>
         /// The Iteration 2B progress window's second line. The round limit is the run's own setting - a limit,
         /// not a total: how many rounds run depends on the results, and it says so.
         /// </summary>

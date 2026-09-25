@@ -62,6 +62,8 @@ namespace SAM.Analytical.UI.WPF
 
         private double? fraction;
 
+        private bool cancelAvailable = true;
+
         public PartOProgressState(IEnumerable<string> stageNames, Func<DateTime> clock = null)
         {
             this.clock = clock ?? (() => DateTime.UtcNow);
@@ -177,6 +179,30 @@ namespace SAM.Analytical.UI.WPF
                 }
 
                 fraction = Math.Min(completed, total) / (double)total;
+            }
+        }
+
+        /// <summary>
+        /// Whether a Cancel pressed now is certain to be observed. True for the life of most operations; an
+        /// operation with stretches that never look at its token turns it off outside the stretches that do
+        /// (see <see cref="PartOProgressHost.AllowCancel"/>), so Cancel is never accepted and then ignored.
+        /// </summary>
+        public bool CancelAvailable
+        {
+            get
+            {
+                lock (@lock)
+                {
+                    return cancelAvailable;
+                }
+            }
+
+            set
+            {
+                lock (@lock)
+                {
+                    cancelAvailable = value;
+                }
             }
         }
 
@@ -405,6 +431,15 @@ namespace SAM.Analytical.UI.WPF
         /// <param name="cancelRequested">Cancel has been pressed and the operation has not yet stopped.</param>
         public static string Note(bool determinate, bool cancellable, bool cancelRequested)
         {
+            return Note(determinate, cancellable, cancelRequested, true);
+        }
+
+        /// <param name="cancelAvailable">
+        /// Cancel is offered at this moment (<see cref="CancelAvailable"/>). Where it is not, the note says when
+        /// it is, rather than implying a click would be acted on.
+        /// </param>
+        public static string Note(bool determinate, bool cancellable, bool cancelRequested, bool cancelAvailable)
+        {
             if (cancelRequested)
             {
                 return "Cancel requested. It stops at the next safe point between steps; a TAS step already running - a conversion, the shading or the simulation - finishes first, which can take minutes.";
@@ -416,9 +451,11 @@ namespace SAM.Analytical.UI.WPF
                     ? "No percentage is shown: TAS does not report progress inside a simulation."
                     : "No percentage is shown: this step does not report one.";
 
-            string cancel = cancellable
-                ? "Cancel takes effect at the next safe point between steps; a TAS step already running finishes first."
-                : "It cannot be cancelled.";
+            string cancel = !cancellable
+                ? "It cannot be cancelled."
+                : cancelAvailable
+                    ? "Cancel takes effect at the next safe point between steps; a TAS step already running finishes first."
+                    : "Cancel is offered only while a TAS simulation is being prepared or run; this step does not stop for it.";
 
             return progress is null ? cancel : string.Format("{0} {1}", progress, cancel);
         }

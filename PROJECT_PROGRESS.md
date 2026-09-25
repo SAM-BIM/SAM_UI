@@ -56,20 +56,39 @@ redesign is Pass 5 and is not started.
   COM call in flight finishes first. Live: stopped about 11 s after the click, at the next step.
 - Review Results / Iteration 3 Open result: not cancellable (single reads), and now said so.
 - 2B: the same observation points as before, in each round's `RunPartOSimulation` `step()` and `RunWorkflow`,
-  through the host token they already link. What is new is that the one Cancel is also clickable between rounds
-  and during the assessments. It is observed at the next round's first simulation step (Stop = Cancelled, as
-  before), or at the envelope's first step. A click during the final round's assessment of a run that then
-  stops by limit, with no envelope, is not observed, and the result window shows the real stop reason. The
-  optimiser loop was not given a new observation point (that would change stop logic, which is Pass 5).
+  through the host token they already link. The optimiser loop was not given a new observation point (that
+  would change stop logic, which is Pass 5).
+- **2B Cancel is offered only where it is observed** (owner review correction, 25 Sep).
+  - The 2B host is built with `cancelOnlyWhileObserved: true`.
+  - Cancel is offered only inside `PartOProgressHost.AllowCancel()` scopes. `RunPartOSimulation` opens one
+    around its preparation steps, and `RunWorkflow` (Part O branch) opens one around `Calculate`.
+  - Each scope is disposed in the finally, BEFORE that code's existing final check. `SetCancelAvailable`
+    waits for the window's thread, so a click either finished first (and the final check sees it), or finds
+    Cancel withdrawn. The click handler also refuses while Cancel is withdrawn.
+  - During the baseline assessment, the rebalancing and each round's TM59 assessment, Cancel is visible,
+    disabled, with a tooltip. The note says "Cancel is offered only while a TAS simulation is being prepared or
+    run; this step does not stop for it."
+  - A request already made keeps "Cancelling…" and its note.
+  - A default host (Prepare & Run, Iteration 3) is unchanged: a scope restores what was offered before.
+  - Remaining gap, documented: a click inside a scope that is followed by a refusal (e.g. the TBD cannot be
+    overwritten) is not acted on as a cancel; the round stops with that refusal instead.
+- **2B stage list ends from the run's own record** (Codex P2 on #117). `Modify.PartOOptimisationProgressEnd`:
+  - Passed / CapacityReached / IterationLimitReached / NoEligibleTargets complete, the same four the Hub calls
+    completed. Anything else fails, Cancelled included.
+  - A running envelope completes only if its own step `IsCompleted`. A null run fails.
+  - Before, `Complete()` was unconditional, so a cancelled round could flash "✓" beside "Cancelling…".
 
-**Files.** `Classes/PartO/PartOProgressState.cs`, `Classes/PartO/PartOProgressHost.cs` (doc),
+**Files.** `Classes/PartO/PartOProgressState.cs`, `Classes/PartO/PartOProgressHost.cs`,
 `Windows/PartOProgressWindow.xaml(.cs)`, `Modify/AssessPartOTM59.cs`, `Modify/OptimisePartOTM59.cs`,
-`Modify/RunPartOOptimisation.cs`; tests `PartOProgressConsistencyTests.cs` (new, 14),
-`PartOWorkflowSimplificationTests.cs` (elapsed wording pins); evidence
-`documentation/evidence/parto-progress-consistency/`.
+`Modify/RunPartOOptimisation.cs`, `Modify/RunPartOSimulation.cs` and `Modify/RunWorkflow.cs` (the cancel
+scopes only); tests `PartOProgressConsistencyTests.cs` (new), `PartOWorkflowSimplificationTests.cs` (elapsed
+wording pins); evidence `documentation/evidence/parto-progress-consistency/`.
 
 **Validation.**
-- `SAM.Analytical.UI.WPF.Tests`: 1173/1173 (was 1159).
+- `SAM.Analytical.UI.WPF.Tests`: 1192/1192 (was 1159; 1173 at the first push).
+  - The correction's tests: the 2B offer through a whole sequence, the latched request, nested scopes,
+    Prepare & Run unchanged, the note, the window refusing a click, the shown window already disabled when the
+    scope returns (UIA, no wait), and the end state for every stop reason and for the envelope.
 - `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): exit 0, 0 errors.
 - `git diff --check` clean.
 - Live, real exe (`LIVE-ACCEPTANCE-2026-09-25.md`):
@@ -90,8 +109,8 @@ redesign is Pass 5 and is not started.
   box before it closes.
 - Live acceptance of 2B needs a completed Iteration 2 run.
 
-**Next step.** The owner reviews the PR. Check CI is green before merge. Then move SAM_Deploy's SAM_UI pointer.
-A live 2B check fits naturally into Pass 5's acceptance.
+**Next step.** The owner reviews the correction on PR #117. Check CI and the Codex re-review are clean before
+merge. Then move SAM_Deploy's SAM_UI pointer. A live 2B check fits naturally into Pass 5's acceptance.
 
 ## Previous: Part O reopened-run naming - check + Hub line (25 Sep 2026) - MERGED (#116)
 
