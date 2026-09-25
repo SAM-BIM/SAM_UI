@@ -2,8 +2,8 @@
 
 ## Current: Part O / TM59 workflow simplification (24-25 Sep 2026) - implemented, live-smoke-tested, PR open
 
-**Status.** Implemented (commit `2ab49f1`), live smoke tests passed on 25 Sep (commit 2), pushed, one PR into
-`sow/2026-Q3`. Branch `feature/parto-workflow-simplification-2026-09-24` (SAM_UI only, from `sow/2026-Q3` `c7281ca`).
+**Status.** Implemented (commit `2ab49f1`), live smoke tests passed on 25 Sep (`4588412`), pushed, PR
+SAM-BIM/SAM_UI#109 into `sow/2026-Q3` (open; wait for CI green before merge). Branch `feature/parto-workflow-simplification-2026-09-24` (SAM_UI only, from `sow/2026-Q3` `c7281ca`).
 SAM / SAM_Systems / SAM_Tas unchanged (engineering behaviour frozen after the merged Nuaire work).
 
 **Environment.** All four repos at `origin/sow/2026-Q3` (SAM `80b01052`, SAM_Systems `2213373`, SAM_Tas `39828c6`,
