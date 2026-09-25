@@ -133,7 +133,27 @@ namespace SAM.Analytical.UI.WPF
             return ShowResult(partOTM59ResultSummary, tM59AssessmentReport.ToString(), partOTM59Assessment.AssociationRefusals, tM59AssessmentResult.VentilationStrategyRefusals, summary, owner);
         }
 
+        /// <summary>
+        /// Shows the summary and returns THAT summary - the caller's own object, never anything read back
+        /// off the window - so the Hub's line and the window are two readers of one state.
+        /// </summary>
         private static PartOTM59ResultSummary ShowResult(PartOTM59ResultSummary partOTM59ResultSummary, string? report, IEnumerable<string>? associationRefusals, IEnumerable<string>? ventilationStrategyRefusals, string? summary, IWin32Window? owner)
+        {
+            PartOTM59ResultWindow partOTM59ResultWindow = ResultWindow(partOTM59ResultSummary, report, associationRefusals, ventilationStrategyRefusals, summary);
+
+            if (owner is not null)
+            {
+                new System.Windows.Interop.WindowInteropHelper(partOTM59ResultWindow).Owner = owner.Handle;
+            }
+
+            partOTM59ResultWindow.ShowDialog();
+
+            return partOTM59ResultSummary;
+        }
+
+        /// <summary>The result window, filled and not yet shown.</summary>
+        /// <remarks>Internal rather than private so what the window is given is pinned by tests.</remarks>
+        internal static PartOTM59ResultWindow ResultWindow(PartOTM59ResultSummary partOTM59ResultSummary, string? report, IEnumerable<string>? associationRefusals, IEnumerable<string>? ventilationStrategyRefusals, string? summary)
         {
             PartOTM59ResultWindow partOTM59ResultWindow = new()
             {
@@ -145,14 +165,7 @@ namespace SAM.Analytical.UI.WPF
 
             partOTM59ResultWindow.ResultSummary = partOTM59ResultSummary;
 
-            if (owner is not null)
-            {
-                new System.Windows.Interop.WindowInteropHelper(partOTM59ResultWindow).Owner = owner.Handle;
-            }
-
-            partOTM59ResultWindow.ShowDialog();
-
-            return partOTM59ResultSummary;
+            return partOTM59ResultWindow;
         }
 
         /// <summary>

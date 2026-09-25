@@ -130,6 +130,9 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>The not-assessed bar's count. For a test to read.</summary>
         internal string DiagnosticsLabel => label_Diagnostics.Text;
 
+        /// <summary>The verdict heading as drawn. For a test to read.</summary>
+        internal string VerdictHeading => textBlock_Verdict.Text;
+
         /// <summary>Whether the Detailed report section is drawn. For a test to read.</summary>
         internal bool ReportShown => textBox_Report.Visibility == Visibility.Visible;
 

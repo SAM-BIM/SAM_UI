@@ -177,11 +177,8 @@ namespace SAM.Analytical.UI.WPF
                         break;
 
                     case PartOWorkflowAction.ReviewResults:
-                        //Worded from what the result window was headed with, so the two cannot disagree.
-                        PartOTM59ResultSummary? partOTM59ResultSummary_Review = ReviewPartOTM59(partORun, owner);
-                        partOWorkflowOutcome = partOTM59ResultSummary_Review is null
-                            ? null
-                            : new PartOWorkflowOutcome(partOTM59ResultSummary_Review.HasVerdict ? PartOWorkflowOutcomeKind.Information : PartOWorkflowOutcomeKind.Warning, string.Format("Reviewed the TM59 results · {0} · no simulation was run", partOTM59ResultSummary_Review.VerdictWord));
+                        //The same summary instance the result window was given - see ReviewOutcome.
+                        partOWorkflowOutcome = ReviewOutcome(ReviewPartOTM59(partORun, owner));
                         break;
 
                     case PartOWorkflowAction.Optimise:
@@ -342,8 +339,32 @@ namespace SAM.Analytical.UI.WPF
                     "✓ {0} complete · TAS simulation {1}{2}{3}",
                     iteration,
                     PartOProgressState.Format(elapsed_Simulation ?? partOSimulationOutcome.Elapsed),
-                    partOTM59ResultSummary is not null ? " · TM59 " + partOTM59ResultSummary.VerdictWord : string.Empty,
+                    TM59OutcomeSuffix(partOTM59ResultSummary),
                     partOSimulationOutcome.Notes.Count != 0 ? string.Format(" · {0} note(s) were shown", partOSimulationOutcome.Notes.Count) : string.Empty));
+        }
+
+        /// <summary>
+        /// The Hub's line after Review Results, worded from the <see cref="PartOTM59ResultSummary"/> that
+        /// <see cref="ReviewPartOTM59"/> built from the assessment and handed to the result window. The Hub never
+        /// reads the window: both are readers of that one object, so they cannot disagree about the verdict.
+        /// Null where there was no run to review.
+        /// </summary>
+        internal static PartOWorkflowOutcome? ReviewOutcome(PartOTM59ResultSummary? partOTM59ResultSummary)
+        {
+            if (partOTM59ResultSummary is null)
+            {
+                return null;
+            }
+
+            return new PartOWorkflowOutcome(
+                partOTM59ResultSummary.HasVerdict ? PartOWorkflowOutcomeKind.Information : PartOWorkflowOutcomeKind.Warning,
+                string.Format("Reviewed the TM59 results · {0} · no simulation was run", partOTM59ResultSummary.VerdictWord));
+        }
+
+        /// <summary>The " · TM59 Fail" part of Prepare &amp; Run's closing line, from the same summary.</summary>
+        internal static string TM59OutcomeSuffix(PartOTM59ResultSummary? partOTM59ResultSummary)
+        {
+            return partOTM59ResultSummary is null ? string.Empty : " · TM59 " + partOTM59ResultSummary.VerdictWord;
         }
 
         /// <summary>

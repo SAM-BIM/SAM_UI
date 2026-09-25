@@ -52,3 +52,12 @@ time (07:54:16) was then restored from the `cp -p` backup in `...\backup\`.
   Each state is covered by `PartOTM59ResultTests` against real `TM59AssessmentReport` objects and the real window.
 - Prepare & Run's closing line ("· TM59 Fail") uses the same word; it was not re-run live because that needs TAS.
 - Non-100 % DPI, as in the earlier passes.
+
+## Round 2 (owner correction: the per-space status moves into SAM)
+
+The space counts are now a tally of SAM's `TM59AssessmentReport.OccupiedSpaces[].ComplianceStatus` (SAM-BIM/SAM#137),
+and the report formatter prints the same value. The same driver was re-run on the same saved FAIL run, against the
+rebuilt SAM and SAM_UI (round 1 captures and log kept as `shots-tm59-round1`, `journey-tm59-round1.log`):
+- heading, counts, facts and Hub line are identical to round 1: FAIL, `8 spaces assessed · 2 pass · 6 fail · 1 not assessed`;
+- 0 message boxes, no TAS;
+- the report it rewrote had the same SHA-256 again (`9ef0c77e…b7bf5`), and its original time was restored.

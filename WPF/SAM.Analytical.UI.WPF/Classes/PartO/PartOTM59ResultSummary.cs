@@ -20,12 +20,15 @@ namespace SAM.Analytical.UI.WPF
     /// criterion, a limit or an hour count, and nothing parses the report text.
     /// </para>
     /// <para>
-    /// The per-space counts group the report's own check rows by the space they belong to
-    /// (<see cref="TM59AssessmentReportCheck.Reference"/>, the grouping the report's own tables use) and read
-    /// each row's <see cref="TM59AssessmentReportCheck.ComplianceStatus"/> verbatim: a space with a failing
-    /// check is a failing space, a space with a passing check and no failing one is a passing space. That is
-    /// the report's own combining rule - the one its "Overall" column and its section statuses apply - and
-    /// the counts can therefore never disagree with the verdict above them.
+    /// The per-space counts only COUNT <see cref="TM59AssessmentReport.OccupiedSpaces"/>: each space's overall
+    /// status is SAM's <see cref="TM59AssessmentReportSpace.ComplianceStatus"/>, the value the text report's
+    /// own "Overall" column prints. No combining rule is restated here, so the counts cannot disagree with the
+    /// report or with the verdict above them.
+    /// </para>
+    /// <para>
+    /// <b>One state, two readers.</b> This object is built by <c>Modify.ReviewPartOTM59</c> from the
+    /// assessment, BEFORE any window exists; the result window is given it to display and the Hub's outcome
+    /// line is worded from the same instance (<c>Modify.ReviewOutcome</c>). Neither reads the other.
     /// </para>
     /// <para>
     /// <b>Not assessed</b> is <see cref="PartOTM59Assessment.SpaceGuids_NoResult"/>: design spaces with no
@@ -215,23 +218,26 @@ namespace SAM.Analytical.UI.WPF
             int fail = 0;
             int notApplicable = 0;
 
-            //The report's own occupied-space rows, grouped by the space they belong to - by identity, never by
-            //name, which two dwellings can share.
-            IEnumerable<TM59AssessmentReportCheck> checks = (tM59AssessmentReport.NaturalVentilationChecks ?? []).Concat(tM59AssessmentReport.MechanicalVentilationChecks ?? []).Where(x => x is not null);
-
-            foreach (IGrouping<string, TM59AssessmentReportCheck> group in checks.GroupBy(x => x.Reference ?? x.SpaceName ?? string.Empty))
+            //Counted, never decided: each occupied space's overall status is SAM's own
+            //(TM59AssessmentReportSpace.ComplianceStatus - the value the report's Overall column prints).
+            foreach (TM59AssessmentReportSpace tM59AssessmentReportSpace in tM59AssessmentReport.OccupiedSpaces ?? [])
             {
-                if (group.Any(x => x.ComplianceStatus == TM59ComplianceStatus.Fail))
+                switch (tM59AssessmentReportSpace?.ComplianceStatus)
                 {
-                    fail++;
-                }
-                else if (group.Any(x => x.ComplianceStatus == TM59ComplianceStatus.Pass))
-                {
-                    pass++;
-                }
-                else
-                {
-                    notApplicable++;
+                    case TM59ComplianceStatus.Fail:
+                        fail++;
+                        break;
+
+                    case TM59ComplianceStatus.Pass:
+                        pass++;
+                        break;
+
+                    case null:
+                        break;
+
+                    default:
+                        notApplicable++;
+                        break;
                 }
             }
 

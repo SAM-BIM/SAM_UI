@@ -100,6 +100,83 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
+        /// The counts are a tally of SAM's structured per-space status and nothing else - on a report mixing a
+        /// bedroom that passes Criterion 1 but fails Criterion 2, a passing living room and a failing
+        /// mechanical kitchen. The bedroom is one failing space (not a pass and a fail), because SAM says so.
+        /// </summary>
+        [Fact]
+        public void TheCounts_AreATallyOfSAMsStructuredSpaceStatus()
+        {
+            TM59AssessmentReport tM59AssessmentReport = new(
+                null,
+                [Mechanical("Kitchen", "kitchen", false)],
+                [
+                    new TM59NaturalVentilationBedroomResult("Bedroom", "test", "bedroom", TM52BuildingCategory.CategoryII, 3000, 90, 10, 3285, 3000, 90, 32, 40, true),
+                    new TM59NaturalVentilationResult("Living", "test", "living", TM52BuildingCategory.CategoryII, 3000, 90, 3000, 90, 10, true),
+                ],
+                null);
+
+            PartOTM59ResultSummary summary = PartOTM59ResultSummary.Create(tM59AssessmentReport, 0, null);
+
+            Assert.Equal(TM59ComplianceStatus.Fail, tM59AssessmentReport.OccupiedSpaces.Single(x => x.Reference == "bedroom").ComplianceStatus);
+            Assert.Equal(tM59AssessmentReport.OccupiedSpaces.Count, summary.SpaceCount_Assessed);
+            Assert.Equal(tM59AssessmentReport.OccupiedSpaces.Count(x => x.ComplianceStatus == TM59ComplianceStatus.Pass), summary.SpaceCount_Pass);
+            Assert.Equal(tM59AssessmentReport.OccupiedSpaces.Count(x => x.ComplianceStatus == TM59ComplianceStatus.Fail), summary.SpaceCount_Fail);
+            Assert.Equal("3 spaces assessed · 1 pass · 2 fail · 0 not assessed", summary.Counts);
+            Assert.Equal(PartOTM59Verdict.Fail, summary.Verdict);
+        }
+
+        /// <summary>
+        /// The Hub and the result window cannot disagree: the window is given the summary instance itself
+        /// (never a copy, and nothing is read back off it), and the Hub's Review line and Prepare &amp; Run
+        /// suffix are worded from that same instance - for every verdict.
+        /// </summary>
+        [WpfTheory]
+        [InlineData(PartOTM59Verdict.Pass)]
+        [InlineData(PartOTM59Verdict.Fail)]
+        [InlineData(PartOTM59Verdict.NotAssessed)]
+        [InlineData(PartOTM59Verdict.Unavailable)]
+        public void TheHubAndTheWindow_ReadOneSummary_AndCannotDisagree(PartOTM59Verdict partOTM59Verdict)
+        {
+            PartOTM59ResultSummary summary = partOTM59Verdict switch
+            {
+                PartOTM59Verdict.Pass => PartOTM59ResultSummary.Create(Report(pass: 2, fail: 0), 0, null),
+                PartOTM59Verdict.Fail => PartOTM59ResultSummary.Create(Report(pass: 1, fail: 1), 0, null),
+                PartOTM59Verdict.NotAssessed => PartOTM59ResultSummary.Create(Report(pass: 2, fail: 0), 1, "partial"),
+                _ => PartOTM59ResultSummary.Unavailable("gone", null),
+            };
+
+            Assert.Equal(partOTM59Verdict, summary.Verdict);
+
+            PartOTM59ResultWindow partOTM59ResultWindow = Modify.ResultWindow(summary, "REPORT", [], [], null);
+
+            Assert.Same(summary, partOTM59ResultWindow.ResultSummary);
+            Assert.Equal(summary.Heading, partOTM59ResultWindow.VerdictHeading);
+
+            PartOWorkflowOutcome? partOWorkflowOutcome = Modify.ReviewOutcome(summary);
+
+            Assert.NotNull(partOWorkflowOutcome);
+            Assert.Equal(string.Format("Reviewed the TM59 results · {0} · no simulation was run", summary.VerdictWord), partOWorkflowOutcome!.Text);
+            Assert.Equal(" · TM59 " + summary.VerdictWord, Modify.TM59OutcomeSuffix(summary));
+
+            //The Hub's word and the window's heading word are the same verdict.
+            Assert.Equal(summary.VerdictText, summary.VerdictWord.ToUpperInvariant());
+            Assert.EndsWith(summary.VerdictText, partOTM59ResultWindow.VerdictHeading, StringComparison.Ordinal);
+
+            //A pass or fail is information, anything else needs attention.
+            Assert.Equal(summary.HasVerdict ? PartOWorkflowOutcomeKind.Information : PartOWorkflowOutcomeKind.Warning, partOWorkflowOutcome.Kind);
+
+            partOTM59ResultWindow.Close();
+        }
+
+        [Fact]
+        public void NoRun_GivesNoHubLine()
+        {
+            Assert.Null(Modify.ReviewOutcome(null));
+            Assert.Equal(string.Empty, Modify.TM59OutcomeSuffix(null));
+        }
+
+        /// <summary>
         /// Two dwellings can both have a "Kitchen". The counts are by identity, as the report's own grouping
         /// is, so two kitchens are two spaces.
         /// </summary>
