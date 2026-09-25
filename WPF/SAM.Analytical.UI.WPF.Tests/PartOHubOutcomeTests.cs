@@ -72,8 +72,9 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
-        /// A reopened run is ready to review, and is neither named nor given a verdict: its saved record cannot
-        /// tell 1a from 2, and no assessment has run.
+        /// A reopened run with no resume record is ready to review, and is neither named nor given a verdict:
+        /// there is no saved record to name it from, and no assessment has run. (Named from a v2 record:
+        /// <c>PartORunResumeNamingTests</c>.)
         /// </summary>
         [Fact]
         public void AReopenedRun_IsReadyToReview_WithNoVerdictAndNoName()

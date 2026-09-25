@@ -84,9 +84,9 @@ namespace SAM.Analytical.UI.WPF
 
             if (partORun.State == PartORunState.WorkflowCompleted && (partOWorkflowCapabilities?.ResultsAvailable ?? false))
             {
-                //A reopened run is not named: its saved record states the engine iteration but not whether a
-                //catalogue was offered, so it cannot tell Iteration 1a from Iteration 2.
-                string name = partORun.IsRestored ? "Saved results reopened" : string.Format("{0} completed", ScenarioName(partORun));
+                //A reopened run is named only where its saved record says which run it was (a v2 resume sidecar
+                //records whether a catalogue was offered); an older record, or none, leaves it unnamed.
+                string name = partORun.IsRestored ? string.Format("{0} reopened", SavedResults(partORun)) : string.Format("{0} completed", ScenarioName(partORun));
 
                 return new PartOWorkflowOutcome(
                     PartOWorkflowOutcomeKind.Information,
@@ -171,10 +171,12 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
-            //A reopened run is not named, for the reason StandingOutcome gives.
-            string subject = partORun is null || (!partORun.IsRestored && PartOWorkflowScenario.Find(partORun.PreparationContext) is null)
+            //A reopened run is named only from its saved record, as StandingOutcome names it.
+            string subject = partORun is null
                 ? "Results reviewed"
-                : partORun.IsRestored ? "Saved results reviewed" : string.Format("{0} results reviewed", ScenarioName(partORun));
+                : partORun.IsRestored
+                    ? string.Format("{0} reviewed", SavedResults(partORun))
+                    : PartOWorkflowScenario.Find(partORun.PreparationContext) is null ? "Results reviewed" : string.Format("{0} results reviewed", ScenarioName(partORun));
 
             return new PartOWorkflowOutcome(
                 Kind(partOTM59ResultSummary),
@@ -303,6 +305,17 @@ namespace SAM.Analytical.UI.WPF
         private static string ScenarioName(PartORun partORun)
         {
             return PartOWorkflowScenario.Find(partORun.PreparationContext)?.Name ?? "Part O iteration";
+        }
+
+        /// <summary>
+        /// "Saved Iteration 2 results" where the reopened run's saved record names it, otherwise "Saved results".
+        /// Never inferred: a v1 sidecar, or a run with no sidecar, has no record to name it from.
+        /// </summary>
+        private static string SavedResults(PartORun partORun)
+        {
+            string? name = PartOWorkflowScenario.Find(partORun.PreparationContext)?.Name;
+
+            return string.IsNullOrWhiteSpace(name) ? "Saved results" : string.Format("Saved {0} results", name);
         }
 
         private static string Name(string? text)
