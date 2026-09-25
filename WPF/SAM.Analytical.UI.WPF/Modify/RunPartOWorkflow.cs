@@ -258,9 +258,18 @@ namespace SAM.Analytical.UI.WPF
                 {
                     partOProgressHost.Start(0);
 
-                    if (!PreparePartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner))
+                    PartOPreparationResult partOPreparationResult = PrepareAndReviewPartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner);
+
+                    if (partOPreparationResult == PartOPreparationResult.Declined)
                     {
-                        //Refused, declined or not adopted. Every one of those has already told the user why.
+                        //The engineer said no at the review. TAS is not reached, and the Hub says so rather
+                        //than coming back as though nothing had been asked.
+                        return DeclinedOutcome(iteration);
+                    }
+
+                    if (partOPreparationResult != PartOPreparationResult.Adopted)
+                    {
+                        //Refused or not adopted. Each of those has already told the user why.
                         return null;
                     }
                 }
@@ -334,6 +343,18 @@ namespace SAM.Analytical.UI.WPF
                     PartOProgressState.Format(elapsed_Simulation ?? partOSimulationOutcome.Elapsed),
                     tM59ComplianceStatus.HasValue ? " · TM59 " + Core.Query.Description(tM59ComplianceStatus.Value) : string.Empty,
                     partOSimulationOutcome.Notes.Count != 0 ? string.Format(" · {0} note(s) were shown", partOSimulationOutcome.Notes.Count) : string.Empty));
+        }
+
+        /// <summary>
+        /// The Hub's line after the engineer cancelled the Review iteration window: a deliberate decline before
+        /// any TAS work, which changed nothing. Not persisted - it is the Hub's last-outcome line, carried only
+        /// to the next showing of the Hub like every other outcome.
+        /// </summary>
+        internal static PartOWorkflowOutcome DeclinedOutcome(string? iteration)
+        {
+            return new PartOWorkflowOutcome(
+                PartOWorkflowOutcomeKind.Information,
+                string.Format("○ {0}: review cancelled before TAS · no simulation was run and the model is unchanged", string.IsNullOrWhiteSpace(iteration) ? "Part O iteration" : iteration));
         }
 
         /// <summary>

@@ -137,6 +137,16 @@ namespace SAM.Analytical.UI.WPF
         /// </returns>
         public static bool PreparePartOIteration(this UIAnalyticalModel? uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, VentilationUnitCatalogue ventilationUnitCatalogue, IWin32Window? owner = null)
         {
+            return PrepareAndReviewPartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner) == PartOPreparationResult.Adopted;
+        }
+
+        /// <summary>
+        /// <see cref="PreparePartOIteration(UIAnalyticalModel, PartORun, PartOWorkflowRequest, VentilationUnitCatalogue, IWin32Window)"/>,
+        /// saying HOW it ended - so the Hub can tell an engineer who declined the review apart from a
+        /// preparation that refused. Both leave the model and the run untouched; only one was a choice.
+        /// </summary>
+        internal static PartOPreparationResult PrepareAndReviewPartOIteration(UIAnalyticalModel? uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, VentilationUnitCatalogue ventilationUnitCatalogue, IWin32Window? owner = null)
+        {
             AnalyticalModel? analyticalModel = uIAnalyticalModel?.JSAMObject;
 
             PartOVentilationStrategyOption? option = partOWorkflowRequest?.Option;
@@ -145,7 +155,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (analyticalModel is null || partORun is null || option is null || zones_Dwelling.Count == 0)
             {
-                return false;
+                return PartOPreparationResult.NotPrepared;
             }
 
             ventilationUnitCatalogue ??= VentilationUnitCatalogue.Read();
@@ -244,7 +254,7 @@ namespace SAM.Analytical.UI.WPF
 
                 MessageBox.Show(string.Format("The Part O iteration was not prepared.\n\n{0}", partOIterationPreparation.Refusal));
 
-                return false;
+                return PartOPreparationResult.NotPrepared;
             }
 
             //An isolated run gets its own project name, so its TBD, TSD, .sam and TM59 report cannot land
@@ -284,7 +294,7 @@ namespace SAM.Analytical.UI.WPF
 
             PartOPreparationWindow partOPreparationWindow = new()
             {
-                Summary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOWorkflowRequest.SelectVentilationUnit, partOIsolationContext, partOEquipmentAssignmentSet),
+                ReviewSummary = Summary(partOIterationPreparation, option, ventilationUnitCatalogue, partOWorkflowRequest.SelectVentilationUnit, partOIsolationContext, partOEquipmentAssignmentSet),
                 SpaceRows = (adjacencyCluster_Prepared.GetSpaces() ?? []).ConvertAll(x => new PartOSpaceRow(x, Name_Dwelling(dictionary_DwellingName_Space, x))),
             };
 
@@ -296,7 +306,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 //Iteration 1a, or a catalogue that could not be read: the rows still say what each dwelling
                 //is designed to move, and say plainly that no product was selected.
-                partOPreparationWindow.EquipmentRows = EquipmentRows(adjacencyCluster_Prepared, partOIterationPreparation, null);
+                partOPreparationWindow.EquipmentRows = EquipmentRows(adjacencyCluster_Prepared, partOIterationPreparation, null, dictionary_DwellingName_Space);
             }
 
             partOPreparationWindow.SetDiagnostics(partOIterationPreparation.Notes, partOIterationPreparation.Warnings, partOIterationPreparation.Refusals);
@@ -314,11 +324,25 @@ namespace SAM.Analytical.UI.WPF
 
             PartOProgressHost.Current?.Show();
 
-            if (showDialog_Preparation is null || !showDialog_Preparation.Value)
+            return ConcludePartOReview(showDialog_Preparation, uIAnalyticalModel!, partORun, partOWorkflowRequest, analyticalModel_Prepared, adjacencyCluster_Prepared, partOIterationPreparation, partOPreparationContext, partOEquipmentAssignmentSet, partOProjectTestVentilationUnit);
+        }
+
+        /// <summary>
+        /// What follows the engineer's answer to the Review iteration window: nothing at all for Cancel, and
+        /// for Accept &amp; Run TAS the one write, the adoption and the model replacement - exactly the steps
+        /// that followed OK before, moved here unchanged so the decision point can be tested without a dialog.
+        /// <para>
+        /// <b>Declined leaves everything as it was.</b> The loaded model is untouched - the preparation worked
+        /// on a copy - and the run is not moved, so nothing can later be simulated and assessed against
+        /// scenarios nobody accepted, and the caller never reaches TAS.
+        /// </para>
+        /// </summary>
+        /// <param name="accepted">The window's DialogResult: true only for Accept &amp; Run TAS.</param>
+        internal static PartOPreparationResult ConcludePartOReview(bool? accepted, UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, AnalyticalModel analyticalModel_Prepared, AdjacencyCluster adjacencyCluster_Prepared, PartOIterationPreparation partOIterationPreparation, PartOPreparationContext partOPreparationContext, PartOEquipmentAssignmentSet? partOEquipmentAssignmentSet, PartOProjectTestVentilationUnit? partOProjectTestVentilationUnit)
+        {
+            if (accepted is null || !accepted.Value)
             {
-                //Declined. The loaded model is untouched - the preparation worked on a copy - and no run is
-                //started, so nothing can later be simulated and assessed against scenarios nobody accepted.
-                return false;
+                return PartOPreparationResult.Declined;
             }
 
             //THE ONE WRITE, and only what the engineer actually changed - so a table that was merely
@@ -333,7 +357,7 @@ namespace SAM.Analytical.UI.WPF
 
                     MessageBox.Show(string.Format("The equipment assignments were not applied, so the prepared model was not adopted.\n\n{0}", string.Join("\n\n", refusals_Commit)));
 
-                    return false;
+                    return PartOPreparationResult.NotPrepared;
                 }
 
                 partOIterationPreparation.Notes.AddRange(notes_Commit);
@@ -377,15 +401,15 @@ namespace SAM.Analytical.UI.WPF
 
                 MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason));
 
-                return false;
+                return PartOPreparationResult.NotPrepared;
             }
 
             //Armed immediately before the write, so this replacement is not read as an outside edit.
             partORun.ExpectModification();
 
-            uIAnalyticalModel!.SetJSAMObject(analyticalModel_Prepared, new FullModification());
+            uIAnalyticalModel.SetJSAMObject(analyticalModel_Prepared, new FullModification());
 
-            return partORun.State == PartORunState.Prepared;
+            return partORun.State == PartORunState.Prepared ? PartOPreparationResult.Adopted : PartOPreparationResult.NotPrepared;
         }
 
         /// <summary>
@@ -454,41 +478,20 @@ namespace SAM.Analytical.UI.WPF
             List<VentilationSystem> ventilationSystems = partOIterationPreparation.VentilationSystems;
 
             Dictionary<Guid, string> dictionary_VentilationSystemName = [];
-            Dictionary<Guid, string> dictionary_DwellingName = [];
 
             for (int i = 0; i < airHandlingUnits.Count; i++)
             {
                 AirHandlingUnit airHandlingUnit = airHandlingUnits[i];
-                if (airHandlingUnit is null)
-                {
-                    continue;
-                }
 
                 VentilationSystem? ventilationSystem = i < ventilationSystems.Count ? ventilationSystems[i] : null;
 
-                if (ventilationSystem is not null)
+                if (airHandlingUnit is not null && ventilationSystem is not null)
                 {
                     dictionary_VentilationSystemName[airHandlingUnit.Guid] = ventilationSystem.FullName;
                 }
-
-                //The dwelling this unit serves, found through the system's own spaces. Left absent rather
-                //than guessed where nothing resolves - the row then falls back to the system or the unit
-                //name, and never to an invented dwelling.
-                if (adjacencyCluster is null || ventilationSystem is null)
-                {
-                    continue;
-                }
-
-                foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(ventilationSystem) ?? [])
-                {
-                    if (space is not null && dictionary_DwellingName_Space.TryGetValue(space.Guid, out string name_Dwelling) && !string.Equals(name_Dwelling, PartOSpaceRow.Unresolved, StringComparison.Ordinal))
-                    {
-                        dictionary_DwellingName[airHandlingUnit.Guid] = name_Dwelling;
-
-                        break;
-                    }
-                }
             }
+
+            Dictionary<Guid, string> dictionary_DwellingName = DwellingNames_AirHandlingUnit(adjacencyCluster, partOIterationPreparation, dictionary_DwellingName_Space);
 
             return PartOEquipmentAssignmentSet.Create(
                 adjacencyCluster,
@@ -498,6 +501,52 @@ namespace SAM.Analytical.UI.WPF
                 ventilationUnitCapacityDescriptors,
                 partOEquipmentSelection,
                 ventilationUnitCapacityDescriptors_ProjectTest);
+        }
+
+        /// <summary>
+        /// Air handling unit -> the dwelling it serves, found through its ventilation system's own spaces.
+        /// <para>
+        /// One resolution for both equipment tables. The Iteration 2 table named its rows "Flat 1" this way
+        /// while the Iteration 1a table printed the system name, "MVHR 1", so the same dwelling had two names
+        /// on two screens. A unit left out where nothing resolves falls back, in the row, to the system or
+        /// the unit name - never to an invented dwelling.
+        /// </para>
+        /// </summary>
+        internal static Dictionary<Guid, string> DwellingNames_AirHandlingUnit(AdjacencyCluster? adjacencyCluster, PartOIterationPreparation partOIterationPreparation, Dictionary<Guid, string> dictionary_DwellingName_Space)
+        {
+            Dictionary<Guid, string> result = [];
+
+            if (adjacencyCluster is null || partOIterationPreparation is null || dictionary_DwellingName_Space is null)
+            {
+                return result;
+            }
+
+            List<AirHandlingUnit> airHandlingUnits = partOIterationPreparation.AirHandlingUnits;
+            List<VentilationSystem> ventilationSystems = partOIterationPreparation.VentilationSystems;
+
+            for (int i = 0; i < airHandlingUnits.Count; i++)
+            {
+                AirHandlingUnit airHandlingUnit = airHandlingUnits[i];
+
+                VentilationSystem? ventilationSystem = i < ventilationSystems.Count ? ventilationSystems[i] : null;
+
+                if (airHandlingUnit is null || ventilationSystem is null)
+                {
+                    continue;
+                }
+
+                foreach (Space space in adjacencyCluster.GetRelatedObjects<Space>(ventilationSystem) ?? [])
+                {
+                    if (space is not null && dictionary_DwellingName_Space.TryGetValue(space.Guid, out string name_Dwelling) && !string.Equals(name_Dwelling, PartOSpaceRow.Unresolved, StringComparison.Ordinal))
+                    {
+                        result[airHandlingUnit.Guid] = name_Dwelling;
+
+                        break;
+                    }
+                }
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -670,7 +719,7 @@ namespace SAM.Analytical.UI.WPF
             return space is not null && dictionary_DwellingName_Space.TryGetValue(space.Guid, out string name) ? name : null;
         }
 
-        private static List<PartOEquipmentRow> EquipmentRows(AdjacencyCluster? adjacencyCluster, PartOIterationPreparation partOIterationPreparation, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors)
+        private static List<PartOEquipmentRow> EquipmentRows(AdjacencyCluster? adjacencyCluster, PartOIterationPreparation partOIterationPreparation, IEnumerable<VentilationUnitCapacityDescriptor>? ventilationUnitCapacityDescriptors, Dictionary<Guid, string>? dictionary_DwellingName_Space = null)
         {
             List<PartOEquipmentRow> result = [];
 
@@ -678,6 +727,8 @@ namespace SAM.Analytical.UI.WPF
             {
                 return result;
             }
+
+            Dictionary<Guid, string> dictionary_DwellingName = DwellingNames_AirHandlingUnit(adjacencyCluster, partOIterationPreparation, dictionary_DwellingName_Space ?? []);
 
             List<AirHandlingUnit> airHandlingUnits = partOIterationPreparation!.AirHandlingUnits;
             List<VentilationSystem> ventilationSystems = partOIterationPreparation.VentilationSystems;
@@ -711,49 +762,86 @@ namespace SAM.Analytical.UI.WPF
                     ? Analytical.Query.IsVentilationUnitSufficient(adjacencyCluster, airHandlingUnit, ventilationUnitCapacityDescriptors, out string reason) ? null : reason
                     : null;
 
-                result.Add(new PartOEquipmentRow(airHandlingUnit.Name, systemName, supplyDuty_Lps, extractDuty_Lps, ventilationUnitCapacityDescriptor, refusal));
+                result.Add(new PartOEquipmentRow(airHandlingUnit.Name, systemName, supplyDuty_Lps, extractDuty_Lps, ventilationUnitCapacityDescriptor, refusal, dictionary_DwellingName.TryGetValue(airHandlingUnit.Guid, out string name_Dwelling) ? name_Dwelling : null));
             }
 
             return result;
         }
 
-        private static string Summary(PartOIterationPreparation partOIterationPreparation, PartOVentilationStrategyOption option, VentilationUnitCatalogue ventilationUnitCatalogue, bool selectVentilationUnit, PartOIsolationContext? partOIsolationContext, PartOEquipmentAssignmentSet? partOEquipmentAssignmentSet)
+        /// <summary>
+        /// What the Review iteration window says about the prepared run, part by part. The same statements
+        /// the one-paragraph summary made, with two corrections: the heading is the WORKFLOW scenario
+        /// (<see cref="PartOWorkflowScenario.Find"/>), so an Iteration 2 run no longer heads itself
+        /// "Iteration 1a"; and an Iteration 1a or 1b run no longer leads its equipment line with the catalogue,
+        /// which that run does not use - the catalogue sentence is kept, on the tooltip.
+        /// </summary>
+        internal static PartOReviewSummary Summary(PartOIterationPreparation partOIterationPreparation, PartOVentilationStrategyOption option, VentilationUnitCatalogue ventilationUnitCatalogue, bool selectVentilationUnit, PartOIsolationContext? partOIsolationContext, PartOEquipmentAssignmentSet? partOEquipmentAssignmentSet)
         {
-            //Said FIRST, and said as a scope rather than as a setting. An isolated run is a different
-            //thermal model from the whole building - the interfaces to the dwellings left out are simulated
-            //as adiabatic - and a person reading these results later has to be told that without having to
-            //go looking for it.
-            string scope = partOIsolationContext is not null && partOIsolationContext.IsValid
-                ? string.Format(
-                    "Thermal model scope: ISOLATED. Selected dwellings: {0}. Interfaces to excluded spaces are simulated as adiabatic and surrounding external geometry is retained as shading context, so these results may differ from a whole-building simulation of the same dwellings. The Part O criteria and the Part F requirements are unchanged.\n",
-                    string.Join(", ", partOIsolationContext.Names_Dwelling))
-                : "Thermal model scope: WHOLE BUILDING.\n";
+            //The option's text is the fallback only for a pairing no workflow scenario describes - the
+            //legacy picker can ask for one.
+            string scenario = PartOWorkflowScenario.Find(option, selectVentilationUnit)?.Text ?? option.Text;
+
+            //Said as a scope rather than as a setting. An isolated run is a different thermal model from the
+            //whole building - the interfaces to the dwellings left out are simulated as adiabatic - and a
+            //person reading these results later has to be told that without having to go looking for it, so
+            //the consequence is shown, not tooltipped.
+            bool isolated = partOIsolationContext is not null && partOIsolationContext.IsValid;
+
+            string scope = isolated
+                ? string.Format("Isolated · selected dwellings: {0}", string.Join(", ", partOIsolationContext!.Names_Dwelling))
+                : "Whole building";
+
+            string? scopeDetail = isolated
+                ? "Interfaces to excluded spaces are simulated as adiabatic and surrounding external geometry is retained as shading context, so these results may differ from a whole-building simulation of the same dwellings. The Part O criteria and the Part F requirements are unchanged."
+                : null;
+
+            //ONE route word, not the settled mode followed by the canonical word in brackets - which on
+            //the mechanical route printed the literal reading "MVHR (MVHR)". Query.PartOVentilationRouteText
+            //proves the two agree rather than assuming it.
+            string route = Query.PartOVentilationRouteText(partOIterationPreparation.VentilationMode, option.VentilationStrategy);
 
             //The whole-run totals, which are sums across every dwelling this run built - NOT any one
             //dwelling's duty. Said so explicitly, because a three-flat model summing to 156 l/s beside a
             //150 l/s product would otherwise read as an exceeded unit.
-            string duty = double.IsNaN(partOIterationPreparation.DesignSupplyDuty_Lps)
-                ? "No mechanical design duty (the natural ventilation route realizes no continuous mechanical terminals)."
-                : string.Format("Design duty totalled across {0} dwelling system(s): {1:N1} l/s supply, {2:N1} l/s extract. Per-dwelling duties are in the equipment table below.", partOIterationPreparation.VentilationSystems.Count, partOIterationPreparation.DesignSupplyDuty_Lps, partOIterationPreparation.DesignExtractDuty_Lps);
+            int count_System = partOIterationPreparation.VentilationSystems.Count;
+
+            bool mechanical = !double.IsNaN(partOIterationPreparation.DesignSupplyDuty_Lps);
+
+            string duty = mechanical
+                ? string.Format("{0:N1} l/s supply · {1:N1} l/s extract, totalled across {2}", partOIterationPreparation.DesignSupplyDuty_Lps, partOIterationPreparation.DesignExtractDuty_Lps, UI.Query.PartOCount(count_System, "dwelling system", "dwelling systems"))
+                : "No mechanical design duty";
+
+            string dutyDetail = mechanical
+                ? "A sum across every dwelling system this run built, not any one dwelling's duty. Per-dwelling duties are in the dwelling table."
+                : "The natural ventilation route realizes no continuous mechanical terminals.";
 
             //Asked of the assignment table rather than restated: it knows the mode, how many dwellings
             //carry a product and how many need looking at, and a second count here could disagree with the
             //grid immediately below it.
-            string equipment = selectVentilationUnit
-                ? partOEquipmentAssignmentSet?.Description ?? string.Format("Equipment selection ran against {0} selectable product(s). A selected product's Maximum is its capability ceiling and is never a design airflow.", ventilationUnitCatalogue.CapacityDescriptors.Count)
-                : string.Format("No equipment selection ran, so no product is selected. {0}", ventilationUnitCatalogue.Description);
+            string equipment;
+            string? equipmentDetail;
 
-            //ONE route word, not the settled mode followed by the canonical word in brackets - which on
-            //the mechanical route printed the literal reading "MVHR (MVHR)". The two are the same
-            //statement, and Query.PartOVentilationRouteText proves that rather than assuming it: a
-            //disagreement, which the preparation itself refuses, is the one case that still states both.
-            return string.Format("{5}{0}. Route stated: {1}. {2} {3}\n{4} overheating scenario(s) stated. Simulate this model to produce results the TM59 assessment can read.",
-                option.Text,
-                Query.PartOVentilationRouteText(partOIterationPreparation.VentilationMode, option.VentilationStrategy),
-                duty,
-                equipment,
-                partOIterationPreparation.OverheatingScenarios.Count,
-                scope);
+            if (!selectVentilationUnit)
+            {
+                equipment = "No equipment selection · design duty only, no product is selected";
+                equipmentDetail = ventilationUnitCatalogue.Description;
+            }
+            else if (partOEquipmentAssignmentSet is not null)
+            {
+                equipment = string.Format("{0} · {1}", Core.Query.Description(partOEquipmentAssignmentSet.EquipmentSelection.Mode), partOEquipmentAssignmentSet.AssignmentSummary);
+                equipmentDetail = "A product's maximum is its capability ceiling and is never a design airflow.";
+            }
+            else
+            {
+                equipment = string.Format("Equipment selection ran against {0}", UI.Query.PartOCount(ventilationUnitCatalogue.CapacityDescriptors.Count, "selectable product", "selectable products"));
+                equipmentDetail = "A selected product's maximum is its capability ceiling and is never a design airflow.";
+            }
+
+            int count_Scenario = partOIterationPreparation.OverheatingScenarios.Count;
+
+            string overheatingScenarios = string.Format("{0} stated", UI.Query.PartOCount(count_Scenario, "overheating scenario", "overheating scenarios"));
+
+            return new PartOReviewSummary(scenario, scope, scopeDetail, route, duty, dutyDetail, equipment, equipmentDetail, overheatingScenarios);
         }
     }
 }

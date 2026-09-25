@@ -1,6 +1,60 @@
 # Project Progress
 
-## Current: Part O journey review - observe only (25 Sep 2026)
+## Current: Part O UX pass 1 - Review iteration window (25 Sep 2026) - PR open, NOT merged
+
+**Status.** Implemented on `feature/parto-review-iteration-2026-09-25` (from `sow/2026-Q3` `a3b38ee`), PR against
+`sow/2026-Q3`. Stopped before merge by owner brief. SAM_UI only. This is proposal item 1 of the journey review (H1, H2,
+M1-M3). Presentation plus one return value: no change to preparation, engineering quantities, validation, blockers,
+provenance, model mutation, or what happens after acceptance.
+
+**What changed.**
+- Heading (H2). `PartOWorkflowScenario.Find(option, selectVentilationUnit)` (SAM.Analytical.UI) returns the Hub's
+  scenario; the review is headed with its text. Iteration 2 no longer says "Iteration 1a" (it printed the engine
+  option's text).
+- Summary. `Modify.Summary` (PreparePartOIteration.cs) now returns `PartOReviewSummary` (new,
+  Classes/PartO): scenario, scope (+ isolated consequence, shown), route, design duty, equipment, overheating. Its
+  `Text` is what Copy All puts first. On 1a/1b the equipment line no longer leads with the catalogue; the catalogue
+  sentence is its tooltip. `PartOEquipmentAssignmentSet.AssignmentSummary` is the counts half of `Description`;
+  "dwelling(s)" became a real plural (in `Description` too, not pinned by any test).
+- Decision (H1). "OK" -> primary **Accept & Run TAS** (`PartO.PrimaryButton`, NOT IsDefault, so Enter never starts
+  TAS); Cancel secondary, IsCancel. A caption says what each does.
+- Layout: scenario + run summary -> dwelling assignments -> spaces -> diagnostics -> decision row. Both tables keep
+  every column. Merges `Themes/PartOStyles.xaml` (wrapped tooltips, palette, section headings).
+- Diagnostics (M1). One bar "Diagnostics  Warnings (8) · Notes (38)" with "Show details" (same switch as the Hub) and
+  Copy All. Box collapsed by default; opens by default only when there are refusals. Every line still in the box and
+  Copy All. `PartODiagnosticSummary.Header` separator is now " · ". The switch listens to Checked/Unchecked (a
+  Click-only handler did not answer a UIA toggle - found live).
+- M2: Convert to Manual, Assign suggested and the bulk row are not drawn when there is no assignment set (1a/1b);
+  enable rules unchanged. 1b's empty table is replaced by one sentence.
+- M3: 1a rows name the dwelling (Flat 1) like Iteration 2. `Modify.DwellingNames_AirHandlingUnit` is the one
+  resolution; `PartOEquipmentRow` ctor gained an optional `dwellingName`.
+- Cancel -> Hub. `PrepareAndReviewPartOIteration` returns `PartOPreparationResult` (NotPrepared / Declined /
+  Adopted); the public bool `PreparePartOIteration` wraps it. On Declined, `PrepareAndRun` returns
+  `Modify.DeclinedOutcome`: "○ <scenario>: review cancelled before TAS · no simulation was run and the model is
+  unchanged". That is the Hub's existing last-outcome line (session-only, not persisted) - no new state.
+- The post-dialog code moved unchanged into `Modify.ConcludePartOReview(accepted, ...)`, so Cancel/Accept are
+  testable without a dialog.
+- Safe placement: `PartOWindowPlacement.KeepOnScreen` (new) is the Hub's KeepOnScreen, shared; the Review window
+  calls it on first render. The Hub now delegates to it (same behaviour).
+
+**Validation.**
+- `SAM.Analytical.UI.WPF.Tests`: 1093/1093 (was 1077; +16 in `PartOReviewIterationTests`: headings 1a/1b/2 and no
+  "(s)", Accept & Run TAS wording / not default / Esc cancels, modal Cancel->false Accept->true, Cancel adopts nothing
+  and leaves the run unprepared, Accept adopts via the production path, Hub declined line, diagnostics collapsed with
+  every line reachable, refusal opens them, UIA toggle, equipment controls only for Iteration 2).
+- `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): 0 errors.
+- Live, real exe, 1a/1b/2 each to Review -> Cancel, no TAS: 0 message boxes, headings correct, counts match lines,
+  Hub line shown. Record + before/after screenshots: `documentation/evidence/parto-review-iteration/`.
+
+**Known / not done.**
+- "Accept & Run TAS" was not pressed live (it would start TAS); covered by the adoption test.
+- Safe positioning not forced live; isolated scope and refusals only unit-tested; non-100% DPI not tested.
+- Catalogue description still says "product(s)" (other windows share it) - consistency sweep item.
+
+**Next step.** Owner reviews the PR (Codex will review each push). After merge, move SAM_Deploy's SAM_UI pointer.
+Proposal item 2 next: TM59 summary band + Review Results progress (H3, M5, m4, m5).
+
+## Previous: Part O journey review - observe only (25 Sep 2026)
 
 **Status.** Research only. No code was changed and no TAS simulation was started. It walked the four Part O cases
 (1a, 1b, 2 with 2B as its follow-on, and 3) in the real exe on the merged #111 build (`90b42e0`), using UI Automation +

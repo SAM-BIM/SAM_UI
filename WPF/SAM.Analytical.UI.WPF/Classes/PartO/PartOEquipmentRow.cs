@@ -53,10 +53,15 @@ namespace SAM.Analytical.UI.WPF
         /// 1a's normal state and not a failure.
         /// </param>
         /// <param name="refusal">Why no product was selected, where that is the reason. Null otherwise.</param>
-        public PartOEquipmentRow(string unitName, string systemName, double designSupplyDuty_Lps, double designExtractDuty_Lps, VentilationUnitCapacityDescriptor? ventilationUnitCapacityDescriptor, string? refusal = null)
+        /// <param name="dwellingName">
+        /// The dwelling the unit serves, where it resolves - so an Iteration 1a row says "Flat 1" as the
+        /// Iteration 2 row does, rather than the system name. Null falls back to the system or unit name.
+        /// </param>
+        public PartOEquipmentRow(string unitName, string systemName, double designSupplyDuty_Lps, double designExtractDuty_Lps, VentilationUnitCapacityDescriptor? ventilationUnitCapacityDescriptor, string? refusal = null, string? dwellingName = null)
         {
             UnitName = unitName;
             SystemName = systemName;
+            DwellingName = dwellingName;
             DesignSupplyDuty_Lps = designSupplyDuty_Lps;
             DesignExtractDuty_Lps = designExtractDuty_Lps;
             descriptor = ventilationUnitCapacityDescriptor;

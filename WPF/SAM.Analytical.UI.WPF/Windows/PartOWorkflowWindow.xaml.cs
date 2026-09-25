@@ -929,25 +929,7 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private void KeepOnScreen()
         {
-            System.IntPtr handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (handle == System.IntPtr.Zero)
-            {
-                return;
-            }
-
-            System.Drawing.Rectangle rectangle = System.Windows.Forms.Screen.FromHandle(handle).WorkingArea;
-
-            Matrix matrix = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
-
-            Point point_Top = matrix.Transform(new Point(rectangle.Left, rectangle.Top));
-            Point point_Bottom = matrix.Transform(new Point(rectangle.Right, rectangle.Bottom));
-
-            (double top, double minHeight, double maxHeight) = Placement(Top, ActualHeight, MinHeight, MaxHeight, point_Top.Y, point_Bottom.Y);
-
-            //The minimum first: WPF resolves a ceiling below the floor by holding the floor.
-            MinHeight = minHeight;
-            MaxHeight = maxHeight;
-            Top = top;
+            PartOWindowPlacement.KeepOnScreen(this);
         }
 
         /// <summary>
