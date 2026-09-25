@@ -193,6 +193,8 @@ namespace SAM.Analytical.UI.WPF
             //enlarged system font or a small screen degrades to scrolling with the buttons reachable.
             MaxHeight = SystemParameters.WorkArea.Height * 0.92;
 
+            SizeChanged += OnGrown;
+
             comboBox_Scenario.ItemsSource = PartOWorkflowScenario.Scenarios;
             comboBox_Scenario.SelectedIndex = 0;
             comboBox_Scenario.SelectionChanged += (s, e) => Refresh();
@@ -891,18 +893,38 @@ namespace SAM.Analytical.UI.WPF
             base.OnContentRendered(e);
 
             KeepOnScreen();
+
+            placed = true;
+        }
+
+        /// <summary>Whether the first placement has run; growth after it is answered by <see cref="OnGrown"/>.</summary>
+        private bool placed;
+
+        /// <summary>
+        /// The Hub grows after it has been placed - Show details, the Simulation case, a taller scenario -
+        /// because its height follows its content. Growth that would take the action row below the working
+        /// area moves it up again. Only while the height is still content-driven: once the person drags the
+        /// grip WPF sets <c>SizeToContent</c> to <c>Manual</c>, and a size they chose is left alone.
+        /// </summary>
+        private void OnGrown(object sender, SizeChangedEventArgs e)
+        {
+            if (placed && e.HeightChanged && e.NewSize.Height > e.PreviousSize.Height && SizeToContent != SizeToContent.Manual)
+            {
+                KeepOnScreen();
+            }
         }
 
         /// <summary>
-        /// Once, when the Hub first renders: where it opened low enough that its bottom - the action row -
-        /// would sit below the working area of its monitor (behind the taskbar), it is moved up to fit.
-        /// Found live: a reopened run opened at the owner's cascade position with its actions off-screen.
+        /// Keeps the Hub's action row inside the working area of the monitor it is on: when it first renders
+        /// (found live: a reopened run opened at the owner's cascade position with its actions off-screen),
+        /// and when its content makes it taller (<see cref="OnGrown"/>).
         /// <para>
         /// <b>Against the monitor it is actually on.</b> The constructor's height ceiling is read from the
         /// PRIMARY working area; on a shorter secondary monitor a Hub taller than that monitor could not be
         /// moved far enough, so the ceiling is lowered to this monitor's first - the content scrolls, and the
-        /// action row sits outside the scroll region. It is never raised, and a window the person has placed
-        /// is never moved again.
+        /// action row sits outside the scroll region. On a monitor shorter than the window's own minimum
+        /// height the minimum comes down with it, or WPF would hold the window at a height that does not fit.
+        /// Neither is ever raised.
         /// </para>
         /// </summary>
         private void KeepOnScreen()
@@ -920,32 +942,42 @@ namespace SAM.Analytical.UI.WPF
             Point point_Top = matrix.Transform(new Point(rectangle.Left, rectangle.Top));
             Point point_Bottom = matrix.Transform(new Point(rectangle.Right, rectangle.Bottom));
 
-            (double top, double maxHeight) = Placement(Top, ActualHeight, MaxHeight, point_Top.Y, point_Bottom.Y);
+            (double top, double minHeight, double maxHeight) = Placement(Top, ActualHeight, MinHeight, MaxHeight, point_Top.Y, point_Bottom.Y);
 
+            //The minimum first: WPF resolves a ceiling below the floor by holding the floor.
+            MinHeight = minHeight;
             MaxHeight = maxHeight;
             Top = top;
         }
 
         /// <summary>
         /// Where a window of <paramref name="height"/> at <paramref name="top"/> goes to fit a working area
-        /// running from <paramref name="areaTop"/> to <paramref name="areaBottom"/>: the height ceiling
-        /// lowered to 92% of that area where it was higher (the constructor's own proportion), and the top
-        /// moved up only as far as the capped height needs. Pure, so the arithmetic is testable without a
-        /// second monitor.
+        /// running from <paramref name="areaTop"/> to <paramref name="areaBottom"/>.
+        /// <list type="bullet">
+        /// <item>The height ceiling is lowered to 92% of that area where it was higher - the constructor's
+        /// own proportion.</item>
+        /// <item>The minimum height is lowered to that ceiling where it was higher, so the window can shrink
+        /// and scroll rather than be held taller than the monitor.</item>
+        /// <item>The top moves up only as far as the height the window will really have - its height between
+        /// that minimum and that ceiling - needs.</item>
+        /// </list>
+        /// Pure, so the arithmetic is testable without a second monitor.
         /// </summary>
-        internal static (double Top, double MaxHeight) Placement(double top, double height, double maxHeight, double areaTop, double areaBottom)
+        internal static (double Top, double MinHeight, double MaxHeight) Placement(double top, double height, double minHeight, double maxHeight, double areaTop, double areaBottom)
         {
             double maxHeight_Area = (areaBottom - areaTop) * 0.92;
 
             double maxHeight_Result = double.IsNaN(maxHeight) ? maxHeight_Area : Math.Min(maxHeight, maxHeight_Area);
 
-            double height_Result = Math.Min(height, maxHeight_Result);
+            double minHeight_Result = double.IsNaN(minHeight) ? 0 : Math.Min(minHeight, maxHeight_Result);
+
+            double height_Result = Math.Max(minHeight_Result, Math.Min(height, maxHeight_Result));
 
             double top_Result = top + height_Result > areaBottom
                 ? Math.Max(areaTop, areaBottom - height_Result)
                 : top;
 
-            return (top_Result, maxHeight_Result);
+            return (top_Result, minHeight_Result, maxHeight_Result);
         }
 
         /// <summary>

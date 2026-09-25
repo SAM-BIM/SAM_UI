@@ -237,28 +237,68 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
-        /// Codex review on #111: on a monitor shorter than the primary, a Hub taller than that monitor's
-        /// working area could not be moved far enough. The ceiling is capped to the monitor it is on first.
+        /// Codex review on #111. On a monitor shorter than the primary, a Hub taller than that monitor's
+        /// working area could not be moved far enough, so the ceiling is capped to the monitor it is on. On
+        /// a monitor shorter than the window's own minimum height, the minimum comes down too - WPF would
+        /// otherwise hold the window at a height that does not fit.
         /// </summary>
         [Theory]
         //Fits already: untouched.
-        [InlineData(100, 500, 2000, 0, 1040, 100, 956.8)]
+        [InlineData(100, 500, 520, 2000, 0, 1040, 100, 520, 956.8)]
         //Opened low on a 1080p secondary: moved up.
-        [InlineData(700, 800, 1300, 0, 1040, 240, 956.8)]
-        //Taller than the secondary's working area (ceiling from a 4K primary): capped, then placed at the top.
-        [InlineData(300, 1300, 1900, 0, 1040, 83.2, 956.8)]
-        //A secondary above-left of the primary, negative coordinates.
-        [InlineData(-200, 900, 1000, -1080, -40, -940, 956.8)]
-        public void The_hub_is_placed_and_capped_against_the_monitor_it_is_on(double top, double height, double maxHeight, double areaTop, double areaBottom, double top_Expected, double maxHeight_Expected)
+        [InlineData(700, 800, 520, 1300, 0, 1040, 240, 520, 956.8)]
+        //Taller than the secondary's working area (ceiling from a 4K primary): capped, then placed.
+        [InlineData(300, 1300, 520, 1900, 0, 1040, 83.2, 520, 956.8)]
+        //A secondary above the primary, in negative coordinates.
+        [InlineData(-200, 900, 520, 1000, -1080, -40, -940, 520, 956.8)]
+        //Placed by the height WPF will really give it - never less than its minimum.
+        [InlineData(600, 400, 520, 2000, 0, 1040, 520, 520, 956.8)]
+        //A 768 px display at high scaling: the working area is shorter than MinHeight, which comes down.
+        [InlineData(200, 553, 520, 2000, 0, 560, 44.8, 515.2, 515.2)]
+        public void The_hub_is_placed_and_capped_against_the_monitor_it_is_on(double top, double height, double minHeight, double maxHeight, double areaTop, double areaBottom, double top_Expected, double minHeight_Expected, double maxHeight_Expected)
         {
-            (double top_Result, double maxHeight_Result) = PartOWorkflowWindow.Placement(top, height, maxHeight, areaTop, areaBottom);
+            (double top_Result, double minHeight_Result, double maxHeight_Result) = PartOWorkflowWindow.Placement(top, height, minHeight, maxHeight, areaTop, areaBottom);
 
             Assert.Equal(maxHeight_Expected, maxHeight_Result, 3);
+            Assert.Equal(minHeight_Expected, minHeight_Result, 3);
             Assert.Equal(top_Expected, top_Result, 3);
 
-            //The action row - the window's bottom - is inside the working area.
-            Assert.True(top_Result + System.Math.Min(height, maxHeight_Result) <= areaBottom + 1e-9);
+            //The action row - the bottom of the height WPF will really give it - is inside the working area.
+            double height_Real = System.Math.Max(minHeight_Result, System.Math.Min(height, maxHeight_Result));
+            Assert.True(top_Result + height_Real <= areaBottom + 1e-9);
             Assert.True(top_Result >= areaTop - 1e-9);
+        }
+
+        /// <summary>
+        /// Codex review on #111: placed near the bottom of its monitor, the Hub then grows with its content
+        /// (Show details). The growth must not take the action row below the working area.
+        /// </summary>
+        [WpfFact]
+        public void Growing_after_it_is_placed_keeps_the_action_row_on_screen()
+        {
+            PartOWorkflowWindow partOWorkflowWindow = Window(Scenario_1a());
+
+            System.Windows.Rect rect = System.Windows.SystemParameters.WorkArea;
+
+            partOWorkflowWindow.WindowStartupLocation = System.Windows.WindowStartupLocation.Manual;
+            partOWorkflowWindow.ShowActivated = false;
+            partOWorkflowWindow.Left = rect.Left + 10;
+            partOWorkflowWindow.Top = rect.Top + 10;
+
+            partOWorkflowWindow.Show();
+            partOWorkflowWindow.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            //Flush with the bottom of the working area, then grown by its content.
+            double height_Compact = partOWorkflowWindow.ActualHeight;
+            partOWorkflowWindow.Top = rect.Bottom - height_Compact - 2;
+
+            partOWorkflowWindow.ShowStatusDetails = true;
+            partOWorkflowWindow.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            Assert.True(partOWorkflowWindow.ActualHeight > height_Compact, "Show details did not make the Hub taller");
+            Assert.True(partOWorkflowWindow.Top + partOWorkflowWindow.ActualHeight <= rect.Bottom + 1, string.Format("bottom {0} is below the working area {1}", partOWorkflowWindow.Top + partOWorkflowWindow.ActualHeight, rect.Bottom));
+
+            partOWorkflowWindow.Close();
         }
 
         // ----- fixture -----------------------------------------------------------------------------------
