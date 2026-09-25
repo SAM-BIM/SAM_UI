@@ -1,9 +1,44 @@
 # Project Progress
 
-## Current: Part O Prepare & Run Hub - presentation pass (25 Sep 2026) - PR #111 OPEN
+## Current: Part O journey review - observe only (25 Sep 2026)
 
-**Status.** On branch `feature/parto-hub-presentation-2026-09-25`, taken from `sow/2026-Q3` `6230d7d`. It is
-pushed after a live acceptance pass in the real exe, and open as SAM-BIM/SAM_UI#111 -> `sow/2026-Q3`. SAM_UI only.
+**Status.** Research only. No code was changed and no TAS simulation was started. It walked the four Part O cases
+(1a, 1b, 2 with 2B as its follow-on, and 3) in the real exe on the merged #111 build (`90b42e0`), using UI Automation +
+PrintWindow. The record, findings and proposal are in
+`documentation/evidence/parto-journey-review/JOURNEY-REVIEW-2026-09-25.md`, with 15 live screenshots. The full report
+is a private artifact: https://claude.ai/artifact/CV9V9fjuMwjuRZaij5yUd1.
+
+**Coverage.**
+- Live: the Hub (fresh 1a/1b/2); Review iteration for 1a/1b/2, each declined before TAS; the legacy picker.
+- Live, on the reopened 1a smoke run: TM59 Review; Iteration 3 Open result, comparison and Technical details; the
+  Run again confirmation (answered No); the pre-flight for all four methods.
+- Earlier evidence or code: the TAS progress, the 2B rounds and result, the Hub after 2B, and the attention box.
+- Result: 0 unexpected message boxes, no TAS process.
+- The driver is `C:\TasOut\parto-journey-review-2026-09-25\scripts\journey.ps1`, outside git.
+
+**Top findings.** These are presentation findings, awaiting owner review.
+- H1: Review iteration's unlabelled OK starts the full-year TAS run; Cancel leaves no Hub line.
+- H2: the Iteration 2 review summary heads with "Iteration 1a - MVHR design duty (no manufacturer unit)".
+- H3: the TM59 verdict is only on report line 7; there is no summary.
+- H4: 2B is outside the Part O language:
+  - the choice is made before preparing;
+  - each round opens its own generic progress window (`OptimisePartOTM59.cs:304`, no `PartOProgressHost`);
+  - the Hub shows no outcome after 2B (`RunPartOWorkflow.cs:188`).
+- Plus 9 medium and 10 minor findings, listed in the record.
+
+**Trap.** Reviewing a copied run writes its TM59 and Iteration 3 review reports at the run's recorded ABSOLUTE paths,
+that is beside the original run. Preserve file times when copying runs (`cp -p`): `.partorun.json` checks the TSD
+timestamp. The bytes here were identical, and the original times were restored.
+
+**Next step.** The owner reviews the proposal. The proposed first implementation PR is "Review iteration: decision
+and identity" (H1, H2, M1-M3): presentation only, with a live acceptance pass like #111. The 2B step (H4) needs one
+short TAS acceptance run (Iteration 2 about 1 min + 2B about 10-12 min); ask before launching it.
+
+## Previous: Part O Prepare & Run Hub - presentation pass (25 Sep 2026) - MERGED
+
+**Status.** MERGED into `sow/2026-Q3` on 2026-09-25 as SAM-BIM/SAM_UI#111 -> merge commit `90b42e0`
+(head `2fd47a9`). CI was green (build, spdx). The feature branch `feature/parto-hub-presentation-2026-09-25` is deleted.
+It was taken from `sow/2026-Q3` `6230d7d`, after a live acceptance pass in the real exe. SAM_UI only.
 
 Presentation-only, by owner brief. There is no change to the workflow, scenarios, validation, preparation,
 simulation, provenance, the inspection's stage statuses, or any enable rule.
@@ -88,9 +123,8 @@ simulation, provenance, the inspection's stage statuses, or any enable rule.
   trimmed in a later pass.
 - A non-100% DPI scale was not tested live.
 
-**Next step.** Merge SAM-BIM/SAM_UI#111 with a merge commit once CI is green on its head and Codex has no
-open finding (GitHub auto-merge is disabled on this repo). Then add a short PROJECT_PROGRESS note with the
-merge commit, as for #110, and bump the SAM_Deploy SAM_UI pointer together with the earlier pending bumps.
+**Next step.** Done: merged as `90b42e0`. SAM_Deploy's SAM_UI pointer moves `6230d7d1` -> `90b42e0e`; the other
+three pointers were already at their tips via SAM_Deploy#47.
 
 ## Previous: Part O / TM59 workflow simplification (24-25 Sep 2026) - MERGED
 
