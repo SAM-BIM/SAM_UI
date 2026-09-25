@@ -1,6 +1,52 @@
 # Project Progress
 
-## Current: Part O UX pass 3 - Hub outcome / completed-state line (25 Sep 2026) - PR OPEN, not merged
+## Current: Part O reopened-run naming - check + Hub line (25 Sep 2026) - PR OPEN, not merged
+
+**Status.** Branch `fix/parto-reopened-run-scenario-2026-09-25` from `sow/2026-Q3` `ba9bf48` (#115 merged). SAM_UI
+only. A PR is open against `sow/2026-Q3`.
+
+**The reported defect is already fixed on `sow/2026-Q3`.** The report said `PartOTM59ResultSummary.RunFacts` names
+a reopened Iteration 2 run "Iteration 1a". That was true before b224453 (the #115 follow-up, merged). The fix is the
+persisted authority the report asked for:
+- the sidecar is `PartORunResume:v2` with `VentilationUnitCatalogueOffered`, and v1 files still read (value null);
+- `TryResume` builds `PartOPreparationContext.Resumed(...)` with the saved value;
+- `PartOWorkflowScenario.Find` returns null where the value is null, so a v1 run has no Scenario fact. Nothing is
+  inferred from text or from the reconstructed context.
+
+**Proof, this pass.**
+- New `PartOTM59RunFactsReopenTests`: prepare with a catalogue, complete, `Modify.PersistPartORunResume`, `Restore`
+  in a fresh run, then assert the `RunFacts` Scenario. It uses only members that predate the fix, so the same test
+  compiles on both versions.
+- Run in place with the six production files b224453 touched checked out at `fd379b4`, and
+  `PartORunResumeNamingTests.cs` set aside: **FAIL**, Scenario = "Iteration 1a — MVHR design duty (no manufacturer
+  unit)".
+- Restored to HEAD: **PASS**. The working tree was verified back to HEAD before any other edit. (A `git worktree` at
+  fd379b4 is not usable here: path length, and the sibling-repo references.)
+
+**Rule revisited: the Hub now names a reopened run from its saved record** (`Modify/PartOHubOutcome.cs`).
+- New helper `SavedResults(run)`: "Saved Iteration 2 results" where `Find` names the run, otherwise "Saved results".
+- Standing line: "○ Saved Iteration 2 results reopened — ready to review".
+- Review line: "Saved Iteration 2 results reviewed — TM59 FAIL".
+- A v1 sidecar, or a run with no sidecar, is unchanged: "Saved results reopened" / "Saved results reviewed".
+- A live, non-restored run is worded exactly as before. Still no verdict before an assessment runs.
+- Tests: `PartORunResumeNamingTests.TheHub_NamesAReopenedRunFromItsSavedRecordOnly` (v2 Iteration 2, v2 1a, v1).
+  `PartOHubOutcomeTests.AReopenedRun_IsReadyToReview_WithNoVerdictAndNoName` is unchanged in behaviour (it has no
+  sidecar); only its comment was corrected.
+
+**Files.** `WPF/SAM.Analytical.UI.WPF/Modify/PartOHubOutcome.cs`; tests `PartOTM59RunFactsReopenTests.cs` (new),
+`PartORunResumeNamingTests.cs`, `PartOHubOutcomeTests.cs` (comment).
+
+**Validation.**
+- `SAM.Analytical.UI.WPF.Tests`: 1159/1159 (was 1155).
+- `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): exit 0, 0 errors.
+- `git diff --check` clean.
+- Not run live: the change is to Hub wording only, and the existing live smoke run has a v1 sidecar, so it still
+  reads "Saved results reopened".
+
+**Next step.** The owner reviews the PR. Before merge, check CI is green. Then move SAM_Deploy's SAM_UI pointer.
+A live check of the named Hub line needs a run saved by a v2 build; any new Prepare & Run produces one.
+
+## Previous: Part O UX pass 3 - Hub outcome / completed-state line (25 Sep 2026) - MERGED (#115)
 
 **Status.** Branch `feature/parto-hub-outcome-2026-09-25` from `sow/2026-Q3` `a13ba4c` (#114 merged). SAM_UI only;
 no SAM change is needed. A PR is open against `sow/2026-Q3`; the owner said to stop before merge. Engineering and
@@ -42,8 +88,7 @@ Only the Hub calls the internal method, to word the 2B line.
   - "○ Iteration 2 prepared — waiting for the full-year TAS run";
   - "○ Saved results reopened — ready to review" (or "<name> completed — ready to review");
   - "! Previous Part O run is no longer valid — no results to review", with the run's reason as caption and tooltip.
-- A reopened run is never named. Its resume context records the engine iteration but not whether a catalogue was
-  offered, so it cannot tell 1a from 2.
+- A reopened run was never named here. That was superseded by the follow-up below and by the naming pass above.
 - `PartOWorkflowOutcome` moved to `Classes/PartO/PartOWorkflowOutcome.cs`. It now holds Glyph / Headline / Detail /
   ToolTip / RunState, and `Text` joins them. The 2-argument constructor still works.
 - The Hub's line is rendered as glyph + semibold headline + caption. The full explanation is on the tooltip and,
@@ -106,8 +151,7 @@ Only the Hub calls the internal method, to word the 2B line.
   - The TM59 window now omits Scenario/Route; everything else is unchanged.
   - The Iteration 3 reference reads the "1a or 2" text.
   - Hub lines unchanged, report SHA-256 unchanged and its time restored.
-- The Hub line still does not name reopened runs ("Saved results reopened"). With v2 sidecars it could; that is left
-  for a later pass.
+- The Hub line did not name reopened runs at merge. That was superseded: the naming pass above names them from v2 sidecars.
 - Progress-dialog pass: 2B still opens a generic progress window per round (`OptimisePartOTM59.cs`); the ribbon
   Review Results route still uses `ProgressBarWindowManager` (M5).
 - 2B pass (H4): the 2B choice is still made before preparing. This pass only adds the Hub line after 2B.

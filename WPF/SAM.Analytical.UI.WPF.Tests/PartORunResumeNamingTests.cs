@@ -73,6 +73,39 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.DoesNotContain(PartOTM59ResultSummary.RunFacts(partORun, null, null, null), x => x.Label == "Scenario");
         }
 
+        /// <summary>
+        /// The Hub names a reopened run from the same record the TM59 window does - never from its resumed context
+        /// alone - and an older (v1) sidecar leaves it unnamed, as before.
+        /// </summary>
+        [Theory]
+        [InlineData(true, false, "Saved Iteration 2 results")]
+        [InlineData(false, false, "Saved Iteration 1a results")]
+        [InlineData(true, true, "Saved results")]
+        public void TheHub_NamesAReopenedRunFromItsSavedRecordOnly(bool catalogue, bool v1, string subject)
+        {
+            using Saved saved = Save(catalogue);
+
+            if (v1)
+            {
+                JsonObject jsonObject = (JsonObject)JsonNode.Parse(File.ReadAllText(saved.Path_Resume))!;
+                jsonObject["Schema"] = PartORunResume.Schema_V1;
+                jsonObject.Remove("VentilationUnitCatalogueOffered");
+                File.WriteAllText(saved.Path_Resume, jsonObject.ToJsonString());
+            }
+
+            PartORun partORun = saved.Reopen();
+
+            PartOWorkflowOutcome? partOWorkflowOutcome = Modify.HubOutcome(null, partORun, Modify.Capabilities(partORun, out _));
+
+            Assert.NotNull(partOWorkflowOutcome);
+            Assert.Equal(string.Format("{0} reopened — ready to review", subject), partOWorkflowOutcome!.Headline);
+            Assert.DoesNotContain("PASS", partOWorkflowOutcome.Text);
+            Assert.DoesNotContain("FAIL", partOWorkflowOutcome.Text);
+
+            //Reviewed: the same subject, with whatever verdict the assessment gave.
+            Assert.Equal(string.Format("{0} reviewed — TM59 UNAVAILABLE", subject), Modify.ReviewOutcome(PartOTM59ResultSummary.Unavailable("No results.", partORun), partORun)!.Headline);
+        }
+
         [Fact]
         public void TheSidecar_RecordsWhetherACatalogueWasOffered()
         {
