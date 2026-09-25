@@ -105,11 +105,23 @@
                     <local:PartOWorkflowStepStripControl x:Name="stepStrip"/>
                 </Border>
 
-                <!-- What the last action did, said inline - in place of the "Time elapsed ... OK" message box a
-                     successful run used to end with. A warning or a refusal is still shown as a dialog by the
-                     action itself; this line is the record of it. -->
+                <!-- The most recent meaningful outcome (Modify.HubOutcome): what the last Hub action did, or,
+                     where there is no such session record, what the run itself says now. Glyph + headline, one
+                     caption, and the complete explanation on the tooltip and under Show details. A warning or a
+                     refusal is still shown as a dialog by the action itself; this line is the record of it. -->
                 <Border x:Name="border_LastOutcome" Visibility="Collapsed" Padding="8,5" Margin="0,10,0,0" CornerRadius="3" BorderThickness="1">
-                    <TextBlock x:Name="textBlock_LastOutcome" TextWrapping="Wrap"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="textBlock_LastOutcomeGlyph" Style="{StaticResource PartO.StatusGlyph}" VerticalAlignment="Top"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock x:Name="textBlock_LastOutcome" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="textBlock_LastOutcomeDetail" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" Margin="0,1,0,0"/>
+                            <TextBlock x:Name="textBlock_LastOutcomeFull" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" Margin="0,4,0,0" Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                 <!-- IS IT READY: every row is PartOWorkflowInspection's, divided into what the CURRENT

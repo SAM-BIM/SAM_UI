@@ -537,8 +537,12 @@ namespace SAM.Analytical.UI.WPF
         //---------------------------------------------------------------------------------------------
 
         /// <summary>
-        /// What the last action in this Hub did, shown inline at the top of the status list - the place a
-        /// successful run's "Time elapsed ... OK" box used to be. Null hides the line.
+        /// What the last action in this Hub did - a session-only record, carried by the caller to the next
+        /// showing and no further. Null where nothing was done in this Hub session.
+        /// <para>
+        /// What is SHOWN is <see cref="DisplayedOutcome"/>: this record while the run still says what it
+        /// claims, otherwise the run's own standing state (<see cref="Modify.HubOutcome"/>).
+        /// </para>
         /// </summary>
         public PartOWorkflowOutcome? LastOutcome
         {
@@ -547,57 +551,62 @@ namespace SAM.Analytical.UI.WPF
             {
                 lastOutcome = value;
 
-                if (value is null || string.IsNullOrWhiteSpace(value.Text))
-                {
-                    border_LastOutcome.Visibility = Visibility.Collapsed;
-
-                    return;
-                }
-
-                border_LastOutcome.Visibility = Visibility.Visible;
-                textBlock_LastOutcome.Text = value.Text;
-
-                (Color background, Color border) = value.Kind switch
-                {
-                    PartOWorkflowOutcomeKind.Success => (Color.FromRgb(0xE8, 0xF5, 0xE9), Color.FromRgb(0x81, 0xC7, 0x84)),
-                    PartOWorkflowOutcomeKind.Warning => (Color.FromRgb(0xFF, 0xF8, 0xE1), Color.FromRgb(0xFF, 0xD5, 0x4F)),
-                    _ => (Color.FromRgb(0xF5, 0xF5, 0xF5), Color.FromRgb(0xCC, 0xCC, 0xCC)),
-                };
-
-                border_LastOutcome.Background = new SolidColorBrush(background);
-                border_LastOutcome.BorderBrush = new SolidColorBrush(border);
+                RenderLastOutcome();
             }
         }
 
         private PartOWorkflowOutcome? lastOutcome;
 
-        /// <summary>The last-outcome line as shown, or empty. Exposed for tests.</summary>
-        internal string LastOutcomeText => border_LastOutcome.Visibility == Visibility.Visible ? textBlock_LastOutcome.Text : string.Empty;
-    }
+        /// <summary>The line as shown: the session record where it still holds, else the run's own state. Null hides it.</summary>
+        internal PartOWorkflowOutcome? DisplayedOutcome { get; private set; }
 
-    public enum PartOWorkflowOutcomeKind
-    {
-        Information,
-        Success,
-        Warning,
-    }
-
-    /// <summary>One line about what the last Hub action did - "✓ TAS simulation complete · 7m 48s".</summary>
-    public class PartOWorkflowOutcome
-    {
-        public PartOWorkflowOutcome(PartOWorkflowOutcomeKind kind, string text)
+        /// <summary>
+        /// Re-derived from the record, the run and the capabilities already taken - no filesystem, no
+        /// re-inspection - so it can follow every refresh.
+        /// </summary>
+        private void RenderLastOutcome()
         {
-            Kind = kind;
-            Text = text;
+            PartOWorkflowOutcome? value = Modify.HubOutcome(lastOutcome, partORun, partOWorkflowCapabilities);
+
+            DisplayedOutcome = value;
+
+            if (value is null || string.IsNullOrWhiteSpace(value.Headline))
+            {
+                border_LastOutcome.Visibility = Visibility.Collapsed;
+
+                return;
+            }
+
+            border_LastOutcome.Visibility = Visibility.Visible;
+
+            textBlock_LastOutcomeGlyph.Text = value.Glyph ?? string.Empty;
+            textBlock_LastOutcomeGlyph.Visibility = value.Glyph is null ? Visibility.Collapsed : Visibility.Visible;
+            textBlock_LastOutcome.Text = value.Headline;
+            textBlock_LastOutcomeDetail.Text = value.Detail ?? string.Empty;
+            textBlock_LastOutcomeDetail.Visibility = value.Detail is null ? Visibility.Collapsed : Visibility.Visible;
+
+            //The complete explanation: always on the tooltip, and under the line with the Hub's one Show
+            //details switch - the same switch the readiness rows answer to.
+            textBlock_LastOutcomeFull.Text = value.ToolTip ?? string.Empty;
+            textBlock_LastOutcomeFull.Visibility = value.ToolTip is not null && ShowStatusDetails ? Visibility.Visible : Visibility.Collapsed;
+            border_LastOutcome.ToolTip = value.ToolTip is null ? null : value.ToolTip;
+
+            (Color background, Color border) = value.Kind switch
+            {
+                PartOWorkflowOutcomeKind.Success => (Color.FromRgb(0xE8, 0xF5, 0xE9), Color.FromRgb(0x81, 0xC7, 0x84)),
+                PartOWorkflowOutcomeKind.Warning => (Color.FromRgb(0xFF, 0xF8, 0xE1), Color.FromRgb(0xFF, 0xD5, 0x4F)),
+                PartOWorkflowOutcomeKind.Fail => (Color.FromRgb(0xFF, 0xEB, 0xE9), Color.FromRgb(0xFF, 0x81, 0x82)),
+                _ => (Color.FromRgb(0xF5, 0xF5, 0xF5), Color.FromRgb(0xCC, 0xCC, 0xCC)),
+            };
+
+            border_LastOutcome.Background = new SolidColorBrush(background);
+            border_LastOutcome.BorderBrush = new SolidColorBrush(border);
         }
 
-        public PartOWorkflowOutcomeKind Kind { get; }
+        /// <summary>The line as shown, glyph, headline and caption, or empty. Exposed for tests.</summary>
+        internal string LastOutcomeText => border_LastOutcome.Visibility == Visibility.Visible ? DisplayedOutcome?.Text ?? string.Empty : string.Empty;
 
-        public string Text { get; }
-
-        public override string ToString()
-        {
-            return Text;
-        }
+        /// <summary>Whether the complete explanation is shown under the line. Exposed for tests.</summary>
+        internal bool LastOutcomeDetailsShown => border_LastOutcome.Visibility == Visibility.Visible && textBlock_LastOutcomeFull.Visibility == Visibility.Visible;
     }
 }

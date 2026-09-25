@@ -72,6 +72,25 @@ namespace SAM.Analytical.UI
         public string Text { get; }
 
         /// <summary>
+        /// The scenario's name alone - "Iteration 1a" - for a line that already says what happened to it.
+        /// The part of <see cref="Text"/> before its dash, so the two can never drift apart.
+        /// </summary>
+        public string Name => ShortName(Text);
+
+        /// <summary>The name part of one of the <c>Text_</c> spellings: "Iteration 2B — TM59 optimisation" gives "Iteration 2B".</summary>
+        public static string ShortName(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return text;
+            }
+
+            int index = text.IndexOf(" — ", System.StringComparison.Ordinal);
+
+            return index < 0 ? text : text.Substring(0, index);
+        }
+
+        /// <summary>
         /// Whether Iteration 2B could follow a run of this scenario at all: 2B raises mechanical design
         /// airflow inside a selected unit's capacity, so it needs both. The same pair
         /// <c>Modify.CanOptimise</c> refuses on, asked before a run rather than after one.

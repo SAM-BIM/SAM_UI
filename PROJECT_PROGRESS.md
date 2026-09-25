@@ -1,6 +1,100 @@
 # Project Progress
 
-## Current: Part O UX pass 2 - TM59 / Overheating result window (25 Sep 2026) - MERGED
+## Current: Part O UX pass 3 - Hub outcome / completed-state line (25 Sep 2026) - PR OPEN, not merged
+
+**Status.** Branch `feature/parto-hub-outcome-2026-09-25` from `sow/2026-Q3` `a13ba4c` (#114 merged). SAM_UI only;
+no SAM change is needed. A PR is open against `sow/2026-Q3`; the owner said to stop before merge. Engineering and
+simulation pathways are unchanged. One public signature changed: `Modify.RunPartOOptimisation` now returns the
+`PartOOptimisationRun?` it already built (void before). Its only other caller, the ribbon, ignores the return value.
+
+**States found, and where each comes from.**
+- Authoritative and persistent (read off `PartORun` / `Modify.Capabilities` at every showing):
+  - None: nothing prepared (no line);
+  - Prepared;
+  - WorkflowCompleted with reviewable results, either this session or `IsRestored`;
+  - None + `InvalidationReason`: stale or invalidated results.
+- Authoritative, per action, not persisted:
+  - TM59 verdict and counts: the `PartOTM59ResultSummary` the result window is given;
+  - `PartOSimulationOutcome` (Cancelled / Refusal / Note_PartORun);
+  - 2B `PartOOptimisationStopReason`, plus the last valid step's `OccupiedSpaceComplianceStatus`.
+- Transient, session-only (the Hub loop's `partOWorkflowOutcome`, never persisted):
+  - review cancelled (`PartOPreparationResult.Declined`);
+  - TAS cancelled;
+  - "completed — TM59 X" after a run or a review.
+
+**What changed.**
+- `Modify.HubOutcome(last, run, capabilities)` (new file `Modify/PartOHubOutcome.cs`) chooses what the Hub shows:
+  - the session record of the last action, while the run still holds what it claims (`PartOWorkflowOutcome.RunState`);
+  - otherwise `Modify.StandingOutcome`, which says what the run is now. It never gives a verdict and never
+    reports an event.
+  - A superseded record stays on the tooltip as "Earlier in this session: …". So a completed-with-results line is
+    never shown over results that have gone, and "prepared iteration kept" is never shown after the preparation
+    was dropped.
+- Wordings, all in `PartOHubOutcome.cs`:
+  - `CompletedOutcome` ("✕ Iteration 1a completed — TM59 FAIL" + "TAS simulation 53s · <counts>");
+  - `ReviewOutcome` ("Iteration 1a results reviewed — TM59 PASS"; a reopened run reads "Saved results reviewed");
+  - `DeclinedOutcome`, `SimulationCancelledOutcome`, `NotCompletedOutcome`, `OptimisationOutcome`.
+  - These replace the old inline strings and `TM59OutcomeSuffix`, which was removed.
+  - Glyph and word come from the summary (✓ ✕ – !). A new kind, `Fail`, gives a red tint; the kind follows the verdict.
+- Standing lines:
+  - "○ Iteration 2 prepared — waiting for the full-year TAS run";
+  - "○ Saved results reopened — ready to review" (or "<name> completed — ready to review");
+  - "! Previous Part O run is no longer valid — no results to review", with the run's reason as caption and tooltip.
+- A reopened run is never named. Its resume context records the engine iteration but not whether a catalogue was
+  offered, so it cannot tell 1a from 2.
+- `PartOWorkflowOutcome` moved to `Classes/PartO/PartOWorkflowOutcome.cs`. It now holds Glyph / Headline / Detail /
+  ToolTip / RunState, and `Text` joins them. The 2-argument constructor still works.
+- The Hub's line is rendered as glyph + semibold headline + caption. The full explanation is on the tooltip and,
+  with the Hub's one Show details switch, under the line. It re-renders when the run or the capabilities are set
+  (no inspection, no filesystem access).
+- `PartOWorkflowScenario.Name` / `ShortName`: "Iteration 1a", the part of the Text before its dash.
+- The Iteration 3 lines only gained glyphs ("! Iteration 3 did not complete", "○ Opened the saved Iteration 3 result").
+
+**Validation.**
+- `SAM.Analytical.UI.WPF.Tests`: 1150/1150 (was 1129; +21 in `PartOHubOutcomeTests`). They cover:
+  - prepared not simulated; fresh run gives no line;
+  - stale results (TSD deleted, through `Modify.Capabilities`); a reopened run is unnamed and has no verdict;
+  - review cancelled; TAS cancelled held only while Prepared; not completed;
+  - completed, with 4 verdicts matching the summary's glyph and word; review; a completed line superseded when
+    its results go;
+  - 2B Passed / capacity + Fail / stopped without a stated fail / cancelled / refused;
+  - window: reopening the Hub does not bring back a cancellation; Show details.
+- Updated pins: `PartOTM59ResultTests` (one-summary theory), `PartOReviewIterationTests` (declined wording).
+- `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): exit 0, 0 errors. `git diff --check` clean.
+- Live, real exe, no TAS, 0 message boxes, 0 TAS processes:
+  - fresh Hub (no line) -> Review > Cancel (declined line) -> Hub reopened (no line) -> legacy Accept Preparation
+    -> "Iteration 2 prepared — waiting…";
+  - reopened 1a run: "Saved results reopened — ready to review" -> Review (FAIL, 8/2/6/1, same as the window) ->
+    "✕ Saved results reviewed — TM59 FAIL" -> Hub reopened (standing line again).
+  - TM59 report SHA-256 unchanged and its time restored.
+  - Record + before/after: `documentation/evidence/parto-hub-outcome/LIVE-ACCEPTANCE-2026-09-25.md`.
+  - Driver outside git: `C:\TasOut\parto-hub-outcome-2026-09-25\scripts\hub.ps1`.
+
+**Not represented, deliberately (the architecture cannot support it reliably).**
+- A TM59 verdict after the Hub is closed and reopened. The verdict exists only once the assessment runs, so the
+  standing line says "ready to review" rather than caching one.
+- "Cancelled before TAS" during the SAM Check phase, as distinct from a cancel during TAS:
+  `PartOSimulationOutcome` has one `Cancelled` flag. Both read "TAS run cancelled".
+- A refused or not-adopted preparation returns no record (its dialog already said why), so the run's standing state
+  shows.
+- A reopened 2B result is just "Saved results reopened". 2B rounds are not persisted on the run.
+- Live: completed PASS/FAIL after Prepare & Run, TAS cancel, 2B outcomes and stale results need TAS to produce, so
+  they are unit-tested only.
+
+**Found, not fixed (recorded for later passes).**
+- The TM59 result window's "Scenario" fact (`PartOTM59ResultSummary.RunFacts` -> `PartOWorkflowScenario.Find(PreparationContext)`)
+  likely names a reopened+resumed Iteration 2 run "Iteration 1a". `PartORun.TryResume` builds the context with no
+  capacity descriptors, so `HasVentilationUnitCatalogue` is false. Not verified live (no saved Iteration 2 run).
+  The Hub line avoids it by not naming reopened runs.
+- Progress-dialog pass: 2B still opens a generic progress window per round (`OptimisePartOTM59.cs`); the ribbon
+  Review Results route still uses `ProgressBarWindowManager` (M5).
+- 2B pass (H4): the 2B choice is still made before preparing. This pass only adds the Hub line after 2B.
+
+**Next step.** The owner reviews the PR; expect Codex review rounds. Before merge, check CI is green. Then move
+SAM_Deploy's SAM_UI pointer. After that, the progress-dialog pass or proposal item 3 (2B in the Part O language; needs one
+short TAS acceptance run, ask first).
+
+## Previous: Part O UX pass 2 - TM59 / Overheating result window (25 Sep 2026) - MERGED
 
 **Status.** MERGED into `sow/2026-Q3` as SAM-BIM/SAM_UI#114, on the owner's merge order:
 1. SAM-BIM/SAM#137 merged first (`7dbeb2e4`).
@@ -75,9 +169,8 @@ be discarded, and they were (`git restore --staged --worktree :/`) before branch
 **Local build dependency.** SAM_UI builds against `..\SAM\build` (HintPath), so it needs SAM `sow/2026-Q3` at or after
 `7dbeb2e4` (#137) for `TM59AssessmentReport.OccupiedSpaces`. Build SAM before SAM_UI. `SAM.sln`'s build also refreshes `%APPDATA%\SAM`.
 
-**Next step.** Move SAM_Deploy's SAM pointer to `7dbeb2e4` and its SAM_UI pointer to the #114 merge commit. Then
-proposal item 3: 2B in the Part O language (H4). It needs one short TAS acceptance run; ask first. Proposal item 3 next: 2B in the
-Part O language (H4). It needs one short TAS acceptance run; ask first.
+**Next step.** Done: merged as `a13ba4c`. Move SAM_Deploy's SAM pointer to `7dbeb2e4` and its SAM_UI pointer to the
+#114 merge commit, if not already done. Pass 3 (Hub outcome line) is the Current entry above.
 
 ## Previous: Part O UX pass 1 - Review iteration window (25 Sep 2026) - MERGED
 

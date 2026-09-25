@@ -143,7 +143,7 @@ namespace SAM.Analytical.UI.WPF
             return new PartOWorkflowOutcome(
                 PartOWorkflowOutcomeKind.Warning,
                 string.Format(
-                    "Iteration 3 did not complete · {0} · stopped at {1} after {2}. It can be run again.",
+                    "! Iteration 3 did not complete · {0} · stopped at {1} after {2}. It can be run again.",
                     label,
                     partOIteration3Stage_Refused.HasValue ? Core.Query.Description(partOIteration3Stage_Refused.Value).ToLowerInvariant() : "an unrecorded stage",
                     PartOProgressState.Format(elapsed)));
@@ -189,7 +189,7 @@ namespace SAM.Analytical.UI.WPF
                 ? new PartOWorkflowOutcome(
                     PartOWorkflowOutcomeKind.Information,
                     string.Format(
-                        "Opened the saved Iteration 3 result · {0} · reference {1} / system {2} · no TAS run ({3})",
+                        "○ Opened the saved Iteration 3 result · {0} · reference {1} / system {2} · no TAS run ({3})",
                         label,
                         Verdict(partOIteration3Result.Assessment_ReferenceA),
                         Verdict(partOIteration3Result.Assessment_CandidateB),
