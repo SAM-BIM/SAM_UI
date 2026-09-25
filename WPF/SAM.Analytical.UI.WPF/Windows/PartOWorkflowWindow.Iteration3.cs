@@ -262,6 +262,11 @@ namespace SAM.Analytical.UI.WPF
 
             stackPanel_It3.Visibility = canRun || anyRecorded ? Visibility.Visible : Visibility.Collapsed;
 
+            //The whole panel waits until it is relevant: a completed reference run it can compare against, or
+            //a method that already has a record. Before that it was a heading over a refusal, on a model that
+            //had not run its Iteration 1a yet. The eligibility is unchanged; only its visibility is.
+            border_Iteration3.Visibility = canRun || anyRecorded ? Visibility.Visible : Visibility.Collapsed;
+
             //Every method's own line: a completed result, a last attempt that did not complete, or nothing.
             foreach (KeyValuePair<PartOIteration3BehaviourMode, TextBlock> keyValuePair in textBlocks_MethodStatus)
             {
@@ -439,16 +444,28 @@ namespace SAM.Analytical.UI.WPF
 
                 PartOSimulationCase partOSimulationCase = value ?? new PartOSimulationCase();
 
-                if (partOSimulationCase.WeatherData is not null)
+                //Written control by control, and each write raises its own change - so without this the
+                //first of them was judged over a half-written case (weather, no folder yet), found wanting,
+                //and opened the section for good. The case is judged once, when it is complete.
+                writing_SimulationCase = true;
+
+                try
                 {
-                    string text = string.IsNullOrWhiteSpace(partOSimulationCase.WeatherData.Name) ? SimulateControl.InternalText : partOSimulationCase.WeatherData.Name;
+                    if (partOSimulationCase.WeatherData is not null)
+                    {
+                        string text = string.IsNullOrWhiteSpace(partOSimulationCase.WeatherData.Name) ? SimulateControl.InternalText : partOSimulationCase.WeatherData.Name;
 
-                    selectSAMObjectComboBoxControl_Weather.Add(text, new WeatherData(partOSimulationCase.WeatherData));
-                    selectSAMObjectComboBoxControl_Weather.SelectedText = text;
+                        selectSAMObjectComboBoxControl_Weather.Add(text, new WeatherData(partOSimulationCase.WeatherData));
+                        selectSAMObjectComboBoxControl_Weather.SelectedText = text;
+                    }
+
+                    textBox_OutputDirectory.Text = partOSimulationCase.OutputDirectory ?? string.Empty;
+                    comboBox_SolarCalculationMethod.SelectedItem = Core.Query.Description(partOSimulationCase.SolarCalculationMethod == SolarCalculationMethod.Undefined ? SolarCalculationMethod.TAS : partOSimulationCase.SolarCalculationMethod);
                 }
-
-                textBox_OutputDirectory.Text = partOSimulationCase.OutputDirectory ?? string.Empty;
-                comboBox_SolarCalculationMethod.SelectedItem = Core.Query.Description(partOSimulationCase.SolarCalculationMethod == SolarCalculationMethod.Undefined ? SolarCalculationMethod.TAS : partOSimulationCase.SolarCalculationMethod);
+                finally
+                {
+                    writing_SimulationCase = false;
+                }
 
                 RefreshSimulationCase();
             }
@@ -461,6 +478,9 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private bool simulationCase_Stated;
 
+        /// <summary>Whether the setter is writing the case's controls; see <see cref="SimulationCase"/>.</summary>
+        private bool writing_SimulationCase;
+
         /// <summary>Why the stated Simulation case cannot run, or null - including where none was stated.</summary>
         private string? SimulationCaseRefusal => simulationCase_Stated ? SimulationCase.Refusal() : null;
 
@@ -469,7 +489,7 @@ namespace SAM.Analytical.UI.WPF
 
         private void RefreshSimulationCase()
         {
-            if (!loaded)
+            if (!loaded || writing_SimulationCase)
             {
                 return;
             }
@@ -485,13 +505,19 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
+            //The header names the weather and the solar method; the output folder - a long path that
+            //dominated the line - is on the tooltip with the complete case, and in the field when opened.
+            string weather = string.IsNullOrWhiteSpace(partOSimulationCase.WeatherData?.Name) ? "model weather" : partOSimulationCase.WeatherData!.Name;
+
             run_SimulationCaseSummary.Text = refusal is not null
                 ? string.Format(" — {0}", refusal)
-                : string.Format(
-                    " — {0} · {1} solar · {2}",
-                    string.IsNullOrWhiteSpace(partOSimulationCase.WeatherData.Name) ? "model weather" : partOSimulationCase.WeatherData.Name,
-                    Core.Query.Description(partOSimulationCase.SolarCalculationMethod),
-                    partOSimulationCase.OutputDirectory);
+                : string.Format(" — {0} · {1} solar", weather, Core.Query.Description(partOSimulationCase.SolarCalculationMethod));
+
+            textBlock_SimulationCaseHeader.ToolTip = refusal ?? string.Format(
+                "Weather: {0}\nSolar calculation: {1}\nOutput folder: {2}\nFull year, days 1 to 365.",
+                weather,
+                Core.Query.Description(partOSimulationCase.SolarCalculationMethod),
+                partOSimulationCase.OutputDirectory);
 
             run_SimulationCaseSummary.Foreground = refusal is not null ? Brushes.Firebrick : new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66));
 

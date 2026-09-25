@@ -167,7 +167,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             string detail = Stage(Inspect(analyticalModel, null), PartOWorkflowStage.PartFRequirements).Detail;
 
-            Assert.Contains(string.Format("{0} of 300 space(s)", count), detail);
+            Assert.Contains(string.Format("{0} of 300 spaces", count), detail);
         }
 
         // ---- Fixture ------------------------------------------------------------------------------------

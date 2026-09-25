@@ -7,7 +7,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 
 namespace SAM.Analytical.UI.WPF
 {
@@ -168,6 +170,18 @@ namespace SAM.Analytical.UI.WPF
         private List<PartOWorkflowStatusRow> statusRows = [];
 
         private List<PartOWorkflowStatusGroup> statusGroups = [];
+
+        /// <summary>
+        /// Whether every status row shows the inspection's complete sentence under its compact line. One
+        /// switch for the whole list, rather than a disclosure on every row. Presentation only.
+        /// </summary>
+        public static readonly DependencyProperty ShowStatusDetailsProperty = DependencyProperty.Register(nameof(ShowStatusDetails), typeof(bool), typeof(PartOWorkflowWindow), new PropertyMetadata(false));
+
+        public bool ShowStatusDetails
+        {
+            get => (bool)GetValue(ShowStatusDetailsProperty);
+            set => SetValue(ShowStatusDetailsProperty, value);
+        }
 
         public PartOWorkflowWindow()
         {
@@ -872,6 +886,40 @@ namespace SAM.Analytical.UI.WPF
             base.OnSourceInitialized(e);
         }
 
+        protected override void OnContentRendered(EventArgs e)
+        {
+            base.OnContentRendered(e);
+
+            KeepOnScreen();
+        }
+
+        /// <summary>
+        /// Once, when the Hub first renders: where it opened low enough that its bottom - the action row -
+        /// would sit below the working area of its monitor (behind the taskbar), it is moved up to fit.
+        /// Found live: a reopened run opened at the owner's cascade position with its actions off-screen.
+        /// It never moves a window the person has placed, and never resizes one.
+        /// </summary>
+        private void KeepOnScreen()
+        {
+            System.IntPtr handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (handle == System.IntPtr.Zero)
+            {
+                return;
+            }
+
+            System.Drawing.Rectangle rectangle = System.Windows.Forms.Screen.FromHandle(handle).WorkingArea;
+
+            Matrix matrix = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+
+            Point point_Top = matrix.Transform(new Point(rectangle.Left, rectangle.Top));
+            Point point_Bottom = matrix.Transform(new Point(rectangle.Right, rectangle.Bottom));
+
+            if (Top + ActualHeight > point_Bottom.Y)
+            {
+                Top = Math.Max(point_Top.Y, point_Bottom.Y - ActualHeight);
+            }
+        }
+
         /// <summary>
         /// How many times this window has inspected the analytical model since it was constructed.
         /// <para>
@@ -915,7 +963,7 @@ namespace SAM.Analytical.UI.WPF
             List<PartOWorkflowStatusRow> rows = [];
             foreach (PartOWorkflowStageState partOWorkflowStageState in partOWorkflowInspection.Stages)
             {
-                rows.Add(new PartOWorkflowStatusRow(partOWorkflowStageState, Summary(partOWorkflowStageState, partOWorkflowScenario)));
+                rows.Add(new PartOWorkflowStatusRow(partOWorkflowStageState, Summary(partOWorkflowStageState, partOWorkflowScenario, capabilities.ResultsAvailable)));
             }
 
             statusRows = rows;
@@ -924,9 +972,65 @@ namespace SAM.Analytical.UI.WPF
             //capabilities' own, read rather than derived; see PartOWorkflowStatusGroup.
             statusGroups = PartOWorkflowStatusGroup.Groups(rows, capabilities.ResultsAvailable);
 
-            itemsControl_Status.ItemsSource = statusGroups;
+            //What is RENDERED is the same groups less one row: an Equipment stage that is not part of this
+            //scenario. The route line under the scenario already says no manufacturer unit is required, and
+            //that was the fourth place saying it. The row stays in StatusRows and StatusGroups, unaltered.
+            itemsControl_Status.ItemsSource = PartOWorkflowStatusGroup.Groups(rows.FindAll(IsRendered), capabilities.ResultsAvailable);
 
             UpdateActions(partOWorkflowInspection);
+        }
+
+        /// <summary>Whether a status row is drawn. Every row is, except an Equipment stage that is N/A.</summary>
+        private static bool IsRendered(PartOWorkflowStatusRow partOWorkflowStatusRow)
+        {
+            return !(partOWorkflowStatusRow.State?.Stage == PartOWorkflowStage.Equipment && partOWorkflowStatusRow.State.Status == PartOWorkflowStageStatus.NotApplicable);
+        }
+
+        /// <summary>The status groups as drawn, less the N/A Equipment row. Exposed for tests.</summary>
+        internal List<PartOWorkflowStatusGroup> RenderedStatusGroups
+        {
+            get { EnsureInspected(); return itemsControl_Status.ItemsSource as List<PartOWorkflowStatusGroup> ?? []; }
+        }
+
+        /// <summary>The workflow strip as drawn. Exposed for tests.</summary>
+        internal IReadOnlyList<PartOWorkflowStep> WorkflowSteps
+        {
+            get { EnsureInspected(); return stepStrip.Steps ?? []; }
+        }
+
+        /// <summary>The next-step line. Exposed for tests.</summary>
+        internal string NextStepText
+        {
+            get { EnsureInspected(); return textBlock_NextStep.Text; }
+        }
+
+        /// <summary>The captions under the Review and Optimise actions. Exposed for tests.</summary>
+        internal string ReviewCaption
+        {
+            get { EnsureInspected(); return textBlock_ReviewCaption.Text; }
+        }
+
+        internal string OptimiseCaption
+        {
+            get { EnsureInspected(); return textBlock_OptimiseCaption.Text; }
+        }
+
+        /// <summary>What the Optimise action's tooltip says. Exposed for tests.</summary>
+        internal string? OptimiseToolTip
+        {
+            get { EnsureInspected(); return button_Optimise.ToolTip as string; }
+        }
+
+        /// <summary>Whether the Iteration 3 panel is shown at all. Exposed for tests.</summary>
+        internal bool IsIteration3PanelVisible
+        {
+            get { EnsureInspected(); return border_Iteration3.Visibility == Visibility.Visible; }
+        }
+
+        /// <summary>Whether the equipment section is shown. Exposed for tests.</summary>
+        internal bool IsEquipmentSectionVisible
+        {
+            get { EnsureInspected(); return stackPanel_EquipmentSelection.Visibility == Visibility.Visible; }
         }
 
         /// <summary>
@@ -1009,6 +1113,8 @@ namespace SAM.Analytical.UI.WPF
                 ? string.Empty
                 : string.Format("Run is unavailable: {0}", string.Join(" ", reasons));
 
+            textBlock_Blockers.Visibility = canRun ? Visibility.Collapsed : Visibility.Visible;
+
             button_Run.IsEnabled = canRun;
             button_Run.ToolTip = canRun
                 ? (partOWorkflowInspection.ReusePreparation
@@ -1021,14 +1127,74 @@ namespace SAM.Analytical.UI.WPF
                 ? "Read this run's existing simulation results and show the CIBSE TM59 assessment. No new simulation is run."
                 : partOWorkflowInspection.ResultsRefusal ?? "There are no results to review yet.";
 
+            //Why a secondary action is unavailable, in two or three words under it. The complete reason is
+            //the tooltip; these name only which of the two known conditions applies.
+            bool supportsOptimisation = Scenario?.SupportsOptimisation ?? false;
+
+            //On a scenario that can never carry an Iteration 2B, the tooltip gives THAT reason - the same
+            //sentence the 2B section states (UpdateOptimiseControls) - rather than the missing results, which
+            //read as though a run would make it available.
             button_Optimise.IsEnabled = partOWorkflowInspection.CanOptimise;
             button_Optimise.ToolTip = partOWorkflowInspection.CanOptimise
                 ? "Raise the design airflow of failing mechanically ventilated rooms by the configured step, rebalance, re-prepare, re-simulate the same weather case and reassess. The selected product is never changed."
-                : partOWorkflowInspection.OptimisationRefusal ?? "Iteration 2B optimises a completed Iteration 2 run.";
+                : !supportsOptimisation && !string.IsNullOrWhiteSpace(textBlock_Optimise.Text)
+                    ? textBlock_Optimise.Text
+                    : partOWorkflowInspection.OptimisationRefusal ?? "Iteration 2B optimises a completed Iteration 2 run.";
+
+            textBlock_ReviewCaption.Text = partOWorkflowInspection.CanReviewResults ? string.Empty : "No results yet";
+            textBlock_OptimiseCaption.Text = partOWorkflowInspection.CanOptimise
+                ? string.Empty
+                : supportsOptimisation ? "After an Iteration 2 run" : "Iteration 2 only";
 
             //The Iteration 3 panel's own actions, from the eligibility the caller gathered once - it touches
             //the filesystem (it looks for saved results), and a status list rebuilt on every keystroke must not.
             RefreshIteration3();
+
+            stepStrip.Steps = PartOWorkflowProgress.Steps(partOWorkflowInspection, supportsOptimisation);
+
+            UpdateNextStep(partOWorkflowInspection, reasons.Count);
+        }
+
+        /// <summary>
+        /// The one line above the actions saying what happens next - from the inspection and the Iteration 3
+        /// eligibility the window already holds, never from a state of its own.
+        /// </summary>
+        private void UpdateNextStep(PartOWorkflowInspection partOWorkflowInspection, int count_Blocking)
+        {
+            if (count_Blocking != 0)
+            {
+                textBlock_NextStep.Text = count_Blocking == 1
+                    ? "✕ Prepare & Run is unavailable — resolve the blocking item shown above."
+                    : string.Format("✕ Prepare & Run is unavailable — resolve the {0} blocking items shown above.", count_Blocking);
+                textBlock_NextStep.Foreground = Brushes.Firebrick;
+
+                return;
+            }
+
+            textBlock_NextStep.ClearValue(TextBlock.ForegroundProperty);
+
+            if (partOWorkflowInspection.CanReviewResults)
+            {
+                string text = "Next: Review the TM59 results.";
+
+                if (iteration3Eligibility?.CanRun ?? false)
+                {
+                    text += " Iteration 3 can then compare them with an explicit ventilation system (below).";
+                }
+
+                if (partOWorkflowInspection.CanOptimise)
+                {
+                    text += " Optimise (2B) is also available.";
+                }
+
+                textBlock_NextStep.Text = text;
+
+                return;
+            }
+
+            textBlock_NextStep.Text = partOWorkflowInspection.ReusePreparation
+                ? "Next: Run the Part O assessment on the prepared ventilation design."
+                : "Next: Prepare the ventilation design and run the Part O assessment.";
         }
 
         /// <summary>
@@ -1049,9 +1215,24 @@ namespace SAM.Analytical.UI.WPF
         /// ventilation route - an unsettled route, say, whose detail is a different sentence entirely -
         /// this returns null and the row shortens itself by cutting at its own first full stop.
         /// </para>
+        /// <para><b>And the ventilation design beside results that already exist</b></para>
+        /// <para>
+        /// A reopened or completed run can honestly report the design as still to prepare - the next run
+        /// rebuilds it - while the simulation and results are ready. Read against "Check &amp; simulate: Done"
+        /// on the strip, "Built by Prepare &amp; Run" looked like a simulation that ran without a design. This
+        /// says what the status means in that case. The status is the inspection's and does not move; the
+        /// fact that results exist is the capabilities' own answer, read rather than derived.
+        /// </para>
         /// </summary>
-        private static string? Summary(PartOWorkflowStageState partOWorkflowStageState, PartOWorkflowScenario? partOWorkflowScenario)
+        private static string? Summary(PartOWorkflowStageState partOWorkflowStageState, PartOWorkflowScenario? partOWorkflowScenario, bool resultsAvailable)
         {
+            if (partOWorkflowStageState is not null && resultsAvailable
+                && partOWorkflowStageState.Stage == PartOWorkflowStage.VentilationDesign
+                && partOWorkflowStageState.Status == PartOWorkflowStageStatus.Prepare)
+            {
+                return "Rebuilt for the next Prepare & Run · the existing results are reviewable as they are";
+            }
+
             if (partOWorkflowStageState is null || partOWorkflowStageState.Stage != PartOWorkflowStage.PartFRequirements)
             {
                 return null;
@@ -1076,20 +1257,20 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            //The route word is SAM's, carried by the option; this states it rather than choosing it.
-            string route = string.Format("Ventilation route stated for every dwelling in scope: {0}.", partOWorkflowScenario.Option.VentilationStrategy);
+            //The route word is SAM's, carried by the option; this states it rather than choosing it - once,
+            //in one line, with what the route does about equipment. It is the only place the window says
+            //that an Iteration 1 route needs no manufacturer unit.
+            string route = partOWorkflowScenario.Option.VentilationStrategy;
 
             //ASKED OF THE ACTIVE MODE, never assumed. This line used to say "the smallest capable
             //manufacturer unit is selected per dwelling" whatever the project's configuration was - which
             //is simply untrue of a project under manual authority, and untrue of a narrowed pool. An
             //engineer reading it would have believed a selection had run that had not.
-            string equipment = partOWorkflowScenario.SelectVentilationUnit
-                ? string.Format(" {0}", control_EquipmentSelection.ModeDescription)
+            textBlock_Scenario.Text = partOWorkflowScenario.SelectVentilationUnit
+                ? string.Format("{0} · Manufacturer unit per dwelling · {1}", route, control_EquipmentSelection.ModeDescription)
                 : partOWorkflowScenario.Option.PartOVentilationMode == PartOVentilationMode.MVHR
-                    ? " No manufacturer unit is selected, so the design duty stands on its own."
-                    : " No mechanical system, unit or terminal is created on this route.";
-
-            textBlock_Scenario.Text = route + equipment;
+                    ? string.Format("{0} · Design duty only · No manufacturer unit required", route)
+                    : string.Format("{0} · No mechanical system, unit or terminal", route);
         }
 
         /// <summary>
@@ -1144,6 +1325,11 @@ namespace SAM.Analytical.UI.WPF
             label_EquipmentSelection.Visibility = control_EquipmentSelection.IsSelectionEnabled
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            //And on a route that selects no unit the whole section is out of sight: the route line says it
+            //once, and the pointer under Advanced / Details says where the catalogue went.
+            stackPanel_EquipmentSelection.Visibility = control_EquipmentSelection.IsSelectionEnabled ? Visibility.Visible : Visibility.Collapsed;
+            textBlock_AdvancedEquipment.Visibility = control_EquipmentSelection.IsSelectionEnabled ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void UpdateScopeControls()
@@ -1161,9 +1347,11 @@ namespace SAM.Analytical.UI.WPF
             //out are simulated as adiabatic.
             textBlock_Scope.Text = Scope switch
             {
-                PartOWorkflowScope.AllDwellings => string.Format("All {0} eligible dwelling zone(s) are assessed, simulated inside the whole building.", zones_Eligible.Count),
-                PartOWorkflowScope.SelectedDwellings => string.Format("{0} of {1} eligible dwelling zone(s) are assessed, simulated inside the whole building.", selected, zones_Eligible.Count),
-                _ => string.Format("{0} of {1} eligible dwelling zone(s) are assessed, and only those are simulated. Interfaces to excluded spaces are simulated as adiabatic and the surrounding external geometry is retained as shading context, so results may differ from a whole-building simulation. The Part O criteria and the Part F requirements are unchanged.", selected, zones_Eligible.Count),
+                PartOWorkflowScope.AllDwellings => zones_Eligible.Count == 1
+                    ? "The 1 eligible dwelling · simulated inside the whole building"
+                    : string.Format("All {0} eligible dwellings · simulated inside the whole building", zones_Eligible.Count),
+                PartOWorkflowScope.SelectedDwellings => string.Format("{0} of {1} · simulated inside the whole building", selected, UI.Query.PartOCount(zones_Eligible.Count, "eligible dwelling", "eligible dwellings")),
+                _ => string.Format("{0} of {1} · only those are simulated. Interfaces to excluded spaces are simulated as adiabatic and the surrounding external geometry is retained as shading context, so results may differ from a whole-building simulation. The Part O criteria and the Part F requirements are unchanged.", selected, UI.Query.PartOCount(zones_Eligible.Count, "eligible dwelling", "eligible dwellings")),
             };
 
             //What the loaded model already IS, from the context the preparation stamped on it - said beside
@@ -1183,8 +1371,8 @@ namespace SAM.Analytical.UI.WPF
         private void UpdateSelectionText()
         {
             textBlock_Selection.Text = string.IsNullOrWhiteSpace(dwellingSelection.SearchText)
-                ? string.Format("{0} of {1} dwelling(s) selected.", dwellingSelection.SelectedCount, dwellingSelection.Count)
-                : string.Format("{0} of {1} dwelling(s) selected. The search is narrowing the list; Select All and None apply to what the search matches.", dwellingSelection.SelectedCount, dwellingSelection.Count);
+                ? string.Format("{0} of {1} selected.", dwellingSelection.SelectedCount, UI.Query.PartOCount(dwellingSelection.Count, "dwelling", "dwellings"))
+                : string.Format("{0} of {1} selected. The search is narrowing the list; Select All and None apply to what the search matches.", dwellingSelection.SelectedCount, UI.Query.PartOCount(dwellingSelection.Count, "dwelling", "dwellings"));
         }
 
         /// <summary>
@@ -1213,6 +1401,10 @@ namespace SAM.Analytical.UI.WPF
             checkBox_WarmStart.IsEnabled = available;
 
             expander_Optimise.IsEnabled = available;
+
+            //Out of sight on a scenario that can never carry an Iteration 2B; greyed, as before, on the one
+            //that can but has no catalogue to optimise within.
+            expander_Optimise.Visibility = (partOWorkflowScenario?.SupportsOptimisation ?? false) ? Visibility.Visible : Visibility.Collapsed;
 
             if (!available)
             {

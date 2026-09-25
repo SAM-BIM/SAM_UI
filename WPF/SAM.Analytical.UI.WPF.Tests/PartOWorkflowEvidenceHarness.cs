@@ -239,7 +239,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>Shows a window at a size, lets it lay out, and writes it to a PNG.</summary>
-        private static void Render(System.Windows.Window window, string path, double width, double height)
+        internal static void Render(System.Windows.Window window, string path, double width, double height)
         {
             window.WindowStartupLocation = WindowStartupLocation.Manual;
             window.Left = 0;

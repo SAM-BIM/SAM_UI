@@ -23,12 +23,25 @@ namespace SAM.Analytical.UI
             Detail = detail;
         }
 
+        public PartOWorkflowStageState(PartOWorkflowStage partOWorkflowStage, PartOWorkflowStageStatus partOWorkflowStageStatus, string detail, string summary)
+            : this(partOWorkflowStage, partOWorkflowStageStatus, detail)
+        {
+            Summary = summary;
+        }
+
         public PartOWorkflowStage Stage { get; }
 
         public PartOWorkflowStageStatus Status { get; }
 
         /// <summary>One sentence: what exists, what will be built, or what is missing and where it comes from.</summary>
         public string Detail { get; }
+
+        /// <summary>
+        /// A compact first-level line - "3 dwellings · 8 spaces", "8/8 spaces mapped" - stated from the same
+        /// counts as <see cref="Detail"/>, or null where the detail's own first sentence is short enough.
+        /// Presentation only: it carries nothing the detail does not.
+        /// </summary>
+        public string Summary { get; }
 
         /// <summary>The stage's name, from the enum's own description. No second spelling.</summary>
         public string Name => Core.Query.Description(Stage);

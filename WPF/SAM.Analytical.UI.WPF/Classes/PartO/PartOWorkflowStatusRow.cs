@@ -46,6 +46,52 @@ namespace SAM.Analytical.UI.WPF
 
         public string StatusText => State.StatusText;
 
+        /// <summary>
+        /// The status as the row shows it, in sentence case and in the stage's own terms - "Waiting" for a
+        /// check that runs later, "Not available" for results that do not exist yet.
+        /// <para>
+        /// <b>A label, never a new state.</b> It is chosen from the stage and the status the inspection
+        /// assigned, and nothing else: two rows with the same stage and status always read the same.
+        /// <see cref="StatusText"/> remains the status's own name.
+        /// </para>
+        /// </summary>
+        public string StatusLabel => Label(State.Stage, State.Status);
+
+        /// <summary>
+        /// A glyph beside the label, so the state never depends on colour alone: ✓ ready, ✕ blocked,
+        /// ○ still to happen, – not part of this scenario.
+        /// </summary>
+        public string StatusGlyph => Glyph(State.Status);
+
+        /// <summary>The label for a stage in a status. Exposed so the mapping is testable on its own.</summary>
+        public static string Label(PartOWorkflowStage partOWorkflowStage, PartOWorkflowStageStatus partOWorkflowStageStatus)
+        {
+            return partOWorkflowStageStatus switch
+            {
+                PartOWorkflowStageStatus.Ready => "Ready",
+                PartOWorkflowStageStatus.Reused => "Reused",
+                PartOWorkflowStageStatus.Blocked => "Blocked",
+                PartOWorkflowStageStatus.NotApplicable => "N/A",
+                PartOWorkflowStageStatus.Prepare => "Not prepared",
+                PartOWorkflowStageStatus.Pending => partOWorkflowStage == PartOWorkflowStage.ModelCheck ? "Waiting" : "Not checked",
+                PartOWorkflowStageStatus.NotRun => partOWorkflowStage == PartOWorkflowStage.Results ? "Not available" : "Not run",
+                _ => Core.Query.Description(partOWorkflowStageStatus),
+            };
+        }
+
+        /// <summary>The glyph for a status. Exposed so the mapping is testable on its own.</summary>
+        public static string Glyph(PartOWorkflowStageStatus partOWorkflowStageStatus)
+        {
+            return partOWorkflowStageStatus switch
+            {
+                PartOWorkflowStageStatus.Ready => "✓",
+                PartOWorkflowStageStatus.Reused => "✓",
+                PartOWorkflowStageStatus.Blocked => "✕",
+                PartOWorkflowStageStatus.NotApplicable => "–",
+                _ => "○",
+            };
+        }
+
         /// <summary>The inspection's sentence, complete and unaltered. Nothing consumes a shortened one.</summary>
         public string Detail => State.Detail;
 
@@ -68,6 +114,12 @@ namespace SAM.Analytical.UI.WPF
                 if (Summary is not null)
                 {
                     return Summary;
+                }
+
+                //The inspection's own compact line, from the same counts as its detail.
+                if (!string.IsNullOrWhiteSpace(State?.Summary))
+                {
+                    return State!.Summary;
                 }
 
                 string detail = State?.Detail ?? string.Empty;

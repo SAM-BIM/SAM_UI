@@ -439,7 +439,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(1, partOWorkflowWindow.VisibleDwellingCount);
 
             //The line describing it moved, and says the search is narrowing the list.
-            Assert.Contains("2 of 40 dwelling(s) selected", partOWorkflowWindow.SelectionDescription, StringComparison.Ordinal);
+            Assert.Contains("2 of 40 dwellings selected", partOWorkflowWindow.SelectionDescription, StringComparison.Ordinal);
             Assert.Contains("The search is narrowing the list", partOWorkflowWindow.SelectionDescription, StringComparison.Ordinal);
 
             //Not one dwelling's state changed - including the one the search hid.

@@ -7,137 +7,192 @@
         mc:Ignorable="d"
         xmlns:WPF="clr-namespace:SAM.Core.UI.WPF;assembly=SAM.Core.UI.WPF"
         Title="Part O — Prepare &amp; Run" MinHeight="520" MinWidth="700" Width="800"
-        SizeToContent="Height" ResizeMode="CanResizeWithGrip" FontFamily="Roboto Light">
-    <Grid Margin="10">
+        SizeToContent="Height" ResizeMode="CanResizeWithGrip" FontFamily="Roboto Light"
+        x:Name="window">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/SAM.Analytical.UI.WPF;component/Themes/PartOStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <!-- LAYOUT, top to bottom, in the order an engineer asks the questions: WHAT am I running (scenario,
+         route, scope), WHERE am I (the workflow strip), IS the model ready (the readiness list), and WHAT
+         happens next (the next-step line and the actions, which sit outside the scroll region and are always
+         reachable). The inputs that rarely change - simulation case, Iteration 2B - are collapsed below, and
+         everything explanatory is one disclosure away rather than always on screen. -->
+    <Grid Margin="12,10,12,10">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- The whole content scrolls where it cannot fit; the action row sits OUTSIDE the scroll region
-             and is always reachable. -->
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+            <StackPanel>
 
-                <Label Grid.Row="0" Content="Scenario" Padding="0,0,0,2"/>
-                <ComboBox x:Name="comboBox_Scenario" Grid.Row="1" Height="22" HorizontalAlignment="Stretch"/>
-                <TextBlock x:Name="textBlock_Scenario" Grid.Row="2" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
-
-                <Grid Grid.Row="3" Margin="0,12,0,0">
-                    <Label Content="Scope" Padding="0,0,0,2" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="comboBox_Scope" Width="240" Height="22" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                </Grid>
-
-                <TextBlock x:Name="textBlock_Scope" Grid.Row="4" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
-
-                <!-- DWELLINGS, one row per dwelling zone - never one per space. The list virtualizes and
-                     the selection lives on the record rather than the row container, so a model with
-                     thousands of spaces is still a list of its dwellings. Hidden entirely on the
-                     all-dwellings scope, where there is nothing to choose. -->
-                <Grid x:Name="grid_Dwellings" Grid.Row="5" Margin="0,8,0,0">
+                <!-- WHAT: scenario, its route in one line, and the scope. -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="72"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Scenario" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="comboBox_Scenario" Grid.Row="0" Grid.Column="1" Height="24" VerticalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+
+                    <!-- The route and what it does with equipment, stated ONCE. -->
+                    <TextBlock x:Name="textBlock_Scenario" Grid.Row="1" Grid.Column="1" Margin="2,4,0,0" Style="{StaticResource PartO.Caption}" FontSize="12"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Scope" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                    <Grid Grid.Row="2" Grid.Column="1" Margin="0,10,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="220"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Search" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBox x:Name="textBox_Search" Grid.Column="1" Height="20" VerticalContentAlignment="Center"
-                                 ToolTip="Narrow the list of dwellings by name. Selection is never lost by searching."/>
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0,0,0">
-                            <Button x:Name="button_SelectAll" Content="Select All" Width="70" Height="20" Margin="0,0,6,0"
-                                    ToolTip="Select every dwelling the search currently matches - all of them while the search is empty."/>
-                            <Button x:Name="button_SelectNone" Content="None" Width="50" Height="20"
-                                    ToolTip="Clear every dwelling the search currently matches - all of them while the search is empty."/>
-                        </StackPanel>
+                        <ComboBox x:Name="comboBox_Scope" Grid.Column="0" Height="24" VerticalContentAlignment="Center" VerticalAlignment="Top"/>
+                        <TextBlock x:Name="textBlock_Scope" Grid.Column="1" Margin="10,4,0,0" Style="{StaticResource PartO.Caption}" FontSize="12"/>
                     </Grid>
 
-                    <ListBox x:Name="listBox_Dwellings" Grid.Row="1" MinHeight="88" MaxHeight="180" Margin="0,4,0,0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="{Binding Name}"/>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <!-- DWELLINGS, one row per dwelling zone - never one per space. The list virtualizes and
+                         the selection lives on the record rather than the row container, so a model with
+                         thousands of spaces is still a list of its dwellings. Hidden entirely on the
+                         all-dwellings scope, where there is nothing to choose. -->
+                    <Grid x:Name="grid_Dwellings" Grid.Row="3" Grid.Column="1" Margin="0,8,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                    <TextBlock x:Name="textBlock_Selection" Grid.Row="2" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Search" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBox x:Name="textBox_Search" Grid.Column="1" Height="20" VerticalContentAlignment="Center"
+                                     ToolTip="Narrow the list of dwellings by name. Selection is never lost by searching."/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0,0,0">
+                                <Button x:Name="button_SelectAll" Content="Select All" Width="70" Height="20" Margin="0,0,6,0"
+                                        ToolTip="Select every dwelling the search currently matches - all of them while the search is empty."/>
+                                <Button x:Name="button_SelectNone" Content="None" Width="50" Height="20"
+                                        ToolTip="Clear every dwelling the search currently matches - all of them while the search is empty."/>
+                            </StackPanel>
+                        </Grid>
+
+                        <ListBox x:Name="listBox_Dwellings" Grid.Row="1" MinHeight="88" MaxHeight="180" Margin="0,4,0,0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="{Binding Name}"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <TextBlock x:Name="textBlock_Selection" Grid.Row="2" Margin="0,4,0,0" Style="{StaticResource PartO.Caption}"/>
+                    </Grid>
                 </Grid>
+
+                <!-- WHERE: the workflow strip, derived from the inspection (PartOWorkflowProgress). -->
+                <Border Margin="0,12,0,0" Padding="12,8" Background="{StaticResource PartO.Brush.Surface}" BorderBrush="{StaticResource PartO.Brush.Border}" BorderThickness="1" CornerRadius="4">
+                    <local:PartOWorkflowStepStripControl x:Name="stepStrip"/>
+                </Border>
+
+                <!-- What the last action did, said inline - in place of the "Time elapsed ... OK" message box a
+                     successful run used to end with. A warning or a refusal is still shown as a dialog by the
+                     action itself; this line is the record of it. -->
+                <Border x:Name="border_LastOutcome" Visibility="Collapsed" Padding="8,5" Margin="0,10,0,0" CornerRadius="3" BorderThickness="1">
+                    <TextBlock x:Name="textBlock_LastOutcome" TextWrapping="Wrap"/>
+                </Border>
+
+                <!-- IS IT READY: every row is PartOWorkflowInspection's, divided into what the CURRENT
+                     CONFIGURATION says and what a RUN produced - see PartOWorkflowStatusGroup. The first level
+                     is compact (stage, glyph + status word, one short line); the inspection's complete
+                     sentence is on every row's tooltip and under it with "Show details". Nothing is
+                     shortened away. -->
+                <Grid Margin="0,12,0,4">
+                    <TextBlock Text="Readiness" Style="{StaticResource PartO.SectionHeading}" Margin="0" VerticalAlignment="Center"/>
+                    <CheckBox x:Name="checkBox_ShowDetails" Content="Show details" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"
+                              IsChecked="{Binding ShowStatusDetails, ElementName=window, Mode=TwoWay}"
+                              ToolTip="Show the complete explanation under every row. Each row's explanation is also on its tooltip."/>
+                </Grid>
+
+                <ItemsControl x:Name="itemsControl_Status" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,2,0,6">
+                                <TextBlock Text="{Binding Name}" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="0,0,0,2"/>
+                                <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="8,1,0,1" ToolTip="{Binding FullDetail}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="150"/>
+                                                    <ColumnDefinition Width="120"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" Foreground="{StaticResource PartO.Brush.Text}"/>
+                                                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding StatusGlyph}" Foreground="{Binding Foreground}" Style="{StaticResource PartO.StatusGlyph}"/>
+                                                    <TextBlock Text="{Binding StatusLabel}" Foreground="{Binding Foreground}" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                                <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding ShortDetail}" TextTrimming="CharacterEllipsis" Foreground="{StaticResource PartO.Brush.Muted}"/>
+                                                <!-- Shown with "Show details", and only where the complete sentence says more
+                                                     than the compact line beside it. -->
+                                                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding FullDetail}" TextWrapping="Wrap" FontSize="11" Margin="0,1,0,4"
+                                                           Foreground="{StaticResource PartO.Brush.Muted}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="{Binding ShowStatusDetails, RelativeSource={RelativeSource AncestorType=local:PartOWorkflowWindow}, Converter={StaticResource PartO.BooleanToVisibility}, FallbackValue=Collapsed}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasMoreDetail}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock x:Name="textBlock_Blockers" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
 
                 <!-- EQUIPMENT SELECTION, over the SAME project-scoped configuration the single-command
                      Prepare Iteration window writes - and through the same control, so the two workflows
-                     cannot offer different modes or describe the same one differently. Native testing found
-                     this window claiming a smallest-capable selection on a project the engineer had put
-                     under manual authority; that was the whole of the defect.
+                     cannot offer different modes or describe the same one differently.
 
-                     Reduced to a compact read-only summary, not hidden, on a scenario that selects no
-                     unit: an Iteration 1a or 1b run has no equipment to configure, so the section keeps its
-                     place in the family's skeleton and says in two lines that nothing here applies - with
-                     the catalogue one disclosure away rather than greyed across the middle of the dialog. -->
-                <StackPanel Grid.Row="6" Margin="0,12,0,0">
-                    <!-- Hidden on Iteration 1a / 1b, where the control states the same heading itself as
-                         part of its compact summary and two of them would read as a repeat. -->
-                    <Label x:Name="label_EquipmentSelection" Content="Equipment selection" Padding="0,0,0,2"/>
+                     Shown only where the scenario selects a unit (Iteration 2). On Iteration 1a / 1b the route
+                     line under the scenario says, once, that no manufacturer unit is required; the control
+                     still runs in its compact read-only state, only hosted out of sight. -->
+                <StackPanel x:Name="stackPanel_EquipmentSelection" Margin="0,12,0,0">
+                    <Label x:Name="label_EquipmentSelection" Content="Equipment selection" Padding="0,0,0,2" FontWeight="SemiBold"/>
                     <local:PartOEquipmentSelectionControl x:Name="control_EquipmentSelection"/>
                 </StackPanel>
 
-                <!-- Iteration 2B is NOT one of the scenarios above: it is an optimisation performed on a
-                     completed Iteration 2 run. It is set up here because the settings have to be recorded
-                     with the preparation for the run to be an optimisation starting point at all, and it
-                     is collapsed by default so a baseline run never has to read it. -->
-                <Expander x:Name="expander_Optimise" Grid.Row="7" Margin="0,12,0,0"
-                          Header="Follow-on optimisation (Iteration 2B — TM59 optimisation)"
-                          ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked.">
-                    <StackPanel Margin="0,6,0,0">
-                        <CheckBox x:Name="checkBox_Optimise" Content="Allow automatic TM59 optimisation after this run"
-                                  ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked."/>
-
-                        <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
-                            <TextBlock Text="Airflow step (l/s)" VerticalAlignment="Center" Width="120"/>
-                            <TextBox x:Name="textBox_AirFlowStep" Width="60" Height="20" VerticalContentAlignment="Center"/>
-                            <TextBlock Text="Maximum iterations" VerticalAlignment="Center" Width="130" Margin="20,0,0,0"/>
-                            <TextBox x:Name="textBox_MaximumIterations" Width="60" Height="20" VerticalContentAlignment="Center"/>
-                        </StackPanel>
-
-                        <CheckBox x:Name="checkBox_CapacityEnvelope" Content="Also report what the selected unit could deliver at its capacity ceiling (diagnostic)" Margin="20,8,0,0"/>
-                        <!-- Worded as what it reuses, never as a claim about results: the reuse is valid only
-                             while the converted geometry still matches the model. -->
-                        <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted TAS geometry between iterations (faster)" Margin="20,6,0,0"
-                                  ToolTip="Reuses the existing converted TAS geometry between optimisation iterations.&#x0a;Disable this when the geometry is no longer valid for the current model."/>
-
-                        <TextBlock x:Name="textBlock_Optimise" Margin="20,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
-                    </StackPanel>
-                </Expander>
-
                 <!-- SIMULATION CASE: the three inputs of the full-year TAS run a person owns - weather, output
-                     folder, solar method - which used to be the only editable fields of a separate, mostly
-                     greyed-out Simulate dialog. Everything else about the case is fixed by
-                     Create.SimulateOptions_PartO exactly as that dialog fixed it; see Modify.SimulatePartO.
-                     Collapsed, with its current values in the header, because they rarely change. -->
-                <Expander x:Name="expander_SimulationCase" Grid.Row="8" Margin="0,12,0,0">
+                     folder, solar method. Everything else about the case is fixed by
+                     Create.SimulateOptions_PartO; see Modify.SimulatePartO. Collapsed, with the weather and
+                     solar method in the header and the complete case on its tooltip. -->
+                <Expander x:Name="expander_SimulationCase" Margin="0,12,0,0">
                     <Expander.Header>
-                        <TextBlock>
+                        <TextBlock x:Name="textBlock_SimulationCaseHeader" TextTrimming="CharacterEllipsis">
                             <Run Text="Simulation case"/>
                             <Run x:Name="run_SimulationCaseSummary" Foreground="#666666"/>
                         </TextBlock>
@@ -165,78 +220,46 @@
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Solar calculation" VerticalAlignment="Center" Margin="0,6,0,0"/>
                         <ComboBox x:Name="comboBox_SolarCalculationMethod" Grid.Row="2" Grid.Column="1" Width="160" Height="22" Margin="0,6,0,0" HorizontalAlignment="Left"/>
 
-                        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#777777" FontSize="11"
+                        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,6,0,0" Style="{StaticResource PartO.Caption}"
                                    Text="The rest of the case is fixed for Part O: a full-year simulation over days 1 to 365, no sizing, no exports, and the project name taken from the prepared model."/>
                     </Grid>
                 </Expander>
 
-                <Label Grid.Row="9" Content="Status" Padding="0,0,0,2" Margin="0,12,0,0"/>
+                <!-- Iteration 2B is NOT one of the scenarios above: it is an optimisation performed on a
+                     completed Iteration 2 run. It is set up here because the settings have to be recorded
+                     with the preparation for the run to be an optimisation starting point at all, and it
+                     is collapsed by default so a baseline run never has to read it. Shown only on a
+                     scenario that can carry one. -->
+                <Expander x:Name="expander_Optimise" Margin="0,8,0,0"
+                          Header="Follow-on optimisation (Iteration 2B — TM59 optimisation)"
+                          ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked.">
+                    <StackPanel Margin="0,6,0,0">
+                        <CheckBox x:Name="checkBox_Optimise" Content="Allow automatic TM59 optimisation after this run"
+                                  ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked."/>
 
-                <!-- WHAT EXISTS, WHAT WILL BE REUSED, WHAT WILL CHANGE, WHAT BLOCKS RUN - one line each,
-                     every one of them produced by PartOWorkflowInspection from an existing authority.
+                        <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
+                            <TextBlock Text="Airflow step (l/s)" VerticalAlignment="Center" Width="120"/>
+                            <TextBox x:Name="textBox_AirFlowStep" Width="60" Height="20" VerticalContentAlignment="Center"/>
+                            <TextBlock Text="Maximum iterations" VerticalAlignment="Center" Width="130" Margin="20,0,0,0"/>
+                            <TextBox x:Name="textBox_MaximumIterations" Width="60" Height="20" VerticalContentAlignment="Center"/>
+                        </StackPanel>
 
-                     DIVIDED INTO TWO PRESENTATION GROUPS, and that is the whole of the change: what the
-                     CURRENT CONFIGURATION says, and what an EXISTING RUN produced. A model can honestly
-                     report "Ventilation design: NEEDS PREPARATION" beside "Results: READY" - saved results
-                     are reviewable without simulating anything - and as one flat list that read like the
-                     dialog contradicting itself. Nothing is compared between the groups, no configuration
-                     is hashed, no timestamp is read or written and no status is inferred: every row still
-                     carries exactly the status the inspection assigned it. See PartOWorkflowStatusGroup.
+                        <CheckBox x:Name="checkBox_CapacityEnvelope" Content="Also report what the selected unit could deliver at its capacity ceiling (diagnostic)" Margin="20,8,0,0"/>
+                        <!-- Worded as what it reuses, never as a claim about results: the reuse is valid only
+                             while the converted geometry still matches the model. -->
+                        <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted TAS geometry between iterations (faster)" Margin="20,6,0,0"
+                                  ToolTip="Reuses the existing converted TAS geometry between optimisation iterations.&#x0a;Disable this when the geometry is no longer valid for the current model."/>
 
-                     One line per row, with the inspection's complete sentence on the tooltip and behind the
-                     row's own disclosure - nothing is shortened away. -->
-                <StackPanel Grid.Row="10">
-                <!-- What the last action did, said inline - in place of the "Time elapsed ... OK" message box a
-                     successful run used to end with. A warning or a refusal is still shown as a dialog by the
-                     action itself; this line is the record of it. -->
-                <Border x:Name="border_LastOutcome" Visibility="Collapsed" Padding="8,5" Margin="0,0,0,8" CornerRadius="3" BorderThickness="1">
-                    <TextBlock x:Name="textBlock_LastOutcome" TextWrapping="Wrap"/>
-                </Border>
-
-                <ItemsControl x:Name="itemsControl_Status">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#333333" Margin="0,0,0,3"/>
-                                <ItemsControl ItemsSource="{Binding Rows}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="10,0,0,3">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="145"/>
-                                                    <ColumnDefinition Width="125"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Top" ToolTip="{Binding FullDetail}"/>
-                                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StatusText}" Foreground="{Binding Foreground}" FontWeight="SemiBold" VerticalAlignment="Top" ToolTip="{Binding FullDetail}"/>
-                                                <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding ShortDetail}" TextTrimming="CharacterEllipsis" Foreground="#555555" ToolTip="{Binding FullDetail}"/>
-                                                <Expander Grid.Row="1" Grid.Column="2" Margin="0,2,0,0" FontSize="11"
-                                                          Header="{Binding DisclosureHeader}" Visibility="{Binding DisclosureVisibility}">
-                                                    <TextBlock Text="{Binding FullDetail}" TextWrapping="Wrap" Foreground="#555555" Margin="0,3,0,0"/>
-                                                </Expander>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                </StackPanel>
-
-                <TextBlock x:Name="textBlock_Blockers" Grid.Row="11" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
+                        <TextBlock x:Name="textBlock_Optimise" Margin="20,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+                    </StackPanel>
+                </Expander>
 
                 <!-- ITERATION 3, in the engineer's terms: an earlier iteration as the reference case, and a
-                     system case that runs the dwellings' ventilation as an explicit TAS system. One method is
-                     chosen; the product methods come first and the two validation methods sit under Advanced.
-                     Whether a method already has a completed result, and what the method would change, is said
-                     BEFORE anything runs - the pre-flight is the run's own resolution step, with no TAS. How the
-                     results are stored is never shown. -->
-                <Border Grid.Row="12" Margin="0,14,0,0" Padding="10,8" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="3">
+                     system case that runs the dwellings' ventilation as an explicit TAS system. Shown only once
+                     it is relevant - a completed reference run exists, or a method already has a record -
+                     rather than as a refusal before anything has run. How the results are stored is never
+                     shown. -->
+                <Border x:Name="border_Iteration3" Margin="0,14,0,0" Padding="10,8" BorderBrush="{StaticResource PartO.Brush.Border}" BorderThickness="1" CornerRadius="4">
                     <StackPanel>
                         <TextBlock Text="Iteration 3 — explicit system and cooling assessment" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock x:Name="textBlock_It3Reference" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#444444"/>
@@ -288,23 +311,47 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock x:Name="textBlock_Advanced" Grid.Row="13" Margin="0,10,0,10" TextWrapping="Wrap" Foreground="#777777"
-                           Text="The individual Part O commands remain available: Edit - Map IC (TM59), AddVent PartF and Prepare Iteration, Simulate - Energy Simulation, and Results - Overheating (TM59) and Optimise (2B)."
-                           ToolTip="Iteration 1a — MVHR design duty (no manufacturer unit)&#x0a;Iteration 1b — Natural ventilation (no mechanical system)&#x0a;Iteration 2 — MVHR with manufacturer unit&#x0a;Iteration 2B — TM59 optimisation"/>
-            </Grid>
+                <!-- ADVANCED / DETAILS: the expert commands, the scenario glossary, and what the route does
+                     not use - reference material, one disclosure away. -->
+                <Expander x:Name="expander_Advanced" Header="Advanced / Details" Margin="0,12,0,4" Foreground="{StaticResource PartO.Brush.Muted}">
+                    <StackPanel Margin="18,4,0,0">
+                        <TextBlock x:Name="textBlock_AdvancedEquipment" Style="{StaticResource PartO.Caption}" Margin="0,0,0,6"
+                                   Text="Equipment selection, the project test product and catalogue products are not used on this route. Choose Iteration 2 to select a manufacturer unit."/>
+                        <TextBlock x:Name="textBlock_Advanced" Style="{StaticResource PartO.Caption}"
+                                   Text="The individual Part O commands remain available: Edit - Map IC (TM59), AddVent PartF and Prepare Iteration, Simulate - Energy Simulation, and Results - Overheating (TM59) and Optimise (2B)."/>
+                        <TextBlock Style="{StaticResource PartO.Caption}" Margin="0,6,0,0"
+                                   Text="Iteration 1a — MVHR design duty (no manufacturer unit)&#x0a;Iteration 1b — Natural ventilation (no mechanical system)&#x0a;Iteration 2 — MVHR with manufacturer unit&#x0a;Iteration 2B — TM59 optimisation of an Iteration 2 run&#x0a;Iteration 3 — explicit system comparison against a completed Iteration 1a run"/>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
         </ScrollViewer>
 
-        <Grid Grid.Row="1" Margin="0,8,0,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Name="button_Run" Width="120" Height="24" Margin="0,0,8,0" IsEnabled="False" Click="button_Run_Click"
-                        ToolTipService.ShowOnDisabled="True">Prepare &amp; Run</Button>
-                <Button x:Name="button_Review" Width="120" Height="24" Margin="0,0,8,0" IsEnabled="False" Click="button_Review_Click"
-                        ToolTipService.ShowOnDisabled="True">Review Results</Button>
-                <Button x:Name="button_Optimise" Width="120" Height="24" Margin="0,0,8,0" IsEnabled="False" Click="button_Optimise_Click"
-                        ToolTipService.ShowOnDisabled="True">Optimise (2B)</Button>
-                <!-- Iteration 3 has its own panel above, with its own two actions. -->
+        <!-- WHAT NEXT: the next-step line and the actions, outside the scroll region. A disabled action
+             says why in a short caption under it; the complete reason is on its tooltip. -->
+        <Border Grid.Row="1" Margin="0,8,0,0" Padding="0,8,0,0" BorderBrush="{StaticResource PartO.Brush.Border}" BorderThickness="0,1,0,0">
+            <StackPanel>
+                <TextBlock x:Name="textBlock_NextStep" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource PartO.Brush.Text}"/>
+                <Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <StackPanel Margin="0,0,8,0">
+                            <Button x:Name="button_Run" MinWidth="130" Height="28" IsDefault="True" IsEnabled="False" Click="button_Run_Click"
+                                    Style="{StaticResource PartO.PrimaryButton}" ToolTipService.ShowOnDisabled="True">Prepare &amp; Run</Button>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0" Width="120">
+                            <Button x:Name="button_Review" Height="28" IsEnabled="False" Click="button_Review_Click"
+                                    ToolTipService.ShowOnDisabled="True">Review Results</Button>
+                            <TextBlock x:Name="textBlock_ReviewCaption" Style="{StaticResource PartO.Caption}" FontSize="10.5" TextAlignment="Center" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0" Width="120">
+                            <Button x:Name="button_Optimise" Height="28" IsEnabled="False" Click="button_Optimise_Click"
+                                    ToolTipService.ShowOnDisabled="True">Optimise (2B)</Button>
+                            <TextBlock x:Name="textBlock_OptimiseCaption" Style="{StaticResource PartO.Caption}" FontSize="10.5" TextAlignment="Center" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <!-- Iteration 3 has its own panel above, with its own two actions. -->
+                    </StackPanel>
+                    <Button x:Name="button_Close" IsCancel="True" Width="80" Height="28" HorizontalAlignment="Right" VerticalAlignment="Top" Click="button_Close_Click">Close</Button>
+                </Grid>
             </StackPanel>
-            <Button x:Name="button_Close" IsCancel="True" Width="70" Height="24" HorizontalAlignment="Right" Click="button_Close_Click">Close</Button>
-        </Grid>
+        </Border>
     </Grid>
 </Window>

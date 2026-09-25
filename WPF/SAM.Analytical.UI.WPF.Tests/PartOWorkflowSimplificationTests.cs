@@ -465,6 +465,9 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             partOWorkflowWindow.CompleteInitialisation();
 
+            //A recorded result makes the panel relevant, although nothing can be run.
+            Assert.True(partOWorkflowWindow.IsIteration3PanelVisible);
+
             Assert.StartsWith("✓ Result available", partOWorkflowWindow.Iteration3StatusText(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance));
             Assert.Contains("reference Fail / system Fail", partOWorkflowWindow.Iteration3StatusText(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance));
             Assert.StartsWith("Last attempt did not complete", partOWorkflowWindow.Iteration3StatusText(PartOIteration3BehaviourMode.SelectedProduct));
