@@ -87,7 +87,7 @@ namespace SAM.Analytical.UI.WPF
                     parts.Add(string.Format("Notes ({0})", NoteCount));
                 }
 
-                return parts.Count == 0 ? "Notes, warnings and refusals (none)" : string.Join("   ", parts);
+                return parts.Count == 0 ? "Notes, warnings and refusals (none)" : string.Join(" · ", parts);
             }
         }
 

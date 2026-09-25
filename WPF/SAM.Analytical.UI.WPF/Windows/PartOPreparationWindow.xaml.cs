@@ -19,7 +19,7 @@ namespace SAM.Analytical.UI.WPF
     /// iteration has been prepared. The previous dialog can state which products are permitted; it cannot
     /// show what any of them would mean for a dwelling. So the pool and the mode are chosen there, and the
     /// assignments - including "Convert to Manual" and every per-dwelling override - are made here, against
-    /// real numbers, before OK adopts the result.
+    /// real numbers, before the accepted review adopts the result.
     /// </para>
     ///
     /// <para><b>Nothing in this window decides anything</b></para>
@@ -27,7 +27,17 @@ namespace SAM.Analytical.UI.WPF
     /// Every edit is delegated to <see cref="EquipmentAssignmentSet"/>, which owns validation, suggestions
     /// and the single write path. There is no capacity comparison and no selection rule in this file - a
     /// second implementation of either is how a dialog comes to disagree with the engine it is a view of.
-    /// The set writes to a model only when <c>Modify.PreparePartOIteration</c> commits it, after OK.
+    /// The set writes to a model only when <c>Modify.PreparePartOIteration</c> commits it, after the review is
+    /// accepted.
+    /// </para>
+    ///
+    /// <para><b>The decision is named for what it does</b></para>
+    /// <para>
+    /// It was an unlabelled "OK", and what it does depends on the command that opened the window. From the
+    /// Prepare &amp; Run Hub it adopts the model and the Hub goes on into TAS, so it says "Accept &amp; Run TAS";
+    /// from the Prepare Iteration command it only adopts, so it says "Accept Preparation". See
+    /// <see cref="Intent"/>. Cancel declines and changes nothing. Neither is the default button: Enter must
+    /// never start a TAS run.
     /// </para>
     /// </summary>
     public partial class PartOPreparationWindow : System.Windows.Window
@@ -50,6 +60,73 @@ namespace SAM.Analytical.UI.WPF
             InitializeComponent();
 
             UpdateEquipmentAvailability();
+
+            UpdateDecision();
+        }
+
+        private PartOReviewIntent partOReviewIntent = PartOReviewIntent.PrepareOnly;
+
+        /// <summary>
+        /// What accepting this window leads to, as the command that opened it does it - and therefore what the
+        /// primary action, its caption and its tooltip say. Wording only: the caller decides what happens after
+        /// an accepted review, and this window returns the same DialogResult either way. Defaults to
+        /// <see cref="PartOReviewIntent.PrepareOnly"/>, so a window nobody told otherwise never promises TAS.
+        /// </summary>
+        public PartOReviewIntent Intent
+        {
+            get
+            {
+                return partOReviewIntent;
+            }
+            set
+            {
+                partOReviewIntent = value;
+
+                UpdateDecision();
+            }
+        }
+
+        /// <summary>The primary action's text for an intent.</summary>
+        internal static string AcceptText(PartOReviewIntent partOReviewIntent)
+        {
+            return partOReviewIntent == PartOReviewIntent.PrepareAndRun ? "Accept & Run TAS" : "Accept Preparation";
+        }
+
+        /// <summary>The line beside the decision buttons for an intent.</summary>
+        internal static string DecisionText(PartOReviewIntent partOReviewIntent)
+        {
+            return partOReviewIntent == PartOReviewIntent.PrepareAndRun
+                ? "Accept & Run TAS adopts this prepared model and starts the full-year TAS simulation, then the TM59 assessment. Cancel changes nothing and starts nothing."
+                : "Accept Preparation adopts this prepared model. No TAS simulation is started. Cancel changes nothing.";
+        }
+
+        private void UpdateDecision()
+        {
+            bool run = partOReviewIntent == PartOReviewIntent.PrepareAndRun;
+
+            button_Accept.Content = AcceptText(partOReviewIntent);
+
+            button_Accept.ToolTip = run
+                ? "Adopt the prepared model, with the assignments above, and start the full-year TAS simulation. The TM59 assessment follows."
+                : "Adopt the prepared model, with the assignments above. Nothing is simulated.";
+
+            textBlock_Decision.Text = DecisionText(partOReviewIntent);
+
+            textBlock_Subtitle.Text = run
+                ? "The iteration is prepared. Review it here; nothing is simulated until you accept."
+                : "The iteration is prepared. Review it here; accepting adopts it and does not start a simulation.";
+        }
+
+        /// <summary>What the line beside the decision buttons says. For a test to read.</summary>
+        internal string DecisionCaption => textBlock_Decision.Text;
+
+        protected override void OnContentRendered(EventArgs e)
+        {
+            base.OnContentRendered(e);
+
+            //Its decision row is at the bottom; an owner low on a short monitor otherwise opens it with Accept
+            //and Cancel under the taskbar. The Hub's own placement, shared.
+            PartOWindowPlacement.KeepOnScreen(this);
         }
 
         /// <summary>The equipment rows, one per dwelling air handling unit.</summary>
@@ -112,18 +189,79 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        /// <summary>The preparation summary.</summary>
-        public string Summary
+        private PartOReviewSummary? partOReviewSummary;
+
+        /// <summary>
+        /// What the preparation produced, as the window's header shows it: the scenario, then scope, route,
+        /// design duty, equipment and overheating scenarios. The details each part carries are on its tooltip,
+        /// except an isolated scope's consequence, which is shown.
+        /// </summary>
+        public PartOReviewSummary? ReviewSummary
         {
             get
             {
-                return textBlock_Summary.Text;
+                return partOReviewSummary;
             }
             set
             {
-                textBlock_Summary.Text = value;
+                partOReviewSummary = value;
+
+                textBlock_Scenario.Text = value?.Scenario ?? string.Empty;
+
+                textBlock_Scope.Text = value?.Scope ?? string.Empty;
+                textBlock_ScopeDetail.Text = value?.ScopeDetail ?? string.Empty;
+                textBlock_ScopeDetail.Visibility = string.IsNullOrWhiteSpace(value?.ScopeDetail) ? Visibility.Collapsed : Visibility.Visible;
+
+                textBlock_Route.Text = value?.Route ?? string.Empty;
+
+                textBlock_Duty.Text = value?.Duty ?? string.Empty;
+                textBlock_Duty.ToolTip = string.IsNullOrWhiteSpace(value?.DutyDetail) ? null : value!.DutyDetail;
+
+                textBlock_Equipment.Text = value?.Equipment ?? string.Empty;
+                textBlock_Equipment.ToolTip = string.IsNullOrWhiteSpace(value?.EquipmentDetail) ? null : value!.EquipmentDetail;
+
+                textBlock_OverheatingScenarios.Text = value?.OverheatingScenarios ?? string.Empty;
             }
         }
+
+        /// <summary>The preparation summary as one block - what Copy All puts first.</summary>
+        public string Summary => partOReviewSummary?.Text ?? string.Empty;
+
+        /// <summary>The scenario the window is headed with. For a test to read.</summary>
+        internal string ScenarioHeading => textBlock_Scenario.Text;
+
+        /// <summary>What the primary action says. For a test to read.</summary>
+        internal string AcceptActionText => button_Accept.Content as string ?? string.Empty;
+
+        /// <summary>What the secondary action says. For a test to read.</summary>
+        internal string CancelActionText => button_Cancel.Content as string ?? string.Empty;
+
+        /// <summary>
+        /// Whether the primary action is the default button - it must not be, or Enter would start a TAS run.
+        /// And whether Cancel is the cancel button, so Esc declines. For a test to read.
+        /// </summary>
+        internal bool IsAcceptDefault => button_Accept.IsDefault;
+
+        /// <summary>Whether Esc presses Cancel. For a test to read.</summary>
+        internal bool IsCancelTheCancelButton => button_Cancel.IsCancel;
+
+        /// <summary>Presses Accept &amp; Run TAS, as a click would. For a test driving a shown dialog.</summary>
+        internal void PressAccept()
+        {
+            button_Accept.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        }
+
+        /// <summary>Presses Cancel, as a click would. For a test driving a shown dialog.</summary>
+        internal void PressCancel()
+        {
+            button_Cancel.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        }
+
+        /// <summary>Whether the equipment authority controls - Convert to Manual, Assign suggested, bulk - are drawn.</summary>
+        internal bool AreEquipmentControlsShown => stackPanel_Authority.Visibility == Visibility.Visible && grid_Bulk.Visibility == Visibility.Visible && grid_Assignment.Visibility == Visibility.Visible;
+
+        /// <summary>Whether the "no dwelling units" line stands in for the dwelling table.</summary>
+        internal bool IsNoEquipmentShown => textBlock_NoEquipment.Visibility == Visibility.Visible;
 
         /// <summary>What this window currently says about the selection authority. For a test to read.</summary>
         public string ModeDescription => textBlock_Mode.Text;
@@ -357,11 +495,10 @@ namespace SAM.Analytical.UI.WPF
         {
             partODiagnosticSummary = new PartODiagnosticSummary(notes, warnings, refusals);
 
-            label_Diagnostics.Content = partODiagnosticSummary.Header;
+            label_Diagnostics.Text = partODiagnosticSummary.Header;
 
             //Offered only where collapsing actually removed a line - and taken off the window entirely
             //otherwise, rather than left greyed.
-            checkBox_ShowEveryLine.Visibility = partODiagnosticSummary.IsGrouped ? Visibility.Visible : Visibility.Collapsed;
             checkBox_ShowEveryLine.IsEnabled = partODiagnosticSummary.IsGrouped;
 
             if (!partODiagnosticSummary.IsGrouped)
@@ -370,10 +507,51 @@ namespace SAM.Analytical.UI.WPF
             }
 
             UpdateDiagnosticsText();
+
+            //Collapsed by default - the counts say what there is - and open where the preparation REFUSED
+            //something: a refusal is not a note, and it is not left one click away.
+            ShowDiagnostics = partODiagnosticSummary.RefusalCount != 0;
         }
 
         /// <summary>What the diagnostics header says - the counts. For a test to read.</summary>
-        internal string DiagnosticsHeader => label_Diagnostics.Content as string ?? string.Empty;
+        internal string DiagnosticsHeader => label_Diagnostics.Text ?? string.Empty;
+
+        /// <summary>
+        /// Whether the diagnostics box is shown. False by default, true where anything was refused. Settable,
+        /// as the Show details switch sets it. Nothing is lost while it is false: the box still holds every
+        /// line, and Copy All copies every line either way.
+        /// </summary>
+        internal bool ShowDiagnostics
+        {
+            get
+            {
+                return checkBox_ShowDiagnostics.IsChecked ?? false;
+            }
+            set
+            {
+                checkBox_ShowDiagnostics.IsChecked = value;
+
+                UpdateDiagnosticsVisibility();
+            }
+        }
+
+        /// <summary>Whether the diagnostic lines are on screen. For a test to read.</summary>
+        internal bool IsDiagnosticsTextShown => textBox_Notes.Visibility == Visibility.Visible;
+
+        private void UpdateDiagnosticsVisibility()
+        {
+            bool show = checkBox_ShowDiagnostics.IsChecked ?? false;
+
+            textBox_Notes.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+            //"Show every line" only means something while the lines are shown.
+            checkBox_ShowEveryLine.Visibility = show && partODiagnosticSummary.IsGrouped ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void checkBox_ShowDiagnostics_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateDiagnosticsVisibility();
+        }
 
         /// <summary>What the diagnostics box is currently showing - grouped, or every line. For a test to read.</summary>
         internal string DiagnosticsText => textBox_Notes.Text;
@@ -410,7 +588,7 @@ namespace SAM.Analytical.UI.WPF
         /// greyed - wherever no two warnings were identical, which is every run of today's Part O
         /// warnings. Exposed so that is assertable rather than merely intended.
         /// </summary>
-        internal bool IsShowEveryLineOffered => checkBox_ShowEveryLine.Visibility == Visibility.Visible && checkBox_ShowEveryLine.IsEnabled;
+        internal bool IsShowEveryLineOffered => checkBox_ShowEveryLine.IsEnabled && checkBox_ShowEveryLine.Visibility == (ShowDiagnostics ? Visibility.Visible : Visibility.Collapsed);
 
         private void UpdateDiagnosticsText()
         {
@@ -432,6 +610,23 @@ namespace SAM.Analytical.UI.WPF
         private void UpdateEquipmentAvailability()
         {
             bool manual = partOEquipmentAssignmentSet?.IsManual ?? false;
+
+            //Drawn only where equipment selection is in play. On Iteration 1a and 1b none of these can ever
+            //apply, and four greyed controls invite a person to work out why. Their enable rules below are
+            //unchanged either way.
+            Visibility visibility_Authority = partOEquipmentAssignmentSet is null ? Visibility.Collapsed : Visibility.Visible;
+
+            stackPanel_Authority.Visibility = visibility_Authority;
+            grid_Assignment.Visibility = visibility_Authority;
+            grid_Bulk.Visibility = visibility_Authority;
+
+            //Iteration 1b builds no dwelling unit: a sentence instead of an empty ten-column table, and the
+            //row gives its height to the space table.
+            bool empty = equipmentRows.Count == 0 && partOEquipmentAssignmentSet is null;
+
+            dataGrid_Equipment.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
+            textBlock_NoEquipment.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+            rowDefinition_Equipment.Height = empty ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
 
             dataGrid_Equipment.IsReadOnly = !manual;
 
@@ -579,7 +774,7 @@ namespace SAM.Analytical.UI.WPF
         {
             StringBuilder stringBuilder = new();
 
-            stringBuilder.AppendLine(textBlock_Summary.Text);
+            stringBuilder.AppendLine(Summary);
             stringBuilder.AppendLine();
 
             stringBuilder.AppendLine("Dwelling\tUnit\tDesign SUP (l/s)\tDesign EXT (l/s)\tAssigned product\tMax SUP (l/s)\tMax EXT (l/s)\tSUP headroom (l/s)\tEXT headroom (l/s)\tStatus");
@@ -635,7 +830,12 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        private void button_OK_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// The window's only "yes" - "Accept &amp; Run TAS" or "Accept Preparation" by <see cref="Intent"/>. The
+        /// caller then does exactly what it did after OK: Prepare &amp; Run adopts and simulates, the Prepare
+        /// Iteration command adopts only. Only the name changed.
+        /// </summary>
+        private void button_Accept_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = true;
         }

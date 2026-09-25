@@ -258,9 +258,18 @@ namespace SAM.Analytical.UI.WPF
                 {
                     partOProgressHost.Start(0);
 
-                    if (!PreparePartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner))
+                    PartOPreparationResult partOPreparationResult = PrepareAndReviewPartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, ReviewIntent_PrepareAndRun, owner);
+
+                    if (partOPreparationResult == PartOPreparationResult.Declined)
                     {
-                        //Refused, declined or not adopted. Every one of those has already told the user why.
+                        //The engineer said no at the review. TAS is not reached, and the Hub says so rather
+                        //than coming back as though nothing had been asked.
+                        return DeclinedOutcome(iteration);
+                    }
+
+                    if (!ContinuesToSimulation(ReviewIntent_PrepareAndRun, partOPreparationResult))
+                    {
+                        //Refused or not adopted. Each of those has already told the user why.
                         return null;
                     }
                 }
@@ -334,6 +343,35 @@ namespace SAM.Analytical.UI.WPF
                     PartOProgressState.Format(elapsed_Simulation ?? partOSimulationOutcome.Elapsed),
                     tM59ComplianceStatus.HasValue ? " · TM59 " + Core.Query.Description(tM59ComplianceStatus.Value) : string.Empty,
                     partOSimulationOutcome.Notes.Count != 0 ? string.Format(" · {0} note(s) were shown", partOSimulationOutcome.Notes.Count) : string.Empty));
+        }
+
+        /// <summary>
+        /// The Hub's line after the engineer cancelled the Review iteration window: a deliberate decline before
+        /// any TAS work, which changed nothing. Not persisted - it is the Hub's last-outcome line, carried only
+        /// to the next showing of the Hub like every other outcome.
+        /// </summary>
+        /// <summary>
+        /// What Prepare &amp; Run's review promises: acceptance continues into TAS and TM59, which is what
+        /// this command does next.
+        /// </summary>
+        internal const PartOReviewIntent ReviewIntent_PrepareAndRun = PartOReviewIntent.PrepareAndRun;
+
+        /// <summary>
+        /// Whether a command goes on into the TAS simulation after its review: only a command whose intent is
+        /// to run, and only where the review was accepted and the model adopted. Prepare &amp; Run's gate before
+        /// <c>SimulatePartO</c>; the Prepare Iteration command has no simulation step at all, and this says why
+        /// it must never grow one to match a label.
+        /// </summary>
+        internal static bool ContinuesToSimulation(PartOReviewIntent partOReviewIntent, PartOPreparationResult partOPreparationResult)
+        {
+            return partOReviewIntent == PartOReviewIntent.PrepareAndRun && partOPreparationResult == PartOPreparationResult.Adopted;
+        }
+
+        internal static PartOWorkflowOutcome DeclinedOutcome(string? iteration)
+        {
+            return new PartOWorkflowOutcome(
+                PartOWorkflowOutcomeKind.Information,
+                string.Format("○ {0}: review cancelled before TAS · no simulation was run and the model is unchanged", string.IsNullOrWhiteSpace(iteration) ? "Part O iteration" : iteration));
         }
 
         /// <summary>

@@ -119,5 +119,29 @@ namespace SAM.Analytical.UI
                 return result;
             }
         }
+
+        /// <summary>
+        /// The scenario a base provision and an equipment intent describe, or null where none of
+        /// <see cref="Scenarios"/> does.
+        /// <para>
+        /// <b>Why a screen asks this rather than printing the option's text.</b> The option is the ENGINE
+        /// iteration, and Iteration 2 is Iteration 1a with the catalogue offered - so an Iteration 2 review
+        /// that printed <see cref="PartOVentilationStrategyOption.Text"/> headed itself "Iteration 1a". Matched
+        /// on the iteration and the route, never on text or instance, because
+        /// <see cref="PartOVentilationStrategyOption.Options"/> builds new instances on every read.
+        /// </para>
+        /// </summary>
+        public static PartOWorkflowScenario Find(PartOVentilationStrategyOption partOVentilationStrategyOption, bool selectVentilationUnit)
+        {
+            if (partOVentilationStrategyOption is null)
+            {
+                return null;
+            }
+
+            return Scenarios.Find(x => x.SelectVentilationUnit == selectVentilationUnit
+                && x.Option is not null
+                && x.Option.PartOIteration == partOVentilationStrategyOption.PartOIteration
+                && x.Option.PartOVentilationMode == partOVentilationStrategyOption.PartOVentilationMode);
+        }
     }
 }

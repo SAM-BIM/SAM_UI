@@ -515,6 +515,21 @@ namespace SAM.Analytical.UI
         {
             get
             {
+                return string.Format(
+                    "Equipment selection: {0}. {1} A product's maximum is its capability ceiling and is never a design airflow.",
+                    Core.Query.Description(EquipmentSelection.Mode),
+                    AssignmentSummary);
+            }
+        }
+
+        /// <summary>
+        /// The counts part of <see cref="Description"/> alone - how many dwellings are assigned and how many
+        /// have something an engineer needs to look at - for a screen that states the mode beside it.
+        /// </summary>
+        public string AssignmentSummary
+        {
+            get
+            {
                 int assigned = 0;
                 int insufficient = 0;
                 int unknown = 0;
@@ -573,10 +588,10 @@ namespace SAM.Analytical.UI
                 }
 
                 return string.Format(
-                    "Equipment selection: {0}. {1} of {2} dwelling(s) have a product assigned.{3} A product's maximum is its capability ceiling and is never a design airflow.",
-                    Core.Query.Description(EquipmentSelection.Mode),
+                    "{0} of {1} {2} a product assigned.{3}",
                     assigned,
-                    assignments.Count,
+                    Query.PartOCount(assignments.Count, "dwelling", "dwellings"),
+                    assigned == 1 ? "has" : "have",
                     descriptions.Count == 0 ? string.Empty : string.Format(" Of those, {0}.", string.Join("; ", descriptions)));
             }
         }
