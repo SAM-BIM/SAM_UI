@@ -92,7 +92,13 @@ namespace SAM.Analytical.UI.WPF
 
             return partOPreparationContext.PartOIteration switch
             {
-                PartOIteration.BasePassive => partOPreparationContext.HasVentilationUnitCatalogue ? "Iteration 2 — MVHR with manufacturer unit" : "Iteration 1a — baseline",
+                //As the run records it; a saved run from before that was recorded cannot tell 1a from 2.
+                PartOIteration.BasePassive => partOPreparationContext.VentilationUnitCatalogueOffered switch
+                {
+                    true => "Iteration 2 — MVHR with manufacturer unit",
+                    false => "Iteration 1a — baseline",
+                    null => "MVHR iteration (1a or 2, not recorded by this saved run)",
+                },
                 PartOIteration.BaseNaturalVentilation => "Iteration 1b — natural ventilation",
                 _ => Core.Query.Description(partOPreparationContext.PartOIteration),
             };

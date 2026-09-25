@@ -55,3 +55,36 @@ restored from the `cp -p` backup.
 
 The before captures are from the #113 and #114 live passes on the pre-change build (same models, same driver
 helpers).
+
+## Follow-up in the same PR: reopened runs named as the run they were
+
+A saved run's resume sidecar did not record whether a catalogue was offered. A resumed context carries no
+capacity descriptors, so every reopened MVHR run read as Iteration 1a. A reopened **Iteration 2** run was
+therefore called "Iteration 1a" by:
+- the TM59 window's Scenario fact;
+- Iteration 3's "Reference case".
+
+This was reproduced by a throwaway test on the unfixed code (expected "Iteration 2 …", got "Iteration 1a …").
+
+The sidecar is now `PartORunResume:v2` with `VentilationUnitCatalogueOffered`. v1 files still resume, but a v1 run is
+not named.
+
+Live re-run of the reopen flow on the same saved 1a smoke run. Its sidecar is v1, so this is the "cannot say" case:
+
+| | Before | After |
+|---|---|---|
+| TM59 window facts | Scenario "Iteration 1a — MVHR design duty (no manufacturer unit)" · Route MVHR · … | Scenario and Route omitted; Thermal model, Weather, Results, Report saved, Method unchanged |
+| Iteration 3 reference case | "Iteration 1a — baseline" | "MVHR iteration (1a or 2, not recorded by this saved run)" |
+| Verdict, counts, Hub lines | FAIL 8/2/6/1 | unchanged |
+
+- No TAS was started and no message boxes appeared.
+- The TM59 report kept the same SHA-256, and its time was restored.
+- The Iteration 3 files were untouched.
+
+A run completed on this build writes v2 and is named 1a or 2 exactly (`PartORunResumeNamingTests`, end to end
+through `PersistPartORunResume` and `Restore`).
+
+Screenshots:
+- `before-naming-tm59-v1-sidecar.png` (from the #114 pass);
+- `after-naming-tm59-v1-sidecar.png`;
+- `after-naming-hub-reopened-v1-sidecar.png` (the Iteration 3 reference line).

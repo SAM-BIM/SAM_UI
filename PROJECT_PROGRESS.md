@@ -53,7 +53,8 @@ Only the Hub calls the internal method, to word the 2B line.
 - The Iteration 3 lines only gained glyphs ("! Iteration 3 did not complete", "○ Opened the saved Iteration 3 result").
 
 **Validation.**
-- `SAM.Analytical.UI.WPF.Tests`: 1150/1150 (was 1129; +21 in `PartOHubOutcomeTests`). They cover:
+- `SAM.Analytical.UI.WPF.Tests`: 1155/1155 (was 1129; +21 in `PartOHubOutcomeTests`, +5 in `PartORunResumeNamingTests`).
+  The Hub outcome tests cover:
   - prepared not simulated; fresh run gives no line;
   - stale results (TSD deleted, through `Modify.Capabilities`); a reopened run is unnamed and has no verdict;
   - review cancelled; TAS cancelled held only while Prepared; not completed;
@@ -83,11 +84,30 @@ Only the Hub calls the internal method, to word the 2B line.
 - Live: completed PASS/FAIL after Prepare & Run, TAS cancel, 2B outcomes and stale results need TAS to produce, so
   they are unit-tested only.
 
-**Found, not fixed (recorded for later passes).**
-- The TM59 result window's "Scenario" fact (`PartOTM59ResultSummary.RunFacts` -> `PartOWorkflowScenario.Find(PreparationContext)`)
-  likely names a reopened+resumed Iteration 2 run "Iteration 1a". `PartORun.TryResume` builds the context with no
-  capacity descriptors, so `HasVentilationUnitCatalogue` is false. Not verified live (no saved Iteration 2 run).
-  The Hub line avoids it by not naming reopened runs.
+**Follow-up in the same PR (owner asked for it to be fixed before merge): reopened runs named correctly.**
+- The bug: `PartORun.TryResume` built the resumed context with no descriptors, so `HasVentilationUnitCatalogue` was
+  false. `PartOWorkflowScenario.Find` then named a reopened Iteration 2 run "Iteration 1a" in two places:
+  - the TM59 window's Scenario fact (`RunFacts`);
+  - Iteration 3's reference case (`Query.PartOIterationText`).
+  - It was reproduced on the unfixed code by a throwaway test.
+- The fix:
+  - The sidecar is now `PartORunResume:v2` with `VentilationUnitCatalogueOffered`. `Read` still accepts
+    `Schema_V1`, where the value is null.
+  - `PersistPartORunResume` writes it.
+  - `PartOPreparationContext.Resumed(...)` records `IsResumed` and the saved value.
+  - `VentilationUnitCatalogueOffered` (bool?) is the naming answer: descriptors on a live preparation, the saved
+    value on a resumed one.
+  - `Find` returns null and `PartOIterationText` says "MVHR iteration (1a or 2, not recorded by this saved run)"
+    where it is null. No guessing.
+  - `HasVentilationUnitCatalogue` and the descriptors are unchanged, so 2B gating and engineering are unaffected.
+- Tests: `PartORunResumeNamingTests` (+5): end to end, Iteration 2 and Iteration 1a reopen named exactly; a v1
+  sidecar resumes unnamed; the v2 round-trip; live contexts unchanged.
+- Live: the saved 1a smoke run has a v1 sidecar.
+  - The TM59 window now omits Scenario/Route; everything else is unchanged.
+  - The Iteration 3 reference reads the "1a or 2" text.
+  - Hub lines unchanged, report SHA-256 unchanged and its time restored.
+- The Hub line still does not name reopened runs ("Saved results reopened"). With v2 sidecars it could; that is left
+  for a later pass.
 - Progress-dialog pass: 2B still opens a generic progress window per round (`OptimisePartOTM59.cs`); the ribbon
   Review Results route still uses `ProgressBarWindowManager` (M5).
 - 2B pass (H4): the 2B choice is still made before preparing. This pass only adds the Hub line after 2B.

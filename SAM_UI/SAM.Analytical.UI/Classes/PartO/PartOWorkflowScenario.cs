@@ -172,12 +172,15 @@ namespace SAM.Analytical.UI
         /// </summary>
         public static PartOWorkflowScenario Find(PartOPreparationContext partOPreparationContext)
         {
-            if (partOPreparationContext is null)
+            //Whether a catalogue was offered, as the run records it. A resumed run whose saved record cannot say
+            //is not named: without it, Iteration 2 would read as Iteration 1a.
+            bool? catalogueOffered = partOPreparationContext?.VentilationUnitCatalogueOffered;
+            if (catalogueOffered is null)
             {
                 return null;
             }
 
-            return Scenarios.Find(x => x.SelectVentilationUnit == partOPreparationContext.HasVentilationUnitCatalogue
+            return Scenarios.Find(x => x.SelectVentilationUnit == catalogueOffered.Value
                 && x.Option is not null
                 && x.Option.PartOIteration == partOPreparationContext.PartOIteration);
         }
