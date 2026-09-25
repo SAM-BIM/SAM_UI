@@ -1,9 +1,88 @@
 # Project Progress
 
-## Current: Part O UX pass 1 - Review iteration window (25 Sep 2026) - PR open, NOT merged
+## Current: Part O UX pass 2 - TM59 / Overheating result window (25 Sep 2026) - MERGED
 
-**Status.** Implemented on `feature/parto-review-iteration-2026-09-25` (from `sow/2026-Q3` `a3b38ee`), PR against
-`sow/2026-Q3`. Stopped before merge by owner brief. SAM_UI only. This is proposal item 1 of the journey review (H1, H2,
+**Status.** MERGED into `sow/2026-Q3` as SAM-BIM/SAM_UI#114, on the owner's merge order:
+1. SAM-BIM/SAM#137 merged first (`7dbeb2e4`).
+2. Local SAM `sow/2026-Q3` updated to it and rebuilt.
+3. #114 re-checked against that merged SAM build: clean `SAM_UI.sln` Rebuild, 0 errors; focused TM59 tests 85/85;
+   full WPF suite 1129/1129; the test binaries carry the merged `SAM.Analytical.dll`.
+4. #114 merged.
+
+Branched from `sow/2026-Q3` `d123f3d` (#113 merged). SAM_UI only. This is proposal item 2 of the journey
+review (H3, m4, m5). M5, Review Results progress, is **not** in it: the Hub route already reports into the progress host.
+
+The session started with 30 staged changes that exactly reverted #113 (an accident). The owner confirmed they should
+be discarded, and they were (`git restore --staged --worktree :/`) before branching.
+
+**Authority seam.** Nothing is parsed out of text and no TM59 rule is restated.
+- Verdict: SAM's `TM59AssessmentReport.OccupiedSpaceComplianceStatus`. A pass goes through the existing
+  `Modify.PartialAssessment` guard, the one 2B stops on: a pass over part of the dwelling scope becomes NOT ASSESSED
+  with that guard's own sentence. A failure stays FAIL.
+- Counts (**owner correction, round 2**): SAM_UI only TALLIES SAM's new structured per-space status,
+  `TM59AssessmentReport.OccupiedSpaces[].ComplianceStatus` (SAM-BIM/SAM#137, same branch name). It is the value the
+  report's "Overall" column prints; the formatter now reads it too, so the combining rule exists once, in SAM. SAM_UI
+  holds no per-space rule.
+- Not assessed: new additive `PartOTM59Assessment.SpaceGuids_NoResult`, the design spaces with no TM59 result of any
+  kind, computed in `Assess`'s existing design-space loop. It counts spaces, not reason sentences. It decides nothing:
+  `SpaceGuids_Unassessed` is still what a pass is guarded on.
+- Corridor and supplementary >28 C rows are context facts (risk / information only), never an occupied-space pass or fail.
+- One state, two readers. `Modify.ReviewPartOTM59` builds the summary from the assessment BEFORE any window exists.
+  `Modify.ResultWindow` gives the window that instance, and the Hub's line (`Modify.ReviewOutcome`,
+  `Modify.TM59OutcomeSuffix`) is worded from the same instance. Nothing is read back off the window.
+
+**What changed.**
+- `PartOTM59ResultSummary` (new, Classes/PartO) and `PartOTM59Verdict` (new enum: Unavailable / NotAssessed / Pass /
+  Fail), each with a glyph (✓ ✕ – !) and a word.
+  - Heading: "TM59 assessment — FAIL". Counts line: "8 spaces assessed · 2 pass · 6 fail · 1 not assessed".
+  - Reason: shown only where there is no verdict.
+  - Caveat: the formatter's own `Caveat`.
+  - Facts: Scenario, Route, Thermal model, Weather, Results, Report saved, Method. A fact the run does not hold is omitted.
+- `PartOTM59ResultWindow` layout:
+  1. verdict band;
+  2. facts;
+  3. a "Not assessed · N reasons" bar, collapsed behind Show details (opens itself only when there is no verdict);
+  4. "Detailed report", the verbatim production text;
+  5. Copy All / Close.
+  It merges `PartOStyles.xaml` and uses `KeepOnScreen`. `CopyAllText` is a seam.
+- `Modify.ReviewPartOTM59` (internal) returns the summary. Public `AssessPartOTM59` is a wrapper with the same return
+  (the production status or null). A gate refusal, or an assessment that produced nothing, now opens the window as
+  UNAVAILABLE with the reason; before, it was a message box.
+- Hub lines (`RunPartOWorkflow`) use `summary.VerdictWord`: Pass/Fail wording unchanged, plus "Not assessed" /
+  "Unavailable" as a Warning.
+- `PartOWorkflowScenario.Find(PartOPreparationContext)`: a run named as the Hub names it (iteration + catalogue offered).
+- `Query.PartOThermalModelScopeText`: the one scope spelling. The Review window's `Modify.Summary` now calls it too.
+
+**Validation.**
+- `SAM.Analytical.UI.WPF.Tests`: 1129/1129 (was 1105; +24 in `PartOTM59ResultTests`). Round 2 added:
+  - counts are a tally of `OccupiedSpaces`: a bedroom that passes C1 and fails C2 counts as one failing space;
+  - the Hub and the window read one summary instance and cannot disagree, a 4-verdict theory;
+  - no run gives no Hub line.
+- SAM (#137): `SAM.Tests` 2368/2368 (+7), including that Overall equals the structured status. SAM_Tas TM59 tests
+  944/944 against it.
+- Round 2 live re-run on the saved FAIL run: the UI was unchanged, and the report was byte-identical again.
+- `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): 0 errors. `git diff --check` clean.
+- Live, real exe, reopened 1a smoke run, no TAS (Hub > Review Results, and the ribbon): FAIL, 8/2/6/1 matching the
+  report, 0 message boxes, Hub line unchanged. The TM59 report it rewrote was byte-identical (same SHA-256) and its time
+  was restored. Record and screenshots: `documentation/evidence/parto-tm59-result-ux/LIVE-ACCEPTANCE-2026-09-25.md`.
+  Driver outside git: `C:\TasOut\parto-tm59-result-ux-2026-09-25\scripts\tm59.ps1`.
+
+**Known / not done.**
+- PASS, NOT ASSESSED and UNAVAILABLE were tested by unit tests only; no saved run produces them without TAS.
+- M5 (Review Results progress on the ribbon route) is still the old `ProgressBarWindowManager`.
+- `Modify.PartialAssessment`'s sentence still says "space(s)" (the m1 sweep).
+
+**Local build dependency.** SAM_UI builds against `..\SAM\build` (HintPath), so it needs SAM `sow/2026-Q3` at or after
+`7dbeb2e4` (#137) for `TM59AssessmentReport.OccupiedSpaces`. Build SAM before SAM_UI. `SAM.sln`'s build also refreshes `%APPDATA%\SAM`.
+
+**Next step.** Move SAM_Deploy's SAM pointer to `7dbeb2e4` and its SAM_UI pointer to the #114 merge commit. Then
+proposal item 3: 2B in the Part O language (H4). It needs one short TAS acceptance run; ask first. Proposal item 3 next: 2B in the
+Part O language (H4). It needs one short TAS acceptance run; ask first.
+
+## Previous: Part O UX pass 1 - Review iteration window (25 Sep 2026) - MERGED
+
+**Status.** MERGED into `sow/2026-Q3` as SAM-BIM/SAM_UI#113 -> merge commit `d123f3d`. Implemented on
+`feature/parto-review-iteration-2026-09-25` (from `sow/2026-Q3` `a3b38ee`). SAM_UI only. This is proposal item 1 of the journey review (H1, H2,
 M1-M3). Presentation plus one return value: no change to preparation, engineering quantities, validation, blockers,
 provenance, model mutation, or what happens after acceptance.
 
@@ -60,8 +139,7 @@ provenance, model mutation, or what happens after acceptance.
 - Safe positioning not forced live; isolated scope and refusals only unit-tested; non-100% DPI not tested.
 - Catalogue description still says "product(s)" (other windows share it) - consistency sweep item.
 
-**Next step.** Owner reviews the PR after the round-2 push (Codex will review it). After merge, move SAM_Deploy's SAM_UI pointer.
-Proposal item 2 next: TM59 summary band + Review Results progress (H3, M5, m4, m5).
+**Next step.** Done: merged as `d123f3d`. Proposal item 2 (TM59 result) is the Current entry above.
 
 ## Previous: Part O journey review - observe only (25 Sep 2026)
 

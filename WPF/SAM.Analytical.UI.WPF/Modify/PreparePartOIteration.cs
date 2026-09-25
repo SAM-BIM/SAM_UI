@@ -796,15 +796,8 @@ namespace SAM.Analytical.UI.WPF
             //whole building - the interfaces to the dwellings left out are simulated as adiabatic - and a
             //person reading these results later has to be told that without having to go looking for it, so
             //the consequence is shown, not tooltipped.
-            bool isolated = partOIsolationContext is not null && partOIsolationContext.IsValid;
-
-            string scope = isolated
-                ? string.Format("Isolated · selected dwellings: {0}", string.Join(", ", partOIsolationContext!.Names_Dwelling))
-                : "Whole building";
-
-            string? scopeDetail = isolated
-                ? "Interfaces to excluded spaces are simulated as adiabatic and surrounding external geometry is retained as shading context, so these results may differ from a whole-building simulation of the same dwellings. The Part O criteria and the Part F requirements are unchanged."
-                : null;
+            //The one spelling the TM59 result window heads the same run's results with.
+            string scope = Query.PartOThermalModelScopeText(partOIsolationContext, out string? scopeDetail);
 
             //ONE route word, not the settled mode followed by the canonical word in brackets - which on
             //the mechanical route printed the literal reading "MVHR (MVHR)". Query.PartOVentilationRouteText

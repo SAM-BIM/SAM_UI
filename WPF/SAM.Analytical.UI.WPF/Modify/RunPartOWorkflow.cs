@@ -177,10 +177,8 @@ namespace SAM.Analytical.UI.WPF
                         break;
 
                     case PartOWorkflowAction.ReviewResults:
-                        TM59ComplianceStatus? tM59ComplianceStatus = AssessPartOTM59(partORun, owner);
-                        partOWorkflowOutcome = tM59ComplianceStatus.HasValue
-                            ? new PartOWorkflowOutcome(PartOWorkflowOutcomeKind.Information, string.Format("Reviewed the TM59 results · {0} · no simulation was run", Core.Query.Description(tM59ComplianceStatus.Value)))
-                            : null;
+                        //The same summary instance the result window was given - see ReviewOutcome.
+                        partOWorkflowOutcome = ReviewOutcome(ReviewPartOTM59(partORun, owner));
                         break;
 
                     case PartOWorkflowAction.Optimise:
@@ -240,7 +238,7 @@ namespace SAM.Analytical.UI.WPF
             bool reuse = ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, partOWorkflowInspection?.ReusePreparation ?? false);
 
             PartOSimulationOutcome partOSimulationOutcome;
-            TM59ComplianceStatus? tM59ComplianceStatus = null;
+            PartOTM59ResultSummary? partOTM59ResultSummary = null;
             TimeSpan? elapsed_Simulation;
 
             //ONE progress window for the whole of Prepare & Run. It stands aside for the review of the
@@ -321,7 +319,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     partOProgressHost.Start(2);
 
-                    tM59ComplianceStatus = AssessPartOTM59(partORun, owner);
+                    partOTM59ResultSummary = ReviewPartOTM59(partORun, owner);
                 }
             }
 
@@ -336,13 +334,37 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return new PartOWorkflowOutcome(
-                partOSimulationOutcome.NeedsAttention ? PartOWorkflowOutcomeKind.Warning : PartOWorkflowOutcomeKind.Success,
+                partOSimulationOutcome.NeedsAttention || (partOTM59ResultSummary is not null && !partOTM59ResultSummary.HasVerdict) ? PartOWorkflowOutcomeKind.Warning : PartOWorkflowOutcomeKind.Success,
                 string.Format(
                     "✓ {0} complete · TAS simulation {1}{2}{3}",
                     iteration,
                     PartOProgressState.Format(elapsed_Simulation ?? partOSimulationOutcome.Elapsed),
-                    tM59ComplianceStatus.HasValue ? " · TM59 " + Core.Query.Description(tM59ComplianceStatus.Value) : string.Empty,
+                    TM59OutcomeSuffix(partOTM59ResultSummary),
                     partOSimulationOutcome.Notes.Count != 0 ? string.Format(" · {0} note(s) were shown", partOSimulationOutcome.Notes.Count) : string.Empty));
+        }
+
+        /// <summary>
+        /// The Hub's line after Review Results, worded from the <see cref="PartOTM59ResultSummary"/> that
+        /// <see cref="ReviewPartOTM59"/> built from the assessment and handed to the result window. The Hub never
+        /// reads the window: both are readers of that one object, so they cannot disagree about the verdict.
+        /// Null where there was no run to review.
+        /// </summary>
+        internal static PartOWorkflowOutcome? ReviewOutcome(PartOTM59ResultSummary? partOTM59ResultSummary)
+        {
+            if (partOTM59ResultSummary is null)
+            {
+                return null;
+            }
+
+            return new PartOWorkflowOutcome(
+                partOTM59ResultSummary.HasVerdict ? PartOWorkflowOutcomeKind.Information : PartOWorkflowOutcomeKind.Warning,
+                string.Format("Reviewed the TM59 results · {0} · no simulation was run", partOTM59ResultSummary.VerdictWord));
+        }
+
+        /// <summary>The " · TM59 Fail" part of Prepare &amp; Run's closing line, from the same summary.</summary>
+        internal static string TM59OutcomeSuffix(PartOTM59ResultSummary? partOTM59ResultSummary)
+        {
+            return partOTM59ResultSummary is null ? string.Empty : " · TM59 " + partOTM59ResultSummary.VerdictWord;
         }
 
         /// <summary>

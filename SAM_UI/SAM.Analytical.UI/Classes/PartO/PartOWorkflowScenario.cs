@@ -143,5 +143,24 @@ namespace SAM.Analytical.UI
                 && x.Option.PartOIteration == partOVentilationStrategyOption.PartOIteration
                 && x.Option.PartOVentilationMode == partOVentilationStrategyOption.PartOVentilationMode);
         }
+
+        /// <summary>
+        /// The scenario a prepared run is, from its own record - the base provision it was prepared over and
+        /// whether a catalogue was offered - or null where none of <see cref="Scenarios"/> describes it. The
+        /// same two facts the Hub's reuse check matches a run on
+        /// (<c>PartOWorkflowInspection.ReusePreparation</c>), so a results screen names the run exactly as the
+        /// Hub would.
+        /// </summary>
+        public static PartOWorkflowScenario Find(PartOPreparationContext partOPreparationContext)
+        {
+            if (partOPreparationContext is null)
+            {
+                return null;
+            }
+
+            return Scenarios.Find(x => x.SelectVentilationUnit == partOPreparationContext.HasVentilationUnitCatalogue
+                && x.Option is not null
+                && x.Option.PartOIteration == partOPreparationContext.PartOIteration);
+        }
     }
 }
