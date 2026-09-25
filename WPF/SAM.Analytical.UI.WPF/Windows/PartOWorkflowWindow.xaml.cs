@@ -173,6 +173,8 @@ namespace SAM.Analytical.UI.WPF
         {
             InitializeComponent();
 
+            InitialiseIteration3();
+
             //The ceiling the auto-sizing gives way to the scroller at. Read from the work area, so an
             //enlarged system font or a small screen degrades to scrolling with the buttons reachable.
             MaxHeight = SystemParameters.WorkArea.Height * 0.92;
@@ -993,6 +995,14 @@ namespace SAM.Analytical.UI.WPF
                 reasons.Add(string.Format("Iteration 2B is ticked, but its settings cannot be used: {0} Correct them, or untick Iteration 2B to run the baseline without it.", refusal_Optimisation));
             }
 
+            //The Simulation case is a workflow input like the 2B settings: typed here, checked here - the
+            //same checks the Simulate dialog's OK made - and never a statement about the building.
+            string? refusal_SimulationCase = SimulationCaseRefusal;
+            if (refusal_SimulationCase is not null)
+            {
+                reasons.Add(string.Format("Simulation case: {0}", refusal_SimulationCase));
+            }
+
             bool canRun = reasons.Count == 0;
 
             textBlock_Blockers.Text = canRun
@@ -1016,16 +1026,9 @@ namespace SAM.Analytical.UI.WPF
                 ? "Raise the design airflow of failing mechanically ventilated rooms by the configured step, rebalance, re-prepare, re-simulate the same weather case and reassess. The selected product is never changed."
                 : partOWorkflowInspection.OptimisationRefusal ?? "Iteration 2B optimises a completed Iteration 2 run.";
 
-            //Read off the capabilities the caller gathered once, not re-derived here - the eligibility
-            //authority touches the filesystem (it looks for the pairing record) and a status list rebuilt
-            //on every keystroke must not.
-            button_Iteration3.IsEnabled = partOWorkflowCapabilities.Iteration3Available;
-            button_Iteration3.Content = partOWorkflowCapabilities.Iteration3Review ? "Review It. 3 (A/B)" : "Iteration 3 (A/B)";
-            button_Iteration3.ToolTip = partOWorkflowCapabilities.Iteration3Available
-                ? (partOWorkflowCapabilities.Iteration3Review
-                    ? "Reopen the Approved Document O Iteration 3 A/B pairing recorded for this run and rebuild its comparison from the existing results. No TAS simulation is run."
-                    : "Run the explicit TAS Systems ventilation route against this Iteration 1a reference and compare the two through the same CIBSE TM59 assessment. This runs TAS twice and takes a long time.")
-                : partOWorkflowCapabilities.Iteration3Refusal ?? "Iteration 3 compares a completed Iteration 1a run against the explicit TAS Systems route.";
+            //The Iteration 3 panel's own actions, from the eligibility the caller gathered once - it touches
+            //the filesystem (it looks for saved results), and a status list rebuilt on every keystroke must not.
+            RefreshIteration3();
         }
 
         /// <summary>

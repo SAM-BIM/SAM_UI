@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Part O — Prepare &amp; Run" MinHeight="520" MinWidth="700" Width="760"
+        xmlns:WPF="clr-namespace:SAM.Core.UI.WPF;assembly=SAM.Core.UI.WPF"
+        Title="Part O — Prepare &amp; Run" MinHeight="520" MinWidth="700" Width="800"
         SizeToContent="Height" ResizeMode="CanResizeWithGrip" FontFamily="Roboto Light">
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -18,6 +19,8 @@
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -127,7 +130,47 @@
                     </StackPanel>
                 </Expander>
 
-                <Label Grid.Row="8" Content="Status" Padding="0,0,0,2" Margin="0,12,0,0"/>
+                <!-- SIMULATION CASE: the three inputs of the full-year TAS run a person owns - weather, output
+                     folder, solar method - which used to be the only editable fields of a separate, mostly
+                     greyed-out Simulate dialog. Everything else about the case is fixed by
+                     Create.SimulateOptions_PartO exactly as that dialog fixed it; see Modify.SimulatePartO.
+                     Collapsed, with its current values in the header, because they rarely change. -->
+                <Expander x:Name="expander_SimulationCase" Grid.Row="8" Margin="0,12,0,0">
+                    <Expander.Header>
+                        <TextBlock>
+                            <Run Text="Simulation case"/>
+                            <Run x:Name="run_SimulationCaseSummary" Foreground="#666666"/>
+                        </TextBlock>
+                    </Expander.Header>
+                    <Grid Margin="18,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Weather" VerticalAlignment="Center"/>
+                        <WPF:SelectSAMObjectComboBoxControl x:Name="selectSAMObjectComboBoxControl_Weather" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Height="22"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Output folder" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox x:Name="textBox_OutputDirectory" Grid.Row="1" Grid.Column="1" Height="22" Margin="0,6,6,0" VerticalContentAlignment="Center"/>
+                        <Button x:Name="button_OutputDirectory" Grid.Row="1" Grid.Column="2" Content="…" Width="30" Height="22" Margin="0,6,0,0"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Solar calculation" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <ComboBox x:Name="comboBox_SolarCalculationMethod" Grid.Row="2" Grid.Column="1" Width="160" Height="22" Margin="0,6,0,0" HorizontalAlignment="Left"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#777777" FontSize="11"
+                                   Text="The rest of the case is fixed for Part O: a full-year simulation over days 1 to 365, no sizing, no exports, and the project name taken from the prepared model."/>
+                    </Grid>
+                </Expander>
+
+                <Label Grid.Row="9" Content="Status" Padding="0,0,0,2" Margin="0,12,0,0"/>
 
                 <!-- WHAT EXISTS, WHAT WILL BE REUSED, WHAT WILL CHANGE, WHAT BLOCKS RUN - one line each,
                      every one of them produced by PartOWorkflowInspection from an existing authority.
@@ -142,7 +185,15 @@
 
                      One line per row, with the inspection's complete sentence on the tooltip and behind the
                      row's own disclosure - nothing is shortened away. -->
-                <ItemsControl x:Name="itemsControl_Status" Grid.Row="9">
+                <StackPanel Grid.Row="10">
+                <!-- What the last action did, said inline - in place of the "Time elapsed ... OK" message box a
+                     successful run used to end with. A warning or a refusal is still shown as a dialog by the
+                     action itself; this line is the record of it. -->
+                <Border x:Name="border_LastOutcome" Visibility="Collapsed" Padding="8,5" Margin="0,0,0,8" CornerRadius="3" BorderThickness="1">
+                    <TextBlock x:Name="textBlock_LastOutcome" TextWrapping="Wrap"/>
+                </Border>
+
+                <ItemsControl x:Name="itemsControl_Status">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,0,0,8">
@@ -175,10 +226,69 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                </StackPanel>
 
-                <TextBlock x:Name="textBlock_Blockers" Grid.Row="10" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
+                <TextBlock x:Name="textBlock_Blockers" Grid.Row="11" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
 
-                <TextBlock x:Name="textBlock_Advanced" Grid.Row="11" Margin="0,10,0,10" TextWrapping="Wrap" Foreground="#777777"
+                <!-- ITERATION 3, in the engineer's terms: an earlier iteration as the reference case, and a
+                     system case that runs the dwellings' ventilation as an explicit TAS system. One method is
+                     chosen; the product methods come first and the two validation methods sit under Advanced.
+                     Whether a method already has a completed result, and what the method would change, is said
+                     BEFORE anything runs - the pre-flight is the run's own resolution step, with no TAS. How the
+                     results are stored is never shown. -->
+                <Border Grid.Row="12" Margin="0,14,0,0" Padding="10,8" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="3">
+                    <StackPanel>
+                        <TextBlock Text="Iteration 3 — explicit system and cooling assessment" FontWeight="SemiBold" FontSize="13"/>
+                        <TextBlock x:Name="textBlock_It3Reference" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#444444"/>
+
+                        <StackPanel x:Name="stackPanel_It3" Margin="0,8,0,0">
+                            <TextBlock Text="System case" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                            <StackPanel x:Name="stackPanel_It3Methods"/>
+                            <Expander x:Name="expander_It3Advanced" Header="Advanced — validation methods" Margin="0,4,0,0" FontSize="11">
+                                <StackPanel x:Name="stackPanel_It3MethodsAdvanced" Margin="0,4,0,0"/>
+                            </Expander>
+
+                            <TextBlock x:Name="textBlock_It3Explanation" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#555555"/>
+
+                            <TextBlock x:Name="textBlock_It3UnitsHeading" Margin="0,8,0,2" FontWeight="SemiBold"/>
+                            <ItemsControl x:Name="itemsControl_It3Summary" Margin="10,0,0,0"/>
+                            <Expander x:Name="expander_It3Units" Margin="10,2,0,0" FontSize="11">
+                                <ListBox x:Name="listBox_It3Units" MaxHeight="160" Margin="0,4,0,0"
+                                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="150"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="80"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Product}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Refusal}"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding StatusText}" ToolTip="{Binding Refusal}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Expander>
+                            <TextBlock x:Name="textBlock_It3Refusal" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
+
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="textBlock_It3Hint" Grid.Column="0" TextWrapping="Wrap" Foreground="#555555" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="button_It3Review" MinWidth="120" Height="24" Padding="8,0" Margin="0,0,8,0" Click="button_It3Review_Click" ToolTipService.ShowOnDisabled="True">Open result</Button>
+                                    <Button x:Name="button_Iteration3" MinWidth="140" Height="24" Padding="8,0" IsEnabled="False" Click="button_Iteration3_Click" ToolTipService.ShowOnDisabled="True">Run system case</Button>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock x:Name="textBlock_Advanced" Grid.Row="13" Margin="0,10,0,10" TextWrapping="Wrap" Foreground="#777777"
                            Text="The individual Part O commands remain available: Edit - Map IC (TM59), AddVent PartF and Prepare Iteration, Simulate - Energy Simulation, and Results - Overheating (TM59) and Optimise (2B)."
                            ToolTip="Iteration 1a — MVHR design duty (no manufacturer unit)&#x0a;Iteration 1b — Natural ventilation (no mechanical system)&#x0a;Iteration 2 — MVHR with manufacturer unit&#x0a;Iteration 2B — TM59 optimisation"/>
             </Grid>
@@ -192,11 +302,7 @@
                         ToolTipService.ShowOnDisabled="True">Review Results</Button>
                 <Button x:Name="button_Optimise" Width="120" Height="24" Margin="0,0,8,0" IsEnabled="False" Click="button_Optimise_Click"
                         ToolTipService.ShowOnDisabled="True">Optimise (2B)</Button>
-                <!-- ONE action, not two. Whether it runs a Candidate B or reopens the pairing this run
-                     already produced is decided by Query.PartOIteration3Eligibility, and the content and
-                     the tooltip say which - two greyed buttons would make a person work that out. -->
-                <Button x:Name="button_Iteration3" Width="130" Height="24" IsEnabled="False" Click="button_Iteration3_Click"
-                        ToolTipService.ShowOnDisabled="True">Iteration 3 (A/B)</Button>
+                <!-- Iteration 3 has its own panel above, with its own two actions. -->
             </StackPanel>
             <Button x:Name="button_Close" IsCancel="True" Width="70" Height="24" HorizontalAlignment="Right" Click="button_Close_Click">Close</Button>
         </Grid>

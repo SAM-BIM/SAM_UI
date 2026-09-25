@@ -92,6 +92,8 @@ namespace SAM.Analytical.UI
 
         private readonly List<PartOIteration3CoolingEvidence> cooling = [];
 
+        private readonly List<PartOIteration3GuidanceEvidence> guidance = [];
+
         public PartOIteration3Record()
         {
         }
@@ -175,6 +177,13 @@ namespace SAM.Analytical.UI
         /// cooling module resolved for it and what its recirculation branch did. Empty in every other mode.
         /// </summary>
         public List<PartOIteration3CoolingEvidence> Cooling => [.. cooling];
+
+        /// <summary>
+        /// SAM#123: one row per scoped air handling unit in manufacturer-guidance mode - the guidance as it was
+        /// resolved, as fields, for presentation. Empty in every other mode and on every record written before
+        /// it existed; see <see cref="PartOIteration3GuidanceEvidence"/>.
+        /// </summary>
+        public List<PartOIteration3GuidanceEvidence> Guidance => [.. guidance];
 
         //---------------------------------------------------------------------------------------------
         //Scope - SAM #114
@@ -289,6 +298,14 @@ namespace SAM.Analytical.UI
             }
         }
 
+        public void Add(PartOIteration3GuidanceEvidence partOIteration3GuidanceEvidence)
+        {
+            if (partOIteration3GuidanceEvidence is not null)
+            {
+                guidance.Add(partOIteration3GuidanceEvidence);
+            }
+        }
+
         public void AddPreparedSystems(IEnumerable<Guid> guids)
         {
             foreach (Guid guid in guids ?? [])
@@ -398,6 +415,12 @@ namespace SAM.Analytical.UI
                 jsonArray_Cooling.Add(partOIteration3CoolingEvidence.ToJsonObject());
             }
 
+            JsonArray jsonArray_Guidance = [];
+            foreach (PartOIteration3GuidanceEvidence partOIteration3GuidanceEvidence in guidance)
+            {
+                jsonArray_Guidance.Add(partOIteration3GuidanceEvidence.ToJsonObject());
+            }
+
             return new JsonObject
             {
                 { "Schema", Schema },
@@ -417,6 +440,7 @@ namespace SAM.Analytical.UI
                 { "Sha256_VentilationUnitCatalogue", Sha256_VentilationUnitCatalogue },
                 { "Equipment", jsonArray_Equipment },
                 { "Cooling", jsonArray_Cooling },
+                { "Guidance", jsonArray_Guidance },
                 { "Guids_VentilationSystem_Prepared", PartOIteration3Json.Array(guids_VentilationSystem_Prepared) },
                 { "Guids_VentilationSystem_ScopedOut", PartOIteration3Json.Array(guids_VentilationSystem_ScopedOut) },
                 { "Notes_Scope", PartOIteration3Json.Array(notes_Scope) },
@@ -515,6 +539,12 @@ namespace SAM.Analytical.UI
             foreach (JsonObject jsonObject_Cooling in PartOIteration3Json.Objects(jsonObject, "Cooling"))
             {
                 result.Add(PartOIteration3CoolingEvidence.FromJsonObject(jsonObject_Cooling));
+            }
+
+            //SAM#123 presentation: absent on every record written before it existed, which reads as none.
+            foreach (JsonObject jsonObject_Guidance in PartOIteration3Json.Objects(jsonObject, "Guidance"))
+            {
+                result.Add(PartOIteration3GuidanceEvidence.FromJsonObject(jsonObject_Guidance));
             }
 
             foreach (JsonObject jsonObject_Stage in PartOIteration3Json.Objects(jsonObject, "Stages"))

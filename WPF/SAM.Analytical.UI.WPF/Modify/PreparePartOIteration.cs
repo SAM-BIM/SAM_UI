@@ -240,6 +240,8 @@ namespace SAM.Analytical.UI.WPF
             {
                 partORun.Invalidate(partOIterationPreparation.Refusal);
 
+                PartOProgressHost.Current?.Hide();
+
                 MessageBox.Show(string.Format("The Part O iteration was not prepared.\n\n{0}", partOIterationPreparation.Refusal));
 
                 return false;
@@ -304,7 +306,14 @@ namespace SAM.Analytical.UI.WPF
                 new System.Windows.Interop.WindowInteropHelper(partOPreparationWindow).Owner = owner.Handle;
             }
 
+            //The engineer's decision. The Part O progress window, where one is up, stands aside for it and
+            //comes back for what follows.
+            PartOProgressHost.Current?.Hide();
+
             bool? showDialog_Preparation = partOPreparationWindow.ShowDialog();
+
+            PartOProgressHost.Current?.Show();
+
             if (showDialog_Preparation is null || !showDialog_Preparation.Value)
             {
                 //Declined. The loaded model is untouched - the preparation worked on a copy - and no run is
@@ -320,6 +329,8 @@ namespace SAM.Analytical.UI.WPF
             {
                 if (!partOEquipmentAssignmentSet.Commit(adjacencyCluster_Prepared, out List<string> notes_Commit, out List<string> refusals_Commit))
                 {
+                    PartOProgressHost.Current?.Hide();
+
                     MessageBox.Show(string.Format("The equipment assignments were not applied, so the prepared model was not adopted.\n\n{0}", string.Join("\n\n", refusals_Commit)));
 
                     return false;
@@ -362,6 +373,8 @@ namespace SAM.Analytical.UI.WPF
 
             if (!AdoptPartOPreparation(partORun, analyticalModel_Prepared, partOIterationPreparation, partOPreparationContext))
             {
+                PartOProgressHost.Current?.Hide();
+
                 MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason));
 
                 return false;

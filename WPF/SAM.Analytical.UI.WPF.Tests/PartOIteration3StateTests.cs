@@ -275,7 +275,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(Path.Combine("C:\\out", "Flat1-It3B-Bridge.tbd"), partOIteration3Paths.Path_TBD_Bridge);
             Assert.Equal(Path.Combine("C:\\out", "Flat1-It3B-Bridge.tsd"), partOIteration3Paths.Path_TSD_Bridge);
             Assert.Equal(Path.Combine("C:\\out", "Flat1-It3B-Bridge.sam"), partOIteration3Paths.Path_Model_CandidateB);
-            Assert.Equal(Path.Combine("C:\\out", "Flat1-Iteration3.json"), partOIteration3Paths.Path_Record);
+            Assert.Equal(Path.Combine("C:\\out", "Flat1-Iteration3-B0.json"), partOIteration3Paths.Path_Record);
 
             //Not an optimisation round: the iteration reader must not see a number in it, or a later
             //optimisation would number its rounds from here and overwrite this pairing's evidence.
@@ -287,7 +287,11 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             PartOIteration3Paths partOIteration3Paths = PartOIteration3Paths.Create(PartOIteration3Fixture.SimulationContext("C:\\out", "Flat1"), "C:\\out\\Flat1.tsd");
 
-            Assert.Equal(partOIteration3Paths.Path_Record, PartOIteration3Paths.Path_Record_ForResults("C:\\out\\Flat1.tsd"));
+            Assert.Equal(partOIteration3Paths.Path_Record, PartOIteration3Paths.Path_Record_ForResults("C:\\out\\Flat1.tsd", PartOIteration3BehaviourMode.Parity));
+
+            //The mode-independent record every pairing written before per-method records used is still where
+            //a review looks for it.
+            Assert.Equal(Path.Combine("C:\\out", "Flat1-Iteration3.json"), PartOIteration3Paths.Path_Record_ForResults("C:\\out\\Flat1.tsd"));
         }
 
         [Fact]

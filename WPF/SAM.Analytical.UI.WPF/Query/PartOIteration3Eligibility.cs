@@ -2,6 +2,7 @@
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Enums;
+using System.Collections.Generic;
 using System.IO;
 
 namespace SAM.Analytical.UI.WPF
@@ -57,42 +58,62 @@ namespace SAM.Analytical.UI.WPF
             string path_Record = PartOIteration3Paths.Path_Record_ForResults(path_TSD);
 
             //---------------------------------------------------------------------------------------------
-            //Review
+            //Review - per method. Only a COMPLETED pairing is reviewable as the answer; a refused attempt is
+            //kept for its diagnosis but never locks its method into Review, so a retry needs no file deleted.
             //---------------------------------------------------------------------------------------------
             bool canReview = false;
             string refusal_Review;
 
+            List<PartOIteration3PairingStatus> partOIteration3PairingStatuses = [];
+
             if (!resultsAvailable)
             {
-                refusal_Review = resultsRefusal ?? "This Part O run has no results, so there is no Iteration 3 pairing to reopen.";
-            }
-            else if (string.IsNullOrWhiteSpace(path_Record) || !File.Exists(path_Record))
-            {
-                refusal_Review = string.Format("No Approved Document O Iteration 3 pairing has been recorded for these results{0}.", string.IsNullOrWhiteSpace(path_Record) ? string.Empty : string.Format(" at '{0}'", path_Record));
+                refusal_Review = resultsRefusal ?? "This Part O run has no results, so there is no Iteration 3 comparison to reopen.";
             }
             else
             {
-                PartOIteration3Record partOIteration3Record = Read(path_Record);
+                partOIteration3PairingStatuses = PartOIteration3PairingStatuses(path_TSD);
 
-                if (partOIteration3Record is null)
+                PartOIteration3PairingStatus partOIteration3PairingStatus_Reviewable = partOIteration3PairingStatuses.Find(x => x.IsReviewable);
+
+                canReview = partOIteration3PairingStatus_Reviewable is not null;
+
+                if (canReview)
                 {
-                    refusal_Review = string.Format("The Iteration 3 pairing record at '{0}' could not be read.", path_Record);
-                }
-                else if (!UI.PartOIteration3Record.IsReadableSchema(partOIteration3Record.Schema))
-                {
-                    refusal_Review = string.Format(
-                        "The Iteration 3 pairing record at '{0}' states schema '{1}' and this build reads only '{2}' or '{3}', so it cannot be read as one.",
-                        path_Record,
-                        partOIteration3Record.Schema ?? "<none>",
-                        UI.PartOIteration3Record.CurrentSchema,
-                        UI.PartOIteration3Record.LegacySchema_V1);
+                    refusal_Review = null;
+                    path_Record = partOIteration3PairingStatus_Reviewable.Path_Record;
                 }
                 else
                 {
-                    //A refused record is offered too: its ledger is the whole point of having kept it, and
-                    //the review presents no Candidate B numbers for one.
-                    canReview = true;
-                    refusal_Review = null;
+                    PartOIteration3PairingStatus partOIteration3PairingStatus_Unreadable = partOIteration3PairingStatuses.Find(x => x.Refusal_Read is not null);
+
+                    //The legacy record belongs to no method until it is read, so one that cannot be read is
+                    //reported here rather than silently ignored.
+                    string refusal_Legacy = null;
+                    if (!string.IsNullOrWhiteSpace(path_Record) && File.Exists(path_Record))
+                    {
+                        PartOIteration3Record partOIteration3Record_Legacy = Read(path_Record);
+
+                        if (partOIteration3Record_Legacy is null)
+                        {
+                            refusal_Legacy = string.Format("The Iteration 3 pairing record at '{0}' could not be read.", path_Record);
+                        }
+                        else if (!UI.PartOIteration3Record.IsReadableSchema(partOIteration3Record_Legacy.Schema))
+                        {
+                            refusal_Legacy = string.Format(
+                                "The Iteration 3 pairing record at '{0}' states schema '{1}' and this build reads only '{2}' or '{3}', so it cannot be read as one.",
+                                path_Record,
+                                partOIteration3Record_Legacy.Schema ?? "<none>",
+                                UI.PartOIteration3Record.CurrentSchema,
+                                UI.PartOIteration3Record.LegacySchema_V1);
+                        }
+                    }
+
+                    refusal_Review = partOIteration3PairingStatus_Unreadable?.Refusal_Read
+                        ?? refusal_Legacy
+                        ?? (partOIteration3PairingStatuses.Exists(x => x.IsRefused)
+                            ? "The last Iteration 3 attempt for these results did not complete, so there is no completed comparison to reopen. It can be run again."
+                            : "No Approved Document O Iteration 3 pairing has been recorded for these results.");
                 }
             }
 
@@ -142,7 +163,7 @@ namespace SAM.Analytical.UI.WPF
                 refusal_Run = "This Part O run does not state an output directory, a project name and a results file together, so Candidate B has nowhere deterministic to be written.";
             }
 
-            return new PartOIteration3Eligibility(refusal_Run is null, refusal_Run, canReview, refusal_Review, path_Record);
+            return new PartOIteration3Eligibility(refusal_Run is null, refusal_Run, canReview, refusal_Review, path_Record, partOIteration3PairingStatuses);
         }
 
         /// <summary>

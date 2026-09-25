@@ -22,7 +22,8 @@ namespace SAM.Analytical.UI.WPF
         /// <item><see cref="PreparePartOIteration(UIAnalyticalModel, PartORun, PartOWorkflowRequest, VentilationUnitCatalogue, IWin32Window)"/>
         /// - which is <c>SAM.Analytical.Modify.PreparePartOIteration</c> plus the summary a person accepts it
         /// on, and which the Prepare Iteration picker also calls.</item>
-        /// <item><see cref="Simulate(UIAnalyticalModel, PartORun, bool)"/> - the Simulate dialog, and beneath it
+        /// <item><see cref="SimulatePartO"/> - the Simulate dialog's own core, with its three open inputs taken
+        /// from the Hub's Simulation case rather than from a dialog, and beneath it
         /// <see cref="RunPartOSimulation"/>, which is where <c>SAMAnalytical.Check</c> gates the normalized
         /// model before TAS converts it and where the run is completed.</item>
         /// <item><see cref="AssessPartOTM59(PartORun, IWin32Window)"/> - the production TM59 assessment over
@@ -80,15 +81,35 @@ namespace SAM.Analytical.UI.WPF
             PartOProjectTestVentilationUnit? partOProjectTestVentilationUnit = null;
             bool stated_ProjectTestVentilationUnit = false;
 
+            //Carried across showings, like the choices above: the Iteration 3 method, the Simulation case
+            //(first taken exactly as the Simulate dialog would have opened), and the line saying what the last
+            //action did - which is where a successful run's completion is reported, instead of a message box.
+            PartOIteration3BehaviourMode partOIteration3BehaviourMode = PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance;
+            PartOSimulationCase? partOSimulationCase = null;
+            PartOWorkflowOutcome? partOWorkflowOutcome = null;
+
             while (true)
             {
+                PartOWorkflowCapabilities partOWorkflowCapabilities = Capabilities(partORun, out PartOIteration3Eligibility? partOIteration3Eligibility);
+
+                if (partOSimulationCase is null)
+                {
+                    ActiveSetting.Setting.TryGetValue(AnalyticalSettingParameter.SimulateOptions_PartO, out SimulateOptions simulateOptions_Remembered);
+
+                    partOSimulationCase = PartOSimulationCase.Create(uIAnalyticalModel.JSAMObject, uIAnalyticalModel.Path, simulateOptions_Remembered);
+                }
+
                 PartOWorkflowWindow partOWorkflowWindow = new()
                 {
                     //Order matters: the model builds the dwelling list the restored selection is applied to.
                     AnalyticalModel = uIAnalyticalModel.JSAMObject,
                     PartORun = partORun,
                     VentilationUnitCatalogue = ventilationUnitCatalogue,
-                    Capabilities = Capabilities(partORun),
+                    Capabilities = partOWorkflowCapabilities,
+                    Iteration3Eligibility = partOIteration3Eligibility,
+                    Iteration3Mode = partOIteration3BehaviourMode,
+                    SimulationCase = partOSimulationCase,
+                    LastOutcome = partOWorkflowOutcome,
                 };
 
                 partOWorkflowWindow.Restore(partOWorkflowScenario, partOWorkflowScope, guids_Dwelling, partOOptimisationSettings);
@@ -135,6 +156,8 @@ namespace SAM.Analytical.UI.WPF
                 partOEquipmentSelection = partOWorkflowWindow.EquipmentSelection;
                 partOProjectTestVentilationUnit = partOWorkflowWindow.ProjectTestVentilationUnit;
                 stated_ProjectTestVentilationUnit = true;
+                partOIteration3BehaviourMode = partOWorkflowWindow.Iteration3Mode;
+                partOSimulationCase = partOWorkflowWindow.SimulationCase;
 
                 guids_Dwelling = [];
                 foreach (Zone zone in partOWorkflowWindow.Zones_Dwelling)
@@ -150,19 +173,27 @@ namespace SAM.Analytical.UI.WPF
                 switch (partOWorkflowWindow.Action)
                 {
                     case PartOWorkflowAction.PrepareAndRun:
-                        PrepareAndRun(uIAnalyticalModel, partORun, partOWorkflowWindow.Request, partOWorkflowWindow.Inspection, ventilationUnitCatalogue, owner);
+                        partOWorkflowOutcome = PrepareAndRun(uIAnalyticalModel, partORun, partOWorkflowWindow.Request, partOWorkflowWindow.Inspection, ventilationUnitCatalogue, partOSimulationCase, partOWorkflowWindow.Scenario, owner);
                         break;
 
                     case PartOWorkflowAction.ReviewResults:
-                        AssessPartOTM59(partORun, owner);
+                        TM59ComplianceStatus? tM59ComplianceStatus = AssessPartOTM59(partORun, owner);
+                        partOWorkflowOutcome = tM59ComplianceStatus.HasValue
+                            ? new PartOWorkflowOutcome(PartOWorkflowOutcomeKind.Information, string.Format("Reviewed the TM59 results · {0} · no simulation was run", Core.Query.Description(tM59ComplianceStatus.Value)))
+                            : null;
                         break;
 
                     case PartOWorkflowAction.Optimise:
                         RunPartOOptimisation(uIAnalyticalModel, partORun, owner);
+                        partOWorkflowOutcome = null;
                         break;
 
                     case PartOWorkflowAction.Iteration3:
-                        PartOIteration3(partORun, owner);
+                        partOWorkflowOutcome = RunPartOIteration3Case(partORun, partOIteration3BehaviourMode, owner) ?? partOWorkflowOutcome;
+                        break;
+
+                    case PartOWorkflowAction.Iteration3Review:
+                        partOWorkflowOutcome = ReviewPartOIteration3Case(partORun, partOIteration3BehaviourMode, owner) ?? partOWorkflowOutcome;
                         break;
 
                     default:
@@ -181,9 +212,16 @@ namespace SAM.Analytical.UI.WPF
         /// uncompleted - with its own reason already shown - and nothing is assessed.
         /// </para>
         /// <para>
-        /// <b>Every dialog those commands own is still shown.</b> The Simulate window in particular: the
-        /// weather file, the output directory and the full-year range are the run's own inputs, and a
-        /// high-level command that chose them silently would be choosing engineering inputs.
+        /// <b>Every decision is still a person's, and nothing is chosen silently.</b> The review of the prepared
+        /// iteration is still its own window. The Simulate dialog is not: its only open inputs - the weather,
+        /// the output folder and the solar method - are the Hub's Simulation case, typed and visible before Run
+        /// is pressed, and the rest of the case is the locked Part O case it always was
+        /// (<see cref="SimulatePartO"/>). The full-year range was never a choice on this route.
+        /// </para>
+        /// <para>
+        /// <b>One progress window, and no success box.</b> <see cref="PartOProgressHost"/> covers the whole
+        /// operation and stands aside for the review and for anything modal. A clean completion is returned as
+        /// the Hub's inline line; notes, refusals and a run that was not completed are still shown.
         /// </para>
         /// <para>
         /// <b>The reuse path records the current Iteration 2B choice.</b> A reused preparation is the same
@@ -194,49 +232,134 @@ namespace SAM.Analytical.UI.WPF
         /// take it the preparation is rebuilt instead - correctness before saving a preparation.
         /// </para>
         /// </summary>
-        private static void PrepareAndRun(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, PartOWorkflowInspection? partOWorkflowInspection, VentilationUnitCatalogue ventilationUnitCatalogue, IWin32Window? owner)
+        /// <returns>The line the Hub shows about what happened, or null where nothing was started.</returns>
+        private static PartOWorkflowOutcome? PrepareAndRun(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, PartOWorkflowInspection? partOWorkflowInspection, VentilationUnitCatalogue ventilationUnitCatalogue, PartOSimulationCase? partOSimulationCase, PartOWorkflowScenario? partOWorkflowScenario, IWin32Window? owner)
         {
-            //Reused only where the run's own record of what it was prepared with describes this request.
-            //Otherwise prepared again - including where an iteration is prepared for something else, which
-            //would otherwise be simulated as though it were this one.
-            if (!ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, partOWorkflowInspection?.ReusePreparation ?? false))
+            string iteration = partOWorkflowScenario?.ToString() ?? "Part O iteration";
+
+            bool reuse = ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, partOWorkflowInspection?.ReusePreparation ?? false);
+
+            PartOSimulationOutcome partOSimulationOutcome;
+            TM59ComplianceStatus? tM59ComplianceStatus = null;
+            TimeSpan? elapsed_Simulation;
+
+            //ONE progress window for the whole of Prepare & Run. It stands aside for the review of the
+            //prepared iteration - the engineer's decision - and for anything modal, and closes before the TM59
+            //result opens.
+            using (PartOProgressHost partOProgressHost = new(
+                string.Format("Prepare & Run — {0}", iteration),
+                reuse ? "The iteration already prepared for this scenario and scope is reused." : null,
+                ["Prepare and review the iteration", "TAS simulation (full year)", "TM59 assessment"]))
             {
-                if (!PreparePartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner))
+                //Reused only where the run's own record of what it was prepared with describes this request.
+                //Otherwise prepared again - including where an iteration is prepared for something else, which
+                //would otherwise be simulated as though it were this one.
+                if (!reuse)
                 {
-                    //Refused, declined or not adopted. Every one of those has already told the user why.
-                    return;
+                    partOProgressHost.Start(0);
+
+                    if (!PreparePartOIteration(uIAnalyticalModel, partORun, partOWorkflowRequest, ventilationUnitCatalogue, owner))
+                    {
+                        //Refused, declined or not adopted. Every one of those has already told the user why.
+                        return null;
+                    }
+                }
+
+                //Not an assumption: PreparePartOIteration returns true only for an adopted preparation, and the
+                //reuse path was reached only from a Prepared run - but a model modified between the inspection
+                //and here drops the run, and simulating an unprepared run would silently produce a result that
+                //cannot be assessed.
+                if (partORun.State != PartORunState.Prepared)
+                {
+                    partOProgressHost.Hide();
+
+                    MessageBox.Show(string.Format("The Part O iteration is no longer prepared, so nothing was simulated.\n\n{0}", partORun.InvalidationReason ?? "Prepare the iteration again."));
+
+                    return null;
+                }
+
+                partOProgressHost.Start(1);
+
+                //The SAM Check gate, the TAS workflow, the run completion and the run's own persisted evidence -
+                //all of it the same core the Simulate dialog used, with the three inputs it left open taken
+                //from the Hub's Simulation case. See Modify.SimulatePartO.
+                partOSimulationOutcome = SimulatePartO(uIAnalyticalModel, partORun, partOSimulationCase);
+
+                elapsed_Simulation = partOProgressHost.State.Duration(1);
+
+                if (partOSimulationOutcome.NeedsAttention || !partORun.CanAssess)
+                {
+                    //Failed only where the run cannot be assessed; a completed run with notes did complete.
+                    if (!partORun.CanAssess)
+                    {
+                        partOProgressHost.State.Fail();
+                    }
+
+                    partOProgressHost.Hide();
+
+                    //What the Simulate dialog's closing box said, where there is something to read: a refusal,
+                    //a run that was not completed, zone-identity notes. A clean success says nothing here.
+                    string text = Attention(partOSimulationOutcome);
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        MessageBox.Show(text, "Part O — Prepare & Run");
+                    }
+
+                    partOProgressHost.Show();
+                }
+
+                if (partORun.CanAssess)
+                {
+                    partOProgressHost.Start(2);
+
+                    tM59ComplianceStatus = AssessPartOTM59(partORun, owner);
                 }
             }
 
-            //Not an assumption: PreparePartOIteration returns true only for an adopted preparation, and the
-            //reuse path was reached only from a Prepared run - but a model modified between the inspection
-            //and here drops the run, and simulating an unprepared run would silently produce a result that
-            //cannot be assessed.
-            if (partORun.State != PartORunState.Prepared)
+            if (partOSimulationOutcome.Cancelled)
             {
-                MessageBox.Show(string.Format("The Part O iteration is no longer prepared, so nothing was simulated.\n\n{0}", partORun.InvalidationReason ?? "Prepare the iteration again."));
-
-                return;
+                return new PartOWorkflowOutcome(PartOWorkflowOutcomeKind.Warning, "The simulation was cancelled, so nothing was completed.");
             }
-
-            //The Simulate dialog, the SAM Check gate, the TAS workflow, the run completion and the run's own
-            //persisted evidence - all of it already lives here.
-            //
-            //The third argument is what makes the dialog a PART O dialog: the annual full-year case chosen
-            //rather than inherited from whatever the manual command last ran, and the settings that are not
-            //Part O decisions locked so an accepted dialog cannot produce a run that is refused after the
-            //TAS time has been spent. The weather, the output directory, the project name and the solar
-            //method stay open, because those are the run's own inputs. See Create.SimulateOptions_PartO.
-            Simulate(uIAnalyticalModel, partORun, true);
 
             if (!partORun.CanAssess)
             {
-                //Simulate has already shown what happened - a cancellation, a partial year, a refused
-                //pre-simulation check. Saying it twice in different words would be worse than saying nothing.
-                return;
+                return new PartOWorkflowOutcome(PartOWorkflowOutcomeKind.Warning, string.Format("{0} was not completed. {1}", iteration, partOSimulationOutcome.Refusal ?? partOSimulationOutcome.Note_PartORun ?? string.Empty).Trim());
             }
 
-            AssessPartOTM59(partORun, owner);
+            return new PartOWorkflowOutcome(
+                partOSimulationOutcome.NeedsAttention ? PartOWorkflowOutcomeKind.Warning : PartOWorkflowOutcomeKind.Success,
+                string.Format(
+                    "✓ {0} complete · TAS simulation {1}{2}{3}",
+                    iteration,
+                    PartOProgressState.Format(elapsed_Simulation ?? partOSimulationOutcome.Elapsed),
+                    tM59ComplianceStatus.HasValue ? " · TM59 " + Core.Query.Description(tM59ComplianceStatus.Value) : string.Empty,
+                    partOSimulationOutcome.Notes.Count != 0 ? string.Format(" · {0} note(s) were shown", partOSimulationOutcome.Notes.Count) : string.Empty));
+        }
+
+        /// <summary>
+        /// What a Part O simulation has to tell a person beyond "it completed" - the parts of the Simulate
+        /// dialog's closing message that were never merely an acknowledgement.
+        /// </summary>
+        private static string Attention(PartOSimulationOutcome partOSimulationOutcome)
+        {
+            List<string> parts = [];
+
+            if (!string.IsNullOrWhiteSpace(partOSimulationOutcome.Refusal))
+            {
+                parts.Add(partOSimulationOutcome.Refusal);
+            }
+
+            if (partOSimulationOutcome.Notes.Count != 0 || partOSimulationOutcome.Note_PartORun is not null || partOSimulationOutcome.Cancelled)
+            {
+                //The dialog path's own message carries the capped notes and the not-completed reason, worded
+                //exactly as before.
+                if (!string.IsNullOrWhiteSpace(partOSimulationOutcome.Message))
+                {
+                    parts.Add(partOSimulationOutcome.Message.Trim());
+                }
+            }
+
+            return string.Join("\n\n", parts);
         }
 
         /// <summary>
@@ -299,9 +422,11 @@ namespace SAM.Analytical.UI.WPF
         /// "nothing to validate", but the command cannot run without a step and a limit.
         /// </para>
         /// </summary>
-        private static PartOWorkflowCapabilities Capabilities(PartORun? partORun)
+        internal static PartOWorkflowCapabilities Capabilities(PartORun? partORun, out PartOIteration3Eligibility? partOIteration3Eligibility)
         {
             PartOWorkflowCapabilities result = new();
+
+            partOIteration3Eligibility = null;
 
             if (partORun is null)
             {
@@ -326,7 +451,7 @@ namespace SAM.Analytical.UI.WPF
             //filesystem. It reuses the IsAssessable answer already taken rather than asking it twice -
             //that call can DROP a run whose results have gone, and dropping it twice in one gesture would
             //report the second drop against a run that no longer exists.
-            PartOIteration3Eligibility partOIteration3Eligibility = Query.PartOIteration3Eligibility(partORun, result.ResultsAvailable, result.ResultsRefusal);
+            partOIteration3Eligibility = Query.PartOIteration3Eligibility(partORun, result.ResultsAvailable, result.ResultsRefusal);
 
             result.Iteration3Available = partOIteration3Eligibility.Available;
             result.Iteration3Review = partOIteration3Eligibility.Review;

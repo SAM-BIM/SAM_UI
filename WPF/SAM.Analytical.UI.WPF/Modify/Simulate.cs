@@ -120,35 +120,180 @@ namespace SAM.Analytical.UI.WPF
 
             ActiveSetting.Setting.SetValue(partO ? AnalyticalSettingParameter.SimulateOptions_PartO : AnalyticalSettingParameter.SimulateOptions, simulateWindow.SimulateOptions);
 
-            string projectName = simulateWindow.ProjectName;
-            string outputDirectory = simulateWindow.OutputDirectory;
-            bool unmetHours = simulateWindow.UnmetHours;
-            bool printRoomDataSheets = simulateWindow.RoomDataSheets;
-
-            bool fullYearSimulation = simulateWindow.FullYearSimulation;
-            int fullYearSimulation_From = simulateWindow.FullYearSimulation_From;
-            int fullYearSimulation_To = simulateWindow.FullYearSimulation_To;
-
-            bool createSAP = simulateWindow.CreateSAP;
-            bool createTM59 = simulateWindow.CreateTM59;
-            bool createTPD = simulateWindow.CreateTPD;
-            bool createPartL = simulateWindow.CreatePartL;
-
-            bool sizing = simulateWindow.Sizing;
-
-            bool useWidths = simulateWindow.UseWidths;
-
-            SolarCalculationMethod solarCalculationMethod = simulateWindow.SolarCalculationMethod;
-            bool updateConstructionLayersByPanelType = simulateWindow.UpdateConstructionLayersByPanelType;
-
-            TextMap textMap = simulateWindow.SelectedTextMap;
-            weatherData = simulateWindow.SelectedWeatherData;
-            string zoneCategory = simulateWindow.SelectedZoneCategory;
-
-            if (!simulateWindow.Simulate && !createSAP && !createTM59)
+            SimulateInputs simulateInputs = new()
             {
-                return;
+                ProjectName = simulateWindow.ProjectName,
+                OutputDirectory = simulateWindow.OutputDirectory,
+                UnmetHours = simulateWindow.UnmetHours,
+                PrintRoomDataSheets = simulateWindow.RoomDataSheets,
+                FullYearSimulation = simulateWindow.FullYearSimulation,
+                FullYearSimulation_From = simulateWindow.FullYearSimulation_From,
+                FullYearSimulation_To = simulateWindow.FullYearSimulation_To,
+                CreateSAP = simulateWindow.CreateSAP,
+                CreateTM59 = simulateWindow.CreateTM59,
+                CreateTPD = simulateWindow.CreateTPD,
+                CreatePartL = simulateWindow.CreatePartL,
+                Sizing = simulateWindow.Sizing,
+                UseWidths = simulateWindow.UseWidths,
+                SolarCalculationMethod = simulateWindow.SolarCalculationMethod,
+                UpdateConstructionLayersByPanelType = simulateWindow.UpdateConstructionLayersByPanelType,
+                TextMap = simulateWindow.SelectedTextMap,
+                WeatherData = simulateWindow.SelectedWeatherData,
+                ZoneCategory = simulateWindow.SelectedZoneCategory,
+                Simulate = simulateWindow.Simulate,
+            };
+
+            Simulate(uIAnalyticalModel, partORun, simulateInputs, false);
+        }
+
+        /// <summary>
+        /// The guided Approved Document O simulation, with no dialog: the Part O Hub's Simulation case supplies
+        /// the three inputs a person owns - weather, output folder and solar method - and everything else is the
+        /// locked Part O case <see cref="Create.SimulateOptions_PartO"/> has always put in the Simulate dialog.
+        ///
+        /// <para><b>The same run as the dialog path, by construction</b></para>
+        /// <para>
+        /// The inputs are composed from <c>SimulateOptions_PartO</c> exactly as the locked dialog would hand
+        /// them back - Simulate and Full Year on, days 1 to 365 (the locked range the dialog's disabled boxes
+        /// hold), sizing, unmet hours, widths and every export off, the project name derived from the prepared
+        /// model - and then go through the one core below that the dialog path also uses. No engineering input
+        /// differs; only where three of them were typed.
+        /// </para>
+        /// <para>
+        /// <b>No success dialog.</b> A clean completion is returned as <see cref="PartOSimulationOutcome"/> and
+        /// shown inline by the Hub. A refusal, a run that could not be completed and any zone-identity notes are
+        /// returned too, and the caller shows those - they are things a person has to read.
+        /// </para>
+        /// </summary>
+        /// <param name="uIAnalyticalModel">The loaded, prepared model.</param>
+        /// <param name="partORun">The session's run; must be <see cref="PartORunState.Prepared"/>.</param>
+        /// <param name="partOSimulationCase">The Hub's Simulation case.</param>
+        public static PartOSimulationOutcome SimulatePartO(this UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOSimulationCase partOSimulationCase)
+        {
+            AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
+
+            if (analyticalModel is null || partORun is null || partORun.State != PartORunState.Prepared)
+            {
+                return new PartOSimulationOutcome { Refusal = "The Part O iteration is not prepared, so nothing was simulated. Prepare the iteration again." };
             }
+
+            string refusal_Case = partOSimulationCase?.Refusal();
+            if (refusal_Case is not null)
+            {
+                return new PartOSimulationOutcome { Refusal = refusal_Case };
+            }
+
+            ActiveSetting.Setting.TryGetValue(AnalyticalSettingParameter.SimulateOptions_PartO, out SimulateOptions simulateOptions_Remembered);
+
+            SimulateOptions simulateOptions = Create.SimulateOptions_PartO(analyticalModel, uIAnalyticalModel.Path, simulateOptions_Remembered);
+
+            //The three inputs the dialog left open, now typed in the Hub instead.
+            simulateOptions.WeatherData = new WeatherData(partOSimulationCase.WeatherData);
+            simulateOptions.OutputDirectory = partOSimulationCase.OutputDirectory;
+            simulateOptions.SolarCalculationMethod = partOSimulationCase.SolarCalculationMethod;
+
+            //Remembered under the Part O key, exactly as the dialog's OK remembered it.
+            ActiveSetting.Setting.SetValue(AnalyticalSettingParameter.SimulateOptions_PartO, simulateOptions);
+
+            SimulateInputs simulateInputs = new()
+            {
+                ProjectName = simulateOptions.ProjectName,
+                OutputDirectory = simulateOptions.OutputDirectory,
+                UnmetHours = simulateOptions.UnmetHours,
+                PrintRoomDataSheets = simulateOptions.RoomDataSheets,
+                FullYearSimulation = simulateOptions.FullYearSimulation,
+
+                //The locked range: the dialog's From/To boxes are disabled on the Part O route and hold 1 and
+                //365, which is what it handed back.
+                FullYearSimulation_From = 1,
+                FullYearSimulation_To = 365,
+
+                CreateSAP = simulateOptions.CreateSAP,
+                CreateTM59 = simulateOptions.CreateTM59,
+                CreateTPD = simulateOptions.CreateTPD,
+                CreatePartL = simulateOptions.CreatePartL,
+                Sizing = simulateOptions.Sizing,
+                UseWidths = simulateOptions.UseWidths,
+                SolarCalculationMethod = simulateOptions.SolarCalculationMethod,
+                UpdateConstructionLayersByPanelType = simulateOptions.UpdateConstructionLayersByPanelType,
+                TextMap = null,
+                WeatherData = simulateOptions.WeatherData,
+                ZoneCategory = null,
+                Simulate = simulateOptions.Simulate,
+            };
+
+            return Simulate(uIAnalyticalModel, partORun, simulateInputs, true);
+        }
+
+        /// <summary>What the Simulate dialog hands back, as values - so the dialog path and the Hub path share one core.</summary>
+        private sealed class SimulateInputs
+        {
+            public string ProjectName;
+            public string OutputDirectory;
+            public bool UnmetHours;
+            public bool PrintRoomDataSheets;
+            public bool FullYearSimulation;
+            public int FullYearSimulation_From;
+            public int FullYearSimulation_To;
+            public bool CreateSAP;
+            public bool CreateTM59;
+            public bool CreateTPD;
+            public bool CreatePartL;
+            public bool Sizing;
+            public bool UseWidths;
+            public SolarCalculationMethod SolarCalculationMethod;
+            public bool UpdateConstructionLayersByPanelType;
+            public TextMap TextMap;
+            public WeatherData WeatherData;
+            public string ZoneCategory;
+            public bool Simulate;
+        }
+
+        /// <summary>
+        /// The one simulation core. <paramref name="quiet"/> is the Hub path: nothing is shown here, and what
+        /// the dialog path shows as message boxes is returned instead.
+        /// </summary>
+        private static PartOSimulationOutcome Simulate(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, SimulateInputs simulateInputs, bool quiet)
+        {
+            PartOSimulationOutcome partOSimulationOutcome = new();
+
+            AnalyticalModel analyticalModel = uIAnalyticalModel?.JSAMObject;
+            if (analyticalModel == null)
+            {
+                return partOSimulationOutcome;
+            }
+
+            string projectName = simulateInputs.ProjectName;
+            string outputDirectory = simulateInputs.OutputDirectory;
+            bool unmetHours = simulateInputs.UnmetHours;
+            bool printRoomDataSheets = simulateInputs.PrintRoomDataSheets;
+
+            bool fullYearSimulation = simulateInputs.FullYearSimulation;
+            int fullYearSimulation_From = simulateInputs.FullYearSimulation_From;
+            int fullYearSimulation_To = simulateInputs.FullYearSimulation_To;
+
+            bool createSAP = simulateInputs.CreateSAP;
+            bool createTM59 = simulateInputs.CreateTM59;
+            bool createTPD = simulateInputs.CreateTPD;
+            bool createPartL = simulateInputs.CreatePartL;
+
+            bool sizing = simulateInputs.Sizing;
+
+            bool useWidths = simulateInputs.UseWidths;
+
+            SolarCalculationMethod solarCalculationMethod = simulateInputs.SolarCalculationMethod;
+            bool updateConstructionLayersByPanelType = simulateInputs.UpdateConstructionLayersByPanelType;
+
+            TextMap textMap = simulateInputs.TextMap;
+            WeatherData weatherData = simulateInputs.WeatherData;
+            string zoneCategory = simulateInputs.ZoneCategory;
+
+            if (!simulateInputs.Simulate && !createSAP && !createTM59)
+            {
+                return partOSimulationOutcome;
+            }
+
+            partOSimulationOutcome.Ran = true;
 
             // The model is renamed here, and a cancelled or failed run must not leave the instance the user
             // still has open renamed behind its back. SHALLOW is enough for that: Name is a field of
@@ -215,7 +360,7 @@ namespace SAM.Analytical.UI.WPF
             // closed. A dialog per space would be unusable on a block of flats.
             List<string> notes_Simulate = [];
 
-            if(simulateWindow.Simulate)
+            if(simulateInputs.Simulate)
             {
                 // The whole path to a TSD - materials, construction layers, the TBD, the solar calculation,
                 // the zones, the shading, the workflow - and the Part O arming that goes before it. Extracted
@@ -230,9 +375,14 @@ namespace SAM.Analytical.UI.WPF
                     // The run never started, so there is no TBD for the exports below to convert or read
                     // back. Aborted outright, exactly as this method has always aborted on these two
                     // conditions - a gbXML that could not be written, and a TBD that could not be replaced.
-                    MessageBox.Show(refusal_Simulation);
+                    partOSimulationOutcome.Refusal = refusal_Simulation;
 
-                    return;
+                    if (!quiet)
+                    {
+                        MessageBox.Show(refusal_Simulation);
+                    }
+
+                    return partOSimulationOutcome;
                 }
 
                 if (!cancelled && analyticalModel_Workflow != null)
@@ -442,7 +592,19 @@ namespace SAM.Analytical.UI.WPF
                 message += string.Format("\n\n{0}", note_PartORun);
             }
 
-            MessageBox.Show(message);
+            partOSimulationOutcome.Cancelled = cancelled;
+            partOSimulationOutcome.Elapsed = timeSpan;
+            partOSimulationOutcome.Message = message;
+            partOSimulationOutcome.Notes.AddRange(notes_Simulate);
+            partOSimulationOutcome.Note_PartORun = note_PartORun;
+
+            //The dialog path's closing message, unchanged. The Hub path shows a clean completion inline and
+            //reads the notes and the not-completed reason off the outcome, so a person is still told
+            //everything this box said - without an OK to click on success.
+            if (!quiet)
+            {
+                MessageBox.Show(message);
+            }
 
             if (completePartORun)
             {
@@ -473,9 +635,20 @@ namespace SAM.Analytical.UI.WPF
                 // would be rejected by the Optimise command with no way for a user to tell why.
                 if (!partORun.Complete(analyticalModel, path_TSD, partOSimulationContext, out string refusal_PartORun))
                 {
-                    MessageBox.Show(string.Format("The Part O run was not completed, so its TM59 assessment is not available.\n\n{0}", refusal_PartORun));
+                    string refusal_Complete = string.Format("The Part O run was not completed, so its TM59 assessment is not available.\n\n{0}", refusal_PartORun);
+
+                    partOSimulationOutcome.Refusal = refusal_Complete;
+
+                    if (!quiet)
+                    {
+                        MessageBox.Show(refusal_Complete);
+                    }
                 }
             }
+
+            partOSimulationOutcome.Completed = partORun is not null && partORun.State == PartORunState.WorkflowCompleted && completePartORun;
+
+            return partOSimulationOutcome;
         }
 
         public static AnalyticalModel Simulate(this AnalyticalModel analyticalModel, string path, IWin32Window owner = null)

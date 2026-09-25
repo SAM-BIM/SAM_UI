@@ -37,19 +37,29 @@ namespace SAM.Analytical.UI.WPF
         /// TAS DomOv XML for TAS to assess. This reads the TSD and produces SAM's own TM59 assessment.
         /// </para>
         /// </summary>
-        public static void AssessPartOTM59(this PartORun partORun, IWin32Window? owner = null)
+        /// <returns>
+        /// The occupied-space verdict of the assessment that was shown, or null where nothing was assessed - so
+        /// the Part O Hub can say inline what it found. Callers that ignore it are unaffected.
+        /// </returns>
+        public static TM59ComplianceStatus? AssessPartOTM59(this PartORun partORun, IWin32Window? owner = null)
         {
             if (partORun is null)
             {
-                return;
+                return null;
             }
+
+            //Inside a Part O operation that shows its own progress window, the reading is reported there, and
+            //that window is hidden before anything modal appears over it.
+            PartOProgressHost? partOProgressHost = PartOProgressHost.Current;
 
             //One gate, and it re-checks the results file rather than trusting the state alone.
             if (!partORun.IsAssessable(out string refusal))
             {
+                partOProgressHost?.Hide();
+
                 MessageBox.Show(string.Format("The Part O TM59 assessment did not run.\n\n{0}", refusal));
 
-                return;
+                return null;
             }
 
             AnalyticalModel? analyticalModel_Workflow = partORun.AnalyticalModel_Assessment;
@@ -59,27 +69,44 @@ namespace SAM.Analytical.UI.WPF
             {
                 //Unreachable through IsAssessable, and asserted rather than assumed: a null slipping through
                 //here is exactly the substitution this command exists to make impossible.
+                partOProgressHost?.Hide();
+
                 MessageBox.Show("The Part O run reports it can be assessed but carries no workflow model or no results path. Nothing was assessed.");
 
-                return;
+                return null;
             }
 
             PartOTM59Assessment partOTM59Assessment;
 
-            using (ProgressBarWindowManager progressBarWindowManager = new("Part O TM59", "Reading simulation results..."))
+            if (partOProgressHost is not null)
             {
-                //The whole assessment, in the one place that owns it - so this command and the Iteration 2B
-                //optimisation can never disagree about what TM59 said. See PartOTM59Assessment.
+                partOProgressHost.Detail("Reading the simulation results and assessing them against CIBSE TM59");
+
+                //The whole assessment, in the one place that owns it - see below.
                 partOTM59Assessment = PartOTM59Assessment.Assess(analyticalModel_Workflow, path_TSD, partORun.OverheatingScenarios);
 
-                progressBarWindowManager.Text = partOTM59Assessment.IsAssessed ? "Assessing..." : "Failed";
+                partOProgressHost.Detail(null);
+
+                //The result window is modal; a topmost window on another thread must not sit over it.
+                partOProgressHost.Hide();
+            }
+            else
+            {
+                using (ProgressBarWindowManager progressBarWindowManager = new("Part O TM59", "Reading simulation results..."))
+                {
+                    //The whole assessment, in the one place that owns it - so this command and the Iteration 2B
+                    //optimisation can never disagree about what TM59 said. See PartOTM59Assessment.
+                    partOTM59Assessment = PartOTM59Assessment.Assess(analyticalModel_Workflow, path_TSD, partORun.OverheatingScenarios);
+
+                    progressBarWindowManager.Text = partOTM59Assessment.IsAssessed ? "Assessing..." : "Failed";
+                }
             }
 
             if (!partOTM59Assessment.IsAssessed)
             {
                 MessageBox.Show(string.Format("The simulation results at '{0}' could not be assessed.\n\n{1}", path_TSD, partOTM59Assessment.Refusal));
 
-                return;
+                return null;
             }
 
             TM59AssessmentResult tM59AssessmentResult = partOTM59Assessment.Result!;
@@ -108,6 +135,8 @@ namespace SAM.Analytical.UI.WPF
             }
 
             partOTM59ResultWindow.ShowDialog();
+
+            return partOTM59Assessment.OccupiedSpaceComplianceStatus;
         }
 
         /// <summary>

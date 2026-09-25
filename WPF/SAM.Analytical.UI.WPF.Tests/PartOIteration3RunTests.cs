@@ -9,6 +9,7 @@ using SAM.Core.Tas;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Xunit;
 
 namespace SAM.Analytical.UI.WPF.Tests
@@ -585,7 +586,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartORun partORun = Run();
 
             string path_Model = Path.Combine(directory, "Flat-It3B-Bridge.sam");
-            string path_Record = Path.Combine(directory, "Flat-Iteration3.json");
+            string path_Record = Path.Combine(directory, "Flat-Iteration3-B0.json");
 
             File.WriteAllText(path_Model, "an earlier attempt's reopenable Candidate B");
             File.WriteAllText(path_Record, "an earlier attempt's pairing");
@@ -937,6 +938,96 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.True(partOIteration3PipelineFake.CoolingSettings_Materialised is null || partOIteration3PipelineFake.CoolingSettings_Materialised.Count == 0);
             Assert.Empty(partOIteration3Result.Record.Cooling);
             Assert.EndsWith(PartOIteration3Paths.Suffix_CandidateB, partOIteration3Result.Record.ProjectName_CandidateB);
+        }
+
+        //-------------------------------------------------------------------------------------------------
+        //Workflow simplification: per-method record, progress stages, cancellation between stages
+        //-------------------------------------------------------------------------------------------------
+
+        /// <summary>A run writes its own method's record, never the mode-independent legacy one.</summary>
+        [Fact]
+        public void A_run_writes_its_own_methods_record()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, Pipeline_Complete(out List<Guid> _));
+
+            Assert.True(partOIteration3Result.IsComplete, string.Join("; ", partOIteration3Result.Ledger.Reasons));
+            Assert.Equal(Path.Combine(directory, "Flat-Iteration3-B0.json"), partOIteration3Result.Path_Record);
+            Assert.True(File.Exists(partOIteration3Result.Path_Record));
+            Assert.False(File.Exists(Path.Combine(directory, "Flat-Iteration3.json")));
+        }
+
+        /// <summary>
+        /// The progress window is told every stage as it starts, in the ledger's order, and the six phases it
+        /// shows only ever move forward.
+        /// </summary>
+        [Fact]
+        public void Every_stage_is_announced_in_order_and_the_phases_only_move_forward()
+        {
+            PartORun partORun = Run();
+
+            List<PartOIteration3Stage> announced = [];
+
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(partORun, Pipeline_Complete(out List<Guid> _), default, PartOIteration3BehaviourMode.Parity, announced.Add);
+
+            Assert.True(partOIteration3Result.IsComplete);
+
+            Assert.Equal(PartOIteration3Stage.Input, announced[0]);
+            Assert.Equal(PartOIteration3Stage.Persistence, announced[^1]);
+
+            for (int i = 1; i < announced.Count; i++)
+            {
+                Assert.True(announced[i] > announced[i - 1], string.Format("{0} was announced after {1}", announced[i], announced[i - 1]));
+                Assert.True(Modify.PartOIteration3Phase(announced[i]) >= Modify.PartOIteration3Phase(announced[i - 1]));
+            }
+
+            //Every one of the six phases is reached by a complete run.
+            Assert.Equal(Modify.PartOIteration3Phases.Count, announced.ConvertAll(Modify.PartOIteration3Phase).Distinct().Count());
+        }
+
+        /// <summary>
+        /// Cancel is honoured between stages: a cancel requested before the building simulation starts stops
+        /// the run there, calls no TAS step at all, and is recorded as a refusal - so the method is not
+        /// reviewable afterwards and can simply be run again.
+        /// </summary>
+        [Fact]
+        public void A_cancel_before_the_tas_stages_stops_the_run_there_and_calls_no_tas_step()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3PipelineFake partOIteration3PipelineFake = Pipeline_Complete(out List<Guid> _);
+
+            using System.Threading.CancellationTokenSource cancellationTokenSource = new();
+
+            //Cancelled as soon as the system case design starts - as a person would click Cancel while the
+            //reference case is still being read.
+            PartOIteration3Result partOIteration3Result = Modify.RunPartOIteration3(
+                partORun,
+                partOIteration3PipelineFake,
+                cancellationTokenSource.Token,
+                PartOIteration3BehaviourMode.Parity,
+                stage =>
+                {
+                    if (stage == PartOIteration3Stage.Materialisation)
+                    {
+                        cancellationTokenSource.Cancel();
+                    }
+                });
+
+            Assert.True(partOIteration3Result.IsRefused);
+            Assert.Equal(PartOIteration3Stage.ThermalSource, partOIteration3Result.Ledger.Stage_Refused);
+            Assert.Contains("cancelled", string.Join(" ", partOIteration3Result.Ledger.Reasons));
+
+            Assert.DoesNotContain(nameof(IPartOIteration3Pipeline.ThermalSource), partOIteration3PipelineFake.Called);
+            Assert.DoesNotContain(nameof(IPartOIteration3Pipeline.Route), partOIteration3PipelineFake.Called);
+            Assert.DoesNotContain(nameof(IPartOIteration3Pipeline.ResultantTemperatures), partOIteration3PipelineFake.Called);
+
+            //Recorded, and not reviewable - so it does not lock the method into Review.
+            PartOIteration3PairingStatus partOIteration3PairingStatus = Query.PartOIteration3PairingStatus(partORun.Path_TSD, PartOIteration3BehaviourMode.Parity);
+
+            Assert.True(partOIteration3PairingStatus.IsRefused);
+            Assert.False(partOIteration3PairingStatus.IsReviewable);
         }
     }
 }

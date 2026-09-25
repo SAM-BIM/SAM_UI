@@ -237,6 +237,10 @@ namespace SAM.Analytical.UI.WPF
                     {
                         log.Sort();
 
+                        //A modal the engineer has to read: the shared progress window, topmost on its own
+                        //thread, must not sit over it.
+                        PartOProgressHost.Current?.Hide();
+
                         new SAM.Core.UI.WPF.LogWindow(log.Filter([Core.LogRecordType.Error, Core.LogRecordType.Warning, Core.LogRecordType.Undefined])).ShowDialog();
                     }
 
@@ -280,25 +284,44 @@ namespace SAM.Analytical.UI.WPF
             // One token spans the COM preparation steps below and the workflow that follows them, so a
             // single Cancel click aborts whichever of the two is running - and, through
             // externalCancellationToken, a whole optimisation rather than one of its rounds.
-            using (CancellationTokenSource cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(externalCancellationToken))
+            //Inside a Part O operation that already shows its own progress window, these steps report there
+            //and take its Cancel instead of opening a "Preparing Model" dialog of their own.
+            PartOProgressHost partOProgressHost = PartOProgressHost.Current;
+
+            using (CancellationTokenSource cancellationTokenSource = partOProgressHost is null
+                ? CancellationTokenSource.CreateLinkedTokenSource(externalCancellationToken)
+                : CancellationTokenSource.CreateLinkedTokenSource(externalCancellationToken, partOProgressHost.Token))
             {
                 CancellationToken cancellationToken = cancellationTokenSource.Token;
 
                 // Hosted off this thread: the steps below are single COM calls that run for minutes, and
                 // Windows ghosts a window whose thread has stopped pumping and then discards clicks on the
                 // ghost. Not a using - see below for why the host must be disposed before the final check.
-                ProgressWindowHost progressWindowHost = new(string.Format("Preparing Model ({0})", projectName), 8, true, Analytical.Tas.Query.CancelNote(null));
+                ProgressWindowHost progressWindowHost = partOProgressHost is null
+                    ? new(string.Format("Preparing Model ({0})", projectName), 8, true, Analytical.Tas.Query.CancelNote(null))
+                    : null;
 
                 Action<string> step = description =>
                 {
-                    progressWindowHost.Note = Analytical.Tas.Query.CancelNote(description);
-                    progressWindowHost.Update(description);
+                    if (progressWindowHost is not null)
+                    {
+                        progressWindowHost.Note = Analytical.Tas.Query.CancelNote(description);
+                        progressWindowHost.Update(description);
+                    }
+                    else
+                    {
+                        partOProgressHost.Detail(description);
+                    }
+
                     cancellationToken.ThrowIfCancellationRequested();
                 };
 
                 try
                 {
-                    progressWindowHost.CancelRequested += (s, e) => cancellationTokenSource.Cancel();
+                    if (progressWindowHost is not null)
+                    {
+                        progressWindowHost.CancelRequested += (s, e) => cancellationTokenSource.Cancel();
+                    }
 
                     //NOT on the warm-start path: the copy from the canonical overwrites this run's TBD
                     //anyway, and deleting first would only widen the window in which the run has no TBD.
@@ -312,7 +335,7 @@ namespace SAM.Analytical.UI.WPF
                         {
                             // Take the dialog down before saying anything: it is topmost and lives on another
                             // thread, so a message shown under it can end up hidden behind it.
-                            progressWindowHost.Dispose();
+                            progressWindowHost?.Dispose();
 
                             refusal = string.Format("The existing TBD file '{0}' could not be overwritten.", path_TBD);
 
@@ -370,13 +393,13 @@ namespace SAM.Analytical.UI.WPF
                 }
                 finally
                 {
-                    progressWindowHost.Dispose();
+                    progressWindowHost?.Dispose();
                 }
 
                 // The host is down, so no further click can arrive and any in-flight one has already run:
                 // this observation is final - but only once the host confirms it actually shut down. If it
                 // could not, its thread is still live and may be sitting on a click nothing observed.
-                if (!cancelled && (cancellationTokenSource.IsCancellationRequested || !progressWindowHost.ShutdownCompleted))
+                if (!cancelled && (cancellationTokenSource.IsCancellationRequested || (progressWindowHost is not null && !progressWindowHost.ShutdownCompleted)))
                 {
                     cancelled = true;
                 }

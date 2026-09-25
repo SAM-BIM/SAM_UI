@@ -178,8 +178,21 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Contains("No Approved Document O Iteration 3 pairing has been recorded", partOIteration3Eligibility.Refusal_Review);
         }
 
+        /// <summary>A ledger in which every stage completed - what a completed pairing records.</summary>
+        private static PartOIteration3Ledger Ledger_Complete()
+        {
+            PartOIteration3Ledger result = new();
+
+            foreach (PartOIteration3Stage partOIteration3Stage in PartOIteration3Ledger.Order)
+            {
+                result.Complete(partOIteration3Stage, "done");
+            }
+
+            return result;
+        }
+
         /// <summary>
-        /// Once a pairing exists the action reviews it rather than rerunning TAS to reproduce a
+        /// Once a COMPLETED pairing exists the action reviews it rather than rerunning TAS to reproduce a
         /// comparison that is already on disk.
         /// </summary>
         [Fact]
@@ -189,7 +202,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             PartOIteration3Record partOIteration3Record = new();
 
-            partOIteration3Record.Adopt(new PartOIteration3Ledger());
+            partOIteration3Record.Adopt(Ledger_Complete());
 
             File.WriteAllText(Path.Combine(directory, "Flat-Iteration3.json"), partOIteration3Record.ToString());
 
@@ -198,6 +211,100 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.True(partOIteration3Eligibility.CanReview);
             Assert.True(partOIteration3Eligibility.Review);
             Assert.True(partOIteration3Eligibility.Available);
+            Assert.True(partOIteration3Eligibility.PairingStatus(PartOIteration3BehaviourMode.Parity).IsReviewable);
+        }
+
+        /// <summary>
+        /// A refused attempt is kept - its ledger is the diagnosis - but it never locks its method into Review:
+        /// the engineer who fixed the reason must be able to run the method again without deleting a file.
+        /// </summary>
+        [Fact]
+        public void A_refused_attempt_does_not_make_its_method_reviewable_and_leaves_run_available()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3Ledger partOIteration3Ledger = new();
+            partOIteration3Ledger.Complete(PartOIteration3Stage.Input, "ready");
+            partOIteration3Ledger.Refuse(PartOIteration3Stage.ReferenceA, "no", ["no"]);
+
+            PartOIteration3Record partOIteration3Record = new() { BehaviourMode = PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance };
+            partOIteration3Record.Adopt(partOIteration3Ledger);
+
+            File.WriteAllText(PartOIteration3Paths.Path_Record_ForResults(partORun.Path_TSD, PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance), partOIteration3Record.ToString());
+
+            PartOIteration3Eligibility partOIteration3Eligibility = Eligibility(partORun);
+
+            PartOIteration3PairingStatus partOIteration3PairingStatus = partOIteration3Eligibility.PairingStatus(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance);
+
+            Assert.True(partOIteration3PairingStatus.IsRefused);
+            Assert.False(partOIteration3PairingStatus.IsReviewable);
+            Assert.False(partOIteration3Eligibility.Review);
+            Assert.True(partOIteration3Eligibility.CanRun);
+            Assert.Contains("can be run again", partOIteration3Eligibility.Refusal_Review);
+        }
+
+        /// <summary>
+        /// Each method keeps its own result: a completed route check and a completed manufacturer-guidance
+        /// result against the same reference case are both reviewable, and neither hides the other.
+        /// </summary>
+        [Fact]
+        public void Completed_results_of_two_methods_coexist_and_are_each_reviewable()
+        {
+            PartORun partORun = Run();
+
+            foreach (PartOIteration3BehaviourMode partOIteration3BehaviourMode in new[] { PartOIteration3BehaviourMode.Parity, PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance })
+            {
+                PartOIteration3Record partOIteration3Record = new() { BehaviourMode = partOIteration3BehaviourMode };
+                partOIteration3Record.Adopt(Ledger_Complete());
+
+                File.WriteAllText(PartOIteration3Paths.Path_Record_ForResults(partORun.Path_TSD, partOIteration3BehaviourMode), partOIteration3Record.ToString());
+            }
+
+            PartOIteration3Eligibility partOIteration3Eligibility = Eligibility(partORun);
+
+            Assert.True(partOIteration3Eligibility.PairingStatus(PartOIteration3BehaviourMode.Parity).IsReviewable);
+            Assert.True(partOIteration3Eligibility.PairingStatus(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance).IsReviewable);
+            Assert.False(partOIteration3Eligibility.PairingStatus(PartOIteration3BehaviourMode.SelectedProduct).Exists);
+
+            //And a completed result never stops a method being run.
+            Assert.True(partOIteration3Eligibility.CanRun);
+        }
+
+        /// <summary>
+        /// The mode-independent record written before per-method records existed is read as the method recorded
+        /// INSIDE it - and only as that method.
+        /// </summary>
+        [Fact]
+        public void A_legacy_record_is_read_as_the_method_it_records_and_no_other()
+        {
+            PartORun partORun = Run();
+
+            PartOIteration3Record partOIteration3Record = new() { BehaviourMode = PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance };
+            partOIteration3Record.Adopt(Ledger_Complete());
+
+            File.WriteAllText(Path.Combine(directory, "Flat-Iteration3.json"), partOIteration3Record.ToString());
+
+            PartOIteration3Eligibility partOIteration3Eligibility = Eligibility(partORun);
+
+            PartOIteration3PairingStatus partOIteration3PairingStatus = partOIteration3Eligibility.PairingStatus(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance);
+
+            Assert.True(partOIteration3PairingStatus.IsReviewable);
+            Assert.True(partOIteration3PairingStatus.IsLegacy);
+            Assert.Equal(Path.Combine(directory, "Flat-Iteration3.json"), partOIteration3PairingStatus.Path_Record);
+
+            Assert.False(partOIteration3Eligibility.PairingStatus(PartOIteration3BehaviourMode.Parity).Exists);
+
+            //A method's own record supersedes the legacy one once it exists.
+            PartOIteration3Record partOIteration3Record_New = new() { BehaviourMode = PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance };
+            partOIteration3Record_New.Adopt(new PartOIteration3Ledger());
+
+            string path_New = PartOIteration3Paths.Path_Record_ForResults(partORun.Path_TSD, PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance);
+            File.WriteAllText(path_New, partOIteration3Record_New.ToString());
+
+            PartOIteration3PairingStatus partOIteration3PairingStatus_New = Eligibility(partORun).PairingStatus(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance);
+
+            Assert.Equal(path_New, partOIteration3PairingStatus_New.Path_Record);
+            Assert.False(partOIteration3PairingStatus_New.IsLegacy);
         }
 
         [Fact]
@@ -234,7 +341,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Schema = PartOIteration3Record.LegacySchema_V1,
             };
 
-            partOIteration3Record.Adopt(new PartOIteration3Ledger());
+            partOIteration3Record.Adopt(Ledger_Complete());
 
             File.WriteAllText(Path.Combine(directory, "Flat-Iteration3.json"), partOIteration3Record.ToString());
 

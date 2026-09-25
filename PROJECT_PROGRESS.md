@@ -1,6 +1,83 @@
 # Project Progress
 
-## Current: Nuaire reply (24 Sep 2026) - exchanger then DX drop, 13 C floor
+## Current: Part O / TM59 workflow simplification (24-25 Sep 2026) - implemented, live-smoke-tested, PR open
+
+**Status.** Implemented (commit `2ab49f1`), live smoke tests passed on 25 Sep (`4588412`), pushed, PR
+SAM-BIM/SAM_UI#109 into `sow/2026-Q3` (open; wait for CI green before merge). Branch `feature/parto-workflow-simplification-2026-09-24` (SAM_UI only, from `sow/2026-Q3` `c7281ca`).
+SAM / SAM_Systems / SAM_Tas unchanged (engineering behaviour frozen after the merged Nuaire work).
+
+**Environment.** All four repos at `origin/sow/2026-Q3` (SAM `80b01052`, SAM_Systems `2213373`, SAM_Tas `39828c6`,
+SAM_UI `c7281ca`), rebuilt in order with VS 18 MSBuild Release `-restore` (0 errors); `SAM_UI\build` refreshed.
+
+**Owner decisions (24 Sep).** (1) Iteration 3 results stored per Reference A + method, legacy `-Iteration3.json`
+read by the mode inside it; a refused attempt never locks Review. (2) The Part O Simulate dialog folds into a Hub
+"Simulation case" (weather, output folder, solar method). (3) B4 kept, under Advanced. Plus: pre-flight per unit
+before Run; fix grouped-grid virtualisation; honest stage-level progress; no success OK box. UX rule: engineer-facing
+text uses Part O iteration language - "Iteration 3 comparison", Reference case / System case; no A/B, B0, B4, MG,
+"pairing" in the UI (they stay in code/files). Product methods first; route check (B0) and published cooling table
+(B4) are "Advanced - validation methods".
+
+**What changed (all SAM_UI).**
+- Storage: `PartOIteration3Paths` - per-method record `<run>-Iteration3-<B0|BP|B4|MG>.json`, report
+  `<record>-Review.txt/json`; SelectedProduct gets its own Candidate B suffix `-It3BP` (was shared with B0).
+  `Query.PartOIteration3RecordPath/PairingStatus(es)` resolve per-method first, then the legacy file only if its
+  recorded mode matches. `PartOIteration3Eligibility.PairingStatuses`; Review = a COMPLETED record only.
+  `ReviewPartOIteration3(run, pipeline, mode?, step?)` (null mode = legacy file, else first per-method record).
+- Record: additive `Guidance` list (`PartOIteration3GuidanceEvidence`, SAM_UI core) written by the MG run; older
+  records read as none. `Query.PartOIteration3GuidanceEvidence` re-reads it for an old record ONLY if the catalogue
+  SHA-256 equals the recorded one, else falls back (says so). Note text and report bytes unchanged.
+- Run: `RunPartOIteration3(..., stageStarting)` announces each ledger stage; cancel honoured before ThermalSource,
+  SystemsConversion (Route), ResultantTemperature, CandidateBTM59 (refusal "Cancelled", method re-runnable).
+- Pre-flight: `Query.PartOIteration3Preflight` = eligibility + system scope + the run's own resolution query for the
+  method (no TAS); per-unit rows, grouped summary, refusals shown before Run is enabled.
+- Progress: `PartOProgressState` (pure, injectable clock) + `PartOProgressHost`/`PartOProgressWindow` (own STA
+  thread, topmost, 0.5 s poll, indeterminate bar, elapsed, Cancel between stages). While `PartOProgressHost.Current`
+  is set, `RunWorkflow` and `RunPartOSimulation` report steps into it instead of their own dialogs; modals hide it.
+- Simulate: `Modify.SimulatePartO(ui, run, PartOSimulationCase)` builds the same inputs the locked dialog returned
+  (SimulateOptions_PartO + the 3 fields; days 1-365) and calls the shared core; returns `PartOSimulationOutcome`
+  instead of the "Time elapsed" box. Dialog path (`Simulate(ui, run, bool)`, Energy Simulation) unchanged.
+- Hub (`PartOWorkflowWindow` + `.Iteration3.cs`): Simulation case expander, inline last-outcome line, Iteration 3
+  panel (reference case text, per-method status, explanation, pre-flight, Open result / Show last attempt, Run
+  system case / Run again with a replace confirmation). Old bottom Iteration 3 button and method combo removed.
+  `PartOWorkflowAction.Iteration3Review` appended. `RunPartOWorkflow` carries method + case + outcome across showings.
+- Comparison window: title "Iteration 3 comparison"; header in engineer terms; stage line; tiles (reference /
+  system TM59, mean diff, RMS, largest diff, outcomes changed); system card (guidance as key/value + per-unit
+  grid; products for other methods); chips Failures/Changed/Largest differences/All + search; dwelling groups as
+  collapsed Expanders with per-dwelling stats, `IsVirtualizingWhenGrouping=True`, auto-open when a filter leaves
+  <= 300 rows; Technical details holds the verbatim outcome/summary/stage ledger/notes; Copy All unchanged.
+  Column MinWidth pins widths (WPF leaves them unresolved when no row is realised).
+- `AssessPartOTM59` now returns the verdict and uses the shared progress window when one is current.
+
+**Validation.** `SAM_UI.sln` Release: 0 errors. `SAM.Analytical.UI.WPF.Tests`: 1056/1056 (1031 before; 22 updated
+for the per-method names/labels and the completed-only Review rule; new: `PartOWorkflowSimplificationTests`, run
+tests for per-method record / stage order / cancel-before-TAS, eligibility per-method/legacy/refused).
+5,000-room test: 1000 dwellings x 5 rooms x 3 criteria = 15 000 rows open with <100 rows realised, groups collapsed.
+Real data, no TAS (`PartOWorkflowEvidenceHarness`, opt-in via `SAM_PARTO_EVIDENCE` + `SAM_PARTO_SCREENSHOTS`) on
+`C:\TasOut\parto-guidance-2026-09-24\03-Resume`: 1a reopened (0.8 s, resume OK); legacy MG record seen as MG
+completed; pre-flight MG ready (3 x Nuaire), SelectedProduct refused before TAS (template states no heat recovery);
+review 8.8 s, bias 0.567 K / RMSE 1.477 K / max 4.121 K (= acceptance); guidance card falls back because the
+catalogue SHA changed since that run. Report files the review rewrote were restored. Screenshots in the session
+scratchpad only (not in git).
+
+**Live smoke tests (25 Sep, real exe + TAS, UI Automation).** Record:
+`documentation/evidence/parto-workflow-simplification/LIVE-SMOKE-2026-09-25.md` (+ 6 screenshots); raw logs and
+scripts outside git in `C:\TasOut\parto-workflow-smoke-2026-09-25\`.
+- Prepare & Run (1a, acceptance model a7e09a25): Simulation case in the Hub, Review iteration shown, no Simulate
+  dialog, one progress window through the whole TAS run (window watcher + its own pixels), TAS 50-54 s, TM59
+  opened, inline Hub line, 0 message boxes (5 passes).
+- Iteration 3 guidance from that 1a: reference case named, guidance default, pre-flight 3 x Nuaire, no picker,
+  6.7 min with the progress window updating throughout (moved/minimised/restored), comparison +0.52 K / 1.41 K /
+  4.14 K, reopened in-session (12 s) and in a fresh process (14.7 s, TSD reader only, no TBD/TPD).
+- Fixed/added after the smoke: regression test that the progress window keeps its content after Hide/Show.
+
+**Known follow-ups (not blocking).** UI Automation exposes no elements for the progress window after it
+re-shows (pixels correct - accessibility only). Main window still busy while TAS holds the UI thread. No sub-step
+text inside the Iteration 3 TAS calls. Pre-existing 'Reloading' flash on model adoption. 2B history grid builds
+all rows eagerly.
+
+**Next step.** Review and merge the SAM_UI PR (CI green first); then bump SAM_Deploy's SAM_UI pointer.
+
+## Previous: Nuaire reply (24 Sep 2026) - exchanger then DX drop, 13 C floor
 
 **Status.** MERGED into `sow/2026-Q3` on 2026-09-24, in order: SAM-BIM/SAM#133 (`54c43438`) -> SAM-BIM/SAM_Systems#29 (`c88c9b37`) -> SAM-BIM/SAM_Tas#65 (`1b659756`) -> SAM-BIM/SAM_UI#107 (`8f58144c`). CI green and Codex review clean (all findings fixed and answered) on every PR. The `feature/parto-nuaire-reply-2026-09-24` branches are deleted.
 The full cross-repo record (evidence, decisions, TAS probes, MG
