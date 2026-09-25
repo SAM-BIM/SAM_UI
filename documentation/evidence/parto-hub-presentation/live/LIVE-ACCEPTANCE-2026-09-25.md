@@ -3,7 +3,7 @@
 The acceptance was run on the real `SAM_UI\build\SAM Analytical.exe` (WPF DLL built 14:33), driven through UI Automation. Window captures use PrintWindow, so they show the window's own pixels.
 
 - The driver is `C:\TasOut\parto-hub-presentation-2026-09-25\scripts\accept.ps1`. It is not in git. It reuses the 25 Sep smoke helpers.
-- The raw logs `accept-fresh.log` and `accept-reopen.log` are in this folder.
+- The raw logs `accept-fresh.log` and `accept-reopen.log` are outside git (`*.log` is ignored), in `C:TasOutparto-hub-presentation-2026-09-25`.
 - No TAS run was started, no review was opened, and nothing was written beside either model.
 
 ## Fresh Iteration 1a
