@@ -180,6 +180,34 @@ namespace SAM.Analytical.UI.WPF.Tests
             partOWorkflowWindow.Close();
         }
 
+        /// <summary>
+        /// Codex review on #111: with reviewable results open, invalidating the preparation inputs blocks
+        /// Prepare &amp; Run but not Review, which reads the existing run. Review stays the next step; the
+        /// blocker is stated beside it.
+        /// </summary>
+        [WpfFact]
+        public void Reviewable_results_stay_the_next_step_while_prepare_and_run_is_blocked()
+        {
+            PartOWorkflowWindow partOWorkflowWindow = Window(Scenario_1a(), resultsAvailable: true);
+
+            //No dwelling selected: the scope blocks the run.
+            partOWorkflowWindow.Scope = PartOWorkflowScope.SelectedDwellings;
+            partOWorkflowWindow.DwellingSelection.SetSelected(false);
+
+            Assert.False(partOWorkflowWindow.CanRun);
+            Assert.True(partOWorkflowWindow.CanReviewResults);
+
+            IReadOnlyList<PartOWorkflowStep> steps = partOWorkflowWindow.WorkflowSteps;
+
+            Assert.Equal(PartOWorkflowStepState.Blocked, steps[0].State);
+            Assert.Equal(PartOWorkflowStepState.Current, steps.Single(x => x.Name == PartOWorkflowProgress.Name_Review).State);
+
+            Assert.StartsWith("Next: Review the TM59 results.", partOWorkflowWindow.NextStepText);
+            Assert.Contains("✕ Prepare & Run is unavailable — resolve the", partOWorkflowWindow.NextStepText);
+
+            partOWorkflowWindow.Close();
+        }
+
         [WpfFact]
         public void Optimise_2B_appears_on_the_strip_only_where_the_scenario_can_carry_it()
         {

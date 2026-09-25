@@ -64,17 +64,19 @@ simulation, provenance, the inspection's stage statuses, or any enable rule.
     Codex review on #111 found three edge cases, all fixed: `MaxHeight` is capped to 92% of the ACTIVE
     monitor (it was read from the primary); `MinHeight` comes down with it on a working area shorter than 520;
     and growth after placement is handled. The arithmetic is the pure `PartOWorkflowWindow.Placement`.
+  - Codex review on #111: with reviewable results open, a blocked Prepare & Run no longer hides Review. The strip
+    marks Review as the current step, and the next-step line leads with Review and states the blocker beside it.
 
 **Validation.**
 - `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): 0 errors.
-- `SAM.Analytical.UI.WPF.Tests`: 1076/1076. The previous count was 1057 (1056 + the new opt-in harness).
+- `SAM.Analytical.UI.WPF.Tests`: 1077/1077. The previous count was 1057 (1056 + the new opt-in harness).
 - Live acceptance in the real exe (UI Automation + PrintWindow): 0 message boxes; fresh 1a, 2 and 1b; Show
   details; Simulation case; tooltips; captions; 700/1200 px widths; move to a second monitor; the reopened 1a
   run with Iteration 3 shown. Record: `documentation/evidence/parto-hub-presentation/live/LIVE-ACCEPTANCE-2026-09-25.md`.
   All monitors are at 96 DPI; no non-100% scale was tested (the system setting was not changed).
   - 7 pins were updated for the wording: plurals, and the template test now asserts label + glyph +
     ShortDetail + FullDetail.
-  - New: `PartOHubPresentationTests` (19 cases, including 6 placement-theory rows and a real-window growth test).
+  - New: `PartOHubPresentationTests` (20 cases, including 6 placement-theory rows, a real-window growth test, and Review staying next while Run is blocked).
     Plus one assertion that the Iteration 3 panel is visible with a recorded result.
 - Before/after renders (fresh 1a, and 1a after its run): `documentation/evidence/parto-hub-presentation/`, via
   the opt-in `PartOWorkflowHubScreenshotHarness` (see its README).

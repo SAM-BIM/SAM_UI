@@ -1221,18 +1221,13 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private void UpdateNextStep(PartOWorkflowInspection partOWorkflowInspection, int count_Blocking)
         {
-            if (count_Blocking != 0)
-            {
-                textBlock_NextStep.Text = count_Blocking == 1
-                    ? "✕ Prepare & Run is unavailable — resolve the blocking item shown above."
-                    : string.Format("✕ Prepare & Run is unavailable — resolve the {0} blocking items shown above.", count_Blocking);
-                textBlock_NextStep.Foreground = Brushes.Firebrick;
+            string blocked = count_Blocking == 1
+                ? "✕ Prepare & Run is unavailable — resolve the blocking item shown above."
+                : string.Format("✕ Prepare & Run is unavailable — resolve the {0} blocking items shown above.", count_Blocking);
 
-                return;
-            }
-
-            textBlock_NextStep.ClearValue(TextBlock.ForegroundProperty);
-
+            //Results that can be reviewed stay the next step whatever the current inputs say: Review reads the
+            //existing run and does not depend on them (Codex review on #111). A blocker is still stated beside
+            //it, because Prepare & Run is what it stops.
             if (partOWorkflowInspection.CanReviewResults)
             {
                 string text = "Next: Review the TM59 results.";
@@ -1247,10 +1242,26 @@ namespace SAM.Analytical.UI.WPF
                     text += " Optimise (2B) is also available.";
                 }
 
+                if (count_Blocking != 0)
+                {
+                    text += " " + blocked;
+                }
+
                 textBlock_NextStep.Text = text;
+                textBlock_NextStep.ClearValue(TextBlock.ForegroundProperty);
 
                 return;
             }
+
+            if (count_Blocking != 0)
+            {
+                textBlock_NextStep.Text = blocked;
+                textBlock_NextStep.Foreground = Brushes.Firebrick;
+
+                return;
+            }
+
+            textBlock_NextStep.ClearValue(TextBlock.ForegroundProperty);
 
             textBlock_NextStep.Text = partOWorkflowInspection.ReusePreparation
                 ? "Next: Run the Part O assessment on the prepared ventilation design."
