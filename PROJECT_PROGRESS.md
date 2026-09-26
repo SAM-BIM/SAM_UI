@@ -1,6 +1,6 @@
 # Project Progress
 
-## Current: Part O UX pass 5 - Iteration 2B journey (26 Sep 2026) - PR OPEN, not merged
+## Current: Part O UX pass 5 - Iteration 2B journey (26 Sep 2026) - PR #118 OPEN, live-accepted, not merged
 
 **Status.** Branch `feature/parto-2b-journey-2026-09-26` from `sow/2026-Q3` `3b29e41` (#117 merged). SAM_UI only.
 Presentation and orchestration only: the optimiser, its eligibility (`Modify.CanOptimise`), stop rules, rounds,
@@ -42,6 +42,26 @@ reporting PRs #136/#139/#140 not needed). Not merged at time of writing.
 - Cancel edge case: the command reads `PartOProgressHost.IsCancellationRequested`; where Cancel was requested but the
   run stopped for another reason (e.g. a refusal after the click), the band says so. Stop precedence unchanged.
 
+**Final acceptance pass (26 Sep, owner request - real app, real TAS; full record in JOURNEY.md "Live acceptance").**
+- Real Iteration 2 (full year, 54 s) with NO 2B tick -> Hub offers Optimise (2B)… on `CanOptimise` alone; no re-run.
+- Start window: correct source run/results/dwellings/weather; defaults 5 l/s / 10 rounds / envelope on; `0` and `abc`
+  disable Start with the reason; Cancel starts nothing and leaves the Hub line.
+- Real 2B: one Part O window, stages assess -> "Optimisation rounds · round 1..10" (no total, no %) -> capacity envelope;
+  Cancel only during TAS steps. Stopped **IterationLimitReached** after 10 rounds (243 s incl. envelope); result
+  TM59 FAIL, "Stopped: round limit reached (10 rounds)", 8 spaces changed (6 targeted, 2 balancing), envelope
+  calculated (diagnostic); Engineering detail collapsed (108 / 36 rows, 863 notes).
+- Second 2B from the kept design, pre-filled from the session, named "design kept by an earlier 2B run (round 10)",
+  written as `-Opt11`; cancelled in round 1's TAS -> "Cancelled", Next = needs a new Iteration 2 run; Hub agrees.
+- Save -> restart -> reopen: "Saved Iteration 2 results reopened — ready to review"; no 2B history shown or inferred.
+- Fixed from this pass: Codex P2 x2 (next step only offers continuing where the run survives - `canContinue`, read off
+  the run; session pre-fill on every route - `Modify.partOOptimisationSettings_LastConfirmed`); live: a reopened
+  Iteration 2 run said "Iteration 2 only" beside Optimise (pre-existing precedence) -> now the authority's refusal and
+  "Needs a live run" where a run with results exists (re-checked live); Hub "iteration limit" -> "round limit".
+- Communal corridor: verified, no defect. SAM `TM59AssessmentReport` classifies by the exact InternalCondition; SAM_UI
+  presents `CorridorChecks` / `SupplementaryChecks` as given. New `PartOTM59CorridorReportingTests` pins it (the live
+  model has no corridor IC).
+- Observed, not changed: per-round `.sam` roughly doubles in size (172 KB -> 1.9 MB at round 10) - flagged separately.
+
 **Unchanged on purpose.** Pass 4 progress window (stages, "round n" with no total, no percentage, Cancel only while
 observed); Pass 3 Hub outcome wording; `CanOptimise` including the restored-run refusal.
 
@@ -52,23 +72,24 @@ can be reviewed, not continued into 2B. Also not available: SAM's per-space over
 check rows, not the report) and before/after airflow totals - not computed in the UI.
 
 **Files.** New: `Classes/PartO/PartOOptimisationSummary.cs`, `Classes/PartO/PartOOptimisationStart.cs`,
-`Windows/PartOOptimisationStartWindow.xaml(.cs)`, tests `PartOIteration2BJourneyTests.cs`, evidence
-`documentation/evidence/parto-2b-journey/` (JOURNEY.md + 7 PNGs). Changed: `Modify/RunPartOOptimisation.cs`,
+`Windows/PartOOptimisationStartWindow.xaml(.cs)`, tests `PartOIteration2BJourneyTests.cs`,
+`PartOTM59CorridorReportingTests.cs`, evidence `documentation/evidence/parto-2b-journey/` (JOURNEY.md, 7 synthetic PNGs,
+`live/` captures and driver logs). Changed: `Modify/RunPartOOptimisation.cs`, `Modify/PartOHubOutcome.cs` (round limit),
 `Modify/RunPartOWorkflow.cs`, `Windows/PartOOptimisationResultWindow.xaml(.cs)`, `Windows/PartOWorkflowWindow.xaml(.cs)`,
 `Windows/PartOIterationWindow.xaml(.cs)` (wording), `Windows/AnalyticalWindow.xaml.cs` (ribbon gate/tooltips); tests
 `PartOWorkflowTests`, `PartOWorkflowRefreshTests`, `PartOWorkflowInitialisationTests` (9 Hub-tick tests retired, one
 rewritten, the workflow-input test now uses the Simulation case folder) and four files for the `Restore` signature.
 
 **Validation.**
-- `SAM.Analytical.UI.WPF.Tests`: 1202/1202 (was 1196; -9 retired Hub-tick tests, +15 new incl. the env-gated evidence test).
-- `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): exit 0, 0 errors; no new warnings in the touched files.
-- Rendered evidence reviewed (start valid/invalid; result capacity collapsed/expanded, passed, baseline passes,
-  failure after Cancel).
-- NOT run live: no saved Iteration 2 run exists; a live 2B needs a full-year Iteration 2 TAS run.
+- `SAM.Analytical.UI.WPF.Tests`: **1208/1208** (was 1196 before Pass 5; -9 retired Hub-tick tests, +19 in
+  `PartOIteration2BJourneyTests` incl. the env-gated evidence test, +2 in `PartOTM59CorridorReportingTests`).
+- `SAM_UI.sln` Release (VS 18 MSBuild): exit 0, 0 errors; no new warnings in the touched files. `git diff --check` clean.
+- Rendered evidence reviewed; live acceptance above (driver `C:\TasOut\parto-2b-journey-2026-09-26\scripts\journey2b.ps1`,
+  parts `run` / `reopen`; the run folder is on this machine only).
 
-**Next step.** Owner reviews the PR (and the rendered evidence). Check CI and the Codex review before merge. Then a live
-acceptance: Prepare & Run Iteration 2 (full year) without any 2B tick -> Optimise (2B)… -> confirm -> watch the
-progress window -> check the result band and the Hub line. Merge SAM_Deploy #49 independently.
+**Next step.** Wait for CI green, the Codex re-review and the repository review on #118; STOP before merge (owner
+merges). Merge SAM_Deploy #49 independently; after #118 merges, bump SAM_Deploy's SAM_UI pointer again. Separate
+follow-ups: per-round `.sam` growth; optionally remove the Prepare Iteration 2B pre-set and its plumbing.
 
 ## Previous: Part O UX pass 4 - shared progress window consistency (25 Sep 2026) - MERGED (#117, 3b29e41)
 

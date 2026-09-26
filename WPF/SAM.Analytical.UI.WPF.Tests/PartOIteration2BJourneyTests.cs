@@ -393,6 +393,47 @@ namespace SAM.Analytical.UI.WPF.Tests
             }
         }
 
+        /// <summary>
+        /// Live acceptance, 26 Sep: a reopened Iteration 2 run with the scenario box back on its first
+        /// scenario said "Iteration 2 only" beside Optimise. Where a run with results exists, the reason is that
+        /// run's - <c>CanOptimise</c>'s refusal - and a reopened run's caption says it needs a live run.
+        /// </summary>
+        [WpfFact]
+        public void AReopenedRun_SaysWhy2BIsUnavailable_InTheAuthoritysWords_WhateverTheScenarioBox()
+        {
+            const string refusal = "This Part O run was reopened from a saved model, so its results can be reviewed but not continued.";
+
+            PartOWorkflowWindow partOWorkflowWindow = new()
+            {
+                AnalyticalModel = Model("reopened"),
+                PartORun = new PartORun(),
+                Capabilities = new PartOWorkflowCapabilities { EquipmentAvailable = true, ResultsAvailable = true, ResultsRestored = true, OptimisationAvailable = false, OptimisationRefusal = refusal },
+            };
+
+            partOWorkflowWindow.Restore(PartOWorkflowScenario.Scenarios.Find(x => !x.SupportsOptimisation), PartOWorkflowScope.AllDwellings, null);
+            partOWorkflowWindow.CompleteInitialisation();
+
+            Assert.False(partOWorkflowWindow.CanOptimise);
+            Assert.Equal(refusal, partOWorkflowWindow.OptimiseToolTip);
+            Assert.Equal("Needs a live run", partOWorkflowWindow.OptimiseCaption);
+
+            partOWorkflowWindow.Close();
+        }
+
+        /// <summary>The Hub line says "round limit", the word every 2B window uses for the same setting.</summary>
+        [Fact]
+        public void TheHubLine_SaysRoundLimit_LikeTheResultWindow()
+        {
+            PartOOptimisationRun partOOptimisationRun = History(rounds: 2);
+            partOOptimisationRun.StopReason = PartOOptimisationStopReason.IterationLimitReached;
+
+            PartOWorkflowOutcome? partOWorkflowOutcome = Modify.OptimisationOutcome(partOOptimisationRun);
+
+            Assert.NotNull(partOWorkflowOutcome);
+            Assert.Contains("Stopped: round limit reached", partOWorkflowOutcome.Text, StringComparison.Ordinal);
+            Assert.DoesNotContain("iteration limit", partOWorkflowOutcome.Text, StringComparison.OrdinalIgnoreCase);
+        }
+
         // ---- What changed ----------------------------------------------------------------------------
 
         /// <summary>

@@ -1027,14 +1027,21 @@ namespace SAM.Analytical.UI.WPF
             button_Optimise.IsEnabled = partOWorkflowInspection.CanOptimise;
             button_Optimise.ToolTip = partOWorkflowInspection.CanOptimise
                 ? "Optimise ventilation (Iteration 2B): raise the design airflow of the spaces that fail TM59 by a fixed step within the selected ventilation units, rebalance, re-simulate the same full year and reassess, until they pass or a limit is reached. You confirm the step and the round limit before it starts. The selected product is never changed."
-                : !supportsOptimisation
+                : !supportsOptimisation && !partOWorkflowInspection.CanReviewResults
                     ? OptimisationScenarioText(Scenario)
                     : partOWorkflowInspection.OptimisationRefusal ?? "Iteration 2B optimises a completed Iteration 2 run.";
 
+            //Where a run with results exists, the reason 2B is unavailable is THAT run's - the authority's
+            //refusal above - whatever scenario the box shows for the next run (live acceptance, 26 Sep: a
+            //reopened Iteration 2 run, with the box back on its first scenario, read "Iteration 2 only").
             textBlock_ReviewCaption.Text = partOWorkflowInspection.CanReviewResults ? string.Empty : "No results yet";
             textBlock_OptimiseCaption.Text = partOWorkflowInspection.CanOptimise
                 ? "Optimise ventilation"
-                : supportsOptimisation ? "After an Iteration 2 run" : "Iteration 2 only";
+                : partOWorkflowInspection.CanReviewResults && partOWorkflowCapabilities.ResultsRestored
+                    ? "Needs a live run"
+                    : partOWorkflowInspection.CanReviewResults
+                        ? "Not available"
+                        : supportsOptimisation ? "After an Iteration 2 run" : "Iteration 2 only";
 
             //The Iteration 3 panel's own actions, from the eligibility the caller gathered once - it touches
             //the filesystem (it looks for saved results), and a status list rebuilt on every keystroke must not.
