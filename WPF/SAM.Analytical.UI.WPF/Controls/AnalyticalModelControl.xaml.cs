@@ -1052,6 +1052,11 @@ namespace SAM.Analytical.UI.WPF
             Modify.RenameSpaces(uIAnalyticalModel, jSAMObjects.FindAll(x => x is Space).Cast<Space>());
         }
 
+        private void MenuItem_SpaceAssumptionsPdf_Click(object sender, RoutedEventArgs e)
+        {
+            uIAnalyticalModel?.CreateSpaceAssumptionsPdf((sender as MenuItem)?.Tag as IEnumerable<Space>, System.Windows.Window.GetWindow(this));
+        }
+
         private void MenuItem_Select_Click(object sender, RoutedEventArgs e)
         {
             List<IJSAMObject> jSAMObjects = GetSAMObjects(sender as MenuItem);
@@ -1276,6 +1281,8 @@ namespace SAM.Analytical.UI.WPF
                 menuItem.Click += MenuItem_EditZones_Click;
                 menuItem.Tag = tuples_Zone;
                 contextMenu_Model.Items.Add(menuItem);
+
+                contextMenu_Model.Items.Add(Create.MenuItem_SpaceAssumptionsPdf(tuples.ConvertAll(x => x.Item2).OfType<Space>(), MenuItem_SpaceAssumptionsPdf_Click));
             }
             else if (jSAMObject is Panel)
             {

@@ -61,6 +61,17 @@
     <Reference Include="SAM.Analytical.Tas.TM59">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.TM59.dll</HintPath>
     </Reference>
+    <!-- SpaceAssumptionsPdfTests: the reporting options (UnitStyle), the renderer contract and the renderer's
+         font resolver. PDFsharp itself arrives through SAM.Analytical.UI.WPF's package reference. -->
+    <Reference Include="SAM.Core.Reporting">
+      <HintPath>..\..\..\SAM\build\SAM.Core.Reporting.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.Reporting.Pdf">
+      <HintPath>..\..\..\SAM\build\SAM.Core.Reporting.Pdf.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Units">
+      <HintPath>..\..\..\SAM\build\SAM.Units.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
