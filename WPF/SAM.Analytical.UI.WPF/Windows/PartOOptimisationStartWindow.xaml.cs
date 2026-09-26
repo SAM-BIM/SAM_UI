@@ -22,6 +22,10 @@ namespace SAM.Analytical.UI.WPF
         {
             InitializeComponent();
 
+            //Never taller than the screen it opens on: the content scrolls and Start / Cancel stay reachable on a
+            //short display or with large text scaling - the same cap the Hub and the Prepare Iteration window use.
+            MaxHeight = SystemParameters.WorkArea.Height * 0.92;
+
             textBlock_Purpose.Text = PartOOptimisationStart.Text_Purpose;
             itemsControl_Changes.ItemsSource = PartOOptimisationStart.Changes;
             itemsControl_Keeps.ItemsSource = PartOOptimisationStart.Keeps;

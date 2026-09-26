@@ -61,6 +61,10 @@ reporting PRs #136/#139/#140 not needed). Not merged at time of writing.
   Iteration window cleared its 2B preset (`ReuseWithCurrentOptimisation` adopted the request's null). Now a request
   stating no settings keeps the recorded preset; the reuse condition is unchanged. Test C renamed
   `AReusedPreparation_KeepsARecordedPresetWhenTheRequestStatesNone`.
+- Codex P2 x2 on 91085dc (fixed): (a) a 2B started from an earlier `-Opt10` said "numbering continues", but only the
+  result files continue - the new run's rounds show 1..N. The Start window now says "saved as round 10 (-Opt10)" and
+  explains that its rounds count from 1 while files continue from -Opt11; the optimiser's numbering is unchanged.
+  (b) the Start window is now capped to the work area with its content in a ScrollViewer and Start/Cancel outside it.
 - Communal corridor: verified, no defect. SAM `TM59AssessmentReport` classifies by the exact InternalCondition; SAM_UI
   presents `CorridorChecks` / `SupplementaryChecks` as given. New `PartOTM59CorridorReportingTests` pins it (the live
   model has no corridor IC).

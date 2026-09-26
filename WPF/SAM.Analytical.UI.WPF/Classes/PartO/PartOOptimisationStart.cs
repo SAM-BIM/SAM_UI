@@ -102,8 +102,10 @@ namespace SAM.Analytical.UI.WPF
                 "Starting from",
                 iteration == 0
                     ? string.Format("The completed {0} run and its TM59 results", name)
-                    : string.Format("The design kept by an earlier Iteration 2B run (round {0}); numbering continues from it", iteration),
-                "Iteration 2B does not simulate the starting design again: it assesses the results it already has, then optimises from there."));
+                    : string.Format("The design kept by an earlier Iteration 2B run, saved as round {0} (-Opt{0:00})", iteration),
+                iteration == 0
+                    ? "Iteration 2B does not simulate the starting design again: it assesses the results it already has, then optimises from there."
+                    : string.Format("Iteration 2B does not simulate the starting design again: it assesses the results it already has, then optimises from there. This optimisation numbers its own rounds from 1 (run 0 is this starting design); only the result files continue the earlier numbering, so its round 1 is saved as -Opt{0:00} and nothing earlier is overwritten.", iteration + 1)));
 
             if (!string.IsNullOrWhiteSpace(path_TSD))
             {

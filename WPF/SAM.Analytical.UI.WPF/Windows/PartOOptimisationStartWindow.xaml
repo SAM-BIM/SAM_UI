@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Part O — Start Iteration 2B" Width="640" SizeToContent="Height" ResizeMode="NoResize"
+        Title="Part O — Start Iteration 2B" Width="640" SizeToContent="Height" ResizeMode="CanResizeWithGrip" MinHeight="260"
         WindowStartupLocation="CenterOwner" FontFamily="Roboto Light">
     <Window.Resources>
         <ResourceDictionary>
@@ -37,7 +37,16 @@
     <!-- LAYOUT, in the order an engineer asks: WHY run it (purpose), WHAT it starts from (the run's own
          record), WHAT it may and may not change, and HOW (the settings, pre-filled). Nothing runs until Start.
          Every fact is PartOOptimisationStart's; eligibility was already Modify.CanOptimise's answer. -->
-    <StackPanel Margin="14,12,14,12">
+    <!-- The content scrolls and the actions sit outside it, so Start and Cancel stay on screen however small the
+         work area or large the text scaling; the height is capped to the work area in code, as the other Part O
+         dialogs are. -->
+    <Grid Margin="14,12,14,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel>
         <TextBlock Text="Optimise ventilation — Iteration 2B" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource PartO.Brush.Text}"/>
         <TextBlock x:Name="textBlock_Purpose" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{StaticResource PartO.Brush.Text}"/>
 
@@ -111,10 +120,13 @@
         <TextBlock Margin="0,10,0,0" Style="{StaticResource PartO.Caption}"
                    Text="The design loaded into the model afterwards is the last one that was simulated and assessed in full. Cancel stops at the next point it can: a TAS step already running finishes first."/>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+    </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button x:Name="button_Start" MinWidth="150" Height="28" Padding="10,0" IsDefault="True" Click="button_Start_Click"
                     Style="{StaticResource PartO.PrimaryButton}" ToolTipService.ShowOnDisabled="True">Start Iteration 2B</Button>
             <Button x:Name="button_Cancel" IsCancel="True" Width="80" Height="28" Margin="8,0,0,0">Cancel</Button>
         </StackPanel>
-    </StackPanel>
+    </Grid>
 </Window>

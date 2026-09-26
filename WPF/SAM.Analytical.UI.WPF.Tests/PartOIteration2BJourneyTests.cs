@@ -173,7 +173,12 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             PartOOptimisationStart partOOptimisationStart_Opt = PartOOptimisationStart.Create(partORun_Opt, null);
 
-            Assert.Contains("earlier Iteration 2B run (round 3)", partOOptimisationStart_Opt.Facts.Single(x => x.Label == "Starting from").Value, StringComparison.Ordinal);
+            //Codex P2 on #118: only the result files continue the numbering - this run's rounds count from 1.
+            PartOOptimisationSummary.Fact fact_Opt = partOOptimisationStart_Opt.Facts.Single(x => x.Label == "Starting from");
+            Assert.Contains("earlier Iteration 2B run, saved as round 3 (-Opt03)", fact_Opt.Value, StringComparison.Ordinal);
+            Assert.DoesNotContain("numbering continues", fact_Opt.Value, StringComparison.Ordinal);
+            Assert.Contains("numbers its own rounds from 1", fact_Opt.Detail, StringComparison.Ordinal);
+            Assert.Contains("saved as -Opt04", fact_Opt.Detail, StringComparison.Ordinal);
         }
 
         /// <summary>
