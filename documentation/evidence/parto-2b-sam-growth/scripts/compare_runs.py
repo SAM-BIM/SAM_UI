@@ -24,6 +24,9 @@ for r in rounds:
     if not os.path.exists(pb): print('|',r or 'baseline','| missing after |'); continue
     oa,ja=load(pa); ob,jb=load(pb)
     ta=open(os.path.join(A,pre+r+'-TM59.txt'),encoding='utf-8',errors='replace').read(); tb=open(os.path.join(B,pre+r+'-TM59.txt'),encoding='utf-8',errors='replace').read()
-    same=ta==tb
-    if not same and '-v' in sys.argv: print(''.join(list(difflib.unified_diff(ta.splitlines(1),tb.splitlines(1)))[:30]))
+    #The report's Source: line names the TSD it was read from, so it differs between the two run folders by
+    #construction; everything else must match.
+    strip=lambda t:''.join(l for l in t.splitlines(True) if not l.startswith('Source:'))
+    same=strip(ta)==strip(tb)
+    if not same and '-v' in sys.argv: print(''.join(list(difflib.unified_diff(strip(ta).splitlines(1),strip(tb).splitlines(1)))[:30]))
     print(f"| {r[1:] or 'baseline'} | {os.path.getsize(pa)/1024:,.0f} KB | {os.path.getsize(pb)/1024:,.0f} KB | {ja/1e6:,.2f} MB | {jb/1e6:,.2f} MB | {len(grp(oa,'DesignDay'))} / {len(grp(ob,'DesignDay'))} | {len(grp(oa,'ZoneSimulationResult'))} / {len(grp(ob,'ZoneSimulationResult'))} | {'yes' if same else 'NO'} | {'yes' if design(oa)==design(ob) else 'NO'} |")
