@@ -1,12 +1,30 @@
 # Project Progress
 
-## Current: SAM Documentation Framework PR3 - Space Assumptions PDF in SAM_UI (26 Sep 2026) - PR OPEN, not merged
+## Current: SAM Documentation Framework Phase 1 - COMPLETE (closeout 26 Sep 2026)
 
-**Status.** Branch `feature/reporting-pr3-space-assumptions-pdf`.
+```text
+SAM Documentation Framework — Phase 1
+Status: COMPLETE
+```
+
+- **SAM_UI#121 merged as `7e7de033`.** The Space Assumptions PDF is available from SAM_UI: select one Space ›
+  Edit › Reports › Space Assumptions PDF › save. The legacy **Print RDS** remains, and is retained until Phase 2
+  reaches sufficient parity.
+- UI integration acceptance passed (below). Phase 1 UI work is complete; no new UI functionality was started.
+- Deployed by SAM_Deploy#51 (`8e6740af`), which pins SAM `22f9c743` and SAM_UI `7e7de033`. The real installed
+  `SAM Analytical.exe` was smoke-tested and produced a 1-page PDF with `L/s`.
+- SI only in the UI: SAM_UI has no global unit-system preference yet, so no IP selector was added. The SAM core
+  supports IP.
+- Completion record, including what is outside Phase 1 and the SAM#138 follow-up (still open): SAM
+  `documentation/Reporting-PDF.md` › *Phase 1 status*.
+- Next step: Phase 2 planning (not started).
+
+## Previous: SAM Documentation Framework PR3 - Space Assumptions PDF in SAM_UI (26 Sep 2026) - MERGED (#121, 7e7de033)
+
+**Status.** Merged as `7e7de033` from branch `feature/reporting-pr3-space-assumptions-pdf`.
 - Base: `sow/2026-Q3` `d7f042f7` (#118 merged); `sow/2026-Q3` `cb61241d` (#119/#120, Part O .sam growth) merged in
   at closeout (only this file conflicted).
 - Consumes SAM `sow/2026-Q3` `22f9c743` (SAM#141 PR2 renderer + SAM#143 `L/s` symbol). No other SAM change.
-- A PR is open against `sow/2026-Q3`. The owner reviews it; do not merge.
 - Phase 1 only. Not in scope: batch reports, Building/Design Load summaries, HTML/Excel output, or an IP option in
   the UI.
 - Full description: `documentation/Reporting-SpaceAssumptionsPdf.md`.
@@ -81,13 +99,11 @@
 **Not done / risks.**
 - No IP choice in the UI (by design for Phase 1).
 - No company logo: SAM_UI has no logo resource.
-- SAM_Deploy's installer pin list does not name the PDFsharp files. Today only SAM_UI deposits them, so there is no
-  drift.
+- Resolved: SAM_Deploy#51 added an installer gate that checks the PDFsharp/MigraDoc files and licences in the payload.
 - A PDF locked in a viewer is reported by Windows as "Access to the path is denied". The message also says to close
   the file.
 
-**Next step.** The owner reviews the PR; check CI is green before any merge. After merge, move SAM_Deploy's SAM_UI
-pointer and confirm that the CI installer payload contains the PdfSharp*/MigraDoc* DLLs and `licenses\NotoSans`.
+**Outcome.** Merged on green CI; SAM_Deploy#51 (`8e6740af`) moved the pointers and verified the installer payload.
 
 ## Previous: Part O 2B per-round `.sam` growth (26 Sep 2026) - MERGED (SAM#142, SAM_Tas#67, SAM_UI#119) and deployed
 
