@@ -59,9 +59,11 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         /// <param name="cancelRequested">Whether Cancel was requested in the progress window - used only to
         /// explain a stop that was not the cancellation.</param>
-        internal void Show(PartOOptimisationRun? partOOptimisationRun, bool cancelRequested)
+        /// <param name="canContinue">Whether the session run still holds the kept design, so 2B can be started
+        /// again from it - see <see cref="PartOOptimisationSummary.Create"/>.</param>
+        internal void Show(PartOOptimisationRun? partOOptimisationRun, bool cancelRequested, bool canContinue = false)
         {
-            PartOOptimisationSummary summary = PartOOptimisationSummary.Create(partOOptimisationRun!, cancelRequested);
+            PartOOptimisationSummary summary = PartOOptimisationSummary.Create(partOOptimisationRun!, cancelRequested, canContinue);
 
             Summary = summary;
 

@@ -66,6 +66,10 @@ namespace SAM.Analytical.UI.WPF
         {
             partOOptimisationSettings_Confirmed = null;
 
+            //"Last used in this session" for every route - the Hub and the Results ribbon alike (Codex P2 on
+            //#118): the ribbon has no session state of its own to carry it in.
+            partOOptimisationSettings_Session ??= partOOptimisationSettings_LastConfirmed;
+
             if (uIAnalyticalModel is null || partORun is null)
             {
                 return null;
@@ -94,6 +98,7 @@ namespace SAM.Analytical.UI.WPF
             }
 
             partOOptimisationSettings_Confirmed = partOOptimisationSettings;
+            partOOptimisationSettings_LastConfirmed = partOOptimisationSettings;
 
             PartOOptimisationRun? partOOptimisationRun;
             string? refusal;
@@ -137,8 +142,18 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
+            AnalyticalModel? analyticalModel_LastValid = partOOptimisationRun.AnalyticalModel_LastValid;
+
+            //Whether the run survives adopting the kept design - the same condition the arming below uses. The
+            //optimiser drops the run on a cancelled or failed round, and then 2B cannot be started again from
+            //the kept design; the result window's next step must say so rather than offer an unavailable action
+            //(Codex P2 on #118).
+            bool canContinue = analyticalModel_LastValid is not null
+                && partORun.State == PartORunState.WorkflowCompleted
+                && ReferenceEquals(partORun.AnalyticalModel_Assessment, analyticalModel_LastValid);
+
             PartOOptimisationResultWindow partOOptimisationResultWindow = new();
-            partOOptimisationResultWindow.Show(partOOptimisationRun, cancelRequested);
+            partOOptimisationResultWindow.Show(partOOptimisationRun, cancelRequested, canContinue);
 
             if (owner is not null)
             {
@@ -147,7 +162,6 @@ namespace SAM.Analytical.UI.WPF
 
             partOOptimisationResultWindow.ShowDialog();
 
-            AnalyticalModel? analyticalModel_LastValid = partOOptimisationRun.AnalyticalModel_LastValid;
             if (analyticalModel_LastValid is null)
             {
                 return partOOptimisationRun;
@@ -169,6 +183,12 @@ namespace SAM.Analytical.UI.WPF
 
             return partOOptimisationRun;
         }
+
+        /// <summary>
+        /// The Iteration 2B settings last confirmed in this application session, whichever route confirmed them -
+        /// only ever a pre-fill for the next confirmation, never a setting a run uses unconfirmed.
+        /// </summary>
+        internal static PartOOptimisationSettings? partOOptimisationSettings_LastConfirmed;
 
         /// <summary>
         /// Shows the "Start Iteration 2B" confirmation and returns the settings Start was pressed with, or null

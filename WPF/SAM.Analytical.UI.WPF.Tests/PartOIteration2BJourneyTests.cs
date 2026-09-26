@@ -332,6 +332,67 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Null(PartOOptimisationSummary.Create(partOOptimisationRun, cancelRequested: true).CancelNote);
         }
 
+        /// <summary>
+        /// Codex P2 on #118: the next step never directs the engineer to an action that is not available. The
+        /// optimiser drops the run on a cancelled or failed round, so "2B again continues from the kept design"
+        /// is said only where the caller found the run still holding it; otherwise the step says a new
+        /// completed Iteration 2 run is needed first.
+        /// </summary>
+        [Fact]
+        public void TheNextStep_OffersContinuingOnlyWhereTheRunStillHoldsTheKeptDesign()
+        {
+            PartOOptimisationRun partOOptimisationRun = History(rounds: 2);
+
+            foreach (PartOOptimisationStopReason partOOptimisationStopReason in new[] { PartOOptimisationStopReason.Cancelled, PartOOptimisationStopReason.SimulationFailed, PartOOptimisationStopReason.IterationLimitReached })
+            {
+                partOOptimisationRun.StopReason = partOOptimisationStopReason;
+
+                string next_Dropped = PartOOptimisationSummary.Create(partOOptimisationRun, canContinue: false).NextStep;
+                Assert.Contains("cannot continue from this stop", next_Dropped, StringComparison.Ordinal);
+                Assert.Contains("Prepare & Run", next_Dropped, StringComparison.Ordinal);
+                Assert.DoesNotContain("continues from the kept design", next_Dropped, StringComparison.Ordinal);
+
+                string next_Held = PartOOptimisationSummary.Create(partOOptimisationRun, canContinue: true).NextStep;
+                Assert.Contains("continues from the kept design", next_Held, StringComparison.Ordinal);
+            }
+        }
+
+        /// <summary>
+        /// Codex P2 on #118: settings confirmed on any route - the Results ribbon included, which carries no
+        /// session state of its own - pre-fill the next confirmation in the same application session.
+        /// </summary>
+        [Fact]
+        public void SettingsConfirmedThisSession_PreFillTheNextConfirmationOnEveryRoute()
+        {
+            PartOOptimisationSettings? before = Modify.partOOptimisationSettings_LastConfirmed;
+
+            try
+            {
+                Modify.partOOptimisationSettings_LastConfirmed = new PartOOptimisationSettings { AirFlowStep_Lps = 4, MaximumIterations = 7 };
+
+                PartORun partORun = Completed(Context(select: true, settings: null), out string _);
+
+                PartOOptimisationStart? shown = null;
+
+                //The ribbon's call: no session settings of its own.
+                Modify.RunPartOOptimisationResult(new UIAnalyticalModel(Model("loaded")), partORun, null, null, out PartOOptimisationSettings? _, x =>
+                {
+                    shown = x;
+
+                    return null;
+                });
+
+                Assert.NotNull(shown);
+                Assert.Equal(4, shown.Settings.AirFlowStep_Lps);
+                Assert.Equal(7, shown.Settings.MaximumIterations);
+                Assert.Contains("last used in this session", shown.SettingsSource, StringComparison.Ordinal);
+            }
+            finally
+            {
+                Modify.partOOptimisationSettings_LastConfirmed = before;
+            }
+        }
+
         // ---- What changed ----------------------------------------------------------------------------
 
         /// <summary>

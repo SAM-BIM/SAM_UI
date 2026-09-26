@@ -132,7 +132,14 @@ namespace SAM.Analytical.UI.WPF
         /// Whether Cancel was requested in the progress window - a session fact the window owns, used only to
         /// explain a stop that is not <see cref="PartOOptimisationStopReason.Cancelled"/>.
         /// </param>
-        public static PartOOptimisationSummary Create(PartOOptimisationRun partOOptimisationRun, bool cancelRequested = false)
+        /// <param name="canContinue">
+        /// Whether the session's Part O run still holds the kept design as a completed run after the stop - so
+        /// Iteration 2B can be started again from it. The optimiser drops the run on a cancelled or failed
+        /// round, and then it cannot; the next step must not direct the engineer to an action that is not
+        /// available. Read off the run by the caller, never inferred from the stop reason. False by default:
+        /// nothing is promised that was not checked.
+        /// </param>
+        public static PartOOptimisationSummary Create(PartOOptimisationRun partOOptimisationRun, bool cancelRequested = false, bool canContinue = false)
         {
             if (partOOptimisationRun is null)
             {
@@ -144,7 +151,7 @@ namespace SAM.Analytical.UI.WPF
 
             PartOTM59Verdict verdict = VerdictOf(partOOptimisationRun);
 
-            (string headline, string meaning, string next) = StopText(partOOptimisationRun);
+            (string headline, string meaning, string next) = StopText(partOOptimisationRun, canContinue);
 
             List<Fact> facts = [];
 
@@ -204,7 +211,7 @@ namespace SAM.Analytical.UI.WPF
         /// One wording per stop reason: the headline, what it means, and what to do next. Materially different
         /// outcomes are never folded into one "completed".
         /// </summary>
-        internal static (string Headline, string Meaning, string Next) StopText(PartOOptimisationRun partOOptimisationRun)
+        internal static (string Headline, string Meaning, string Next) StopText(PartOOptimisationRun partOOptimisationRun, bool canContinue = false)
         {
             PartOOptimisationSettings partOOptimisationSettings = partOOptimisationRun.Settings;
 
@@ -214,7 +221,12 @@ namespace SAM.Analytical.UI.WPF
                     ? "The starting design is kept."
                     : string.Format("The last complete design (run {0}) is kept.", partOOptimisationRun.Step_LastValid.Iteration);
 
-            string fix = "Open Engineering detail › Notes, warnings and refusals for the cause, resolve it, then run Iteration 2B again from Part O — Prepare & Run.";
+            //Whether 2B can be started again from the kept design, as the caller read it off the run.
+            string again = canContinue
+                ? "Optimise (2B) again continues from the kept design."
+                : "Iteration 2B cannot continue from this stop, because the stop closed the session run: to optimise further, first produce a new completed Iteration 2 run with Prepare & Run (a full-year simulation), then start Iteration 2B.";
+
+            string fix = string.Format("Open Engineering detail › Notes, warnings and refusals for the cause and resolve it. {0}", again);
 
             switch (partOOptimisationRun.StopReason)
             {
@@ -235,7 +247,9 @@ namespace SAM.Analytical.UI.WPF
                 case PartOOptimisationStopReason.IterationLimitReached:
                     return (string.Format("Stopped: round limit reached ({0})", UI.Query.PartOCount(partOOptimisationSettings.MaximumIterations, "round", "rounds")),
                             string.Format("Eligible spaces were still failing after the last allowed round. {0}", kept),
-                            "Run Iteration 2B again from Part O — Prepare & Run: it continues from the kept design, and you can allow more rounds. Or reconsider the design or the selected unit.");
+                            canContinue
+                                ? "Optimise (2B) again continues from the kept design, and you can allow more rounds. Or reconsider the design or the selected unit."
+                                : string.Format("{0} Or reconsider the design or the selected unit.", again));
 
                 case PartOOptimisationStopReason.NoEligibleTargets:
                     return ("Stopped: no failing space that Iteration 2B can change",
@@ -265,7 +279,7 @@ namespace SAM.Analytical.UI.WPF
                 case PartOOptimisationStopReason.Cancelled:
                     return ("Cancelled",
                             string.Format("The round in progress was stopped and is not a result. {0}", kept),
-                            "Run Iteration 2B again from Part O — Prepare & Run when you are ready; it continues from the kept design.");
+                            again);
 
                 default:
                     return ("The optimisation has not finished", string.Empty, "Return to Part O — Prepare & Run.");
