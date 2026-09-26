@@ -20,7 +20,7 @@
     <!-- LAYOUT, top to bottom, in the order an engineer asks the questions: WHAT am I running (scenario,
          route, scope), WHERE am I (the workflow strip), IS the model ready (the readiness list), and WHAT
          happens next (the next-step line and the actions, which sit outside the scroll region and are always
-         reachable). The inputs that rarely change - simulation case, Iteration 2B - are collapsed below, and
+         reachable). The input that rarely changes - the simulation case - is collapsed below, and
          everything explanatory is one disclosure away rather than always on screen. -->
     <Grid Margin="12,10,12,10">
         <Grid.RowDefinitions>
@@ -237,35 +237,6 @@
                     </Grid>
                 </Expander>
 
-                <!-- Iteration 2B is NOT one of the scenarios above: it is an optimisation performed on a
-                     completed Iteration 2 run. It is set up here because the settings have to be recorded
-                     with the preparation for the run to be an optimisation starting point at all, and it
-                     is collapsed by default so a baseline run never has to read it. Shown only on a
-                     scenario that can carry one. -->
-                <Expander x:Name="expander_Optimise" Margin="0,8,0,0"
-                          Header="Follow-on optimisation (Iteration 2B — TM59 optimisation)"
-                          ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked.">
-                    <StackPanel Margin="0,6,0,0">
-                        <CheckBox x:Name="checkBox_Optimise" Content="Allow automatic TM59 optimisation after this run"
-                                  ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked."/>
-
-                        <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
-                            <TextBlock Text="Airflow step (l/s)" VerticalAlignment="Center" Width="120"/>
-                            <TextBox x:Name="textBox_AirFlowStep" Width="60" Height="20" VerticalContentAlignment="Center"/>
-                            <TextBlock Text="Maximum iterations" VerticalAlignment="Center" Width="130" Margin="20,0,0,0"/>
-                            <TextBox x:Name="textBox_MaximumIterations" Width="60" Height="20" VerticalContentAlignment="Center"/>
-                        </StackPanel>
-
-                        <CheckBox x:Name="checkBox_CapacityEnvelope" Content="Also report what the selected unit could deliver at its capacity ceiling (diagnostic)" Margin="20,8,0,0"/>
-                        <!-- Worded as what it reuses, never as a claim about results: the reuse is valid only
-                             while the converted geometry still matches the model. -->
-                        <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted TAS geometry between iterations (faster)" Margin="20,6,0,0"
-                                  ToolTip="Reuses the existing converted TAS geometry between optimisation iterations.&#x0a;Disable this when the geometry is no longer valid for the current model."/>
-
-                        <TextBlock x:Name="textBlock_Optimise" Margin="20,6,0,0" TextWrapping="Wrap" Foreground="#555555"/>
-                    </StackPanel>
-                </Expander>
-
                 <!-- ITERATION 3, in the engineer's terms: an earlier iteration as the reference case, and a
                      system case that runs the dwellings' ventilation as an explicit TAS system. Shown only once
                      it is relevant - a completed reference run exists, or a method already has a record -
@@ -356,7 +327,7 @@
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0" Width="120">
                             <Button x:Name="button_Optimise" Height="28" IsEnabled="False" Click="button_Optimise_Click"
-                                    ToolTipService.ShowOnDisabled="True">Optimise (2B)</Button>
+                                    ToolTipService.ShowOnDisabled="True">Optimise (2B)…</Button>
                             <TextBlock x:Name="textBlock_OptimiseCaption" Style="{StaticResource PartO.Caption}" FontSize="10.5" TextAlignment="Center" Margin="0,2,0,0"/>
                         </StackPanel>
                         <!-- Iteration 3 has its own panel above, with its own two actions. -->

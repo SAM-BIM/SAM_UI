@@ -76,6 +76,8 @@ namespace SAM.Analytical.UI.WPF
             PartOWorkflowScenario? partOWorkflowScenario = null;
             PartOWorkflowScope partOWorkflowScope = PartOWorkflowScope.AllDwellings;
             List<Guid>? guids_Dwelling = null;
+            //The Iteration 2B settings last confirmed in this session - only a pre-fill for the next
+            //confirmation; the settings a run uses are the ones confirmed when it starts.
             PartOOptimisationSettings? partOOptimisationSettings = null;
             PartOEquipmentSelection? partOEquipmentSelection = null;
             PartOProjectTestVentilationUnit? partOProjectTestVentilationUnit = null;
@@ -112,7 +114,7 @@ namespace SAM.Analytical.UI.WPF
                     LastOutcome = partOWorkflowOutcome,
                 };
 
-                partOWorkflowWindow.Restore(partOWorkflowScenario, partOWorkflowScope, guids_Dwelling, partOOptimisationSettings);
+                partOWorkflowWindow.Restore(partOWorkflowScenario, partOWorkflowScope, guids_Dwelling);
 
                 //Carried across the loop, on top of what the model said. A prepare that refused, or a
                 //dialog that was closed, leaves the project's stored preselection untouched - so without
@@ -152,7 +154,6 @@ namespace SAM.Analytical.UI.WPF
                 //session does not start over.
                 partOWorkflowScenario = partOWorkflowWindow.Scenario;
                 partOWorkflowScope = partOWorkflowWindow.Scope;
-                partOOptimisationSettings = partOWorkflowWindow.OptimisationSettings;
                 partOEquipmentSelection = partOWorkflowWindow.EquipmentSelection;
                 partOProjectTestVentilationUnit = partOWorkflowWindow.ProjectTestVentilationUnit;
                 stated_ProjectTestVentilationUnit = true;
@@ -182,9 +183,19 @@ namespace SAM.Analytical.UI.WPF
                         break;
 
                     case PartOWorkflowAction.Optimise:
-                        //Worded from the run's own stop reason. Null where it was refused before starting:
-                        //that refusal was shown, and the Hub then says what the run itself says.
-                        partOWorkflowOutcome = OptimisationOutcome(RunPartOOptimisationResult(uIAnalyticalModel, partORun, owner));
+                        {
+                            //Worded from the run's own stop reason. Where nothing started - the confirmation was
+                            //cancelled, or the run was refused (that refusal was shown) - the previous line is
+                            //kept; HubOutcome still shows it only while the run it describes holds.
+                            PartOOptimisationRun? partOOptimisationRun = RunPartOOptimisationResult(uIAnalyticalModel, partORun, owner, partOOptimisationSettings, out PartOOptimisationSettings? partOOptimisationSettings_Confirmed);
+
+                            if (partOOptimisationSettings_Confirmed is not null)
+                            {
+                                partOOptimisationSettings = partOOptimisationSettings_Confirmed;
+
+                                partOWorkflowOutcome = OptimisationOutcome(partOOptimisationRun) ?? partOWorkflowOutcome;
+                            }
+                        }
                         break;
 
                     case PartOWorkflowAction.Iteration3:
@@ -437,9 +448,9 @@ namespace SAM.Analytical.UI.WPF
         /// status list may do on every keystroke. <c>Modify.CanOptimise</c> reads it in turn.
         /// </para>
         /// <para>
-        /// The Iteration 2B answer additionally requires the settings to be there at all, matching
-        /// <see cref="RunPartOOptimisation"/>'s own second gate: <c>CanOptimise</c> accepts null settings as
-        /// "nothing to validate", but the command cannot run without a step and a limit.
+        /// The Iteration 2B answer is <c>CanOptimise</c>'s alone, with no settings: the step and the limit are
+        /// confirmed when 2B starts (<see cref="RunPartOOptimisationResult"/>), so a completed Iteration 2 run
+        /// is not refused for having been prepared without them.
         /// </para>
         /// </summary>
         internal static PartOWorkflowCapabilities Capabilities(PartORun? partORun, out PartOIteration3Eligibility? partOIteration3Eligibility)
@@ -458,13 +469,11 @@ namespace SAM.Analytical.UI.WPF
             result.ResultsRestored = partORun.IsRestored;
             result.Path_Results = partORun.Path_TSD;
 
-            PartOOptimisationSettings? partOOptimisationSettings = partORun.PreparationContext?.OptimisationSettings;
+            //CanOptimise alone: the settings are confirmed when 2B starts, so a run does not have to have been
+            //prepared with them (see RunPartOOptimisationResult).
+            result.OptimisationAvailable = partORun.CanOptimise(null, out string? refusal_Optimisation);
 
-            result.OptimisationAvailable = partORun.CanOptimise(partOOptimisationSettings, out string? refusal_Optimisation) && partOOptimisationSettings is not null;
-
-            result.OptimisationRefusal = refusal_Optimisation ?? (partOOptimisationSettings is null
-                ? "This Part O run was not prepared with automatic TM59 optimisation enabled, so there is no airflow step or iteration limit to run it at. Prepare and run the iteration again with the follow-on optimisation ticked."
-                : null);
+            result.OptimisationRefusal = refusal_Optimisation;
 
             //Asked here for the same reason the two above are: the eligibility authority looks for the
             //pairing record on disk, and a status list rebuilt on every keystroke must not touch the

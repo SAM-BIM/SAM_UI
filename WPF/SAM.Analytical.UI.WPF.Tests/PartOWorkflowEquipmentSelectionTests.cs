@@ -534,7 +534,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             };
 
             //The Iteration 2 scenario, so equipment selection is in play at all.
-            result.Restore(PartOWorkflowScenario.Scenarios.Find(x => x.SelectVentilationUnit), PartOWorkflowScope.AllDwellings, null, null);
+            result.Restore(PartOWorkflowScenario.Scenarios.Find(x => x.SelectVentilationUnit), PartOWorkflowScope.AllDwellings, null);
 
             result.CompleteInitialisation();
 

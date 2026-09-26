@@ -42,8 +42,8 @@ namespace SAM.Analytical.UI.WPF
     /// <para>
     /// <b>The analytical model is inspected only when an inspection input moved.</b> A change of scenario,
     /// scope, dwelling selection, model, run, catalogue or session capability rebuilds the status list
-    /// (<see cref="Refresh"/>); the Iteration 2B step, the iteration limit, the follow-on tick and the search
-    /// text cannot move a single stage, so they re-derive only this dialog's own state
+    /// (<see cref="Refresh"/>); a workflow input such as the Simulation case, and the search text, cannot
+    /// move a single stage, so they re-derive only this dialog's own state
     /// (<see cref="RefreshWorkflowInput"/>) over the inspection already built. Nothing here touches the
     /// filesystem or the catalogue, both of which the caller reads once and hands in through
     /// <see cref="Capabilities"/>.
@@ -147,17 +147,15 @@ namespace SAM.Analytical.UI.WPF
         ///
         /// <para><b>The re-entrancy this closes, which predates the deferral above</b></para>
         /// <para>
-        /// <see cref="UpdateOptimiseControls"/> clears the Iteration 2B tick where the chosen scenario cannot
-        /// carry one - and clearing it raises <c>Unchecked</c>, which this window answers with
-        /// <see cref="RefreshWorkflowInput"/>. That reuses the inspection already built, except that on the
-        /// FIRST rebuild there is not one yet, so it fell back to a full <see cref="Refresh"/> - from inside
-        /// the rebuild that was about to produce the very inspection it was missing. One rebuild therefore
-        /// inspected the model twice, every time the tick had to be cleared.
+        /// A rebuild writes controls whose events this window answers - the scenario-dependent equipment
+        /// controls, for instance - and a nested rebuild from inside one would inspect the model a second time
+        /// before the first has produced the inspection it is about to produce. (Historically this was the
+        /// Iteration 2B tick, cleared on a scenario that cannot carry one; that tick no longer exists.)
         /// </para>
         /// <para>
         /// Suppressing the nested rebuild loses nothing. The outer one has not reached
-        /// <c>PartOWorkflowInspection.Inspect</c> yet, and it derives the actions and the Iteration 2B note
-        /// afterwards, from the inspection it then produces and over the controls as the clearing left them.
+        /// <c>PartOWorkflowInspection.Inspect</c> yet, and it derives the actions afterwards, from the
+        /// inspection it then produces and over the controls as it left them.
         /// </para>
         /// </summary>
         private bool refreshing;
@@ -218,20 +216,8 @@ namespace SAM.Analytical.UI.WPF
                 }
             };
 
-            textBox_AirFlowStep.Text = PartOOptimisationSettings.DefaultAirFlowStep_Lps.ToString();
-            textBox_MaximumIterations.Text = PartOOptimisationSettings.DefaultMaximumIterations.ToString();
-
-            checkBox_CapacityEnvelope.IsChecked = new PartOOptimisationSettings().CapacityEnvelope;
-            checkBox_WarmStart.IsChecked = new PartOOptimisationSettings().WarmStart;
-
-            //Workflow input, not model input. None of these four can move a single stage of the inspection:
-            //the Iteration 2B step, the iteration limit and the follow-on tick are deliberately outside the
-            //engineering-preparation match, and no authority the inspection asks looks at them. They are
-            //answered by the lightweight refresh, which reuses the inspection already built.
-            checkBox_Optimise.Checked += (s, e) => RefreshWorkflowInput();
-            checkBox_Optimise.Unchecked += (s, e) => RefreshWorkflowInput();
-            textBox_AirFlowStep.TextChanged += (s, e) => RefreshWorkflowInput();
-            textBox_MaximumIterations.TextChanged += (s, e) => RefreshWorkflowInput();
+            //Iteration 2B has no inputs here: its step, round limit and envelope are confirmed when it starts
+            //(Modify.RunPartOOptimisationResult), because they are not preparation inputs.
 
             //The search narrows the VIEW, never the selection: a dwelling filtered out of sight keeps its
             //state and reappears with it intact.
@@ -447,7 +433,7 @@ namespace SAM.Analytical.UI.WPF
         /// the preparation cannot honour.
         /// </para>
         /// </summary>
-        public void Restore(PartOWorkflowScenario? partOWorkflowScenario, PartOWorkflowScope partOWorkflowScope, IEnumerable<Guid>? guids_Dwelling, PartOOptimisationSettings? partOOptimisationSettings)
+        public void Restore(PartOWorkflowScenario? partOWorkflowScenario, PartOWorkflowScope partOWorkflowScope, IEnumerable<Guid>? guids_Dwelling)
         {
             if (partOWorkflowScenario is not null)
             {
@@ -470,15 +456,6 @@ namespace SAM.Analytical.UI.WPF
                 //block-scale model flips hundreds of rows, and this window answers a selection change with a
                 //full inspection - so a row-by-row restore ran that inspection hundreds of times.
                 dwellingSelection.RestoreSelection(guids_Dwelling);
-            }
-
-            if (partOOptimisationSettings is not null && checkBox_Optimise.IsEnabled)
-            {
-                textBox_AirFlowStep.Text = partOOptimisationSettings.AirFlowStep_Lps.ToString();
-                textBox_MaximumIterations.Text = partOOptimisationSettings.MaximumIterations.ToString();
-                checkBox_CapacityEnvelope.IsChecked = partOOptimisationSettings.CapacityEnvelope;
-                checkBox_WarmStart.IsChecked = partOOptimisationSettings.WarmStart;
-                checkBox_Optimise.IsChecked = true;
             }
 
             Refresh();
@@ -587,126 +564,6 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// The Iteration 2B airflow step exactly as typed. Exposed for tests, which have to state text a
-        /// <c>PartOOptimisationSettings</c> cannot represent - the unparseable case
-        /// <see cref="OptimisationRefusal"/> exists for.
-        /// </summary>
-        internal string AirFlowStepText
-        {
-            get => textBox_AirFlowStep.Text;
-            set => textBox_AirFlowStep.Text = value;
-        }
-
-        /// <summary>The Iteration 2B iteration limit exactly as typed. Exposed for tests, as above.</summary>
-        internal string MaximumIterationsText
-        {
-            get => textBox_MaximumIterations.Text;
-            set => textBox_MaximumIterations.Text = value;
-        }
-
-        /// <summary>Whether the Iteration 2B tick is on. Exposed for tests.</summary>
-        internal bool OptimiseChecked
-        {
-            get => checkBox_Optimise.IsChecked ?? false;
-            set => checkBox_Optimise.IsChecked = value;
-        }
-
-        /// <summary>
-        /// The Iteration 2B optimisation this run is set up to allow afterwards, or null where none was asked
-        /// for, the scenario cannot support one, or the numbers typed in are unusable.
-        /// <para>
-        /// Validated by <c>PartOOptimisationSettings.IsValid</c> - this window states no rule about a step or
-        /// an iteration limit of its own.
-        /// </para>
-        /// </summary>
-        public PartOOptimisationSettings? OptimisationSettings
-        {
-            get
-            {
-                if (!Optimise)
-                {
-                    return null;
-                }
-
-                if (!double.TryParse(textBox_AirFlowStep.Text, out double airFlowStep_Lps) || !int.TryParse(textBox_MaximumIterations.Text, out int maximumIterations))
-                {
-                    return null;
-                }
-
-                PartOOptimisationSettings result = new()
-                {
-                    AirFlowStep_Lps = airFlowStep_Lps,
-                    MaximumIterations = maximumIterations,
-                    CapacityEnvelope = checkBox_CapacityEnvelope.IsChecked ?? false,
-                    WarmStart = checkBox_WarmStart.IsChecked ?? false,
-                };
-
-                return result.IsValid(out string? _) ? result : null;
-            }
-        }
-
-        /// <summary>Whether a follow-on Iteration 2B was asked for and the scenario can carry one.</summary>
-        public bool Optimise
-        {
-            //IsEnabled is written by UpdateOptimiseControls, so this is derived state - and it is what
-            //OptimisationSettings, OptimisationRefusal and Request all read, which is why they need no
-            //EnsureInspected of their own.
-            get { EnsureInspected(); return (checkBox_Optimise.IsChecked ?? false) && checkBox_Optimise.IsEnabled; }
-        }
-
-        /// <summary>
-        /// Why the Iteration 2B settings as typed cannot be used, or null where they can - or where no
-        /// optimisation was asked for at all.
-        /// <para>
-        /// <b>This is validation of an explicit workflow input, not a statement about the building.</b> It is
-        /// deliberately not a <see cref="PartOWorkflowInspection"/> stage: the stages report what the model
-        /// and the run provide, and a number somebody mistyped in this dialog is neither. It blocks Run in
-        /// its own right, beside them.
-        /// </para>
-        /// <para>
-        /// <b>Ticked 2B with unusable settings must never quietly become no 2B.</b>
-        /// <see cref="OptimisationSettings"/> returns null for an unparseable step, an unparseable limit or a
-        /// pair <c>PartOOptimisationSettings.IsValid</c> refuses - and a null there is indistinguishable from
-        /// "the user did not ask for an optimisation". Without this the baseline ran, discarded the 2B setup
-        /// the user could see was ticked, and the follow-on was then unavailable on a run that had already
-        /// cost a full-year TAS simulation.
-        /// </para>
-        /// <para>
-        /// <b>The rule is <c>PartOOptimisationSettings.IsValid</c>'s</b>, asked here rather than restated -
-        /// exactly as the Prepare Iteration picker asks it. Nothing about a step or an iteration limit is
-        /// decided in this window.
-        /// </para>
-        /// </summary>
-        public string? OptimisationRefusal
-        {
-            get
-            {
-                if (!Optimise)
-                {
-                    return null;
-                }
-
-                if (!double.TryParse(textBox_AirFlowStep.Text, out double airFlowStep_Lps))
-                {
-                    return string.Format("'{0}' is not an airflow step. Enter the number of litres per second each failing room's design airflow is raised by each round.", textBox_AirFlowStep.Text);
-                }
-
-                if (!int.TryParse(textBox_MaximumIterations.Text, out int maximumIterations))
-                {
-                    return string.Format("'{0}' is not a number of iterations. Enter the most optimisation rounds the run may take.", textBox_MaximumIterations.Text);
-                }
-
-                PartOOptimisationSettings partOOptimisationSettings = new()
-                {
-                    AirFlowStep_Lps = airFlowStep_Lps,
-                    MaximumIterations = maximumIterations,
-                };
-
-                return partOOptimisationSettings.IsValid(out string? refusal) ? null : refusal;
-            }
-        }
-
-        /// <summary>
         /// Everything the run needs, in the shape the preparation seam takes.
         /// <para>
         /// <b>The request is the user's INTENT, never what this machine happens to be able to do.</b>
@@ -726,7 +583,6 @@ namespace SAM.Analytical.UI.WPF
 
                 return new PartOWorkflowRequest(partOWorkflowScenario?.Option, Scope, Zones_Dwelling, partOWorkflowScenario is not null && partOWorkflowScenario.SelectVentilationUnit)
                 {
-                    OptimisationSettings = OptimisationSettings,
                     EquipmentSelection = EquipmentSelection,
                     ProjectTestVentilationUnit = ProjectTestVentilationUnit,
                 };
@@ -761,10 +617,10 @@ namespace SAM.Analytical.UI.WPF
             get { EnsureInspected(); return textBlock_Blockers.Text; }
         }
 
-        /// <summary>What the window says beside the Iteration 2B fields. Exposed so it is assertable.</summary>
+        /// <summary>What the window says about Iteration 2B on the chosen scenario. Exposed so it is assertable.</summary>
         public string OptimisationDescription
         {
-            get { EnsureInspected(); return textBlock_Optimise.Text; }
+            get { EnsureInspected(); return OptimisationScenarioText(Scenario); }
         }
 
         /// <summary>Whether Prepare and Run is currently offered. Exposed for tests.</summary>
@@ -989,7 +845,6 @@ namespace SAM.Analytical.UI.WPF
 
             UpdateScenarioText(partOWorkflowScenario);
             UpdateScopeControls();
-            UpdateOptimiseControls(partOWorkflowScenario);
 
             PartOWorkflowCapabilities capabilities = new()
             {
@@ -1081,17 +936,15 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// Re-derives only what this dialog's own workflow input can change: the Iteration 2B note, the
-        /// combined Run blocker line and which actions are offered.
+        /// Re-derives only what this dialog's own workflow input can change: the combined Run blocker line and
+        /// which actions are offered.
         /// <para>
-        /// <b>It reuses the inspection already built and never asks for another one.</b> The Iteration 2B
-        /// step, the iteration limit and the follow-on tick cannot move the dwelling scope, the TM59
-        /// mapping, the Approved Document F requirements, the prepared ventilation design, the equipment
-        /// availability, the model-check state, the simulation or results state, or the
-        /// engineering-preparation reuse match - the settings are deliberately excluded from that match, and
-        /// nothing <see cref="PartOWorkflowInspection.Inspect"/> asks reads them. Re-inspecting on a
-        /// keystroke re-asked every authority over every space in scope to re-read two numbers none of them
-        /// looks at.
+        /// <b>It reuses the inspection already built and never asks for another one.</b> A workflow input -
+        /// today the Simulation case - cannot move the dwelling scope, the TM59 mapping, the Approved Document
+        /// F requirements, the prepared ventilation design, the equipment availability, the model-check state,
+        /// the simulation or results state, or the engineering-preparation reuse match, and nothing
+        /// <see cref="PartOWorkflowInspection.Inspect"/> asks reads it. Re-inspecting on a keystroke would
+        /// re-ask every authority over every space in scope.
         /// </para>
         /// <para>
         /// Falls back to the full <see cref="Refresh"/> only where there is no inspection to reuse yet, so
@@ -1099,11 +952,9 @@ namespace SAM.Analytical.UI.WPF
         /// </para>
         /// <para>
         /// <b>It does nothing at all while the dialog is still being set up</b>, and it reads the inspection
-        /// off the field rather than the property. Restoring the saved optimisation settings writes four of
-        /// these controls, and each write lands here; going through the property would have ended the
-        /// deferral - and inspected - on the first of them, over a state the restore had not finished
-        /// building. There is nothing to lose by returning: a full refresh is already owed, and it derives
-        /// everything this does.
+        /// off the field rather than the property: going through the property would end the deferral - and
+        /// inspect - over a state the set-up had not finished building. There is nothing to lose by returning:
+        /// a full refresh is already owed, and it derives everything this does.
         /// </para>
         /// </summary>
         private void RefreshWorkflowInput()
@@ -1123,8 +974,6 @@ namespace SAM.Analytical.UI.WPF
                 return;
             }
 
-            UpdateOptimiseControls(Scenario);
-
             UpdateActions(partOWorkflowInspection);
         }
 
@@ -1136,18 +985,12 @@ namespace SAM.Analytical.UI.WPF
         private void UpdateActions(PartOWorkflowInspection partOWorkflowInspection)
         {
             //Two kinds of reason, kept apart on purpose. The inspection's blockers are what the MODEL and the
-            //run do not provide; the optimisation refusal is what was typed into THIS dialog and cannot be
+            //run do not provide; a workflow-input refusal is what was typed into THIS dialog and cannot be
             //used. Both stop Run, and the text says which is which.
             List<string> reasons = [.. partOWorkflowInspection.Blockers];
 
-            string? refusal_Optimisation = OptimisationRefusal;
-            if (refusal_Optimisation is not null)
-            {
-                reasons.Add(string.Format("Iteration 2B is ticked, but its settings cannot be used: {0} Correct them, or untick Iteration 2B to run the baseline without it.", refusal_Optimisation));
-            }
-
-            //The Simulation case is a workflow input like the 2B settings: typed here, checked here - the
-            //same checks the Simulate dialog's OK made - and never a statement about the building.
+            //The Simulation case is a workflow input: typed here, checked here - the same checks the Simulate
+            //dialog's OK made - and never a statement about the building.
             string? refusal_SimulationCase = SimulationCaseRefusal;
             if (refusal_SimulationCase is not null)
             {
@@ -1178,19 +1021,19 @@ namespace SAM.Analytical.UI.WPF
             //the tooltip; these name only which of the two known conditions applies.
             bool supportsOptimisation = Scenario?.SupportsOptimisation ?? false;
 
-            //On a scenario that can never carry an Iteration 2B, the tooltip gives THAT reason - the same
-            //sentence the 2B section states (UpdateOptimiseControls) - rather than the missing results, which
-            //read as though a run would make it available.
+            //On a scenario that can never carry an Iteration 2B, the tooltip gives THAT reason rather than the
+            //missing results, which read as though a run would make it available. Where it is available, the
+            //tooltip says what it does and that its settings are confirmed before anything runs.
             button_Optimise.IsEnabled = partOWorkflowInspection.CanOptimise;
             button_Optimise.ToolTip = partOWorkflowInspection.CanOptimise
-                ? "Raise the design airflow of failing mechanically ventilated rooms by the configured step, rebalance, re-prepare, re-simulate the same weather case and reassess. The selected product is never changed."
-                : !supportsOptimisation && !string.IsNullOrWhiteSpace(textBlock_Optimise.Text)
-                    ? textBlock_Optimise.Text
+                ? "Optimise ventilation (Iteration 2B): raise the design airflow of the spaces that fail TM59 by a fixed step within the selected ventilation units, rebalance, re-simulate the same full year and reassess, until they pass or a limit is reached. You confirm the step and the round limit before it starts. The selected product is never changed."
+                : !supportsOptimisation
+                    ? OptimisationScenarioText(Scenario)
                     : partOWorkflowInspection.OptimisationRefusal ?? "Iteration 2B optimises a completed Iteration 2 run.";
 
             textBlock_ReviewCaption.Text = partOWorkflowInspection.CanReviewResults ? string.Empty : "No results yet";
             textBlock_OptimiseCaption.Text = partOWorkflowInspection.CanOptimise
-                ? string.Empty
+                ? "Optimise ventilation"
                 : supportsOptimisation ? "After an Iteration 2 run" : "Iteration 2 only";
 
             //The Iteration 3 panel's own actions, from the eligibility the caller gathered once - it touches
@@ -1226,7 +1069,7 @@ namespace SAM.Analytical.UI.WPF
 
                 if (partOWorkflowInspection.CanOptimise)
                 {
-                    text += " Optimise (2B) is also available.";
+                    text += " Or optimise ventilation with Iteration 2B (Optimise (2B)): it raises the design airflow of the failing spaces within the selected units and re-simulates.";
                 }
 
                 if (count_Blocking != 0)
@@ -1434,58 +1277,25 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// Iteration 2B needs a mechanical route and a selected product, so it is offered only on the
-        /// scenario that has both - and cleared, not merely greyed, on the others.
+        /// What Iteration 2B is on the chosen scenario, in one sentence: why it is not offered on a scenario
+        /// that can never carry one, and otherwise what it is and when it becomes available.
         /// <para>
         /// The rule is the scenario's own (<see cref="PartOWorkflowScenario.SupportsOptimisation"/>), which
         /// reads the route off what SAM says the iteration is defined over. This window states nothing about
-        /// what natural ventilation is.
+        /// what natural ventilation is. Whether 2B can actually start is <c>Modify.CanOptimise</c>'s answer,
+        /// carried in on <see cref="Capabilities"/>.
         /// </para>
         /// </summary>
-        private void UpdateOptimiseControls(PartOWorkflowScenario? partOWorkflowScenario)
+        private static string OptimisationScenarioText(PartOWorkflowScenario? partOWorkflowScenario)
         {
-            bool available = (partOWorkflowScenario?.SupportsOptimisation ?? false) && (ventilationUnitCatalogue?.HasSelectableProducts ?? false);
-
-            checkBox_Optimise.IsEnabled = available;
-
-            if (!available && (checkBox_Optimise.IsChecked ?? false))
+            if (partOWorkflowScenario?.SupportsOptimisation ?? false)
             {
-                checkBox_Optimise.IsChecked = false;
+                return "Iteration 2B is not a scenario of its own - it optimises this Iteration 2 design once it has been simulated. Its airflow step and round limit are confirmed when it starts.";
             }
 
-            textBox_AirFlowStep.IsEnabled = available;
-            textBox_MaximumIterations.IsEnabled = available;
-            checkBox_CapacityEnvelope.IsEnabled = available;
-            checkBox_WarmStart.IsEnabled = available;
-
-            expander_Optimise.IsEnabled = available;
-
-            //Out of sight on a scenario that can never carry an Iteration 2B; greyed, as before, on the one
-            //that can but has no catalogue to optimise within.
-            expander_Optimise.Visibility = (partOWorkflowScenario?.SupportsOptimisation ?? false) ? Visibility.Visible : Visibility.Collapsed;
-
-            if (!available)
-            {
-                textBlock_Optimise.Text = (partOWorkflowScenario?.Option?.PartOVentilationMode) != PartOVentilationMode.MVHR
-                    ? "Iteration 2B raises mechanical design airflow, and this scenario is not a mechanical route. Natural ventilation is not a mechanical airflow optimisation target."
-                    : "Iteration 2B works within the capacity of a selected manufacturer unit, so it is available on Iteration 2 only.";
-
-                return;
-            }
-
-            //Said at the fields as well as in the blocker line below the status list: the blocker line is
-            //always visible and states that Run is stopped, and this states it where the numbers are typed.
-            string? refusal = OptimisationRefusal;
-            if (refusal is not null)
-            {
-                textBlock_Optimise.Text = string.Format("These settings cannot be used, so Prepare & Run is unavailable. {0}", refusal);
-
-                return;
-            }
-
-            textBlock_Optimise.Text = Optimise
-                ? "After the full-year simulation and the TM59 assessment, each eligible failing room's DESIGN airflow is raised by the step, the dwelling is rebalanced, the Part O state is rebuilt and the same weather case is re-run - until every eligible space passes, or the selected unit cannot carry another full step. The selected product is never changed and no Approved Document F requirement is altered."
-                : "Iteration 2B is not a scenario of its own - it is an optimisation performed on this Iteration 2 design, and it becomes available once this run has been simulated and assessed. Tick this now if you may want it: the step and the limit have to be recorded with the preparation.";
+            return (partOWorkflowScenario?.Option?.PartOVentilationMode) != PartOVentilationMode.MVHR
+                ? "Iteration 2B raises mechanical design airflow, and this scenario is not a mechanical route. Natural ventilation is not a mechanical airflow optimisation target."
+                : "Iteration 2B works within the capacity of a selected manufacturer unit, so it is available on Iteration 2 only.";
         }
 
         private void button_Run_Click(object sender, RoutedEventArgs e)

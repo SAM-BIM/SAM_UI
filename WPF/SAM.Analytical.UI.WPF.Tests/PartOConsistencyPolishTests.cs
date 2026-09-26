@@ -1423,7 +1423,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Capabilities = new PartOWorkflowCapabilities { EquipmentAvailable = true, ResultsAvailable = resultsAvailable },
             };
 
-            result.Restore(partOWorkflowScenario, PartOWorkflowScope.AllDwellings, null, null);
+            result.Restore(partOWorkflowScenario, PartOWorkflowScope.AllDwellings, null);
 
             result.CompleteInitialisation();
 

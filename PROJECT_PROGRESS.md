@@ -1,9 +1,79 @@
 # Project Progress
 
-## Current: Part O UX pass 4 - shared progress window consistency (25 Sep 2026) - PR OPEN, not merged
+## Current: Part O UX pass 5 - Iteration 2B journey (26 Sep 2026) - PR OPEN, not merged
+
+**Status.** Branch `feature/parto-2b-journey-2026-09-26` from `sow/2026-Q3` `3b29e41` (#117 merged). SAM_UI only.
+Presentation and orchestration only: the optimiser, its eligibility (`Modify.CanOptimise`), stop rules, rounds,
+capacity envelope, cancellation points, TAS behaviour, provenance and saved-run format are unchanged. A PR is open
+against `sow/2026-Q3`; stop before merge for owner review. Full record: `documentation/evidence/parto-2b-journey/JOURNEY.md`.
+
+**Housekeeping (separate).** SAM_Deploy PR #49 (`chore/bump-sam-ui-parto-pass4-2026-09-26`): SAM_UI `90b42e0e` ->
+`3b29e41f`, SAM `80b01052` -> `7dbeb2e4` (the SAM#137 merge SAM_UI#114 needs; SAM deliberately not moved to its tip -
+reporting PRs #136/#139/#140 not needed). Not merged at time of writing.
+
+**Owner decision (26 Sep): 2B settings are confirmed at the start, not at preparation.**
+- Before: the Hub had a collapsed "Follow-on optimisation" expander; a completed Iteration 2 run prepared without the
+  tick was refused 2B ("prepare and run again with the follow-on ticked") - a full-year TAS re-run for two numbers the
+  preparation never reads (`PartORun.AdoptOptimisationSettings` documents that).
+- Now: `Modify.Capabilities` and the ribbon gate use `CanOptimise(run, null)` only. The Hub expander and its
+  properties (`OptimisationSettings`, `Optimise`, `OptimisationRefusal`, `AirFlowStepText`, `MaximumIterationsText`,
+  `OptimiseChecked`) are removed; `PartOWorkflowWindow.Restore` lost its settings parameter; the Hub request records
+  no 2B settings.
+- `Optimise (2B)…` (Hub) and Results - Optimise (2B) (ribbon) open **Start Iteration 2B**
+  (`Windows/PartOOptimisationStartWindow`, `Classes/PartO/PartOOptimisationStart`): purpose, starting run, May change /
+  Never changes, settings pre-filled (recorded on the run -> last confirmed this session -> defaults; says which),
+  validated by `PartOOptimisationSettings.IsValid`. Confirmed settings go straight to `OptimisePartOTM59` and are kept
+  on `PartOOptimisationRun.Settings`. Cancel runs nothing and leaves the Hub line as it was.
+- `RunPartOOptimisationResult(ui, run, owner, sessionSettings, out confirmed, confirm = null)` - `confirm` is a test
+  seam. Public `RunPartOOptimisation` signature kept.
+- The Prepare Iteration window keeps its 2B tick, reworded as an optional pre-set (it only pre-fills). The
+  `PartOPreparationContext.OptimisationSettings` / `AdoptOptimisationSettings` / `ReuseWithCurrentOptimisation`
+  plumbing is kept (it is the "recorded" pre-fill source); a follow-up could remove the tick and that plumbing.
+
+**Result window (`PartOOptimisationResultWindow`, `Classes/PartO/PartOOptimisationSummary`).**
+- Top: verdict band - PASS only on a `Passed` stop, FAIL where the kept design's production status is Fail, NOT ASSESSED
+  otherwise (e.g. partial-scope refusal), UNAVAILABLE with no kept design (same rule as the Hub's
+  `OptimisationOutcome`); a distinct headline + meaning + "Next:" for each of the 9 stop reasons (baseline-already-
+  passes has its own); facts: rounds (run/completed, limit, step), starting vs kept design (status + spaces with a
+  failing TM59 check), design airflow changed (spaces from COMPLETED rounds, targeted vs balancing), capacity envelope
+  (only if asked for; "diagnostic, not adopted").
+- Below: "Engineering detail" expander, collapsed - tabs for the airflow history, unit duty by round and notes (the
+  run's full `Description` first). Grids virtualise. Copy All keeps everything.
+- Cancel edge case: the command reads `PartOProgressHost.IsCancellationRequested`; where Cancel was requested but the
+  run stopped for another reason (e.g. a refusal after the click), the band says so. Stop precedence unchanged.
+
+**Unchanged on purpose.** Pass 4 progress window (stages, "round n" with no total, no percentage, Cancel only while
+observed); Pass 3 Hub outcome wording; `CanOptimise` including the restored-run refusal.
+
+**Persistence limitation (documented, not changed).** `PartOOptimisationRun` is session-only: after closing the result
+window or restarting SAM_UI the rounds, stop reason and envelope are gone. Each round's TSD/TBD/TM59 report and a
+`PartORunResume` sidecar (scenario = Iteration 2; round only in the `-OptNN` file name) persist. A reopened kept design
+can be reviewed, not continued into 2B. Also not available: SAM's per-space overall status per round (a step keeps
+check rows, not the report) and before/after airflow totals - not computed in the UI.
+
+**Files.** New: `Classes/PartO/PartOOptimisationSummary.cs`, `Classes/PartO/PartOOptimisationStart.cs`,
+`Windows/PartOOptimisationStartWindow.xaml(.cs)`, tests `PartOIteration2BJourneyTests.cs`, evidence
+`documentation/evidence/parto-2b-journey/` (JOURNEY.md + 7 PNGs). Changed: `Modify/RunPartOOptimisation.cs`,
+`Modify/RunPartOWorkflow.cs`, `Windows/PartOOptimisationResultWindow.xaml(.cs)`, `Windows/PartOWorkflowWindow.xaml(.cs)`,
+`Windows/PartOIterationWindow.xaml(.cs)` (wording), `Windows/AnalyticalWindow.xaml.cs` (ribbon gate/tooltips); tests
+`PartOWorkflowTests`, `PartOWorkflowRefreshTests`, `PartOWorkflowInitialisationTests` (9 Hub-tick tests retired, one
+rewritten, the workflow-input test now uses the Simulation case folder) and four files for the `Restore` signature.
+
+**Validation.**
+- `SAM.Analytical.UI.WPF.Tests`: 1202/1202 (was 1196; -9 retired Hub-tick tests, +15 new incl. the env-gated evidence test).
+- `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): exit 0, 0 errors; no new warnings in the touched files.
+- Rendered evidence reviewed (start valid/invalid; result capacity collapsed/expanded, passed, baseline passes,
+  failure after Cancel).
+- NOT run live: no saved Iteration 2 run exists; a live 2B needs a full-year Iteration 2 TAS run.
+
+**Next step.** Owner reviews the PR (and the rendered evidence). Check CI and the Codex review before merge. Then a live
+acceptance: Prepare & Run Iteration 2 (full year) without any 2B tick -> Optimise (2B)… -> confirm -> watch the
+progress window -> check the result band and the Hub line. Merge SAM_Deploy #49 independently.
+
+## Previous: Part O UX pass 4 - shared progress window consistency (25 Sep 2026) - MERGED (#117, 3b29e41)
 
 **Status.** Branch `feature/parto-progress-consistency-2026-09-25` from `sow/2026-Q3` `91aeb43` (#116 merged).
-SAM_UI only. A PR is open against `sow/2026-Q3`; the owner said to stop before merge. There are no engineering,
+SAM_UI only. Merged into `sow/2026-Q3` as #117 (merge `3b29e41`, head `3fb7bd0`); CI, build and review green. There are no engineering,
 TAS, calculation, provenance or saved-run changes, and no public signature changed. The Iteration 2B journey
 redesign is Pass 5 and is not started.
 
@@ -113,8 +183,8 @@ wording pins); evidence `documentation/evidence/parto-progress-consistency/`.
   box before it closes.
 - Live acceptance of 2B needs a completed Iteration 2 run.
 
-**Next step.** The owner reviews the correction on PR #117. Check CI and the Codex re-review are clean before
-merge. Then move SAM_Deploy's SAM_UI pointer. A live 2B check fits naturally into Pass 5's acceptance.
+**Next step.** Done: merged. SAM_Deploy pointer bump to `3b29e41` is SAM_Deploy PR #49 (separate). The 2B journey
+is Pass 5 (above).
 
 ## Previous: Part O reopened-run naming - check + Hub line (25 Sep 2026) - MERGED (#116)
 

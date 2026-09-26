@@ -222,7 +222,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             int notifications = 0;
             partOWorkflowWindow.DwellingSelection.SelectionChanged += (s, e) => notifications++;
 
-            partOWorkflowWindow.Restore(null, PartOWorkflowScope.SelectedDwellings, guids, null);
+            partOWorkflowWindow.Restore(null, PartOWorkflowScope.SelectedDwellings, guids);
 
             Assert.Equal(1, notifications);
 
@@ -269,7 +269,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             List<Guid> guids = [partOWorkflowWindow.DwellingSelection.Items[0].Guid, partOWorkflowWindow.DwellingSelection.Items[9].Guid];
 
-            partOWorkflowWindow.Restore(null, PartOWorkflowScope.SelectedDwellings, guids, null);
+            partOWorkflowWindow.Restore(null, PartOWorkflowScope.SelectedDwellings, guids);
 
             for (int i = 0; i < partOWorkflowWindow.DwellingSelection.Count; i++)
             {
@@ -280,117 +280,6 @@ namespace SAM.Analytical.UI.WPF.Tests
         // -------------------------------------------------------------------------------------------------
         // The dialog: workflow-only input does not reinspect the model
         // -------------------------------------------------------------------------------------------------
-
-        /// <summary>
-        /// <b>3.</b> The Iteration 2B airflow step is a workflow input. Changing it moves the refusal, the
-        /// blocker line and Run's availability - and reuses the inspection that is already built.
-        /// <para>
-        /// The assertion is object identity: the same <see cref="PartOWorkflowInspection"/> instance is
-        /// still on the window afterwards, so no second <c>Inspect</c> ran.
-        /// </para>
-        /// </summary>
-        [WpfFact]
-        public void ChangingTheAirFlowStep_MovesTheRunStateAndInspectsNothing()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            PartOWorkflowInspection partOWorkflowInspection = partOWorkflowWindow.Inspection;
-
-            Assert.NotNull(partOWorkflowInspection);
-            Assert.True(partOWorkflowWindow.CanRun);
-            Assert.Null(partOWorkflowWindow.OptimisationRefusal);
-
-            partOWorkflowWindow.AirFlowStepText = "abc";
-
-            //The workflow-input state moved...
-            Assert.False(partOWorkflowWindow.CanRun);
-            Assert.Contains("'abc' is not an airflow step", partOWorkflowWindow.OptimisationRefusal, StringComparison.Ordinal);
-            Assert.Contains("Iteration 2B is ticked, but its settings cannot be used", partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
-            Assert.Contains("cannot be used", partOWorkflowWindow.OptimisationDescription, StringComparison.Ordinal);
-
-            //...and the model was not inspected again to work that out.
-            Assert.Same(partOWorkflowInspection, partOWorkflowWindow.Inspection);
-
-            //Back to a usable step: Run returns, still on the same inspection.
-            partOWorkflowWindow.AirFlowStepText = "2.5";
-
-            Assert.True(partOWorkflowWindow.CanRun);
-            Assert.Null(partOWorkflowWindow.OptimisationRefusal);
-            Assert.Empty(partOWorkflowWindow.BlockerDescription);
-
-            Assert.Same(partOWorkflowInspection, partOWorkflowWindow.Inspection);
-
-            //And the value reached the request that will be recorded with the run.
-            Assert.Equal(2.5, partOWorkflowWindow.Request.OptimisationSettings.AirFlowStep_Lps);
-        }
-
-        /// <summary>
-        /// <b>4.</b> The same for the iteration limit, including a value that parses and that
-        /// <c>PartOOptimisationSettings.IsValid</c> refuses - the refusal is that authority's, reached
-        /// without inspecting the model.
-        /// </summary>
-        [WpfFact]
-        public void ChangingTheMaximumIterations_MovesTheRunStateAndInspectsNothing()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            PartOWorkflowInspection partOWorkflowInspection = partOWorkflowWindow.Inspection;
-
-            partOWorkflowWindow.MaximumIterationsText = "many";
-
-            Assert.False(partOWorkflowWindow.CanRun);
-            Assert.Contains("'many' is not a number of iterations", partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
-            Assert.Same(partOWorkflowInspection, partOWorkflowWindow.Inspection);
-
-            //Parses, and is refused by the settings authority.
-            partOWorkflowWindow.MaximumIterationsText = "0";
-
-            Assert.False(partOWorkflowWindow.CanRun);
-            Assert.NotNull(partOWorkflowWindow.OptimisationRefusal);
-            Assert.Same(partOWorkflowInspection, partOWorkflowWindow.Inspection);
-
-            partOWorkflowWindow.MaximumIterationsText = "4";
-
-            Assert.True(partOWorkflowWindow.CanRun);
-            Assert.Same(partOWorkflowInspection, partOWorkflowWindow.Inspection);
-
-            Assert.Equal(4, partOWorkflowWindow.Request.OptimisationSettings.MaximumIterations);
-        }
-
-        /// <summary>
-        /// Ticking and unticking the follow-on itself does not need an inspection either: the Iteration 2B
-        /// settings are the one thing deliberately excluded from the engineering-preparation reuse match,
-        /// so the tick cannot change what any stage reports or whether the prepared model is reusable.
-        /// </summary>
-        [WpfFact]
-        public void TogglingTheFollowOn_DoesNotInspectTheModel()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            //An unusable step, so unticking has something visible to change.
-            partOWorkflowWindow.AirFlowStepText = "abc";
-
-            PartOWorkflowInspection partOWorkflowInspection = partOWorkflowWindow.Inspection;
-
-            Assert.False(partOWorkflowWindow.CanRun);
-
-            partOWorkflowWindow.OptimiseChecked = false;
-
-            //Unticked, so the text is no longer part of the request and blocks nothing.
-            Assert.True(partOWorkflowWindow.CanRun);
-            Assert.Null(partOWorkflowWindow.OptimisationRefusal);
-            Assert.Null(partOWorkflowWindow.Request.OptimisationSettings);
-
-            Assert.Same(partOWorkflowInspection, partOWorkflowWindow.Inspection);
-
-            partOWorkflowWindow.OptimiseChecked = true;
-
-            Assert.False(partOWorkflowWindow.CanRun);
-            Assert.Same(partOWorkflowInspection, partOWorkflowWindow.Inspection);
-
-            //The reuse answer is the inspection's and is untouched by the tick.
-            Assert.Equal(partOWorkflowInspection.ReusePreparation, partOWorkflowWindow.Inspection.ReusePreparation);
-        }
 
         // -------------------------------------------------------------------------------------------------
         // The dialog: search
@@ -526,7 +415,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             PartOWorkflowInspection partOWorkflowInspection_Isolated = partOWorkflowWindow.Inspection;
 
-            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null, null);
+            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null);
 
             Assert.NotSame(partOWorkflowInspection_Isolated, partOWorkflowWindow.Inspection);
         }
@@ -591,27 +480,6 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         // ---- Fixture ------------------------------------------------------------------------------------
-
-        /// <summary>
-        /// The dialog on a runnable model, set to Iteration 2 with a real catalogue and Iteration 2B ticked
-        /// at its defaults - the one state in which the 2B fields are live and Run is otherwise available,
-        /// so a test that changes one of them is changing exactly one thing.
-        /// </summary>
-        private static PartOWorkflowWindow Iteration2WithOptimisation()
-        {
-            PartOWorkflowWindow result = new()
-            {
-                AnalyticalModel = Model(2),
-                VentilationUnitCatalogue = Catalogue(),
-            };
-
-            result.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null, new PartOOptimisationSettings());
-
-            Assert.True(result.OptimiseChecked);
-            Assert.NotNull(result.Request.OptimisationSettings);
-
-            return result;
-        }
 
         private static PartOWorkflowScenario Scenario_2()
         {

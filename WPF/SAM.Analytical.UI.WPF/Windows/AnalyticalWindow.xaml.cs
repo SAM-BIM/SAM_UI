@@ -2044,24 +2044,22 @@ namespace SAM.Analytical.UI.WPF.Windows
                     ? "A Part O iteration is prepared but not simulated. Run the energy simulation first."
                     : partORun.InvalidationReason ?? "Prepare a Part O iteration and run the energy simulation first.";
 
-            //The same pure state read as above, plus the two things 2B additionally needs and which are
-            //knowable without touching the filesystem: the run has to have been prepared with an
-            //optimisation, and with a product selected for it to work within. Modify.CanOptimise is still
-            //the gate - it re-checks the results file and the recorded TAS case - so this stays
-            //presentation.
+            //The same pure state read as above, plus the one thing 2B additionally needs that is knowable
+            //without touching the filesystem: a product selected for it to work within. Its settings are
+            //confirmed when it starts, so they are not required here. Modify.CanOptimise is still the gate -
+            //it re-checks the results file and the recorded TAS case - so this stays presentation.
             bool canOptimise = canAssess
-                && partORun.PreparationContext?.OptimisationSettings is not null
                 && (partORun.PreparationContext?.HasVentilationUnitCatalogue ?? false);
 
             RibbonButton_OptimisePartOTM59.IsEnabled = canOptimise;
 
             RibbonButton_OptimisePartOTM59.ToolTipDescription = canOptimise
-                ? "Raise the design airflow of failing mechanically ventilated rooms by the configured step, rebalance, re-prepare, re-simulate the same weather case and reassess - until every eligible space passes or the selected ventilation unit cannot carry another full step. The selected product is never changed."
+                ? "Optimise ventilation (Iteration 2B): raise the design airflow of failing mechanically ventilated rooms by a fixed step, rebalance, re-prepare, re-simulate the same weather case and reassess - until every eligible space passes or the selected ventilation unit cannot carry another full step. You confirm the step and the round limit before it starts. The selected product is never changed."
                 : canAssess && partORun.IsRestored
                     ? "This run was reopened from its saved results, which is enough to review its TM59 assessment but not to resume Iteration 2B: optimising repeats the recorded preparation and the same TAS case, and those belong to the session that produced them. Prepare the iteration again and re-run the simulation to optimise."
                     : !canAssess
                     ? "Iteration 2B optimises a completed Iteration 2 run. " + (partORun.InvalidationReason ?? "Prepare a Part O iteration, simulate it over the full year, and assess it first.")
-                    : "This Part O run was not prepared with automatic TM59 optimisation and a selected ventilation unit. Prepare the iteration again with both.";
+                    : "This Part O run was prepared without a selected ventilation unit, so it is an Iteration 1a run and there is nothing for Iteration 2B to optimise within. Prepare the iteration again with a manufacturer ventilation unit selected.";
         }
         
         private void RibbonButton_AirHandlingUnitDiagram_Click(object sender, RoutedEventArgs e)

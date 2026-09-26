@@ -719,7 +719,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Capabilities = new PartOWorkflowCapabilities { EquipmentAvailable = true },
             };
 
-            result.Restore(PartOWorkflowScenario.Scenarios.Find(x => x.SelectVentilationUnit), PartOWorkflowScope.AllDwellings, null, null);
+            result.Restore(PartOWorkflowScenario.Scenarios.Find(x => x.SelectVentilationUnit), PartOWorkflowScope.AllDwellings, null);
 
             result.CompleteInitialisation();
 
