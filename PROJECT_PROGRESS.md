@@ -20,12 +20,16 @@ Status: COMPLETE
 - Next step: Phase 2 (Space Design Load Summary) audit done and BLOCKED on SAM/SAM_Tas prerequisites; see SAM
   `documentation/Reporting-Phase2-ResultAuthority.md`. No SAM_UI Phase-2 work yet.
 
-## Previous: Part O UX pass 6 - final consistency and end-to-end acceptance (26 Sep 2026) - MERGED (#122, 4b773f3e)
+## Previous: Part O UX pass 6 - final consistency and end-to-end acceptance (26 Sep 2026) - MERGED (#122, 4b773f3e) and deployed; programme CLOSED
 
-**Status.** Branch `feature/parto-pass6-acceptance-2026-09-26` from `sow/2026-Q3` `7e7de03` (#121 merged); merged as #122 (`4b773f3e`). SAM_UI only;
+**Part O UX programme: CLOSED / FROZEN.** Pass 6 merged into `sow/2026-Q3` as SAM_UI#122 (`4b773f3`); final
+validation WPF 1245/1245, Release 0 errors, build CI and SPDX green, Codex re-review no major issues (the multi-monitor
+placement correction `dc214b6` included). Deployed by SAM_Deploy#53 (merge `5450341e`, rebased over #52; validate
+green, Codex no findings): `sow/2026-Q3` pins SAM `22f9c743`, SAM_Tas `b32c0808`, SAM_UI `4b773f3e`; no other gitlink
+moved. The "Left unchanged" items below are follow-ups, not gates. Originally: branch `feature/parto-pass6-acceptance-2026-09-26` from `sow/2026-Q3` `7e7de03` (#121 merged). SAM_UI only;
 presentation fixes + acceptance. Pass 5 (#118) merged; the 2B `.sam` growth fix (SAM#142 / SAM_Tas#67 / SAM_UI#119)
 merged and deployed (SAM_Deploy#50). Engineering logic, `CanOptimise`, stop rules, cancellation points, provenance,
-saved-run format and TM59 rules unchanged. Merged into `sow/2026-Q3` as #122 (`4b773f3e`).
+saved-run format and TM59 rules unchanged.
 Full record: `documentation/evidence/parto-final-acceptance/ACCEPTANCE-2026-09-26.md`.
 
 **Environment note.** This machine's SAM was at `ba343bfb` with no `SAM.Core.Reporting.Pdf` build, so SAM_UI (with
@@ -69,9 +73,8 @@ also persisted in the Iteration 3 report JSON); 2B "Run" vs "round" in Engineeri
 `L/s` (cross-repo decision); remaining "(s)" in the Iteration 3 window / equipment control; 2B cancel-then-refusal
 precedence; unreachable host-less "Preparing Model" fallback; session-only 2B history; output-path portability.
 
-**Recommendation.** Part O UX ready for closeout/freeze once this PR merges; the items above are follow-ups, not gates.
-
-**Next step.** Bump SAM_Deploy's SAM_UI pointer to include #122 (not yet done).
+**Next step.** None for the Part O UX programme (closed). Any new Part O work - e.g. the mixed-dwelling-strategy
+programme (not started) - begins in a fresh session from `sow/2026-Q3` `4b773f3` or later, as a separate programme.
 
 ## Previous: SAM Documentation Framework PR3 - Space Assumptions PDF in SAM_UI (26 Sep 2026) - MERGED (#121, 7e7de033)
 
