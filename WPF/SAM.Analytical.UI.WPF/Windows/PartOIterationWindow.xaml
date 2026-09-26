@@ -110,7 +110,7 @@
                          provision: it is an optimisation performed ON an Iteration 2 design, and it needs a selected
                          ventilation unit to work within - which is why it is offered here, under the selection tick
                          it depends on, and disabled without it. -->
-                    <CheckBox x:Name="checkBox_Optimise" Content="Automatically optimise TM59 failures (Iteration 2B — TM59 optimisation)" Margin="0,10,0,0"
+                    <CheckBox x:Name="checkBox_Optimise" Content="Pre-set Iteration 2B settings for this run (optional — confirmed when 2B starts)" Margin="0,10,0,0"
                               ToolTip="TM59 optimisation of the Iteration 2 design.&#x0a;Selected equipment identity remains locked."/>
 
                     <StackPanel Orientation="Horizontal" Margin="20,6,0,0">

@@ -253,7 +253,11 @@ namespace SAM.Analytical.UI.WPF
                 UI.Query.PartOCount(partOOptimisationRun.Rounds, "round", "rounds"),
                 partOOptimisationStep_LastValid is null ? "no valid design was produced" : string.Format("last valid design: run {0}", partOOptimisationStep_LastValid.Iteration));
 
-            string stop = Core.Query.Description(partOOptimisationRun.StopReason).ToLowerInvariant();
+            //"round limit", the word the progress window, the Start window and the result window use for the
+            //same setting (live acceptance, 26 Sep: the Hub said "iteration limit" beside a "round limit" result).
+            string stop = partOOptimisationRun.StopReason == PartOOptimisationStopReason.IterationLimitReached
+                ? "round limit reached"
+                : Core.Query.Description(partOOptimisationRun.StopReason).ToLowerInvariant();
 
             string description = partOOptimisationRun.Description;
 

@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Windows;
+using System.Windows.Media;
 
 namespace SAM.Analytical.UI.WPF
 {
@@ -18,16 +19,19 @@ namespace SAM.Analytical.UI.WPF
     /// Limit.
     /// </para>
     /// <para>
-    /// <b>The stop reason is shown first and in the run's own words.</b> An optimisation that ended at the
-    /// selected unit's capacity with rooms still failing is a real, useful answer; one that ended because a
-    /// simulation would not run is not. A reader must not have to work out which they are looking at.
+    /// <b>Simple by default, detailed on demand.</b> The kept design's TM59 outcome and the stop reason come
+    /// first, one wording per <see cref="PartOOptimisationStopReason"/> (<see cref="PartOOptimisationSummary"/>):
+    /// an optimisation that ended at the selected unit's capacity with rooms still failing is a real, useful
+    /// answer; one that ended because a simulation would not run is not, and a reader must not have to work
+    /// out which they are looking at. The histories and every note follow, collapsed; the run's own complete
+    /// statement heads the notes, so nothing the summary shortens is lost.
     /// </para>
     /// <para>
     /// <b>The diagnostic capacity envelope is shown apart from the run's answer, always.</b> It says what
     /// the already-selected unit could deliver if taken to its own ceiling - which is a different statement
     /// from what the optimisation accepted, and would be actively misleading read as the run's best result.
-    /// So it has its own line, its own Stage value in both grids, and its own <c>MAX</c> run label; and
-    /// where none was calculated, the line says why rather than going blank.
+    /// So it has its own summary line, its own Stage value in both grids, and its own <c>MAX</c> run label;
+    /// and where none was calculated although it was asked for, the line says why rather than going blank.
     /// </para>
     /// </summary>
     public partial class PartOOptimisationResultWindow : System.Windows.Window
@@ -38,38 +42,93 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// The run to show. Setting it fills both histories and the notes.
+        /// The run to show, with no Cancel request recorded. Setting it fills the summary, both histories and
+        /// the notes - see <see cref="Show"/>.
         /// </summary>
         public PartOOptimisationRun OptimisationRun
         {
-            set
+            set => Show(value, false);
+        }
+
+        /// <summary>What the window says above the detail. Exposed so what the user is told is assertable.</summary>
+        internal PartOOptimisationSummary? Summary { get; private set; }
+
+        /// <summary>
+        /// Fills the window from the run: the outcome and summary first (<see cref="PartOOptimisationSummary"/>),
+        /// the histories and notes collapsed below.
+        /// </summary>
+        /// <param name="cancelRequested">Whether Cancel was requested in the progress window - used only to
+        /// explain a stop that was not the cancellation.</param>
+        /// <param name="canContinue">Whether the session run still holds the kept design, so 2B can be started
+        /// again from it - see <see cref="PartOOptimisationSummary.Create"/>.</param>
+        internal void Show(PartOOptimisationRun? partOOptimisationRun, bool cancelRequested, bool canContinue = false)
+        {
+            PartOOptimisationSummary summary = PartOOptimisationSummary.Create(partOOptimisationRun!, cancelRequested, canContinue);
+
+            Summary = summary;
+
+            textBlock_VerdictGlyph.Text = summary.Glyph;
+            textBlock_Verdict.Text = summary.VerdictText;
+
+            Brush brush = VerdictBrush(summary.Verdict);
+            textBlock_VerdictGlyph.Foreground = brush;
+            border_Verdict.BorderBrush = brush;
+
+            textBlock_StopReason.Text = summary.StopHeadline;
+            textBlock_StopMeaning.Text = summary.StopMeaning;
+
+            textBlock_CancelNote.Text = summary.CancelNote ?? string.Empty;
+            textBlock_CancelNote.Visibility = string.IsNullOrWhiteSpace(summary.CancelNote) ? Visibility.Collapsed : Visibility.Visible;
+
+            itemsControl_Facts.ItemsSource = summary.Facts;
+
+            run_NextStep.Text = summary.NextStep;
+
+            List<PartOOptimisationAirFlowRow> rows_AirFlow = PartOOptimisationAirFlowRow.Rows(partOOptimisationRun);
+            List<PartOOptimisationUnitRow> rows_Unit = PartOOptimisationUnitRow.Rows(partOOptimisationRun);
+
+            dataGrid_AirFlow.ItemsSource = rows_AirFlow;
+            dataGrid_Unit.ItemsSource = rows_Unit;
+
+            tabItem_AirFlow.Header = string.Format("Design airflow changes ({0})", UI.Query.PartOCount(rows_AirFlow.Count, "row", "rows"));
+            tabItem_Unit.Header = string.Format("Ventilation unit duty by round ({0})", UI.Query.PartOCount(rows_Unit.Count, "row", "rows"));
+
+            int count = SetDiagnostics(partOOptimisationRun);
+
+            tabItem_Diagnostics.Header = string.Format("Notes, warnings and refusals ({0})", count);
+
+            run_DetailSummary.Text = string.Format(
+                " — every round's design airflow, ventilation unit duty and {0}",
+                UI.Query.PartOCount(count, "note", "notes"));
+        }
+
+        private Brush VerdictBrush(PartOTM59Verdict partOTM59Verdict)
+        {
+            string key = partOTM59Verdict switch
             {
-                textBlock_StopReason.Text = value is null
-                    ? "No optimisation was run."
-                    : string.Format("Stopped: {0}", Core.Query.Description(value.StopReason));
+                PartOTM59Verdict.Pass => "PartO.Brush.Success",
+                PartOTM59Verdict.Fail => "PartO.Brush.Danger",
+                _ => "PartO.Brush.Muted",
+            };
 
-                textBlock_Summary.Text = value?.Description ?? string.Empty;
-
-                //Stated whatever happened - including "there was nothing to diagnose". An optional
-                //diagnostic that leaves the line blank leaves a reader unable to tell it was considered.
-                textBlock_CapacityEnvelope.Text = value is null || string.IsNullOrWhiteSpace(value.CapacityEnvelopeDescription)
-                    ? string.Empty
-                    : string.Format("Capacity envelope: {0}", value.CapacityEnvelopeDescription);
-
-                dataGrid_AirFlow.ItemsSource = PartOOptimisationAirFlowRow.Rows(value);
-                dataGrid_Unit.ItemsSource = PartOOptimisationUnitRow.Rows(value);
-
-                SetDiagnostics(value);
-            }
+            return TryFindResource(key) as Brush ?? Brushes.Gray;
         }
 
         /// <summary>
         /// Every iteration's notes, warnings and refusals, in order and labelled by iteration - including
         /// each iteration's unique TSD, which is what makes the run auditable afterwards.
         /// </summary>
-        private void SetDiagnostics(PartOOptimisationRun partOOptimisationRun)
+        private int SetDiagnostics(PartOOptimisationRun? partOOptimisationRun)
         {
             StringBuilder stringBuilder = new();
+
+            //The run's own complete statement first, in its own words: the summary above shortens it, and
+            //nothing it says is lost.
+            if (partOOptimisationRun is not null)
+            {
+                stringBuilder.AppendLine(partOOptimisationRun.Description);
+                stringBuilder.AppendLine();
+            }
 
             int count = 0;
 
@@ -121,9 +180,11 @@ namespace SAM.Analytical.UI.WPF
             //and each of those iterations' own notes says so too.
             int warmStarted = partOOptimisationRun?.WarmStarted ?? 0;
 
-            label_Diagnostics.Content = warmStarted == 0
-                ? string.Format("Notes, warnings and refusals - {0}", count)
-                : string.Format("Notes, warnings and refusals - {0} ({1} iteration(s) reused the baseline conversion; each still ran its own full-year simulation)", count, warmStarted);
+            label_Diagnostics.Text = warmStarted == 0
+                ? "Every iteration's notes, warnings and refusals, in order, with each iteration's own results file."
+                : string.Format("Every iteration's notes, warnings and refusals, in order, with each iteration's own results file. {0} reused the baseline conversion; each still ran its own full-year simulation.", UI.Query.PartOCount(warmStarted, "iteration", "iterations"));
+
+            return count;
         }
 
         /// <summary>
@@ -151,13 +212,7 @@ namespace SAM.Analytical.UI.WPF
         {
             StringBuilder stringBuilder = new();
 
-            stringBuilder.AppendLine(textBlock_StopReason.Text);
-            stringBuilder.AppendLine(textBlock_Summary.Text);
-
-            if (!string.IsNullOrWhiteSpace(textBlock_CapacityEnvelope.Text))
-            {
-                stringBuilder.AppendLine(textBlock_CapacityEnvelope.Text);
-            }
+            stringBuilder.AppendLine(Summary?.Text ?? string.Empty);
 
             stringBuilder.AppendLine();
 

@@ -2,6 +2,7 @@
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Core.UI;
+using System;
 using System.Windows.Forms;
 
 namespace SAM.Analytical.UI.WPF
@@ -9,17 +10,22 @@ namespace SAM.Analytical.UI.WPF
     public static partial class Modify
     {
         /// <summary>
-        /// The ribbon command behind the automatic Approved Document O Iteration 2B optimisation: run it,
-        /// show its history, and adopt the last design that was actually valid.
+        /// The ribbon command behind the automatic Approved Document O Iteration 2B optimisation: confirm it,
+        /// run it, show its outcome and history, and adopt the last design that was actually valid.
         /// <para>
         /// <b>Orchestration only.</b> Every engineering decision belongs to
         /// <see cref="OptimisePartOTM59(PartORun, PartOOptimisationSettings, out string)"/> and, beneath it,
         /// to <c>SAM.Analytical</c>. This method chooses no target, no airflow and no stopping point.
         /// </para>
         /// <para>
-        /// <b>The settings are the ones the run was prepared with.</b> They were stated in the preparation
-        /// dialog, alongside the equipment selection they depend on, and carried on the run - so an
-        /// optimisation cannot be run at a step nobody agreed to.
+        /// <b>Eligibility is <see cref="CanOptimise"/>'s alone; the settings are confirmed at the start.</b>
+        /// The step, the round limit, the capacity envelope and the warm start are not preparation inputs
+        /// (<c>PartORun.AdoptOptimisationSettings</c> says why), so a completed Iteration 2 run does not have to
+        /// have been prepared with them. They are stated in the "Start Iteration 2B" confirmation
+        /// (<see cref="PartOOptimisationStartWindow"/>), pre-filled from the run's record, this session or the
+        /// defaults, passed straight to the optimiser, and recorded on the optimisation's own
+        /// <see cref="PartOOptimisationRun.Settings"/> - so an optimisation still cannot run at a step nobody
+        /// agreed to.
         /// </para>
         /// <para>
         /// <b>What is adopted is the last valid design</b> - the last iteration that was prepared, simulated
@@ -32,44 +38,71 @@ namespace SAM.Analytical.UI.WPF
         /// <param name="owner">Owner window for the dialogs.</param>
         public static void RunPartOOptimisation(this UIAnalyticalModel? uIAnalyticalModel, PartORun? partORun, IWin32Window? owner = null)
         {
-            RunPartOOptimisationResult(uIAnalyticalModel, partORun, owner);
+            RunPartOOptimisationResult(uIAnalyticalModel, partORun, owner, null, out PartOOptimisationSettings? _);
         }
 
         /// <summary>
         /// <see cref="RunPartOOptimisation"/> itself, returning the optimisation it ran so the Prepare &amp; Run Hub
         /// can word its outcome line from the run's own stop reason. The public command keeps its signature.
         /// </summary>
+        /// <param name="partOOptimisationSettings_Session">
+        /// The settings last confirmed in this session, used only to pre-fill the confirmation where the run
+        /// records none.
+        /// </param>
+        /// <param name="partOOptimisationSettings_Confirmed">
+        /// The settings Start was pressed with, or null where the confirmation was cancelled or the run was
+        /// refused before it.
+        /// </param>
+        /// <param name="confirm">
+        /// Test seam: answers the confirmation instead of showing it. Null shows
+        /// <see cref="PartOOptimisationStartWindow"/>.
+        /// </param>
         /// <returns>
         /// The optimisation that ran, or null where it was refused before starting (that refusal has already
-        /// been shown).
+        /// been shown) or the confirmation was cancelled (<paramref name="partOOptimisationSettings_Confirmed"/>
+        /// is then null too).
         /// </returns>
-        internal static PartOOptimisationRun? RunPartOOptimisationResult(UIAnalyticalModel? uIAnalyticalModel, PartORun? partORun, IWin32Window? owner = null)
+        internal static PartOOptimisationRun? RunPartOOptimisationResult(UIAnalyticalModel? uIAnalyticalModel, PartORun? partORun, IWin32Window? owner, PartOOptimisationSettings? partOOptimisationSettings_Session, out PartOOptimisationSettings? partOOptimisationSettings_Confirmed, Func<PartOOptimisationStart, PartOOptimisationSettings?>? confirm = null)
         {
+            partOOptimisationSettings_Confirmed = null;
+
+            //"Last used in this session" for every route - the Hub and the Results ribbon alike (Codex P2 on
+            //#118): the ribbon has no session state of its own to carry it in.
+            partOOptimisationSettings_Session ??= partOOptimisationSettings_LastConfirmed;
+
             if (uIAnalyticalModel is null || partORun is null)
             {
                 return null;
             }
 
-            PartOOptimisationSettings? partOOptimisationSettings = partORun.PreparationContext?.OptimisationSettings;
-
-            //Refused BEFORE anything runs, because the alternative is spending minutes of TAS time to
-            //discover the run was never an Iteration 2B starting point.
-            if (!partORun.CanOptimise(partOOptimisationSettings, out string? refusal_CanOptimise))
+            //Refused BEFORE anything is asked or run, because the alternative is spending minutes of TAS time
+            //to discover the run was never an Iteration 2B starting point. No settings yet: they are confirmed
+            //below, and the optimiser validates them with the same PartOOptimisationSettings.IsValid.
+            if (!partORun.CanOptimise(null, out string? refusal_CanOptimise))
             {
                 MessageBox.Show(string.Format("The Part O Iteration 2B optimisation did not run.\n\n{0}", refusal_CanOptimise));
 
                 return null;
             }
 
+            PartOOptimisationStart partOOptimisationStart = PartOOptimisationStart.Create(partORun, partOOptimisationSettings_Session);
+
+            PartOOptimisationSettings? partOOptimisationSettings = confirm is null
+                ? ConfirmPartOOptimisationStart(partOOptimisationStart, owner)
+                : confirm(partOOptimisationStart);
+
             if (partOOptimisationSettings is null)
             {
-                MessageBox.Show("This Part O run was not prepared with automatic TM59 optimisation enabled, so there is no airflow step or iteration limit to run it at. Prepare the iteration again with 'Automatically optimise TM59 failures' ticked.");
-
+                //Cancelled at the confirmation: nothing ran and nothing changed.
                 return null;
             }
 
+            partOOptimisationSettings_Confirmed = partOOptimisationSettings;
+            partOOptimisationSettings_LastConfirmed = partOOptimisationSettings;
+
             PartOOptimisationRun? partOOptimisationRun;
             string? refusal;
+            bool cancelRequested;
 
             //ONE Part O progress window for the whole optimisation, as Prepare & Run and Iteration 3 have.
             //While it is the ambient host, each round's preparation and TAS workflow report into it and take
@@ -95,6 +128,11 @@ namespace SAM.Analytical.UI.WPF
                 //From the run's own stop reason, as Iteration 3 ends its list from its result: a cancelled or
                 //failed round must not read as completed while the window closes.
                 PartOOptimisationProgressEnd(partOProgressHost.State, partOOptimisationRun);
+
+                //Read for the result window only, to explain a stop that followed a Cancel request without
+                //being the cancellation - a round that reached a refusal before a point it could stop at. The
+                //stop reason is the optimiser's, and its precedence is not changed here.
+                cancelRequested = partOProgressHost.IsCancellationRequested;
             }
 
             if (partOOptimisationRun is null)
@@ -104,10 +142,18 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
-            PartOOptimisationResultWindow partOOptimisationResultWindow = new()
-            {
-                OptimisationRun = partOOptimisationRun,
-            };
+            AnalyticalModel? analyticalModel_LastValid = partOOptimisationRun.AnalyticalModel_LastValid;
+
+            //Whether the run survives adopting the kept design - the same condition the arming below uses. The
+            //optimiser drops the run on a cancelled or failed round, and then 2B cannot be started again from
+            //the kept design; the result window's next step must say so rather than offer an unavailable action
+            //(Codex P2 on #118).
+            bool canContinue = analyticalModel_LastValid is not null
+                && partORun.State == PartORunState.WorkflowCompleted
+                && ReferenceEquals(partORun.AnalyticalModel_Assessment, analyticalModel_LastValid);
+
+            PartOOptimisationResultWindow partOOptimisationResultWindow = new();
+            partOOptimisationResultWindow.Show(partOOptimisationRun, cancelRequested, canContinue);
 
             if (owner is not null)
             {
@@ -116,7 +162,6 @@ namespace SAM.Analytical.UI.WPF
 
             partOOptimisationResultWindow.ShowDialog();
 
-            AnalyticalModel? analyticalModel_LastValid = partOOptimisationRun.AnalyticalModel_LastValid;
             if (analyticalModel_LastValid is null)
             {
                 return partOOptimisationRun;
@@ -137,6 +182,31 @@ namespace SAM.Analytical.UI.WPF
             uIAnalyticalModel.SetJSAMObject(analyticalModel_LastValid, new FullModification());
 
             return partOOptimisationRun;
+        }
+
+        /// <summary>
+        /// The Iteration 2B settings last confirmed in this application session, whichever route confirmed them -
+        /// only ever a pre-fill for the next confirmation, never a setting a run uses unconfirmed.
+        /// </summary>
+        internal static PartOOptimisationSettings? partOOptimisationSettings_LastConfirmed;
+
+        /// <summary>
+        /// Shows the "Start Iteration 2B" confirmation and returns the settings Start was pressed with, or null
+        /// where it was cancelled.
+        /// </summary>
+        private static PartOOptimisationSettings? ConfirmPartOOptimisationStart(PartOOptimisationStart partOOptimisationStart, IWin32Window? owner)
+        {
+            PartOOptimisationStartWindow partOOptimisationStartWindow = new()
+            {
+                Start = partOOptimisationStart,
+            };
+
+            if (owner is not null)
+            {
+                new System.Windows.Interop.WindowInteropHelper(partOOptimisationStartWindow).Owner = owner.Handle;
+            }
+
+            return partOOptimisationStartWindow.ShowDialog() == true ? partOOptimisationStartWindow.ConfirmedSettings : null;
         }
     }
 }

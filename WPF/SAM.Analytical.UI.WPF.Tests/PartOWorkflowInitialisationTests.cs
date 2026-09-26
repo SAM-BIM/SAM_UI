@@ -264,7 +264,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             int count = partOWorkflowWindow.InspectionCount;
 
-            partOWorkflowWindow.Restore(null, PartOWorkflowScope.AllDwellings, null, null);
+            partOWorkflowWindow.Restore(null, PartOWorkflowScope.AllDwellings, null);
 
             Assert.True(partOWorkflowWindow.InspectionCount > count, "A restore after initialisation did not inspect the model at all.");
             Assert.NotSame(inspection, partOWorkflowWindow.Inspection);
@@ -287,8 +287,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             int count = partOWorkflowWindow.InspectionCount;
 
-            partOWorkflowWindow.AirFlowStepText = "6";
-            partOWorkflowWindow.MaximumIterationsText = "9";
+            partOWorkflowWindow.textBox_OutputDirectory.Text = @"C:\TasOut\other";
             partOWorkflowWindow.SearchText = "Flat 007";
             partOWorkflowWindow.SearchText = string.Empty;
 
@@ -299,8 +298,8 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         /// <summary>
         /// The dialog set up <b>exactly the way <c>Modify.RunPartOWorkflow</c> sets it up</b>: the four
-        /// properties in the same order, then a restore of a saved scenario, scope, dwelling set and
-        /// optimisation settings. Anything less faithful would be counting a path production does not take.
+        /// properties in the same order, then a restore of a saved scenario, scope and dwelling set.
+        /// Anything less faithful would be counting a path production does not take.
         /// </summary>
         private static PartOWorkflowWindow Constructed(AnalyticalModel analyticalModel, out List<Guid> guids_Restored)
         {
@@ -327,7 +326,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             //Iteration 2 and reopened the hub is restoring a scenario that really moves.
             List<PartOWorkflowScenario> scenarios = PartOWorkflowScenario.Scenarios;
 
-            result.Restore(scenarios[scenarios.Count - 1], PartOWorkflowScope.SelectedDwellings, guids_Restored, new PartOOptimisationSettings());
+            result.Restore(scenarios[scenarios.Count - 1], PartOWorkflowScope.SelectedDwellings, guids_Restored);
 
             return result;
         }

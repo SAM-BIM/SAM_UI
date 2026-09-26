@@ -828,12 +828,12 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
-        /// The follow-on Iteration 2B controls are offered on Iteration 2 only, and cleared - not merely
-        /// greyed - on the others, so a scenario switch cannot leave an optimisation ticked that the run
-        /// cannot carry.
+        /// Pass 5: the Hub asks for NO Iteration 2B input before a run. The request a Prepare &amp; Run records
+        /// carries no optimisation settings on any scenario - the step and the limit are confirmed when 2B
+        /// starts - and the Hub says so on Iteration 2, and says why 2B does not apply on a natural route.
         /// </summary>
         [WpfFact]
-        public void TheDialog_OffersOptimisationOnIteration2Only()
+        public void TheDialog_AsksForNoIteration2BInputBeforeARun()
         {
             PartOWorkflowWindow partOWorkflowWindow = new()
             {
@@ -841,15 +841,15 @@ namespace SAM.Analytical.UI.WPF.Tests
                 VentilationUnitCatalogue = Catalogue(),
             };
 
-            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null, new PartOOptimisationSettings());
+            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null);
 
-            Assert.True(partOWorkflowWindow.Optimise);
-            Assert.NotNull(partOWorkflowWindow.OptimisationSettings);
+            Assert.Null(partOWorkflowWindow.Request.OptimisationSettings);
+            Assert.Contains("confirmed when it starts", partOWorkflowWindow.OptimisationDescription, StringComparison.Ordinal);
 
-            partOWorkflowWindow.Restore(Scenario_1b(), PartOWorkflowScope.AllDwellings, null, null);
+            partOWorkflowWindow.Restore(Scenario_1b(), PartOWorkflowScope.AllDwellings, null);
 
-            Assert.False(partOWorkflowWindow.Optimise);
-            Assert.Null(partOWorkflowWindow.OptimisationSettings);
+            Assert.Null(partOWorkflowWindow.Request.OptimisationSettings);
+            Assert.Contains("not a mechanical route", partOWorkflowWindow.OptimisationDescription, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -868,7 +868,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 AnalyticalModel = analyticalModel,
             };
 
-            partOWorkflowWindow.Restore(Scenario_1b(), PartOWorkflowScope.SelectedDwellingsIsolated, [guid], null);
+            partOWorkflowWindow.Restore(Scenario_1b(), PartOWorkflowScope.SelectedDwellingsIsolated, [guid]);
 
             Assert.Equal(PartOIteration.BaseNaturalVentilation, partOWorkflowWindow.Scenario.Option.PartOIteration);
             Assert.Equal(PartOWorkflowScope.SelectedDwellingsIsolated, partOWorkflowWindow.Scope);
@@ -923,7 +923,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 VentilationUnitCatalogue = ventilationUnitCatalogue,
             };
 
-            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null, null);
+            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null);
 
             //THE INTENT. Not downgraded, not silently turned into Iteration 1a.
             Assert.True(partOWorkflowWindow.Request.SelectVentilationUnit);
@@ -954,7 +954,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 VentilationUnitCatalogue = Catalogue(),
             };
 
-            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null, null);
+            partOWorkflowWindow.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null);
 
             Assert.True(partOWorkflowWindow.Request.SelectVentilationUnit);
 
@@ -977,7 +977,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 VentilationUnitCatalogue = Catalogue(),
             };
 
-            partOWorkflowWindow.Restore(Scenario_1a(), PartOWorkflowScope.AllDwellings, null, null);
+            partOWorkflowWindow.Restore(Scenario_1a(), PartOWorkflowScope.AllDwellings, null);
 
             Assert.False(partOWorkflowWindow.Request.SelectVentilationUnit);
 
@@ -987,154 +987,6 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         // ---- A ticked Iteration 2B must be usable before Run is offered ----------------------------------
-
-        /// <summary>
-        /// <b>1.</b> A ticked Iteration 2B whose airflow step is not a number stops Run, and the window says
-        /// so.
-        /// <para>
-        /// Without this the baseline ran: <c>OptimisationSettings</c> returns null for an unparseable step,
-        /// which is indistinguishable from "no optimisation was asked for", so a full-year TAS simulation
-        /// completed having silently discarded the 2B setup the user could still see ticked - and the
-        /// follow-on was then unavailable on the run it had just paid for.
-        /// </para>
-        /// </summary>
-        [WpfFact]
-        public void TickedOptimisationWithAnUnparseableStep_StopsRunAndSaysWhy()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            Assert.True(partOWorkflowWindow.CanRun);
-
-            partOWorkflowWindow.AirFlowStepText = "abc";
-
-            //Still ticked - the tick is the user's intent and is never cleared behind their back.
-            Assert.True(partOWorkflowWindow.OptimiseChecked);
-
-            //And still discarded by the settings property, which is exactly why the refusal is needed.
-            Assert.Null(partOWorkflowWindow.Request.OptimisationSettings);
-
-            Assert.False(partOWorkflowWindow.CanRun);
-
-            Assert.NotNull(partOWorkflowWindow.OptimisationRefusal);
-            Assert.Contains("'abc' is not an airflow step", partOWorkflowWindow.OptimisationRefusal, StringComparison.Ordinal);
-
-            Assert.Contains("Run is unavailable", partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
-            Assert.Contains("Iteration 2B is ticked, but its settings cannot be used", partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
-            Assert.Contains("'abc' is not an airflow step", partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
-
-            //Said at the fields as well as under the status list.
-            Assert.Contains("cannot be used", partOWorkflowWindow.OptimisationDescription, StringComparison.Ordinal);
-        }
-
-        /// <summary>
-        /// The same for a ticked 2B whose iteration limit is not a number.
-        /// </summary>
-        [WpfFact]
-        public void TickedOptimisationWithAnUnparseableIterationLimit_StopsRun()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            partOWorkflowWindow.MaximumIterationsText = "many";
-
-            Assert.False(partOWorkflowWindow.CanRun);
-            Assert.Contains("'many' is not a number of iterations", partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
-        }
-
-        /// <summary>
-        /// <b>2.</b> Numbers that parse but that <c>PartOOptimisationSettings.IsValid</c> refuses stop Run
-        /// too, and the refusal is that authority's own sentence. No step or iteration rule is stated in this
-        /// window.
-        /// </summary>
-        [WpfFact]
-        public void TickedOptimisationTheSettingsAuthorityRefuses_StopsRunInItsOwnWords()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            //Parses cleanly, and is refused: a step of zero would re-simulate the same design every round.
-            partOWorkflowWindow.AirFlowStepText = "0";
-
-            Assert.False(partOWorkflowWindow.CanRun);
-
-            PartOOptimisationSettings partOOptimisationSettings = new() { AirFlowStep_Lps = 0 };
-
-            Assert.False(partOOptimisationSettings.IsValid(out string refusal));
-
-            Assert.Equal(refusal, partOWorkflowWindow.OptimisationRefusal);
-            Assert.Contains(refusal, partOWorkflowWindow.BlockerDescription, StringComparison.Ordinal);
-
-            //And an iteration limit that leaves nothing to run, refused by the same authority.
-            partOWorkflowWindow.AirFlowStepText = PartOOptimisationSettings.DefaultAirFlowStep_Lps.ToString();
-            partOWorkflowWindow.MaximumIterationsText = "0";
-
-            Assert.False(partOWorkflowWindow.CanRun);
-            Assert.NotNull(partOWorkflowWindow.OptimisationRefusal);
-        }
-
-        /// <summary>
-        /// <b>3.</b> With Iteration 2B unticked the same text is irrelevant: it is not part of the request,
-        /// so it blocks nothing and the baseline runs. Only a ticked optimisation is validated.
-        /// </summary>
-        [WpfFact]
-        public void UntickedOptimisation_IsNotValidatedAndDoesNotBlockTheBaseline()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            partOWorkflowWindow.AirFlowStepText = "abc";
-
-            Assert.False(partOWorkflowWindow.CanRun);
-
-            partOWorkflowWindow.OptimiseChecked = false;
-
-            Assert.Null(partOWorkflowWindow.OptimisationRefusal);
-            Assert.Null(partOWorkflowWindow.Request.OptimisationSettings);
-
-            Assert.True(partOWorkflowWindow.CanRun);
-            Assert.Empty(partOWorkflowWindow.BlockerDescription);
-        }
-
-        /// <summary>
-        /// <b>4.</b> Valid settings: Run stays available and the request carries them, so the run records the
-        /// optimisation the user asked for.
-        /// </summary>
-        [WpfFact]
-        public void TickedOptimisationWithValidSettings_RunsAndIsCarriedOnTheRequest()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            partOWorkflowWindow.AirFlowStepText = "2.5";
-            partOWorkflowWindow.MaximumIterationsText = "4";
-
-            Assert.Null(partOWorkflowWindow.OptimisationRefusal);
-            Assert.True(partOWorkflowWindow.CanRun);
-            Assert.Empty(partOWorkflowWindow.BlockerDescription);
-
-            PartOOptimisationSettings? partOOptimisationSettings = partOWorkflowWindow.Request.OptimisationSettings;
-
-            Assert.NotNull(partOOptimisationSettings);
-            Assert.Equal(2.5, partOOptimisationSettings.AirFlowStep_Lps);
-            Assert.Equal(4, partOOptimisationSettings.MaximumIterations);
-        }
-
-        /// <summary>
-        /// An unusable 2B setup is a <b>workflow-input</b> refusal, not an analytical one: the model stages
-        /// stay exactly as they were, and the inspection - which knows nothing about this dialog's text boxes
-        /// - still reports the model as runnable. The two kinds of reason are kept apart.
-        /// </summary>
-        [WpfFact]
-        public void AnUnusableOptimisation_DoesNotChangeWhatTheModelStagesReport()
-        {
-            PartOWorkflowWindow partOWorkflowWindow = Iteration2WithOptimisation();
-
-            partOWorkflowWindow.AirFlowStepText = "abc";
-
-            Assert.False(partOWorkflowWindow.CanRun);
-
-            //The model is unchanged and says so; only the dialog's own input is refused.
-            Assert.True(partOWorkflowWindow.Inspection.CanRun);
-            Assert.Empty(partOWorkflowWindow.Inspection.Blockers);
-
-            Assert.All(partOWorkflowWindow.Inspection.Stages, x => Assert.NotEqual(PartOWorkflowStageStatus.Blocked, x.Status));
-        }
 
         // ---- The Iteration 2B record on a reused preparation ---------------------------------------------
 
@@ -1202,11 +1054,12 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
-        /// <b>C.</b> Unticking Iteration 2B leaves nothing active. A stale step and limit surviving on the
-        /// run would offer an optimisation the user had just declined.
+        /// <b>C.</b> Pass 5 (Codex P2 on #118): a request that states NO 2B settings - every Hub request, since the
+        /// Hub no longer asks for them - keeps a preset the Prepare Iteration window recorded, rather than clearing
+        /// it. The preset only pre-fills the Start Iteration 2B confirmation; nothing runs at it unconfirmed.
         /// </summary>
         [Fact]
-        public void AReusedPreparation_ClearsTheOptimisationWhenItIsNoLongerAskedFor()
+        public void AReusedPreparation_KeepsARecordedPresetWhenTheRequestStatesNone()
         {
             AnalyticalModel analyticalModel = Model();
 
@@ -1224,7 +1077,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(Modify.ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, true));
 
-            Assert.Null(partORun.PreparationContext.OptimisationSettings);
+            Assert.NotNull(partORun.PreparationContext.OptimisationSettings);
         }
 
         /// <summary>
@@ -1325,27 +1178,6 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         // ---- Fixture ------------------------------------------------------------------------------------
-
-        /// <summary>
-        /// A dialog on a runnable model, set to Iteration 2 with a real catalogue and Iteration 2B ticked at
-        /// its defaults - the one state in which the 2B fields are live and Run is otherwise available, so a
-        /// test that changes them is changing exactly one thing.
-        /// </summary>
-        private static PartOWorkflowWindow Iteration2WithOptimisation()
-        {
-            PartOWorkflowWindow result = new()
-            {
-                AnalyticalModel = Model(),
-                VentilationUnitCatalogue = Catalogue(),
-            };
-
-            result.Restore(Scenario_2(), PartOWorkflowScope.AllDwellings, null, new PartOOptimisationSettings());
-
-            Assert.True(result.OptimiseChecked);
-            Assert.NotNull(result.Request.OptimisationSettings);
-
-            return result;
-        }
 
         private static PartOWorkflowStageState Stage(PartOWorkflowInspection partOWorkflowInspection, PartOWorkflowStage partOWorkflowStage)
         {
