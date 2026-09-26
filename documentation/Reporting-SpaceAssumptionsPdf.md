@@ -1,5 +1,8 @@
 # Space Assumptions PDF in SAM_UI (SAM Documentation Framework, PR3)
 
+Status: merged (SAM_UI#121, `7e7de033`) and shipped by SAM_Deploy#51 (`8e6740af`). Phase 1 is complete; see
+SAM `documentation/Reporting-PDF.md` › *Phase 1 status*.
+
 SAM_UI's one-click entry to the Phase 1 **Space Assumptions** report. SAM_UI only orchestrates. The data, units,
 placeholders, document structure and layout all come from SAM:
 - `SAM.Analytical.Reporting` (`Create.DocumentContext`, `Create.SpaceAssumptions`);
