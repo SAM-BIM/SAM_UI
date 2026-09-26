@@ -1,8 +1,13 @@
 # Project Progress
 
-## Current: Part O 2B per-round `.sam` growth (26 Sep 2026) - PRs OPEN (SAM -> SAM_Tas -> SAM_UI), not merged
+## Current: Part O 2B per-round `.sam` growth (26 Sep 2026) - MERGED (SAM#142, SAM_Tas#67, SAM_UI#119) and deployed
 
-**Status.** Investigated and fixed; three coordinated PRs, stop before merge. SAM_UI branch
+**Status.** MERGED in dependency order and deployed: SAM#142 `78a57466` -> SAM_Tas#67 `b32c0808` -> SAM_UI#119
+`5a0b9bf6`; SAM_Deploy#50 `7fcd79a7` pins SAM `78a57466`, SAM_Tas `b32c0808`, SAM_UI `5a0b9bf6`. Each downstream repo
+was re-validated against the merged upstream build with unchanged results (SAM 2441, SAM_Tas TM59 947, WPF 1210; all
+three Release rebuilds exit 0; merged trees identical to the reviewed heads). Two Codex P2s on #119's evidence script
+(`compare_runs.py`: ignore the TM59 `Source:` line; key airflows by space Guid) fixed in `faf8c50`/`2c53aa4` - script
+only, results unchanged. Originally: SAM_UI branch
 `feature/parto-2b-sam-growth-2026-09-26` from `sow/2026-Q3` `d7f042f` (#118 merged). SAM branch
 `fix/deepclone-guidless-objects-2026-09-26` (from `3ec76eca`), SAM_Tas branch `fix/parto-replace-run-records-2026-09-26`
 (from `39828c6`). Full record: `documentation/evidence/parto-2b-sam-growth/GROWTH.md`.
@@ -47,8 +52,9 @@ built). Then bump SAM_Deploy's SAM / SAM_Tas / SAM_UI pointers.
 **Not done / follow-ups.** Existing saved models keep accumulated records until next simulated (then replaced).
 `WorkflowCalculator`'s Adding Design Days step and `AddResults` zone replacement are exercised live only (TAS COM).
 
-**Next step.** Owner reviews the three PRs (links in the PR bodies); check CI green on each; merge SAM, then SAM_Tas,
-then SAM_UI; then bump SAM_Deploy. STOP before merge.
+**Next step.** Start Part O UX Pass 6 (final Part O consistency and end-to-end acceptance) in a fresh session from
+`sow/2026-Q3` `5a0b9bf6` or later. SAM `sow/2026-Q3` has since moved on with SAM#141 (reporting PDF renderer, not
+Part O); deploy it in a separate bump.
 
 ## Previous: Part O UX pass 5 - Iteration 2B journey (26 Sep 2026) - MERGED (#118, d7f042f)
 
