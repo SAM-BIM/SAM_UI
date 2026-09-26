@@ -46,7 +46,7 @@ Code:
 
 ## Units
 SAM_UI has no unit-system preference (only the Mollier chart's own default), and PR3 adds none. The command uses the
-reporting framework's default, **SI**, with air flow in **l/s**. Every unit is formatted upstream by `QuantityFormatter`.
+reporting framework's default, **SI**, with air flow in **L/s**. Every unit is formatted upstream by `QuantityFormatter`.
 `WriteSpaceAssumptionsPdf` takes a `UnitStyle`, so a later preference or IP option is a one-line change. That path is
 tested for IP: no SI unit appears.
 

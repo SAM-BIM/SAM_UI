@@ -3,7 +3,8 @@
 ## Current: SAM Documentation Framework PR3 - Space Assumptions PDF in SAM_UI (26 Sep 2026) - PR OPEN, not merged
 
 **Status.** Branch `feature/reporting-pr3-space-assumptions-pdf`.
-- Base: `sow/2026-Q3` `d7f042f7` (#118 merged).
+- Base: `sow/2026-Q3` `d7f042f7` (#118 merged); `sow/2026-Q3` `cb61241d` (#119/#120, Part O .sam growth) merged in
+  at closeout (only this file conflicted).
 - Consumes SAM `sow/2026-Q3` `ba343bfb` (SAM#141, the PR2 renderer, merged) as it is. No SAM change.
 - A PR is open against `sow/2026-Q3`. The owner reviews it; do not merge.
 - Phase 1 only. Not in scope: batch reports, Building/Design Load summaries, HTML/Excel output, or an IP option in
@@ -30,7 +31,7 @@
 - On success: "saved: <path> — Open it now?" Yes shell-opens the PDF.
 - On failure: an error message naming the stage (Document / Rendering / Output), plus `Trace.TraceError`.
   - The PDF is rendered in memory, then written to `.tmp` and moved into place, so an existing PDF is never damaged.
-- Units: SI, with air flow in l/s (the reporting default). SAM_UI has no unit preference, and none was added.
+- Units: SI, with air flow in L/s (the reporting default; SAM#143 changed the central symbol from `l/s`). SAM_UI has no unit preference, and none was added.
   `Modify.WriteSpaceAssumptionsPdf(..., UnitStyle)` is the seam for a later option.
 - Packaging (`SAM.Analytical.UI.WPF.csproj`):
   - HintPath references to SAM.Analytical.Reporting, SAM.Core.Reporting, SAM.Core.Reporting.Pdf and SAM.Units.
@@ -85,7 +86,63 @@
 **Next step.** The owner reviews the PR; check CI is green before any merge. After merge, move SAM_Deploy's SAM_UI
 pointer and confirm that the CI installer payload contains the PdfSharp*/MigraDoc* DLLs and `licenses\NotoSans`.
 
-## Previous: Part O UX pass 5 - Iteration 2B journey (26 Sep 2026) - MERGED (#118, d7f042f7)
+## Previous: Part O 2B per-round `.sam` growth (26 Sep 2026) - MERGED (SAM#142, SAM_Tas#67, SAM_UI#119) and deployed
+
+**Status.** MERGED in dependency order and deployed: SAM#142 `78a57466` -> SAM_Tas#67 `b32c0808` -> SAM_UI#119
+`5a0b9bf6`; SAM_Deploy#50 `7fcd79a7` pins SAM `78a57466`, SAM_Tas `b32c0808`, SAM_UI `5a0b9bf6`. Each downstream repo
+was re-validated against the merged upstream build with unchanged results (SAM 2441, SAM_Tas TM59 947, WPF 1210; all
+three Release rebuilds exit 0; merged trees identical to the reviewed heads). Two Codex P2s on #119's evidence script
+(`compare_runs.py`: ignore the TM59 `Source:` line; key airflows by space Guid) fixed in `faf8c50`/`2c53aa4` - script
+only, results unchanged. Originally: SAM_UI branch
+`feature/parto-2b-sam-growth-2026-09-26` from `sow/2026-Q3` `d7f042f` (#118 merged). SAM branch
+`fix/deepclone-guidless-objects-2026-09-26` (from `3ec76eca`), SAM_Tas branch `fix/parto-replace-run-records-2026-09-26`
+(from `39828c6`). Full record: `documentation/evidence/parto-2b-sam-growth/GROWTH.md`.
+
+**What grew.** Only the adjacency cluster's `DesignDay` records: `2n + 2` per TAS run (12 -> 26 -> 54 ... 28,670 at
+Opt10, 57,342 at OptMax; 1.9 MB -> 92 MB JSON, 172 KB -> 3.7 MB `.sam`), plus `ZoneSimulationResult` +1 per zone per
+run. Spaces, zones, panels, ICs, space/surface results, relations: flat; space/IC/zone NAMES unchanged. `OptNN.prepared`
+= `Opt(N-1).sam` structurally - the growth is inside each TAS run, not in SAM_UI's round adoption.
+
+**Root cause (SAM / SAM_Tas, not SAM_UI).**
+1. `2n`: SAM.Core `SAMObjectRelationCluster(cluster, deepClone: true)` re-added each clone via `AddObject`; a
+   `DesignDay` (a `WeatherDay`, no Guid, no value `Equals`) got a new key BESIDE its original. `RunPartOSimulation`'s
+   ownership deep copy (SAM `bdcfe5df`) runs once per TAS run.
+2. `+2`: `WorkflowCalculator` APPENDED the run's design days to the cluster (the TBD itself is cleared and rewritten).
+   Also why the model carried stale **London** design days beside its CIBSE Z1 ones (mixed weather in one `.sam`).
+3. `ZoneSimulationResult`: `AddResults` replaced space/surface results but appended zone results.
+
+**Classification: performance/storage defect; engineering results unaffected.** Nothing sizes/simulates from the
+cluster design days (`DesignDays_Authoritative` reads settings/weather/model PARAMETERS; SAM_UI passes the run
+weather's pair; `AddDesignDays` clears the TBD); no Part O/TM59/optimiser code reads `DesignDay` or
+`ZoneSimulationResult`. Exponential in runs (20 runs would be ~15M design days - OOM on any project); "Saving Model"
+0.19 s -> 14.0 s by OptMax.
+
+**Fix.** SAM: deep clone stores each clone in the original's own slot (`RelationCluster.ReplaceObjects`). SAM_Tas:
+`Modify.ReplaceDesignDays` (cluster records exactly the TBD's design days) + `AddResults` replaces a zone's cooling
+result like the space results. SAM_UI: no production change - regression `PartORunModelGrowthTests` (2) drives the
+real `RunPartOSimulation` for 6 rounds via `PartOWorkflowRunner`; pre-fix SAM.Core fails it ("Round 1: 24 design
+days, not 12"). Not changed: optimiser, targeting, balancing, rounds, stop reasons, Part F, TM59, TAS inputs, unit,
+envelope, Pass 5 UX.
+
+**Validation.** SAM tests 2441/2441 (new `DeepCopy_OfObjectsWithNoGuid_NeitherDuplicatesNorSharesThem`; pre-fix 2 ->
+64). SAM_Tas TM59 tests 947/947 (+3 `DesignDayRecordReplacementTests`). WPF 1210/1210 (+2). `SAM.sln`, `SAM_Tas.sln`,
+`SAM_UI.sln` Release (VS 18 MSBuild): exit 0, 0 errors. `git diff --check` clean in all three.
+Live (same fresh model, driver `C:\TasOut\parto-2b-journey-2026-09-26\scripts\journey2b.ps1 -Out
+C:\TasOut\parto-2b-sam-growth-2026-09-26`): every round `.sam` 166 KB (was 170 KB -> 3.6 MB), 2 design days (Z1 pair
+only), 4 zone results; all 12 TM59 reports identical to the Pass 5 run except the `Source:` path; per-space airflows
+identical; same stop (round limit, 10), kept design run 10, 8 spaces changed (6/2); 2B 243 s -> 160 s.
+
+**Merge order.** SAM PR first, then SAM_Tas (its build uses `..\SAM\build`), then SAM_UI (test only needs both
+built). Then bump SAM_Deploy's SAM / SAM_Tas / SAM_UI pointers.
+
+**Not done / follow-ups.** Existing saved models keep accumulated records until next simulated (then replaced).
+`WorkflowCalculator`'s Adding Design Days step and `AddResults` zone replacement are exercised live only (TAS COM).
+
+**Next step.** Start Part O UX Pass 6 (final Part O consistency and end-to-end acceptance) in a fresh session from
+`sow/2026-Q3` `5a0b9bf6` or later. SAM `sow/2026-Q3` has since moved on with SAM#141 (reporting PDF renderer, not
+Part O); deploy it in a separate bump.
+
+## Previous: Part O UX pass 5 - Iteration 2B journey (26 Sep 2026) - MERGED (#118, d7f042f)
 
 **Status.** Branch `feature/parto-2b-journey-2026-09-26` from `sow/2026-Q3` `3b29e41` (#117 merged). SAM_UI only.
 Presentation and orchestration only: the optimiser, its eligibility (`Modify.CanOptimise`), stop rules, rounds,
@@ -153,7 +210,7 @@ reporting PRs #136/#139/#140 not needed). Not merged at time of writing.
 - Communal corridor: verified, no defect. SAM `TM59AssessmentReport` classifies by the exact InternalCondition; SAM_UI
   presents `CorridorChecks` / `SupplementaryChecks` as given. New `PartOTM59CorridorReportingTests` pins it (the live
   model has no corridor IC).
-- Observed, not changed: per-round `.sam` roughly doubles in size (172 KB -> 1.9 MB at round 10) - flagged separately.
+- Observed, not changed: per-round `.sam` roughly doubles in size (172 KB -> 1.9 MB at round 10) - root-caused and fixed in the *Current* entry above.
 
 **Unchanged on purpose.** Pass 4 progress window (stages, "round n" with no total, no percentage, Cancel only while
 observed); Pass 3 Hub outcome wording; `CanOptimise` including the restored-run refusal.
@@ -180,9 +237,8 @@ rewritten, the workflow-input test now uses the Simulation case folder) and four
 - Rendered evidence reviewed; live acceptance above (driver `C:\TasOut\parto-2b-journey-2026-09-26\scripts\journey2b.ps1`,
   parts `run` / `reopen`; the run folder is on this machine only).
 
-**Next step.** Wait for CI green, the Codex re-review and the repository review on #118; STOP before merge (owner
-merges). Merge SAM_Deploy #49 independently; after #118 merges, bump SAM_Deploy's SAM_UI pointer again. Separate
-follow-ups: per-round `.sam` growth; optionally remove the Prepare Iteration 2B pre-set and its plumbing.
+**Next step.** Done: merged as #118 (`d7f042f`). Bump SAM_Deploy's SAM_UI pointer (after SAM_Deploy #49). The
+`.sam` growth follow-up is the *Current* entry; optional: remove the Prepare Iteration 2B pre-set and its plumbing.
 
 ## Previous: Part O UX pass 4 - shared progress window consistency (25 Sep 2026) - MERGED (#117, 3b29e41)
 
