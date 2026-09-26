@@ -12,9 +12,11 @@ def grp(o,t):
 def params(v):
     return {p['Name']:p['Value'] for ps in v.get('ParameterSets',[]) for p in ps.get('Parameters',[])}
 def design(o):
+    #Keyed by the space's Guid, not its name: names need not be unique across dwellings.
     r={}
     for s in grp(o,'Space'):
-        p=params(s); r[s['Name']]=tuple((k,p.get(k)) for k in sorted(p) if 'Air Flow' in k or 'Ventilation' in k)
+        p=params(s); r[s['Guid']]=(s.get('Name'),tuple((k,p.get(k)) for k in sorted(p) if 'Air Flow' in k or 'Ventilation' in k))
+    assert len(r)==len(grp(o,'Space')), 'duplicate space Guid'
     return r
 rounds=['']+['-Opt%02d'%i for i in range(1,11)]+['-OptMax']
 print('| Round | .sam before | .sam after | JSON before | JSON after | DesignDay b/a | ZoneResult b/a | TM59 report same | design airflows same |')
