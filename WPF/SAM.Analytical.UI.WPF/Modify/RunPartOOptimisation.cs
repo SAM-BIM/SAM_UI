@@ -80,7 +80,7 @@ namespace SAM.Analytical.UI.WPF
             //below, and the optimiser validates them with the same PartOOptimisationSettings.IsValid.
             if (!partORun.CanOptimise(null, out string? refusal_CanOptimise))
             {
-                MessageBox.Show(string.Format("The Part O Iteration 2B optimisation did not run.\n\n{0}", refusal_CanOptimise));
+                MessageBox.Show(string.Format("The Part O Iteration 2B optimisation did not run.\n\n{0}", refusal_CanOptimise), "Part O — Iteration 2B");
 
                 return null;
             }
@@ -137,7 +137,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (partOOptimisationRun is null)
             {
-                MessageBox.Show(string.Format("The Part O Iteration 2B optimisation did not run.\n\n{0}", refusal));
+                MessageBox.Show(string.Format("The Part O Iteration 2B optimisation did not run.\n\n{0}", refusal), "Part O — Iteration 2B");
 
                 return null;
             }

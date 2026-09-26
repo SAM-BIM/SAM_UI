@@ -298,7 +298,7 @@
             </WrapPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-                <Button x:Name="button_CopyAll" MinWidth="80" Height="24" Padding="8,0" Margin="8,0,10,0" Click="button_CopyAll_Click">Copy all</Button>
+                <Button x:Name="button_CopyAll" MinWidth="80" Height="24" Padding="8,0" Margin="8,0,10,0" Click="button_CopyAll_Click">Copy All</Button>
                 <Button x:Name="button_Close" IsCancel="True" MinWidth="70" Height="24" Click="button_Close_Click">Close</Button>
             </StackPanel>
         </Grid>

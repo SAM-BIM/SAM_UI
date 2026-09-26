@@ -116,7 +116,7 @@
                     <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
                         <TextBlock Text="Airflow step (l/s)" VerticalAlignment="Center" Width="120"/>
                         <TextBox x:Name="textBox_AirFlowStep" Width="60" Height="20" VerticalContentAlignment="Center"/>
-                        <TextBlock Text="Maximum iterations" VerticalAlignment="Center" Width="130" Margin="20,0,0,0"/>
+                        <TextBlock Text="Round limit" VerticalAlignment="Center" Width="130" Margin="20,0,0,0"/>
                         <TextBox x:Name="textBox_MaximumIterations" Width="60" Height="20" VerticalContentAlignment="Center"/>
                     </StackPanel>
 
@@ -133,8 +133,8 @@
                          claims "no change to results": the reuse is valid only while the converted geometry still
                          matches the model. Offered as a tick because the full conversion has to stay available as
                          the reference path. -->
-                    <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted TAS geometry between iterations (faster)" Margin="20,8,0,0"
-                              ToolTip="Reuses the existing converted TAS geometry between optimisation iterations.&#x0a;Disable this when the geometry is no longer valid for the current model."/>
+                    <CheckBox x:Name="checkBox_WarmStart" Content="Reuse the converted TAS geometry between rounds (faster)" Margin="20,8,0,0"
+                              ToolTip="Reuses the existing converted TAS geometry between optimisation rounds.&#x0a;Every round still runs its own full-year simulation. Untick this when the geometry is no longer valid for the current model."/>
                     <TextBlock x:Name="textBlock_WarmStart" Margin="40,4,0,10" TextWrapping="Wrap" Foreground="#555555"/>
                 </StackPanel>
             </Grid>

@@ -410,7 +410,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (refusals.Count != 0)
             {
-                MessageBox.Show(string.Format("Not every selected dwelling was assigned.\n\n{0}", string.Join("\n\n", refusals)));
+                MessageBox.Show(string.Format("Not every selected dwelling was assigned.\n\n{0}", string.Join("\n\n", refusals)), "Part O — Review iteration");
             }
 
             return result;

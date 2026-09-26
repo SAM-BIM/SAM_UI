@@ -107,7 +107,7 @@ namespace SAM.Analytical.UI.WPF
         public const string Name_Prepare = "Prepare model";
         public const string Name_Simulate = "Check & simulate";
         public const string Name_Review = "Review";
-        public const string Name_Optimise = "Optimise 2B";
+        public const string Name_Optimise = "Optimise (2B)";
 
         /// <param name="partOWorkflowInspection">The inspection the window is showing.</param>
         /// <param name="includeOptimisation">Whether the scenario can carry an Iteration 2B at all - the step is shown only then.</param>
