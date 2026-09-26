@@ -15,7 +15,9 @@ Full record: `documentation/evidence/parto-final-acceptance/ACCEPTANCE-2026-09-2
 1. Progress window reappearing after "Simulation cancelled" (Pass 4 known issue): `Modify/RunPartOWorkflow.cs`
    `PrepareAndRun` now re-shows the host after the attention box only where TM59 still follows (`partORun.CanAssess`).
    Reproduced live on the base build, gone after (logs in the evidence `live/`).
-2. 2B result window: `MaxHeight = WorkArea × 0.92`, content in a ScrollViewer, Copy All / Close outside it.
+2. 2B result window: content in a ScrollViewer, Copy All / Close outside it; height capped by
+   `PartOWindowPlacement.KeepOnScreen` on the monitor the window is on, at first render and on growth (Codex P2 on
+   #122: the first version used the primary monitor's `SystemParameters.WorkArea`).
 3. Iteration 3 verdict words PASS / FAIL / NOT ASSESSED (tiles, Hub Iteration 3 row, Hub outcome line) via new
    `Query/PartOVerdictText.cs`; a saved record with no status still "—".
 4. TM59 window draws its verdict band and facts box only once `ResultSummary` is set - Iteration 3's "TM59 report"
@@ -35,10 +37,11 @@ Optimise "Needs a live run"). 2B Cancel was not re-exercised live (rounds now ~1
 `Windows/PartOOptimisationResultWindow.xaml(.cs)`, `Windows/PartOTM59ResultWindow.xaml(.cs)`,
 `Windows/PartOIteration3ResultWindow.xaml(.cs)`, `Windows/PartOIterationWindow.xaml(.cs)`,
 `Windows/PartOPreparationWindow.xaml.cs`, `Windows/PartOWorkflowWindow.xaml`, `Windows/PartOWorkflowWindow.Iteration3.cs`,
-`Windows/AnalyticalWindow.xaml.cs`; tests `PartOFinalConsistencyTests.cs` (new, 6), `PartOWorkflowSimplificationTests.cs`
+`Windows/AnalyticalWindow.xaml.cs`; tests `PartOFinalConsistencyTests.cs` (new, 8), `PartOWorkflowSimplificationTests.cs`
 (Iteration 3 pins → PASS/FAIL); evidence `documentation/evidence/parto-final-acceptance/`.
 
-**Validation.** `SAM_UI.sln` Release 0 errors; WPF tests **1243/1243**; `git diff --check` clean. Corridor tests (2)
+**Validation.** `SAM_UI.sln` Release 0 errors; WPF tests **1245/1245** (1243 at the first push `d2ce1cb`; the Codex
+correction replaced one test, added two); `git diff --check` clean. No TAS rerun for the correction (placement only). Corridor tests (2)
 and model-growth tests (2) pass.
 
 **Left unchanged (separate).** Iteration 3 refusal pane internal wording ("REFUSED at", "Candidate B" - ledger text,

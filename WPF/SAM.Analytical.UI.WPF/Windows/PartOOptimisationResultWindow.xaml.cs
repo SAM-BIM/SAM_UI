@@ -40,9 +40,34 @@ namespace SAM.Analytical.UI.WPF
         {
             InitializeComponent();
 
-            //Never taller than the screen it opens on: with the detail open the content scrolls and Copy All /
-            //Close stay reachable - the cap the Start Iteration 2B window and the Hub use.
-            MaxHeight = SystemParameters.WorkArea.Height * 0.92;
+            SizeChanged += OnGrown;
+        }
+
+        /// <summary>Whether the first placement has run; growth after it is answered by <see cref="OnGrown"/>.</summary>
+        private bool placed;
+
+        protected override void OnContentRendered(System.EventArgs e)
+        {
+            base.OnContentRendered(e);
+
+            //Never taller than the monitor it is on - the one its handle is on, not the primary: the content
+            //scrolls and Copy All / Close stay reachable with the detail open. The Hub's placement, shared.
+            PartOWindowPlacement.KeepOnScreen(this);
+
+            placed = true;
+        }
+
+        /// <summary>
+        /// Opening Engineering detail makes the window taller after it was placed, since its height follows its
+        /// content; growth that would take Copy All / Close below the working area moves it up again - the Hub's
+        /// rule. A size the person dragged (<c>SizeToContent</c> then <c>Manual</c>) is left alone.
+        /// </summary>
+        private void OnGrown(object sender, SizeChangedEventArgs e)
+        {
+            if (placed && e.HeightChanged && e.NewSize.Height > e.PreviousSize.Height && SizeToContent != SizeToContent.Manual)
+            {
+                PartOWindowPlacement.KeepOnScreen(this);
+            }
         }
 
         /// <summary>

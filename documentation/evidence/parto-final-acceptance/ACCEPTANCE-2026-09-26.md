@@ -30,8 +30,14 @@ TM59 rules are unchanged.
    - before (`live/journey-cancel-before.txt`): `answer OK` → `PROGRESS 'Part O' #1` (window back) → Hub;
    - after (`live/journey-cancel-after.txt`): `answer OK` → Hub, no progress window.
 2. **Iteration 2B result window had no height ceiling** - opening Engineering detail (fixed 380 px tabs) could push
-   Copy All / Close below the taskbar. Now the Start window's pattern: `MaxHeight = WorkArea × 0.92`, content in a
-   ScrollViewer, buttons outside it (07, live UIA shows the `ScrollViewer` pane).
+   Copy All / Close below the taskbar. Now: content in a ScrollViewer, buttons outside it (07, live UIA shows the
+   `ScrollViewer` pane), and the height capped by the Hub's monitor-aware placement (below).
+   - **Codex correction on #122.** The first version capped `MaxHeight` from `SystemParameters.WorkArea` - the
+     PRIMARY monitor - so on a shorter secondary monitor the buttons could still be off screen. Now the window takes
+     no cap in its constructor; `OnContentRendered` calls `PartOWindowPlacement.KeepOnScreen` (92% of the working
+     area of the monitor its handle is on, moved up to fit), and growth after that - opening Engineering detail -
+     re-places it (`OnGrown`, the Hub's rule; a size the person dragged is left alone). Proved in place: both window
+     tests fail against the first version.
 3. **Iteration 3 said "Pass" / "Fail" / "Undefined"** (tiles, Hub Iteration 3 row, Hub outcome line) where every
    other surface says PASS / FAIL / NOT ASSESSED. One helper, `Query.PartOVerdictText`. A saved Iteration 3 record
    with no status still reads "—" (unknown, not "not assessed"). Nothing re-decided: the status is SAM's.
@@ -78,8 +84,9 @@ history is bounded by the round limit. No change needed.
 ## Validation
 
 - `SAM_UI.sln` Release (VS 18 MSBuild): 0 errors.
-- `SAM.Analytical.UI.WPF.Tests`: **1243/1243** (1237 + 6 in `PartOFinalConsistencyTests`; one Iteration 3 pin updated
-  to PASS/FAIL in `PartOWorkflowSimplificationTests`).
+- `SAM.Analytical.UI.WPF.Tests`: **1245/1245** (1237 + 8 in `PartOFinalConsistencyTests`; one Iteration 3 pin updated
+  to PASS/FAIL in `PartOWorkflowSimplificationTests`). 1243 at the first push; the Codex correction replaced one test
+  and added two (secondary-monitor `Placement` case; shown window opened low with the detail open).
 - Coverage still present: Review intent (`PartOReviewIterationTests`), Hub outcomes (`PartOHubOutcomeTests`),
   reopened scenario authority (`PartORunResumeNamingTests`), TM59 summary (`PartOTM59ResultTests`), shared progress and
   truthful Cancel (`PartOProgressConsistencyTests`), 2B entry and stop reasons (`PartOIteration2BJourneyTests`),

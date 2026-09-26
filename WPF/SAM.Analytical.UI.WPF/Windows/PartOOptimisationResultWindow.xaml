@@ -40,7 +40,7 @@
         </Grid.RowDefinitions>
 
         <!-- The content scrolls and Copy All / Close stay outside it, so opening the detail on a short display or
-             with large text scaling never pushes them off screen (the window's height is capped in code). -->
+             with large text scaling never pushes them off screen (PartOWindowPlacement caps the height to the monitor the window is on). -->
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid>
         <Grid.RowDefinitions>

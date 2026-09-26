@@ -9,7 +9,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 {
     /// <summary>
     /// <b>Part O UX pass 6 - final consistency.</b> Only what that pass found and changed: Iteration 3's verdict
-    /// words, the TM59 window opened as a bare report, and the Iteration 2B result window's height.
+    /// words, the TM59 window opened as a bare report, and the Iteration 2B result window's height (monitor-aware).
     /// </summary>
     [Collection(WpfCollection.Name)]
     public class PartOFinalConsistencyTests
@@ -58,19 +58,72 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         /// <summary>
         /// The 2B result window was the one Part O result with no height ceiling: opening Engineering detail
-        /// (a fixed-height tab set) could push Copy All and Close below the taskbar. It now takes the Start
-        /// window's cap, and its content scrolls with the buttons outside the scroll.
+        /// (a fixed-height tab set) could push Copy All and Close below the taskbar. Its content now scrolls with
+        /// the buttons outside the scroll, and its height is capped by the Hub's monitor-aware placement once the
+        /// window exists - not from the primary monitor in the constructor (Codex review on #122), which on a
+        /// shorter secondary monitor left the buttons off screen.
         /// </summary>
         [WpfFact]
-        public void The2BResultWindow_KeepsItsButtonsOnScreen()
+        public void The2BResultWindow_KeepsItsButtonsOutsideTheScroll_AndTakesNoPrimaryMonitorCap()
         {
             PartOOptimisationResultWindow partOOptimisationResultWindow = new();
 
-            Assert.Equal(SystemParameters.WorkArea.Height * 0.92, partOOptimisationResultWindow.MaxHeight, 3);
+            //No ceiling until the window knows which monitor it is on.
+            Assert.True(double.IsPositiveInfinity(partOOptimisationResultWindow.MaxHeight));
 
             Assert.True(InsideScrollViewer(partOOptimisationResultWindow.expander_Detail));
             Assert.False(InsideScrollViewer(partOOptimisationResultWindow.button_Close));
             Assert.False(InsideScrollViewer(partOOptimisationResultWindow.button_CopyAll));
+
+            partOOptimisationResultWindow.Close();
+        }
+
+        /// <summary>
+        /// The arithmetic the window relies on, for the case Codex named: a window with no ceiling of its own
+        /// (+infinity, the WPF default) on a secondary monitor shorter than the primary and below it. The ceiling
+        /// is 92% of THAT monitor, and the window is moved up inside it.
+        /// </summary>
+        [Fact]
+        public void OnAShorterSecondaryMonitor_TheCeilingIsThatMonitors()
+        {
+            //Secondary working area y 1080..1800 (720 high); window opened at y 1500, 700 high, minimum 360.
+            (double top, double minHeight, double maxHeight) = PartOWorkflowWindow.Placement(1500, 700, 360, double.PositiveInfinity, 1080, 1800);
+
+            Assert.Equal(720 * 0.92, maxHeight, 3);
+            Assert.Equal(360, minHeight);
+            Assert.Equal(1800 - 720 * 0.92, top, 3);
+        }
+
+        /// <summary>
+        /// The real window, opened low on its monitor with Engineering detail open: once rendered, its ceiling
+        /// is that monitor's (whichever it is on), and Close is still inside the working area.
+        /// </summary>
+        [WpfFact]
+        public void The2BResultWindow_OpenedLowWithTheDetailOpen_StaysOnItsMonitor()
+        {
+            System.Windows.Rect rect = SystemParameters.WorkArea;
+
+            PartOOptimisationResultWindow partOOptimisationResultWindow = new()
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual,
+                ShowActivated = false,
+                Left = rect.Left + 10,
+                Top = rect.Bottom - 150,
+            };
+
+            partOOptimisationResultWindow.expander_Detail.IsExpanded = true;
+
+            partOOptimisationResultWindow.Show();
+            partOOptimisationResultWindow.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            System.IntPtr handle = new System.Windows.Interop.WindowInteropHelper(partOOptimisationResultWindow).Handle;
+            System.Drawing.Rectangle workingArea = System.Windows.Forms.Screen.FromHandle(handle).WorkingArea;
+            System.Windows.Media.Matrix matrix = PresentationSource.FromVisual(partOOptimisationResultWindow).CompositionTarget.TransformFromDevice;
+            double areaTop = matrix.Transform(new Point(workingArea.Left, workingArea.Top)).Y;
+            double areaBottom = matrix.Transform(new Point(workingArea.Right, workingArea.Bottom)).Y;
+
+            Assert.Equal((areaBottom - areaTop) * 0.92, partOOptimisationResultWindow.MaxHeight, 1);
+            Assert.True(partOOptimisationResultWindow.Top + partOOptimisationResultWindow.ActualHeight <= areaBottom + 1, string.Format("bottom {0} is below the working area {1}", partOOptimisationResultWindow.Top + partOOptimisationResultWindow.ActualHeight, areaBottom));
 
             partOOptimisationResultWindow.Close();
         }
