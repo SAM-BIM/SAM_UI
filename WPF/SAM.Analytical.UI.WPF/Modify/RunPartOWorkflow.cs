@@ -436,7 +436,17 @@ namespace SAM.Analytical.UI.WPF
                 return false;
             }
 
-            return partORun.AdoptOptimisationSettings(partOWorkflowRequest?.OptimisationSettings);
+            //No settings on the request means none were STATED - the Hub no longer asks for 2B settings (Pass 5:
+            //they are confirmed when 2B starts). A preset the Prepare Iteration window recorded is then kept, not
+            //cleared: it is what pre-fills the Start Iteration 2B confirmation after this run (Codex P2 on #118).
+            //The reuse condition is AdoptOptimisationSettings' own, unchanged: a prepared run with a context.
+            PartOOptimisationSettings? partOOptimisationSettings = partOWorkflowRequest?.OptimisationSettings;
+            if (partOOptimisationSettings is null)
+            {
+                return partORun.State == PartORunState.Prepared && partORun.PreparationContext is not null;
+            }
+
+            return partORun.AdoptOptimisationSettings(partOOptimisationSettings);
         }
 
         /// <summary>

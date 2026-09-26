@@ -83,6 +83,7 @@ Exe `build\SAM Analytical.exe`, WPF dll 08:10 (then 08:27 for the reopen re-chec
 - *Reopen caption/tooltip.* With the scenario box back on its first entry (Iteration 1a), a reopened **Iteration 2** run showed "Iteration 2 only" / "available on Iteration 2 only" (`40`). This behaviour predates Pass 5. Now, where a run with results exists, the tooltip is `CanOptimise`'s refusal ("reopened from a saved model … Run Prepare & Run again …") and the caption is "Needs a live run" (restored) or "Not available" (`41`, re-checked live 08:29).
 - *Hub vocabulary.* The Hub said "iteration limit reached" beside the result's "round limit reached". Changed to "round limit reached", the word every 2B window uses.
 - (Codex P2s on #118, fixed before this run and proven in 6: next step only offers continuing where the run survives; session pre-fill on every route.)
+- (Codex P2 on 5b0c039, fixed after this run: a Hub Prepare & Run reusing a Prepare Iteration preparation no longer clears its recorded 2B preset - a request stating no settings keeps it. Unit-tested; the live run did not use that route.)
 
 **Observed, not changed (outside Pass 5):**
 - Each round's saved `.sam` roughly doubles (172 KB → 1.9 MB at `-Opt10`, 3.7 MB `-OptMax`) - the workflow model accumulates between rounds. A scalability concern for large projects; flagged separately.

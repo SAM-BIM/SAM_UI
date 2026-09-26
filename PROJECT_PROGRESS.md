@@ -57,6 +57,10 @@ reporting PRs #136/#139/#140 not needed). Not merged at time of writing.
   the run; session pre-fill on every route - `Modify.partOOptimisationSettings_LastConfirmed`); live: a reopened
   Iteration 2 run said "Iteration 2 only" beside Optimise (pre-existing precedence) -> now the authority's refusal and
   "Needs a live run" where a run with results exists (re-checked live); Hub "iteration limit" -> "round limit".
+- Codex P2 on 5b0c039 (fixed after the live run): a Hub Prepare & Run that REUSED a preparation made by the Prepare
+  Iteration window cleared its 2B preset (`ReuseWithCurrentOptimisation` adopted the request's null). Now a request
+  stating no settings keeps the recorded preset; the reuse condition is unchanged. Test C renamed
+  `AReusedPreparation_KeepsARecordedPresetWhenTheRequestStatesNone`.
 - Communal corridor: verified, no defect. SAM `TM59AssessmentReport` classifies by the exact InternalCondition; SAM_UI
   presents `CorridorChecks` / `SupplementaryChecks` as given. New `PartOTM59CorridorReportingTests` pins it (the live
   model has no corridor IC).
