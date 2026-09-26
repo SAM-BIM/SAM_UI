@@ -39,6 +39,10 @@ namespace SAM.Analytical.UI.WPF
         public PartOOptimisationResultWindow()
         {
             InitializeComponent();
+
+            //Never taller than the screen it opens on: with the detail open the content scrolls and Copy All /
+            //Close stay reachable - the cap the Start Iteration 2B window and the Hub use.
+            MaxHeight = SystemParameters.WorkArea.Height * 0.92;
         }
 
         /// <summary>

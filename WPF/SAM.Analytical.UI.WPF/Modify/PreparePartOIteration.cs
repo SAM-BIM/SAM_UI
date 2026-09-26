@@ -44,7 +44,7 @@ namespace SAM.Analytical.UI.WPF
             List<Zone> zones = analyticalModel.GetZones() ?? [];
             if (zones.Count == 0)
             {
-                MessageBox.Show("The model has no zones, so no dwelling can be assessed. Zone the model, mark its dwellings, and size it against Approved Document F first.");
+                MessageBox.Show("The model has no zones, so no dwelling can be assessed. Zone the model, mark its dwellings, and size it against Approved Document F first.", "Part O — Preparation");
 
                 return;
             }
@@ -262,7 +262,7 @@ namespace SAM.Analytical.UI.WPF
 
                 PartOProgressHost.Current?.Hide();
 
-                MessageBox.Show(string.Format("The Part O iteration was not prepared.\n\n{0}", partOIterationPreparation.Refusal));
+                MessageBox.Show(string.Format("The Part O iteration was not prepared.\n\n{0}", partOIterationPreparation.Refusal), "Part O — Preparation");
 
                 return PartOPreparationResult.NotPrepared;
             }
@@ -366,7 +366,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     PartOProgressHost.Current?.Hide();
 
-                    MessageBox.Show(string.Format("The equipment assignments were not applied, so the prepared model was not adopted.\n\n{0}", string.Join("\n\n", refusals_Commit)));
+                    MessageBox.Show(string.Format("The equipment assignments were not applied, so the prepared model was not adopted.\n\n{0}", string.Join("\n\n", refusals_Commit)), "Part O — Preparation");
 
                     return PartOPreparationResult.NotPrepared;
                 }
@@ -410,7 +410,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 PartOProgressHost.Current?.Hide();
 
-                MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason));
+                MessageBox.Show(string.Format("The prepared model was not adopted.\n\n{0}", partORun.InvalidationReason), "Part O — Preparation");
 
                 return PartOPreparationResult.NotPrepared;
             }

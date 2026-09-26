@@ -248,7 +248,7 @@ namespace SAM.Analytical.UI.WPF
         {
             return partOIteration3Assessment is null || !partOIteration3Assessment.IsAssessed
                 ? "—"
-                : Core.Query.Description(partOIteration3Assessment.OccupiedSpaceComplianceStatus);
+                : Query.PartOVerdictText(partOIteration3Assessment.OccupiedSpaceComplianceStatus);
         }
     }
 }

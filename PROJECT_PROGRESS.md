@@ -1,12 +1,64 @@
 # Project Progress
 
-## Current: SAM Documentation Framework PR3 - Space Assumptions PDF in SAM_UI (26 Sep 2026) - PR OPEN, not merged
+## Current: Part O UX pass 6 - final consistency and end-to-end acceptance (26 Sep 2026) - PR OPEN, not merged
+
+**Status.** Branch `feature/parto-pass6-acceptance-2026-09-26` from `sow/2026-Q3` `7e7de03` (#121 merged). SAM_UI only;
+presentation fixes + acceptance. Pass 5 (#118) merged; the 2B `.sam` growth fix (SAM#142 / SAM_Tas#67 / SAM_UI#119)
+merged and deployed (SAM_Deploy#50). Engineering logic, `CanOptimise`, stop rules, cancellation points, provenance,
+saved-run format and TM59 rules unchanged. A PR is open against `sow/2026-Q3`; the owner reviews it - do not merge.
+Full record: `documentation/evidence/parto-final-acceptance/ACCEPTANCE-2026-09-26.md`.
+
+**Environment note.** This machine's SAM was at `ba343bfb` with no `SAM.Core.Reporting.Pdf` build, so SAM_UI (with
+#121) failed CS0234. SAM fast-forwarded to `22f9c743` and `SAM.sln` Release rebuilt (0 errors).
+
+**Fixed (all presentation).**
+1. Progress window reappearing after "Simulation cancelled" (Pass 4 known issue): `Modify/RunPartOWorkflow.cs`
+   `PrepareAndRun` now re-shows the host after the attention box only where TM59 still follows (`partORun.CanAssess`).
+   Reproduced live on the base build, gone after (logs in the evidence `live/`).
+2. 2B result window: `MaxHeight = WorkArea × 0.92`, content in a ScrollViewer, Copy All / Close outside it.
+3. Iteration 3 verdict words PASS / FAIL / NOT ASSESSED (tiles, Hub Iteration 3 row, Hub outcome line) via new
+   `Query/PartOVerdictText.cs`; a saved record with no status still "—".
+4. TM59 window draws its verdict band and facts box only once `ResultSummary` is set - Iteration 3's "TM59 report"
+   (report text only; no verdict may be parsed from it) no longer shows an empty band.
+5. Twin wording: Prepare Iteration's 2B pre-set "Round limit" / "between rounds" (as Start Iteration 2B); its dwelling
+   count uses the counted noun (as the Hub); step strip "Optimise (2B)"; Hub glossary Iteration 3 "1a or Iteration 2".
+6. Captions on the nine captionless Part O message boxes; ribbon tooltip em dash; Iteration 3 "Copy All".
+
+**Live acceptance (real exe, real TAS).** Prepare & Run cancel (before/after the fix); reopened no-sidecar 1a run →
+Review Results → TM59 → Hub (scenario not guessed, window and Hub agree); Iteration 3 Open result; Iteration 2 run →
+Hub → Start Iteration 2B (pre-fill, invalid step, Cancel) → 2B at a 3-round limit (not 10) → result (detail open,
+buttons on screen) → Hub → second 2B → save → restart → reopen ("Saved Iteration 2 results reopened", no 2B history,
+Optimise "Needs a live run"). 2B Cancel was not re-exercised live (rounds now ~14 s, shorter than the driver's delay).
+
+**Files.** `Modify/RunPartOWorkflow.cs`, `Modify/PartOIteration3.cs`, `Modify/PreparePartOIteration.cs`,
+`Modify/RunPartOOptimisation.cs`, `Query/PartOVerdictText.cs` (new), `Classes/PartO/PartOWorkflowStep.cs`,
+`Windows/PartOOptimisationResultWindow.xaml(.cs)`, `Windows/PartOTM59ResultWindow.xaml(.cs)`,
+`Windows/PartOIteration3ResultWindow.xaml(.cs)`, `Windows/PartOIterationWindow.xaml(.cs)`,
+`Windows/PartOPreparationWindow.xaml.cs`, `Windows/PartOWorkflowWindow.xaml`, `Windows/PartOWorkflowWindow.Iteration3.cs`,
+`Windows/AnalyticalWindow.xaml.cs`; tests `PartOFinalConsistencyTests.cs` (new, 6), `PartOWorkflowSimplificationTests.cs`
+(Iteration 3 pins → PASS/FAIL); evidence `documentation/evidence/parto-final-acceptance/`.
+
+**Validation.** `SAM_UI.sln` Release 0 errors; WPF tests **1243/1243**; `git diff --check` clean. Corridor tests (2)
+and model-growth tests (2) pass.
+
+**Left unchanged (separate).** Iteration 3 refusal pane internal wording ("REFUSED at", "Candidate B" - ledger text,
+also persisted in the Iteration 3 report JSON); 2B "Run" vs "round" in Engineering detail; Part O `l/s` vs reporting
+`L/s` (cross-repo decision); remaining "(s)" in the Iteration 3 window / equipment control; 2B cancel-then-refusal
+precedence; unreachable host-less "Preparing Model" fallback; session-only 2B history; output-path portability.
+
+**Recommendation.** Part O UX ready for closeout/freeze once this PR merges; the items above are follow-ups, not gates.
+
+**Next step.** Owner reviews the PR; check CI green before merge. After merge, bump SAM_Deploy's SAM_UI pointer (and
+SAM to `22f9c743` for #121 in the same or a separate bump).
+
+## Previous: SAM Documentation Framework PR3 - Space Assumptions PDF in SAM_UI (26 Sep 2026) - MERGED (#121, 7e7de03)
 
 **Status.** Branch `feature/reporting-pr3-space-assumptions-pdf`.
 - Base: `sow/2026-Q3` `d7f042f7` (#118 merged); `sow/2026-Q3` `cb61241d` (#119/#120, Part O .sam growth) merged in
   at closeout (only this file conflicted).
 - Consumes SAM `sow/2026-Q3` `22f9c743` (SAM#141 PR2 renderer + SAM#143 `L/s` symbol). No other SAM change.
-- A PR is open against `sow/2026-Q3`. The owner reviews it; do not merge.
+- Merged into `sow/2026-Q3` as #121 (`7e7de03`). Building SAM_UI now needs SAM built at `22f9c743` or later
+  (`SAM.Core.Reporting.Pdf`); a machine with an older SAM build fails with CS0234 in `SpaceAssumptionsPdf.cs`.
 - Phase 1 only. Not in scope: batch reports, Building/Design Load summaries, HTML/Excel output, or an IP option in
   the UI.
 - Full description: `documentation/Reporting-SpaceAssumptionsPdf.md`.

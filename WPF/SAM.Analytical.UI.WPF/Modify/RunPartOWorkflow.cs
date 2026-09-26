@@ -293,7 +293,7 @@ namespace SAM.Analytical.UI.WPF
                 {
                     partOProgressHost.Hide();
 
-                    MessageBox.Show(string.Format("The Part O iteration is no longer prepared, so nothing was simulated.\n\n{0}", partORun.InvalidationReason ?? "Prepare the iteration again."));
+                    MessageBox.Show(string.Format("The Part O iteration is no longer prepared, so nothing was simulated.\n\n{0}", partORun.InvalidationReason ?? "Prepare the iteration again."), "Part O — Prepare & Run");
 
                     return null;
                 }
@@ -325,7 +325,13 @@ namespace SAM.Analytical.UI.WPF
                         MessageBox.Show(text, "Part O — Prepare & Run");
                     }
 
-                    partOProgressHost.Show();
+                    //Back only where there is still a stage to watch. A cancelled or uncompleted run goes
+                    //nowhere after this box, so showing the window again only flashed it up before it
+                    //closed - after the "Simulation cancelled" message had already ended the operation.
+                    if (partORun.CanAssess)
+                    {
+                        partOProgressHost.Show();
+                    }
                 }
 
                 if (partORun.CanAssess)

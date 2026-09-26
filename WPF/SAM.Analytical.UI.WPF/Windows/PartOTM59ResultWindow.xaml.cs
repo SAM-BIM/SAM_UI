@@ -80,6 +80,9 @@ namespace SAM.Analytical.UI.WPF
 
                 itemsControl_Facts.ItemsSource = summary.Facts;
 
+                border_Verdict.Visibility = Visibility.Visible;
+                border_Facts.Visibility = summary.Facts.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+
                 //No assessment, no report: the section is not drawn rather than shown empty.
                 Visibility visibility_Report = summary.Verdict == PartOTM59Verdict.Unavailable ? Visibility.Collapsed : Visibility.Visible;
                 stackPanel_ReportHeading.Visibility = visibility_Report;
