@@ -772,6 +772,9 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_PrintRoomDataSheets.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_PrintRDS);
             RibbonButton_PrintRoomDataSheets.Click += RibbonButton_PrintRoomDataSheets_Click;
 
+            RibbonButton_SpaceAssumptionsPdf.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);
+            RibbonButton_SpaceAssumptionsPdf.Click += RibbonButton_SpaceAssumptionsPdf_Click;
+
             RibbonButton_OpenMollierChart.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_MollierDiagram);
             RibbonButton_OpenMollierChart.Click += RibbonButton_OpenMollierChart_Click;
 
@@ -2483,6 +2486,17 @@ namespace SAM.Analytical.UI.WPF.Windows
             uIAnalyticalModel?.PrintRoomDataSheets(windowHandle);
         }
 
+        private void RibbonButton_SpaceAssumptionsPdf_Click(object sender, RoutedEventArgs e)
+        {
+            //The Space selected in the active view; Modify.CreateSpaceAssumptionsPdf explains none or several.
+            uIAnalyticalModel?.CreateSpaceAssumptionsPdf(GetActiveViewportControl()?.SelectedSAMObjects<Space>(), this);
+        }
+
+        private void MenuItem_SpaceAssumptionsPdf_Click(object sender, RoutedEventArgs e)
+        {
+            uIAnalyticalModel?.CreateSpaceAssumptionsPdf(((sender as MenuItem)?.Tag as IEnumerable<Space>), this);
+        }
+
         private void RibbonButton_Redo_Click(object sender, RoutedEventArgs e)
         {
             Redo();
@@ -3034,6 +3048,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_AirHandlingUnitDiagram.IsEnabled = false;
             RibbonButton_Wiki.IsEnabled = false;
             RibbonButton_PrintRoomDataSheets.IsEnabled = false;
+            RibbonButton_SpaceAssumptionsPdf.IsEnabled = false;
             RibbonButton_AddMissingObjects.IsEnabled = false;
             RibbonButton_CleanAnalyticalModel.IsEnabled = false;
             RibbonButton_Hydra.IsEnabled = false;
@@ -3108,6 +3123,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             if (analyticalModel != null)
             {
                 RibbonButton_PrintRoomDataSheets.IsEnabled = true;
+                RibbonButton_SpaceAssumptionsPdf.IsEnabled = true;
                 RibbonButton_AddMissingObjects.IsEnabled = true;
                 RibbonButton_CleanAnalyticalModel.IsEnabled = true;
                 RibbonButton_MapInternalConditions.IsEnabled = true;
@@ -4024,6 +4040,8 @@ namespace SAM.Analytical.UI.WPF.Windows
                     menuItem.Click += MenuItem_ManageMechanicalSystems_Click;
                     menuItem.Tag = spaces;
                     contextMenu.Items.Add(menuItem);
+
+                    contextMenu.Items.Add(Create.MenuItem_SpaceAssumptionsPdf(spaces, MenuItem_SpaceAssumptionsPdf_Click));
                 }
 
                 List<Aperture> apertures = jSAMObjects.FindAll(x => x is Aperture).ConvertAll(x => (Aperture)x);

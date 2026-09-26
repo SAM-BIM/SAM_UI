@@ -1,11 +1,96 @@
 # Project Progress
 
-## Current: Part O UX pass 5 - Iteration 2B journey (26 Sep 2026) - PR #118 OPEN, live-accepted, not merged
+## Current: SAM Documentation Framework PR3 - Space Assumptions PDF in SAM_UI (26 Sep 2026) - PR OPEN, not merged
+
+**Status.** Branch `feature/reporting-pr3-space-assumptions-pdf`.
+- Base: `sow/2026-Q3` `d7f042f7` (#118 merged).
+- Consumes SAM `sow/2026-Q3` `ba343bfb` (SAM#141, the PR2 renderer, merged) as it is. No SAM change.
+- A PR is open against `sow/2026-Q3`. The owner reviews it; do not merge.
+- Phase 1 only. Not in scope: batch reports, Building/Design Load summaries, HTML/Excel output, or an IP option in
+  the UI.
+- Full description: `documentation/Reporting-SpaceAssumptionsPdf.md`.
+- Evidence: `documentation/evidence/space-assumptions-pdf/ACCEPTANCE-2026-09-26.md`.
+
+**What was built (orchestration only; no reporting logic in SAM_UI).**
+- Command "Space Assumptions PDF", in three places:
+  - Ribbon Edit › **Reports** (a new group, to the right of Analytical Model / legacy Print RDS). It uses the active
+    view's selection.
+  - The 3D/2D view's context menu.
+  - The model tree's context menu for a Space.
+- Selection:
+  - exactly one Space is required;
+  - with none, an info message;
+  - with several, an info message, or in a context menu the item is disabled with a tooltip;
+  - a stale Space is re-read by Guid; a removed one is refused.
+- Save: WPF `SaveFileDialog`.
+  - Default name `<Space name> - Space Assumptions.pdf`. Forbidden characters become `_`; reserved names are
+    prefixed; the name is capped at 150 characters; with no name the fallback is `Space <guid>`.
+  - It starts in the model folder, with the overwrite prompt on.
+  - Cancel does nothing.
+- On success: "saved: <path> — Open it now?" Yes shell-opens the PDF.
+- On failure: an error message naming the stage (Document / Rendering / Output), plus `Trace.TraceError`.
+  - The PDF is rendered in memory, then written to `.tmp` and moved into place, so an existing PDF is never damaged.
+- Units: SI, with air flow in l/s (the reporting default). SAM_UI has no unit preference, and none was added.
+  `Modify.WriteSpaceAssumptionsPdf(..., UnitStyle)` is the seam for a later option.
+- Packaging (`SAM.Analytical.UI.WPF.csproj`):
+  - HintPath references to SAM.Analytical.Reporting, SAM.Core.Reporting, SAM.Core.Reporting.Pdf and SAM.Units.
+  - `PackageReference PDFsharp-MigraDoc 6.2.0`. It is needed because a netstandard library build does not copy its
+    NuGet dependencies into `SAM\build`. It brings PdfSharp*/MigraDoc* 6.2.0 (net8.0), Microsoft.Extensions.* 8.0 and
+    Pkcs 8.0 into `SAM_UI\build`, and from there into `%APPDATA%\SAM`, the installer payload.
+  - Licences: `licenses\NotoSans\OFL.txt` (linked from SAM) and `licenses\PDFsharp-MigraDoc\LICENSE.txt`
+    (`files/licenses`).
+- Font resolver: nothing else in the SAM_UI process uses PDFsharp.
+  - Mollier export uses OxyPlot.SkiaSharp.
+  - SAM_Revit's PDFsharp deploys to `%APPDATA%\SAM\Revit 20xx`, draws images only, and installs no resolver.
+  - `PdfRenderer` registers `NotoSansFontResolver` idempotently; SAM_UI never sets a resolver.
+
+**Files.**
+- New: `Modify/SpaceAssumptionsPdf.cs`, `Query/SpaceAssumptionsPdf.cs`, `Create/MenuItem_SpaceAssumptionsPdf.cs`,
+  `Classes/Reporting/SpaceAssumptionsPdfResult.cs`.
+- Changed: `Windows/AnalyticalWindow.xaml(.cs)`, `Controls/AnalyticalModelControl.xaml.cs`,
+  `SAM.Analytical.UI.WPF.csproj`.
+- New: `files/licenses/PDFsharp-MigraDoc/LICENSE.txt`.
+- Tests: `SpaceAssumptionsPdfTests.cs` (new, in `WpfCollection`) and the tests csproj (reporting references).
+- Docs and evidence, as listed above.
+
+**Validation.**
+- Builds: `SAM.sln` Release rebuilt at `ba343bfb`. SAM_Systems and SAM_Tas were fast-forwarded and rebuilt; they were
+  stale, and SAM_UI does not compile against the old ones. `SAM_UI.sln` Release (VS 18 MSBuild `-restore`): 0 errors.
+- `SpaceAssumptionsPdfTests`: 27/27. Full `SAM.Analytical.UI.WPF.Tests`: **1235/1235**.
+- Production seam: a scratch harness loads only from `%APPDATA%\SAM`.
+  - Real Part O model: 4 PDFs (SI and IP), 1 page each.
+  - 1,608-Space model: 2 PDFs, 1 page each.
+  - First call 0.2–0.5 s, later calls 16–33 ms.
+  - Negative control: a payload with no PdfSharp gives a controlled Rendering failure.
+- Native: UI Automation of the real `%APPDATA%\SAM\SAM Analytical.exe` (real mouse and keys). Steps passed:
+  - ribbon with nothing selected;
+  - tree single Space and save;
+  - two Spaces, item disabled;
+  - Save dialog cancelled;
+  - sparse Space;
+  - locked destination, error shown with the original intact;
+  - ribbon using the view's selection;
+  - view context menu, then Yes, opens the PDF.
+- The PDF made by the app was inspected: A4, 1/1 page, SAM mark, Noto Sans, footer, SI units, no clipping.
+- `git diff --check` clean.
+
+**Not done / risks.**
+- No IP choice in the UI (by design for Phase 1).
+- No company logo: SAM_UI has no logo resource.
+- SAM_Deploy's installer pin list does not name the PDFsharp files. Today only SAM_UI deposits them, so there is no
+  drift.
+- A PDF locked in a viewer is reported by Windows as "Access to the path is denied". The message also says to close
+  the file.
+
+**Next step.** The owner reviews the PR; check CI is green before any merge. After merge, move SAM_Deploy's SAM_UI
+pointer and confirm that the CI installer payload contains the PdfSharp*/MigraDoc* DLLs and `licenses\NotoSans`.
+
+## Previous: Part O UX pass 5 - Iteration 2B journey (26 Sep 2026) - MERGED (#118, d7f042f7)
 
 **Status.** Branch `feature/parto-2b-journey-2026-09-26` from `sow/2026-Q3` `3b29e41` (#117 merged). SAM_UI only.
 Presentation and orchestration only: the optimiser, its eligibility (`Modify.CanOptimise`), stop rules, rounds,
-capacity envelope, cancellation points, TAS behaviour, provenance and saved-run format are unchanged. A PR is open
-against `sow/2026-Q3`; stop before merge for owner review. Full record: `documentation/evidence/parto-2b-journey/JOURNEY.md`.
+capacity envelope, cancellation points, TAS behaviour, provenance and saved-run format are unchanged. Merged as #118
+into `sow/2026-Q3`. Full record: `documentation/evidence/parto-2b-journey/JOURNEY.md`.
 
 **Housekeeping (separate).** SAM_Deploy PR #49 (`chore/bump-sam-ui-parto-pass4-2026-09-26`): SAM_UI `90b42e0e` ->
 `3b29e41f`, SAM `80b01052` -> `7dbeb2e4` (the SAM#137 merge SAM_UI#114 needs; SAM deliberately not moved to its tip -

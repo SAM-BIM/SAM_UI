@@ -131,6 +131,21 @@
     <Reference Include="SAM.Weather">
       <HintPath>..\..\..\SAM\build\SAM.Weather.dll</HintPath>
     </Reference>
+    <!-- The SAM Documentation Framework (Space Assumptions PDF). SAM_UI only orchestrates: the data, units,
+         document and layout all come from these assemblies. SAM.Units is referenced for the UnitStyle the
+         reporting options take. -->
+    <Reference Include="SAM.Analytical.Reporting">
+      <HintPath>..\..\..\SAM\build\SAM.Analytical.Reporting.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.Reporting">
+      <HintPath>..\..\..\SAM\build\SAM.Core.Reporting.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.Reporting.Pdf">
+      <HintPath>..\..\..\SAM\build\SAM.Core.Reporting.Pdf.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Units">
+      <HintPath>..\..\..\SAM\build\SAM.Units.dll</HintPath>
+    </Reference>
     <Reference Include="SAM.Weather.Tas">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Weather.Tas.dll</HintPath>
     </Reference>
@@ -149,6 +164,17 @@
       <Version>2.6.0</Version>
     </PackageReference>
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <!-- SAM.Core.Reporting.Pdf is a netstandard2.0 library in SAM\build, and a library build does not copy its
+         NuGet dependencies there. This reference puts PDFsharp, MigraDoc and their Microsoft dependencies into
+         build\ (and so into the installed %APPDATA%\SAM). Keep it at the version SAM.Core.Reporting.Pdf is built
+         against: 6.2.0, the PDFsharp that SAM_Revit also uses. -->
+    <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Licences that must accompany the renderer: Noto Sans (SIL OFL 1.1, embedded in SAM.Core.Reporting.Pdf.dll;
+         taken from SAM so there is one copy of the text) and PDFsharp/MigraDoc (MIT). -->
+    <None Include="..\..\..\SAM\SAM\SAM.Core.Reporting.Pdf\Fonts\OFL.txt" Link="licenses\NotoSans\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\files\licenses\PDFsharp-MigraDoc\LICENSE.txt" Link="licenses\PDFsharp-MigraDoc\LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\WPF\SAM.Core.Mollier.UI.WPF\SAM.Core.Mollier.UI.WPF.csproj" />
