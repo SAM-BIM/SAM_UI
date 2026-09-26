@@ -5,7 +5,7 @@
 **Status.** Branch `feature/reporting-pr3-space-assumptions-pdf`.
 - Base: `sow/2026-Q3` `d7f042f7` (#118 merged); `sow/2026-Q3` `cb61241d` (#119/#120, Part O .sam growth) merged in
   at closeout (only this file conflicted).
-- Consumes SAM `sow/2026-Q3` `ba343bfb` (SAM#141, the PR2 renderer, merged) as it is. No SAM change.
+- Consumes SAM `sow/2026-Q3` `22f9c743` (SAM#141 PR2 renderer + SAM#143 `L/s` symbol). No other SAM change.
 - A PR is open against `sow/2026-Q3`. The owner reviews it; do not merge.
 - Phase 1 only. Not in scope: batch reports, Building/Design Load summaries, HTML/Excel output, or an IP option in
   the UI.
@@ -74,6 +74,9 @@
   - view context menu, then Yes, opens the PDF.
 - The PDF made by the app was inspected: A4, 1/1 page, SAM mark, Noto Sans, footer, SI units, no clipping.
 - `git diff --check` clean.
+- Closeout (26 Sep): SAM#143 (`22f9c743`) moved the central airflow symbol `l/s` -> `L/s` (approved convention);
+  `sow/2026-Q3` `cb61241d` merged into this branch. `SAM.sln` rebuilt at `22f9c743`, `SAM_UI.sln` Release 0 errors,
+  WPF tests **1237/1237** (1235 + #119's 2). The earlier acceptance evidence shows `l/s`, the symbol at that time.
 
 **Not done / risks.**
 - No IP choice in the UI (by design for Phase 1).
