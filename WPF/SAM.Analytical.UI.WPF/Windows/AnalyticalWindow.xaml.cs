@@ -792,7 +792,7 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             RibbonButton_PartOWorkflow.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EnergySimulation);
             RibbonButton_PartOWorkflow.Click += RibbonButton_PartOWorkflow_Click;
-            RibbonButton_PartOWorkflow.ToolTipTitle = "Part O - Prepare & Run";
+            RibbonButton_PartOWorkflow.ToolTipTitle = "Part O — Prepare & Run";
             RibbonButton_PartOWorkflow.ToolTipDescription = "Inspect what this model already provides for an Approved Document O run, then prepare, check, simulate and assess it in one command. Existing results are reviewed without simulating again.";
 
             RibbonButton_PreparePartOIteration.LargeImageSource = Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Space);

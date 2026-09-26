@@ -321,7 +321,7 @@ namespace SAM.Analytical.UI.WPF
 
             TM59ComplianceStatus tM59ComplianceStatus = partOIteration3Assessment.OccupiedSpaceComplianceStatus;
 
-            textBlock.Text = Core.Query.Description(tM59ComplianceStatus);
+            textBlock.Text = Query.PartOVerdictText(tM59ComplianceStatus);
             textBlock.Foreground = tM59ComplianceStatus switch
             {
                 TM59ComplianceStatus.Pass => Brushes.SeaGreen,
@@ -755,10 +755,10 @@ namespace SAM.Analytical.UI.WPF
             partOTM59ResultWindow.SetDiagnostics(partOIteration3Assessment.AssociationRefusals, partOIteration3Assessment.VentilationStrategyRefusals);
 
             partOTM59ResultWindow.Summary = string.Format(
-                "{0}: {1} over {2} processed space(s). {3}",
+                "{0}: TM59 {1} over {2}. {3}",
                 description,
-                Core.Query.Description(partOIteration3Assessment.OccupiedSpaceComplianceStatus),
-                partOIteration3Assessment.Count_Processed,
+                Query.PartOVerdictText(partOIteration3Assessment.OccupiedSpaceComplianceStatus),
+                UI.Query.PartOCount(partOIteration3Assessment.Count_Processed, "processed space", "processed spaces"),
                 string.IsNullOrWhiteSpace(path_Report) ? "No report file was written." : string.Format("Report: {0}", path_Report));
 
             //Owned, so the child cannot be lost behind the main application window.

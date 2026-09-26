@@ -373,7 +373,8 @@ namespace SAM.Analytical.UI.WPF
 
         private static string Verdict(TM59ComplianceStatus tM59ComplianceStatus)
         {
-            return tM59ComplianceStatus == TM59ComplianceStatus.Undefined ? "—" : Core.Query.Description(tM59ComplianceStatus);
+            //Undefined is a saved record with no status - unknown, not "not assessed".
+            return tM59ComplianceStatus == TM59ComplianceStatus.Undefined ? "—" : Query.PartOVerdictText(tM59ComplianceStatus);
         }
 
         /// <summary>

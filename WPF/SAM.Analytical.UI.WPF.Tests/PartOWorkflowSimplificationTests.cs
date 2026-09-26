@@ -469,7 +469,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.True(partOWorkflowWindow.IsIteration3PanelVisible);
 
             Assert.StartsWith("✓ Result available", partOWorkflowWindow.Iteration3StatusText(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance));
-            Assert.Contains("reference Fail / system Fail", partOWorkflowWindow.Iteration3StatusText(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance));
+            Assert.Contains("reference FAIL / system FAIL", partOWorkflowWindow.Iteration3StatusText(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance));
             Assert.StartsWith("Last attempt did not complete", partOWorkflowWindow.Iteration3StatusText(PartOIteration3BehaviourMode.SelectedProduct));
             Assert.Equal("Not run yet", partOWorkflowWindow.Iteration3StatusText(PartOIteration3BehaviourMode.Parity));
 
@@ -735,8 +735,8 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.Equal("Iteration 3 comparison — Selected product — manufacturer operating guidance", Text("textBlock_Heading"));
             Assert.StartsWith("Reference case: Iteration 1a — baseline", Text("textBlock_Cases"));
-            Assert.Equal("Pass", Text("textBlock_TileReference"));
-            Assert.Equal("Fail", Text("textBlock_TileSystem"));
+            Assert.Equal("PASS", Text("textBlock_TileReference"));
+            Assert.Equal("FAIL", Text("textBlock_TileSystem"));
             Assert.EndsWith(" K", Text("textBlock_TileBias"));
             Assert.Contains(" of ", Text("textBlock_TileChanged"));
 
