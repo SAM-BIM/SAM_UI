@@ -235,7 +235,7 @@ namespace SAM.Core.Mollier.UI.Grasshopper
     {
         public override Guid ComponentGuid => new Guid("bbf6a119-0bcb-402c-9dd9-b6b45112c169");
 
-        protected override System.Drawing.Bitmap Icon => Resources.SAM_Small;
+        protected override System.Drawing.Bitmap Icon => Resources.SAM_GH_MollierChart;
 
         bool IGH_PreviewObject.Hidden { get; set; } = false;
 

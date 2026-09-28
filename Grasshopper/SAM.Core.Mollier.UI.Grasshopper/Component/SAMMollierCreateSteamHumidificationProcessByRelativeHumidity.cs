@@ -24,7 +24,7 @@ namespace SAM.Core.Mollier.UI.Grasshopper
         /// <summary>
         /// Provides an Icon for the component.
         /// </summary>
-        protected override Bitmap Icon => Resources.SAM_Mollier;
+        protected override Bitmap Icon => Resources.SAM_GH_ProcessHumidificationCreate;
 
         //public override GH_Exposure Exposure => GH_Exposure.primary;
         public override GH_Exposure Exposure => GH_Exposure.tertiary | GH_Exposure.hidden;
