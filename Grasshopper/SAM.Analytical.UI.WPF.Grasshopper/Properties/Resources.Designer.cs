@@ -79,5 +79,15 @@ namespace SAM.Analytical.UI.WPF.Grasshopper.Properties {
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap SAM_GH_TasksRun {
+            get {
+                object obj = ResourceManager.GetObject("SAM_GH_TasksRun", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
     }
 }
