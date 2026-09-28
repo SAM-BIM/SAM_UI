@@ -39,7 +39,8 @@ def assembly_name(project_dir):
 def find(dirs, name):
     hits = []
     for d in dirs:
-        for root, _, files in os.walk(d):
+        for root, subdirs, files in os.walk(d):
+            subdirs[:] = [x for x in subdirs if x not in ("obj", ".git", "packages")]  # skip reference assemblies (obj/*/ref, refint)
             hits += [os.path.join(root, f) for f in files if f in (name + ".gha", name + ".dll")]
     return max(hits, key=os.path.getmtime) if hits else None
 
