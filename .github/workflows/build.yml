@@ -137,7 +137,7 @@ jobs:
             }
             if ($canonical -and $candidates -notcontains $canonical) { $candidates += $canonical }
             # Hard fallbacks to the active quarter branches (in priority order).
-            foreach ($fb in @('sow/2026-Q3', 'sow/2026-Q2')) {
+            foreach ($fb in @('sow/2026-Q4', 'sow/2026-Q3', 'sow/2026-Q2')) {
               if ($candidates -notcontains $fb) { $candidates += $fb }
             }
             # Use the auth-token form so private deps (e.g. SAM_Solver) don't prompt
