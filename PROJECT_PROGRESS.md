@@ -6,7 +6,7 @@
 
 ## Last updated
 
-2026-10-06 (Q4 operational cleanup).
+2026-10-06 (Q4 icon-redesign migration).
 
 ## Current status
 
@@ -18,7 +18,7 @@ Not yet set by the owner. Record them here at the first Q4 planning pass. Known 
 
 ## Known carry-over work
 
-- **SAM Grasshopper icon redesign - PR #138** (`feature/sam-gh-icon-redesign` @ `51de3fc7`, open, base `sow/2026-Q3`, not merged). Analysed 2026-10-06: the branch carries only its own 5 icon-only commits (`1ac7af2`, `da7c037`, `20e800a`, `6d4becb`, `51de3fc`) on top of Q3 commit `05800789`. Those commits are not reachable from `sow/2026-Q4` (Q4 is built on the promoted `master` line), so a plain retarget would list 335 commits. Replaying exactly those commits onto `sow/2026-Q4` @ `638f22e7` is conflict-free (verified commit-by-commit with `git merge-tree`; identical to the net-diff merge). Planned action: rebase-onto Q4 as a new branch + PR, then close this one; owner-approved controlled task, not yet executed.
+- **SAM Grasshopper icon redesign - PR #138** (`feature/sam-gh-icon-redesign` @ `51de3fc7`, open, base `sow/2026-Q3`, not merged). Analysed 2026-10-06: the branch carries only its own 5 icon-only commits (`1ac7af2`, `da7c037`, `20e800a`, `6d4becb`, `51de3fc`) on top of Q3 commit `05800789`. Those commits are not reachable from `sow/2026-Q4` (Q4 is built on the promoted `master` line), so a plain retarget would list 335 commits. Replaying exactly those commits onto `sow/2026-Q4` @ `638f22e7` is conflict-free (verified commit-by-commit with `git merge-tree`; identical to the net-diff merge). Planned action: rebase-onto Q4 as a new branch + PR, then close this one; owner-approved controlled task, not yet executed. **Update:** migrated; replacement Q4 PR SAM_UI#203 (see the Q4 icon-redesign migration section); this old PR stays open for now.
 
 ## Repository-specific next steps
 
@@ -66,6 +66,16 @@ authoring machine) and must be transferred separately.
 - Checked, no action: the `github.repository_owner == 'SAM-BIM'` build guard (intentional; its comment names HoareLea only to explain why the guard exists), CODEOWNERS (SAM-BIM owners), and workflow secrets (no HoareLea-named secret). The local `upstream` (HoareLea) remote is preserved.
 - Carry-over: **SAM Grasshopper icon redesign - PR #138** (`feature/sam-gh-icon-redesign` @ `51de3fc7`, open, base `sow/2026-Q3`, not merged). Analysed 2026-10-06: the branch carries only its own 5 icon-only commits (`1ac7af2`, `da7c037`, `20e800a`, `6d4becb`, `51de3fc`) on top of Q3 commit `05800789`. Those commits are not reachable from `sow/2026-Q4` (Q4 is built on the promoted `master` line), so a plain retarget would list 335 commits. Replaying exactly those commits onto `sow/2026-Q4` @ `638f22e7` is conflict-free (verified commit-by-commit with `git merge-tree`; identical to the net-diff merge). Planned action: rebase-onto Q4 as a new branch + PR, then close this one; owner-approved controlled task, not yet executed.
 - Full cross-repository record, migration table and owner decisions: `SAM_Deploy:sow/2026-Q4` `PROJECT_PROGRESS.md`.
+
+## Q4 icon-redesign migration (2026-10-06)
+
+- Old PR: SAM-BIM/SAM_UI#138 (`feature/sam-gh-icon-redesign` @ `51de3fc7`, base `sow/2026-Q3`) - **preserved, open, untouched**.
+- New branch `feature/sam-gh-icon-redesign-q4` cut from `sow/2026-Q4` @ `9bef0158`; new PR **SAM-BIM/SAM_UI#203** (base `sow/2026-Q4`), replay-only tip `017b65d9`, feature head `a114cd54`. **Not merged.** Companion: SAM-BIM/SAM#179 (Q4 migration of SAM#166).
+- Replayed (old -> new, `cherry-pick -x`): `1ac7af2`->`93ddfbc`, `da7c037`->`3b2e42c`, `20e800a`->`5ba9eee`, `6d4becb`->`3ec6660`, `51de3fc`->`017b65d`; plus one new docs commit `a114cd5` pointing `documentation/GH-IconRedesign.md` at the new PR. No Q3 history imported.
+- High-scrutiny review: `Grasshopper/` is byte-identical at the Q3 base, the Q3 tip and Q4 (`b0f66384`). All Q3/Q4 UI/product work after the PR was cut (231 Q3-line commits; `WPF/*`, `SAM_UI/SAM.Analytical.UI`, `documentation/`) touches no file of this PR, so the replay overwrites no newer product logic.
+- Verified at the replay-only tip, before push: tree identical to the net-diff merge of the old feature onto Q4 (`a9a3300b`); same aggregate and per-commit `git patch-id`, file set, numstat and blobs (all PNG/resx/designer) as the old PR; ComponentGuid lines 33 unchanged; no EOL/BOM churn; no workflow/solution/product-project/`.gitmodules`/`AGENTS.md`/`PROJECT_PROGRESS.md` change; `git diff --check` output identical to the old PR.
+- Validation: `check_source.py origin/sow/2026-Q4` OK (32 swaps, 18 SPDX headers, 0 non-icon changes, GUIDs unchanged); Release `msbuild SAM_UI.sln` with the CI flags against SAM `feature/sam-gh-icon-redesign-q4` and local sibling build outputs (APPDATA/USERPROFILE redirected) 0 errors; `check_assemblies.py` OK; PR CI `build`, `spdx` green; mergeable. Not run: Rhino-hosted `tests/GhIconTest` (Rhino does not start under the redirected profile; not in CI) and `SAM.Analytical.UI.WPF.Tests` (no WPF/UI file changed).
+- Next: owner decides whether/when to close the old PR; merge remains the maintainer's call.
 
 ---
 
