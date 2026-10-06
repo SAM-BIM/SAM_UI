@@ -77,6 +77,16 @@ authoring machine) and must be transferred separately.
 - Validation: `check_source.py origin/sow/2026-Q4` OK (32 swaps, 18 SPDX headers, 0 non-icon changes, GUIDs unchanged); Release `msbuild SAM_UI.sln` with the CI flags against SAM `feature/sam-gh-icon-redesign-q4` and local sibling build outputs (APPDATA/USERPROFILE redirected) 0 errors; `check_assemblies.py` OK; PR CI `build`, `spdx` green; mergeable. Not run: Rhino-hosted `tests/GhIconTest` (Rhino does not start under the redirected profile; not in CI) and `SAM.Analytical.UI.WPF.Tests` (no WPF/UI file changed).
 - Next: owner decides whether/when to close the old PR; merge remains the maintainer's call.
 
+## Q4 runtime-URL cleanup (2026-10-06)
+
+- **Status:** complete. SAM-BIM/SAM_UI#204 merged into `sow/2026-Q4` as merge commit `34519b5a3592e29877f152dfb24277b3635bfe96` (PR head `9fc0ed46313e1d57d13dd179dcf7b6b955246577`, Q4 base `70c86f3`); merge method: merge commit (repository convention). Remote and local `fix/sam-bim-runtime-urls-q4` removed.
+- **Work completed:** The Mollier form help link now opens `https://github.com/SAM-BIM/SAM_Mollier/wiki/HomeUI` instead of `https://github.com/HoareLea/SAM_Mollier/wiki/HomeUI` (the identical page exists in the SAM-BIM wiki). SAM-BIM is the authoritative ecosystem; HoareLea is no longer the synchronised operational source. Record: the PR's `SAM-BIM-RuntimeUrls-Q4.md` document.
+- **Decisions / owner classifications:** Assembly author/contact strings (`Hoare Lea`, `@hoarelea.com` in `Kernel/AssemblyInfo.cs`) are provenance/metadata, not repository ownership: KEEP unchanged. The `references/gbXMLSerializer.dll` binary and the `build.yml` guard comment still contain the string HoareLea: provenance, KEEP.
+- **Files changed:** `WPF/SAM.Core.Mollier.UI.WPF/Forms/MollierForm.xaml.cs`, `documentation/SAM-BIM-RuntimeUrls-Q4.md` (1 product line).
+- **Validation:** `msbuild SAM_UI.sln -p:Configuration=Release` (APPDATA/USERPROFILE redirected): 0 errors. PR CI build and spdx green.
+- **Unresolved issues, risks:** None introduced.
+- **Next step:** Review/merge of the deferred icon PR (SAM_UI#203) is the maintainer's call; untouched.
+
 ---
 
 # Historical record - 2026-Q3 (frozen)
