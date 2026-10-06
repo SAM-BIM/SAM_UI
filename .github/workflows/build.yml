@@ -128,7 +128,7 @@ jobs:
             # Current sow branch: base_ref on PR events, ref_name on push events.
             $sowRef = if ($baseRef -match '^sow/') { $baseRef } elseif ($refName -match '^sow/') { $refName } else { '' }
             if ($sowRef -and $sowRef -ne $headRef) { $candidates += $sowRef }
-            # Canonical quarter branch (strip suffixes like -update-optimization): e.g. sow/2026-Q3.
+            # Canonical quarter branch (strip suffixes like -update-optimization): e.g. sow/yyyy-Qn.
             # On push events base_ref is empty and ref_name may be a feature branch off a sow branch,
             # so without this the dep clone falls back to master and misses in-quarter API changes.
             $canonical = ''
@@ -136,12 +136,15 @@ jobs:
               if ($cref -match 'sow/(\d{4})-Q(\d)') { $canonical = "sow/$($Matches[1])-Q$($Matches[2])"; break }
             }
             if ($canonical -and $candidates -notcontains $canonical) { $candidates += $canonical }
-            # Hard fallbacks to the active quarter branches (in priority order).
-            foreach ($fb in @('sow/2026-Q4', 'sow/2026-Q3', 'sow/2026-Q2')) {
-              if ($candidates -notcontains $fb) { $candidates += $fb }
-            }
             # Use the auth-token form so private deps (e.g. SAM_Solver) don't prompt
             $url = if ($token) { "https://$token@github.com/$org/$r.git" } else { "https://github.com/$org/$r.git" }
+            # Hard fallback: the newest quarterly branch (sow/YYYY-Qn) the dependency has, so the active
+            # quarter is followed without editing a branch list every quarter.
+            $newestSow = git ls-remote --heads $url 'sow/*' 2>$null |
+              ForEach-Object { ($_ -split '\s+')[1] -replace '^refs/heads/', '' } |
+              Where-Object { $_ -match '^sow/\d{4}-Q\d$' } |
+              Sort-Object -Descending | Select-Object -First 1
+            if ($newestSow -and $candidates -notcontains $newestSow) { $candidates += $newestSow }
             $cloned = $false
             foreach ($cand in $candidates) {
               $has = (git ls-remote --heads $url $cand 2>$null | Out-String).Trim()
