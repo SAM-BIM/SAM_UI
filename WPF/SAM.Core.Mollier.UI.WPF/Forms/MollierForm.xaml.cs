@@ -1190,7 +1190,7 @@ namespace SAM.Core.Mollier.UI
         {
             // .NET (Core) defaults ProcessStartInfo.UseShellExecute to false, so Process.Start(url) throws
             // Win32Exception ("The system cannot find the file specified"). Opening a URL needs the shell.
-            const string url = "https://github.com/HoareLea/SAM_Mollier/wiki/HomeUI";
+            const string url = "https://github.com/SAM-BIM/SAM_Mollier/wiki/HomeUI";
             try
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
