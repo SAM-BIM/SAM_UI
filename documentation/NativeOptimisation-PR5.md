@@ -3,10 +3,10 @@
 
 # Simulate > Optimisation: the native SAM optimiser in SAM_UI (PR5, 7 Oct 2026)
 
-**Status:** code, automated tests and a visual check are complete. Licensed real-system acceptance (A–E below) is
-**pending**. Not merged; the owner must approve the implementation and the acceptance first. Branch
-`feature/native-optimisation-ui` from `sow/2026-Q4` `3fa41ba4` (after SAM_UI#209). `PROJECT_PROGRESS.md` is not touched on this branch
-(post-merge closeout).
+**Status:** code, automated tests and licensed real-system acceptance (A–E) are complete; all passed on the final
+head. Awaiting owner review. Not merged; the owner must approve the implementation and the acceptance first. Branch
+`feature/native-optimisation-ui` from `sow/2026-Q4` `3fa41ba4` (after SAM_UI#209). `PROJECT_PROGRESS.md` is not
+touched on this branch (post-merge closeout).
 
 This is the fifth PR of the Java-free GenOpt replacement. The first four are complete and frozen:
 - PR1: SAM#182 (oracle) and SAM_Tas#85 (Gate T).
@@ -160,7 +160,11 @@ Implementation decisions:
   - APPDATA and USERPROFILE were redirected to scratch, so the post-build xcopy never touched the installed
     `%APPDATA%\SAM`, and `NUGET_PACKAGES` pointed at the real cache.
   - SAM was rebuilt from `f391e022` (SAM#184) first.
-- **Full `SAM.Analytical.UI.WPF.Tests`: 2603/2603 pass** (2531 existing + 72 new). `git diff --check` is clean.
+- **Full `SAM.Analytical.UI.WPF.Tests` on the final head `fd6d560`: 2615/2615 pass** (2543 existing + 72 new).
+  `git diff --check` is clean. Two unrelated one-off failures were seen in earlier full runs, and each passed on rerun:
+  - `UserConstructionCandidateTests` failed once with a Windows file-replace lock ("Unable to remove the file to be
+    replaced"); it passes 3/3 alone.
+  - One other run reported a single failure whose name was not captured; the full rerun was clean.
 - **New tests (72).** They need no Tas, licence or COM:
   - **Input:**
     - defaults are read from the SAM_Tas objects;
@@ -229,18 +233,56 @@ Implementation decisions:
 - **CI.** SAM_UI CI builds the solution (including the tests and the SAM_Tas stub project) and runs no tests (the
   repository convention). See the PR checks.
 
-### Licensed real-system acceptance: PENDING
+### Licensed real-system acceptance (7 Oct 2026, licensed Tas, this machine): PASSED
 
-Planned in the real SAM_UI app, run from a recorded build, with a fresh copy of the PR3/PR4 Systems Demo workspace for
-each run (the `Systems Training` T3D/TBD/TPD/TSD and the Demo script; nothing licensed is committed):
+**How it ran.**
+- **The real application.** `SAM Analytical.exe` was started from the PR build folder (`SAM_UI\build`, head
+  `fd6d560`). The installed `%APPDATA%\SAM` was not used or changed.
+- **Driven like a user.** A UI-Automation driver selected the **Simulate** tab, invoked the **Optimisation** ribbon
+  button, filled the window, pressed **Run optimisation** (and, for C, **Cancel run**), then read the result off the
+  window's own controls.
+- **Inputs.** Each case used a fresh copy of the PR3/PR4 Systems Demo workspace: `Script.txt` `d68a7e2e…` and
+  `Systems Training` `.t3d` `588d2b03…`, `.tbd` `bf3c0c7d…`, `.tpd` `c7178b65…`, `.tsd` `babe6c3c…`. These are
+  identical to the PR4 inputs.
+- **Monitoring.** A process monitor logged every new process with its parent. `HKCU\Software\EDSL\TasManager` was
+  exported before and after each case.
+- **Where it lives.** The harness and evidence are in `C:\TasOut\pr5-acc` (not committed).
 
-| Case | Expected (frozen PR3/PR4 reference) |
-|---|---|
-| A. GoldenSection example | 11 simulations; best Setpoint `4.968943799848584`; Result `7360.04370117188`; interval [4.767943850222925, 5.093168600454254]; evaluations identical to PR3/PR4 |
-| B. GPSHookeJeeves example | 16 simulations; best Setpoint `5`; Result `7360.04370117188` |
-| C. Cancel during evaluation 2 | evaluation 2 finishes; no evaluation 3; no process killed |
-| D. Refusal (golden section with 2 parameters) | SAM_Tas message; nothing runs; no run folder |
-| E. Environment | no java or cmd child of SAM_UI; `HKCU\Software\EDSL\TasManager` unchanged; SHA-256 of `SAM.Math.dll`, `SAM.Analytical.Tas.GenOpt.dll` and `SAM.Analytical.UI.WPF.dll` recorded |
+Binaries (SHA-256):
+
+| File | SHA-256 | Note |
+|---|---|---|
+| `SAM.Analytical.UI.WPF.dll` | `D750E7B8…` | |
+| `SAM.Analytical.Tas.GenOpt.dll` | `505C4757…` | SAM_Tas `da891dd2` |
+| `SAM.Math.dll` | `46AA4623…` | rebuilt from SAM `f391e022` |
+| `SAM Analytical.exe` | `B1D436D5…` | |
+
+| Case | Result (final head `fd6d560`) | vs frozen PR3/PR4 |
+|---|---|---|
+| A. GoldenSection example | Success, **11** simulations; best Setpoint **4.968943799848584** (simulation 9); Result **7360.04370117188**, Cost 7360.04370117188, CO2 4076.69276428223; interval [4.767943850222925, 5.093168600454254]; 11 trace rows; 231 s | **11/11 evaluations bit-identical** (`Variables.txt` candidate; `Output.txt` Result/Cost/CO2) |
+| B. GPSHookeJeeves example | Success, **16** simulations; best Setpoint **5** (simulation 9); Result **7360.04370117188**; 41 trace rows (= PR3 OutputListingAll); 328 s | **16/16 evaluations bit-identical** |
+| C. Cancel during evaluation 2 | Cancel invoked while TasGenExecute #2 (pid 42944) ran, and it was still running. It then **exited by itself** 14 s later and wrote its `Output.txt` after the cancel. **Only 0001 and 0002 exist.** Outcome Cancelled; no best point; the message names the kernel count 3 (frozen PR2 convention). | 2/2 completed evaluations bit-identical |
+| D. Refusal (golden section + a 2nd parameter `Other`) | Readiness ✕ "Invalid GenOpt settings for the native route: GoldenSection requires exactly one optimisation parameter; 2 were given." (SAM_Tas' message); ⚠ for the name `Other`; **Run disabled** (UI Automation could not invoke it); **no run folder**; no child process | — |
+| E. Environment | **Every child of SAM Analytical was TasGenExecute.exe**, with `args[0]` = the run's `project` snapshot. **No java/javaw process at all.** The only `cmd.exe` processes on the machine were children of another application (`codex.exe` starting its MCP servers), none under SAM Analytical. The TasManager registry was **unchanged** in every case. The workspace originals were byte-identical after the runs. | — |
+
+Also observed in every case:
+- The ribbon order is `RibbonButton_SolarSimulation, RibbonButton_EnergySimulation, RibbonButton_Optimisation`, and
+  the button is enabled with no model open.
+- The window opens on the GoldenSection example with ✕ folder/script and ✓ TasGenExecute/settings.
+- Golden section shows Start/Step as "not used"; Hooke-Jeeves shows Start 10 / Step 2.
+- The outputs caption reads "Minimises Result; also records Cost, CO2".
+- When a run starts, the window scrolls to the run panel.
+
+**Fix found during acceptance (`fd6d560`).** In round 1 (head `8ef5ab1`, cases A–D all passed with the same
+numbers), the run panel started below the fold at the default window height. It is now brought into view when a run
+starts, and all cases were re-run on `fd6d560`.
+
+**Harness notes (not product issues).**
+- Round 1's first attempt stopped before Run because the log watcher locked the driver's log file.
+- Round 2's first B stopped because the example dropdown's items were not yet realised for UI Automation.
+
+Both were fixed in the driver and the cases re-run. The process monitor polls, so it can miss a short-lived PID
+(10/11 and 15/16 launches logged); the evaluation folders are the authoritative count.
 
 ## Unresolved issues, risks
 
@@ -266,7 +308,7 @@ each run (the `Systems Training` T3D/TBD/TPD/TSD and the Demo script; nothing li
 
 ## Next step
 
-Run licensed acceptance A–E and record it here. Then come the owner's review of the implementation and the
-acceptance, PR CI on the reviewed head, and a merge (merge commit, `--match-head-commit`) only after the owner's
+Owner review of the implementation and of this acceptance (optionally a manual run of the two examples in the
+app). Then PR CI on the reviewed head, and a merge (merge commit, `--match-head-commit`) only after the owner's
 explicit approval. After that: post-merge CI, the `PROJECT_PROGRESS.md` closeout on `sow/2026-Q4` (`[skip ci]`), and
 deleting the branch.
