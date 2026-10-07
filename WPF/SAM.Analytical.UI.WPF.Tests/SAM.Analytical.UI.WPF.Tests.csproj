@@ -81,6 +81,16 @@
     <Reference Include="SAM.Units">
       <HintPath>..\..\..\SAM\build\SAM.Units.dll</HintPath>
     </Reference>
+    <!-- Simulate > Optimisation (TasOptimisation*Tests): the SAM_Tas GenOpt objects the window builds and the SAM.Math
+         kernel types it presents. SAM.Math is aliased exactly as in SAM.Analytical.UI.WPF, so this project's
+         unqualified Math.* keeps meaning System.Math. -->
+    <Reference Include="SAM.Analytical.Tas.GenOpt">
+      <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.GenOpt.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Math">
+      <HintPath>..\..\..\SAM\build\SAM.Math.dll</HintPath>
+      <Aliases>SAMMath</Aliases>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
@@ -90,5 +100,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SAM.Analytical.UI.WPF\SAM.Analytical.UI.WPF.csproj" />
+    <!-- SAM_Tas' protocol stand-in for TasGenExecute.exe (SAM_Tas#86), a real child process that follows the Gate T
+         protocol, copied next to this assembly. The Optimisation tests run GenOptDocument.RunNative end to end through
+         it, so no Tas, licence or COM is needed. The pattern of SAM_Tas_Grasshopper#11. -->
+    <ProjectReference Include="..\..\..\SAM_Tas\SAM_Tas\SAM.Analytical.Tas.GenOpt.Tests.StubTasGenExecute\SAM.Analytical.Tas.GenOpt.Tests.StubTasGenExecute.csproj" />
   </ItemGroup>
 </Project>
