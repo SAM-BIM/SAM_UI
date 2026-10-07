@@ -67,7 +67,9 @@ Open **Simulate → Part O → Prepare & Run** on the clean design model. Choose
 
 Under **Simulation case**, set **Weather**, **Solar calculation** and a fresh **Output folder** root. The Part O case is a full-year simulation. Read **Readiness**, expand **Show details** for blockers, and resolve them before starting TAS. Check Part F design duties and products where relevant.
 
-> **IMPORTANT:** Choose a fresh output root for each new run. SAM refuses a case folder owned by another run or containing older unowned evidence. A retry of the same run and case may reuse its folder. Keep the result model with its associated output tree.
+Leave **Direct T3D** unchecked for the established gbXML route. Check it to build the TAS3D model directly from the SAM geometry; this applies to the TAS solar calculation only, and the collapsed **Simulation case** header states the route in use. The choice is not remembered between separate openings of the command, so check it each time you need it.
+
+> **IMPORTANT:** A fresh output root is the simplest choice for each new run. If you press **Prepare & Run** with a case folder that already holds results from an earlier session, SAM asks first, **before** the Review window: **Part O — Replace existing results** names the case and folder and says how many generated files it holds and when they were last written. **Cancel** (the default) changes nothing. **Replace existing results** removes only that case's `tas`, `reports` and `diagnostics` folders and its `PartOCase.json` marker, and only when TAS is about to start, so cancelling the Review afterwards still leaves every file as it was. Other files in the folder, other iterations' folders and your design model are never touched. If a file is in use, SAM says it could not be removed and runs nothing. A retry of the same run and case may reuse its folder. Keep the result model with its associated output tree.
 
 # Part 2 — Test and escalate
 
@@ -89,7 +91,7 @@ The iterations are an engineering decision ladder, not a sequence every dwelling
 
 In **Scenario**, choose **Iteration 1b — Natural ventilation (no mechanical system)** when the project permits a natural route and the model's openings support it. Choose **Iteration 1a — MVHR design duty (no manufacturer unit)** for the mechanical design-duty route. These are alternatives; their numeric order is not a rule to run both. Check the dwelling scope, openings or MVHR duty, weather and readiness.
 
-Click **Prepare & Run**. In **Part O — Review iteration**, inspect the preparation and choose **Accept & Run TAS** or **Cancel**. The progress window tracks the native TAS run and TM59 assessment. On completion use **Review Results**. Record the dwelling's pass/fail outcome and any failing room criteria; a pass is a candidate for Mixed Design.
+Click **Prepare & Run**. In **Part O — Review iteration**, inspect the preparation and choose **Accept & Run TAS** or **Cancel**. The progress window tracks the native TAS run and TM59 assessment. A completed run does not stop on a message box: any notes are kept on the Hub line (for example "2 notes - see Show details"). A run that did not complete still shows why it stopped. On completion use **Review Results**. Record the dwelling's pass/fail outcome and any failing room criteria; a pass is a candidate for Mixed Design.
 
 ## 10. Assess the result before escalating
 
@@ -106,6 +108,8 @@ If a dwelling passes, its product-based route can inform Mixed Design. If airflo
 After an eligible full-year **Iteration 1a** or **Iteration 2** run, the **Iteration 3 — Explicit system and cooling assessment** panel becomes available. For the current product operating and cooling route, use an Iteration 2 product result and select **Selected product — manufacturer operating guidance** under **System case**. Iteration 1b cannot provide this mechanical reference. Review the unit summary and preflight message before **Run Iteration 3**.
 
 For every cooled dwelling, first select its control room on the clean design model: open **Simulate → Part O → Mixed Design**, set its MVHR/product strategy, select the dwelling, choose **Cooling on**, select **Cooling control room**, click **Confirm control room**, then **Save selection** and save the model. The room must belong to that dwelling and be served by its unit. SAM does not choose a control room for you. Prepare the Iteration 2 reference from this saved design. The current nominal Nuaire control uses **22°C**.
+
+If a step is missing, the Iteration 3 panel does not just refuse: it lists the steps as a checklist (done, current, later) with a button on the current one - **Remove Results...** where the open model still carries results, or **Choose cooling control rooms (Mixed Design)...**, which opens Mixed Design and returns you to the Hub. After saving rooms, run **Prepare & Run** for Iteration 2 again, because Iteration 3 reads the cooling rooms from the prepared design. Where no product method can run yet, the Hub may select **Route check** (under Advanced) for you and say so; a method you chose yourself is never replaced. The **Iteration 3** button in the actions row scrolls the panel into view.
 
 Iteration 3 represents supported behaviour with TAS Mechanical Systems, including airflow, heat recovery or bypass and active supply-air cooling. After running, use **Open result** to review **Part O — Iteration 3 comparison**, the reference and system TM59 reports, and operating diagnostics. Check that the unit operated as intended as well as whether the dwelling passed. Iteration 3 is needed only where that system/cooling representation answers the design question.
 
@@ -149,7 +153,19 @@ Review the **Final TM59** and **Failing spaces / note** columns and open **Open 
 
 **Prepare & Run** refuses a prepared or simulated result as a new design baseline. Reopen the original clean design. If necessary, use **Results → Part O → Remove Results...** and **Save cleaned copy...**, inspect its baseline check, then **Open cleaned copy**. The original result and TAS files remain available.
 
-If a run is cancelled after TAS stages complete, retry the same run and case in the session. SAM may reuse completed stages and report **“Reusing the completed TAS results”**. Changed design, weather or case identity can prevent reuse. To review a completed run later, open its saved result `.sam`, then **Simulate → Part O → Prepare & Run**: **Review Results** opens TM59, and **Open result** reopens an existing Iteration 3 comparison without TAS. A reopened result is for review, not a new baseline.
+If a run is cancelled after TAS stages complete, retry the same run and case in the session. SAM may reuse completed stages and report **“Reusing the completed TAS results”**. Changed design, weather or case identity can prevent reuse.
+
+### Reviewing a completed run later
+
+To review a completed run without simulating again, open its **result model**, then **Simulate → Part O → Prepare & Run**:
+
+- Open `<output folder>\<case>\tas\<name>.sam` - for example `Iteration1a\tas\000000_SAM_AnalyticalModel.sam`. This file carries the run record and the link to the design it came from.
+- Do **not** open `<name>.prepared.sam` (saved before simulating, with no run record), the `.partorun.json` note, or your original design model. Opening the design starts a new session with no run attached, so Part O asks you to simulate.
+- Keep the `.sam`, the `.tsd` results file and the rest of the `tas` folder together and unchanged. The result is accepted only when the results file still has the length and write time it was saved with and the model still matches its record. Re-simulating the case, or overwriting or editing any of these, means you are asked to simulate again.
+
+When it works, the Hub reads "Saved Iteration N results reopened - ready to review". **Review Results** opens TM59 without a new simulation, and **Open result** reopens an existing Iteration 3 comparison. Limits of a reopened run: it is for review, not a new baseline, so **Prepare & Run** is disabled for it (start new cases from the design model); **Optimise (2B)** needs a live run; the **Scenario** box and the **Direct T3D** header describe the case being set up, not the reopened run.
+
+Automatic "previous run found" from the design model is not available yet; open the saved result model as above.
 
 If evidence is missing, stale or mismatched, restore the matching result model and output tree or rerun from the design. A moved tree can be valid when its relative references and file identities still match. Replacing a completed Iteration 3 result requires explicit confirmation; use **Open result** for ordinary review.
 
@@ -164,7 +180,8 @@ Iteration 2 uses SAM's established Part O product representation. Iteration 3 us
 | No eligible dwelling or wrong room count | Zone membership and **Dwelling = Yes**. |
 | Missing or unclassified TM59 rooms | Run **Map IC (TM59)**; verify room use and internal conditions. |
 | Iteration 3 run disabled | Complete an eligible 1a/2 reference; for the product method, assign a product and a saved cooling control room to each cooled dwelling. |
-| Output folder occupied | Choose a fresh output root; retain existing evidence. |
+| Prepare & Run asks to replace existing results | The case folder holds an earlier session's results. **Cancel** keeps everything; **Replace existing results** removes only that case's `tas`, `reports` and `diagnostics` folders and marker. Or choose a fresh output root. |
+| Reopened a model and Part O asks to simulate again | Open the saved result `<name>.sam` in `<case>\tas`, not the design or `.prepared.sam`, with its `.tsd` unchanged beside it. |
 | Result file missing, stale or mismatched | Restore the matching saved model and output tree, or rerun from the clean design. |
 | `UNAVAILABLE` in operating history | The evidence cannot establish that hour's state unambiguously. Do not read it as zero, off or failure; inspect adjacent hours and TM59 results. |
 
