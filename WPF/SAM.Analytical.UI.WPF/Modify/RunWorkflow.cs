@@ -178,6 +178,37 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
+        /// The gbXML a TAS workflow run starts from on the <see cref="T3DRoute.GbXML"/> route. On
+        /// <see cref="T3DRoute.Direct"/> nothing is exported: the direct route builds the T3D from the SAM geometry and
+        /// ignores <c>Path_gbXML</c>, so an export that is never read must not be able to fail or skip a case.
+        /// </summary>
+        /// <returns>False when the gbXML route's export could not be made (the case is skipped); true otherwise,
+        /// with <paramref name="path_gbXML"/> null on the direct route.</returns>
+        internal static bool TryExportGbXML(AnalyticalModel analyticalModel, WorkflowSettings workflowSettings, string path_gbXML_Export, out string? path_gbXML)
+        {
+            path_gbXML = null;
+
+            if (workflowSettings?.T3DRoute == T3DRoute.Direct)
+            {
+                return true;
+            }
+
+            gbXMLSerializer.gbXML gbXML = Analytical.gbXML.Convert.TogbXML(analyticalModel);
+            if (gbXML == null)
+            {
+                return false;
+            }
+
+            if (!Core.gbXML.Create.gbXML(gbXML, path_gbXML_Export))
+            {
+                return false;
+            }
+
+            path_gbXML = path_gbXML_Export;
+            return true;
+        }
+
+        /// <summary>
         /// Runs the TAS workflow over several models, with a cancellable progress dialog hosted off the
         /// calling thread for the same reason as the single-model overload above.
         /// <para>
@@ -241,16 +272,7 @@ namespace SAM.Analytical.UI.WPF
                         Directory.CreateDirectory(directory_AnalyticalModel);
                     }
 
-                    string path_gbXML = Path.Combine(directory_AnalyticalModel, name + ".gbXML");
-
-                    gbXMLSerializer.gbXML gbXML = Analytical.gbXML.Convert.TogbXML(analyticalModel);
-                    if (gbXML == null)
-                    {
-                        return;
-                    }
-
-                    bool exported = Core.gbXML.Create.gbXML(gbXML, path_gbXML);
-                    if (!exported)
+                    if (!TryExportGbXML(analyticalModel, workflowSettings, Path.Combine(directory_AnalyticalModel, name + ".gbXML"), out string? path_gbXML))
                     {
                         return;
                     }
