@@ -3,8 +3,8 @@
 
 # Simulate > Optimisation: the native SAM optimiser in SAM_UI (PR5, 7 Oct 2026)
 
-**Status:** code, automated tests and licensed real-system acceptance (A–E) are complete; all passed on the final
-head. Awaiting owner review. Not merged; the owner must approve the implementation and the acceptance first. Branch
+**Status:** code, automated tests, licensed real-system acceptance (A–E) and the Codex review are complete; all
+passed on the code head `36af2ee`. Awaiting owner review. Not merged; the owner must approve the implementation and the acceptance first. Branch
 `feature/native-optimisation-ui` from `sow/2026-Q4` `3fa41ba4` (after SAM_UI#209). `PROJECT_PROGRESS.md` is not
 touched on this branch (post-merge closeout).
 
@@ -140,7 +140,7 @@ Implementation decisions:
   - `Windows/TasOptimisationWindow.xaml(.cs)` (new).
   - `Classes/TasOptimisation/{TasOptimisationInput, TasOptimisationDefinition, TasOptimisationParameterRow, TasOptimisationObjectiveRow, TasOptimisationCheck, TasOptimisationReport, TasOptimisationProgressState, TasOptimisationTraceRow}.cs` (new).
   - `Enums/TasOptimisationExample.cs` (new).
-  - `Query/{TasOptimisationChecks, TasOptimisationAssemblies}.cs` (new).
+  - `Query/{TasOptimisationChecks, TasOptimisationAssemblies}.cs` (new). An unlistable folder is a blocked check.
   - `Resources/SAM_Optimisation.png` (new) and `Properties/Resources.resx` / `Resources.Designer.cs`.
   - `SAM.Analytical.UI.WPF.csproj`: HintPaths `SAM_Tas\build\SAM.Analytical.Tas.GenOpt.dll` and
     `SAM\build\SAM.Math.dll` (alias `SAMMath`).
@@ -160,12 +160,19 @@ Implementation decisions:
   - APPDATA and USERPROFILE were redirected to scratch, so the post-build xcopy never touched the installed
     `%APPDATA%\SAM`, and `NUGET_PACKAGES` pointed at the real cache.
   - SAM was rebuilt from `f391e022` (SAM#184) first.
-- **Full `SAM.Analytical.UI.WPF.Tests` on the final head `fd6d560`: 2615/2615 pass** (2543 existing + 72 new).
-  `git diff --check` is clean. Two unrelated one-off failures were seen in earlier full runs, and each passed on rerun:
-  - `UserConstructionCandidateTests` failed once with a Windows file-replace lock ("Unable to remove the file to be
-    replaced"); it passes 3/3 alone.
-  - One other run reported a single failure whose name was not captured; the full rerun was clean.
-- **New tests (72).** They need no Tas, licence or COM:
+- **Full `SAM.Analytical.UI.WPF.Tests` on the code head `36af2ee`: 2617/2617 pass** (2543 existing + 74 new).
+  `git diff --check` is clean.
+- **A pre-existing flake, not caused by this PR.**
+  `UserConstructionCandidateTests.Saved_constructions_follow_the_existing_target_window_made_for_notes_and_the_row_limit`
+  sometimes fails with "Constructions.json could not be written: Unable to remove the file to be replaced"
+  (35 rapid saves into the test's own temp library).
+  - **On this branch:** it appeared in some full runs.
+  - **Run alone:** it fails 3/15 on this branch and **1/15 on the unchanged base `3fa41ba4`**.
+  - **Full suite on the base:** 2/2 runs were clean.
+  - No PR5 test runs in that process, and the class isolates its library folder.
+  - It is flagged as a separate task (user-library save path vs a file held briefly by Windows or a background
+    refresh). It is not changed here.
+- **New tests (74).** They need no Tas, licence or COM:
   - **Input:**
     - defaults are read from the SAM_Tas objects;
     - each example builds byte-identical Command, Parameter, Template, Output, Config and Script GenOpt texts to
@@ -183,6 +190,7 @@ Implementation decisions:
     - nothing is created;
     - name warnings do not block;
     - runs-folder resolution;
+    - a folder that exists but cannot be listed (a real deny-ListDirectory ACL) is a blocked line, not an exception;
     - assembly locations;
     - load-failure recognition and wording (a missing TasGenExecute.exe is not treated as a load failure).
   - **Report**, over **real SAM.Math kernel results** from a delegate evaluator: Success for golden section and for
@@ -197,6 +205,8 @@ Implementation decisions:
     - **Model-folder pre-fill** happens only when that folder holds Tas files.
     - **Session memory:** the form is remembered for the session only.
     - **A missing TasGenExecute** blocks the run and nothing starts.
+    - **An unlistable Tas folder**, whether proposed as the model folder or chosen in the form, blocks the run
+      instead of failing the window.
     - **Golden section run:**
       - the trace equals `Entries`;
       - the evaluation folders equal the entries;
@@ -226,6 +236,7 @@ Implementation decisions:
   | M3: late cancel not withheld | 1 |
   | M4: golden section validates Start/Step | 1 |
   | M5: Cancel does not cancel the token | 2 |
+  | M6 (after review): the folder-listing catch disabled | 2 |
 
 - **Visual check.** The window was rendered (RenderTargetBitmap) in three states: opening, Hooke-Jeeves, and after a
   stub run. A stub with its optimum at the proven Setpoint gives the Systems Demo's golden-section sequence: 11
@@ -236,8 +247,8 @@ Implementation decisions:
 ### Licensed real-system acceptance (7 Oct 2026, licensed Tas, this machine): PASSED
 
 **How it ran.**
-- **The real application.** `SAM Analytical.exe` was started from the PR build folder (`SAM_UI\build`, head
-  `fd6d560`). The installed `%APPDATA%\SAM` was not used or changed.
+- **The real application.** `SAM Analytical.exe` was started from the PR build folder (`SAM_UI\build`, clean
+  Rebuild of head `36af2ee`). The installed `%APPDATA%\SAM` was not used or changed.
 - **Driven like a user.** A UI-Automation driver selected the **Simulate** tab, invoked the **Optimisation** ribbon
   button, filled the window, pressed **Run optimisation** (and, for C, **Cancel run**), then read the result off the
   window's own controls.
@@ -252,16 +263,16 @@ Binaries (SHA-256):
 
 | File | SHA-256 | Note |
 |---|---|---|
-| `SAM.Analytical.UI.WPF.dll` | `D750E7B8…` | |
+| `SAM.Analytical.UI.WPF.dll` | `ECBCB104…` | |
 | `SAM.Analytical.Tas.GenOpt.dll` | `505C4757…` | SAM_Tas `da891dd2` |
 | `SAM.Math.dll` | `46AA4623…` | rebuilt from SAM `f391e022` |
 | `SAM Analytical.exe` | `B1D436D5…` | |
 
-| Case | Result (final head `fd6d560`) | vs frozen PR3/PR4 |
+| Case | Result (code head `36af2ee`) | vs frozen PR3/PR4 |
 |---|---|---|
-| A. GoldenSection example | Success, **11** simulations; best Setpoint **4.968943799848584** (simulation 9); Result **7360.04370117188**, Cost 7360.04370117188, CO2 4076.69276428223; interval [4.767943850222925, 5.093168600454254]; 11 trace rows; 231 s | **11/11 evaluations bit-identical** (`Variables.txt` candidate; `Output.txt` Result/Cost/CO2) |
-| B. GPSHookeJeeves example | Success, **16** simulations; best Setpoint **5** (simulation 9); Result **7360.04370117188**; 41 trace rows (= PR3 OutputListingAll); 328 s | **16/16 evaluations bit-identical** |
-| C. Cancel during evaluation 2 | Cancel invoked while TasGenExecute #2 (pid 42944) ran, and it was still running. It then **exited by itself** 14 s later and wrote its `Output.txt` after the cancel. **Only 0001 and 0002 exist.** Outcome Cancelled; no best point; the message names the kernel count 3 (frozen PR2 convention). | 2/2 completed evaluations bit-identical |
+| A. GoldenSection example | Success, **11** simulations; best Setpoint **4.968943799848584** (simulation 9); Result **7360.04370117188**, Cost 7360.04370117188, CO2 4076.69276428223; interval [4.767943850222925, 5.093168600454254]; 11 trace rows; 240 s | **11/11 evaluations bit-identical** (`Variables.txt` candidate; `Output.txt` Result/Cost/CO2) |
+| B. GPSHookeJeeves example | Success, **16** simulations; best Setpoint **5** (simulation 9); Result **7360.04370117188**; 41 trace rows (= PR3 OutputListingAll); 334 s | **16/16 evaluations bit-identical** |
+| C. Cancel during evaluation 2 | Cancel invoked while TasGenExecute #2 (pid 46600) ran, and it was still running. It then **exited by itself** 18 s later. **Only 0001 and 0002 exist.** Outcome Cancelled; no best point; the message names the kernel count 3 (frozen PR2 convention). | 2/2 completed evaluations bit-identical |
 | D. Refusal (golden section + a 2nd parameter `Other`) | Readiness ✕ "Invalid GenOpt settings for the native route: GoldenSection requires exactly one optimisation parameter; 2 were given." (SAM_Tas' message); ⚠ for the name `Other`; **Run disabled** (UI Automation could not invoke it); **no run folder**; no child process | — |
 | E. Environment | **Every child of SAM Analytical was TasGenExecute.exe**, with `args[0]` = the run's `project` snapshot. **No java/javaw process at all.** The only `cmd.exe` processes on the machine were children of another application (`codex.exe` starting its MCP servers), none under SAM Analytical. The TasManager registry was **unchanged** in every case. The workspace originals were byte-identical after the runs. | — |
 
@@ -273,9 +284,14 @@ Also observed in every case:
 - The outputs caption reads "Minimises Result; also records Cost, CO2".
 - When a run starts, the window scrolls to the run panel.
 
-**Fix found during acceptance (`fd6d560`).** In round 1 (head `8ef5ab1`, cases A–D all passed with the same
-numbers), the run panel started below the fold at the default window height. It is now brought into view when a run
-starts, and all cases were re-run on `fd6d560`.
+**Three rounds, the same numbers each time.**
+- **Round 1 (`8ef5ab1`).** It showed that the run panel started below the fold. Fix `fd6d560` now brings it into view
+  when a run starts; in round 1, C's `Output.txt` was last written 13 s after the cancel.
+- **Round 2 (`fd6d560`).**
+- **Round 3 (`36af2ee`, after the Codex P2 fix).**
+
+Cases A–D passed in every round with identical results. The evidence of each round is in
+`C:\TasOut\pr5-acc\round1`, `round2-fd6d560` and the top-level files (round 3).
 
 **Harness notes (not product issues).**
 - Round 1's first attempt stopped before Run because the log watcher locked the driver's log file.
@@ -283,6 +299,15 @@ starts, and all cases were re-run on `fd6d560`.
 
 Both were fixed in the driver and the cases re-run. The process monitor polls, so it can miss a short-lived PID
 (10/11 and 15/16 launches logged); the evaluation folders are the authoritative count.
+
+### Review
+
+Codex reviewed `8ef5ab1`, then each new head:
+- **P1 (record).** The record showed a stale full-suite result. Fixed in `6affbcc`.
+- **P2 (an unlistable Tas folder could throw from the constructor or Refresh).** Fixed in `36af2ee`, with two tests
+  that fail without the fix.
+
+The review of `36af2ee` completed with no findings (👍). No human review comments yet.
 
 ## Unresolved issues, risks
 
