@@ -81,7 +81,7 @@ Mutations: `ReplaceAttempts = 1` (old behaviour) -> 3 tests fail; "retry everyth
   - **after**: **50/50 passed**.
 - User-library tests (`UserLibraryFileTests|UserConstruction|UserGlazing`): 190/190.
 - Full suite `dotnet test SAM_UI.sln -c Release --no-build`: **2631/2631 passed** (2617 before + 14 new), 7 min 53 s. The
-  redirected profile was seeded with a read-only copy of `%APPDATA%\SAMesources` and `Documents\SAMesources`; a
+  redirected profile was seeded with a read-only copy of `%APPDATA%\SAM\resources` and `Documents\SAM\resources`; a
   first run without them had 23 environment-only failures (default libraries missing: NRE in gbXML export / Part O).
 - `git diff --check`: clean.
 
