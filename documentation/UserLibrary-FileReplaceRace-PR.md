@@ -52,7 +52,11 @@ the glazing library and the removed-archive companion:
 - exhausted retries keep the OS message and add the attempt count and the likely cause:
   `... could not be written: Unable to remove the file to be replaced. (still refused after 5 attempts; another program
   may be holding Constructions.json or Constructions.json.bak open)`;
-- the temporary file is still always removed; the file is unchanged on failure.
+- the temporary file is still always removed; the file is unchanged on failure. That includes a **partial swap**
+  (`0x80070499`: Windows has already moved the previous file to `.bak` and the new one is still the temporary file):
+  the next attempt moves the new file in; if no attempt does (exhaustion or another failure), the previous file is
+  copied back from `.bak` before the error is reported, and if even that fails the error says it is kept as `.bak`
+  (Codex review P1 on the first head `4a88290`).
 - Test-only seam `BeforeReplace(attempt)` (same pattern as the existing `BeforeWrite`), copied to companions. No public API
   change.
 
@@ -70,7 +74,13 @@ refusal is a genuine Windows `0x80070497`/`0x80070020`, deterministic:
 - a non-transient IOException -> 1 attempt, original message;
 - transient-code classification (9 codes); companion shares the seam.
 
-Mutations: `ReplaceAttempts = 1` (old behaviour) -> 3 tests fail; "retry everything" -> 5 tests fail. Both reverted.
+Partial swap (seam reproduces what `0x80070499` leaves): next attempt completes the write with the previous file as
+`.bak`; never completed -> previous file back, retry message; followed by another failure -> previous file back, that
+message; cannot be put back (`.bak` held exclusively) -> "The previous ... could not be put back (...); it is kept as
+....bak", the `.bak` intact.
+
+Mutations: `ReplaceAttempts = 1` (old behaviour) -> 3 tests fail; "retry everything" -> 5 tests fail; no restore after a
+partial swap -> 3 tests fail. All reverted.
 
 ## Validation
 
@@ -78,9 +88,11 @@ Mutations: `ReplaceAttempts = 1` (old behaviour) -> 3 tests fail; "retry everyth
   cache): exit 0, 0 errors.
 - Isolated stress, fresh `dotnet test --no-build --filter FullyQualifiedName~UserConstructionCandidateTests` process per run:
   - **before** (base binary): **25/30 passed, 5 failed**, every failure the target test with the exact message;
-  - **after**: **50/50 passed**.
-- User-library tests (`UserLibraryFileTests|UserConstruction|UserGlazing`): 190/190.
-- Full suite `dotnet test SAM_UI.sln -c Release --no-build`: **2631/2631 passed** (2617 before + 14 new), 7 min 53 s. The
+  - **after** (first head `4a88290`): **50/50 passed**; **after the partial-swap fix**: a second 50-run, **50/50 passed**.
+- User-library tests (`UserLibraryFileTests|UserConstruction|UserGlazing`): 190/190 on `4a88290`; `UserLibraryFileTests`
+  41/41 after the partial-swap fix.
+- Full suite `dotnet test SAM_UI.sln -c Release --no-build`: **2635/2635 passed** on the final code (2617 before + 18
+  new; 2631/2631 on `4a88290`). Release Rebuild repeated on the final code: 0 errors. The
   redirected profile was seeded with a read-only copy of `%APPDATA%\SAM\resources` and `Documents\SAM\resources`; a
   first run without them had 23 environment-only failures (default libraries missing: NRE in gbXML export / Part O).
 - `git diff --check`: clean.
@@ -96,6 +108,7 @@ Mutations: `ReplaceAttempts = 1` (old behaviour) -> 3 tests fail; "retry everyth
 - A save can take up to ~0.4 s longer when another program keeps the file; beyond that it fails as before, with a clearer
   message.
 - A scanner that holds the `.bak` longer than 0.4 s still produces the (now explained) error; the user can save again.
+- Codex review: P1 (partial swap could leave no target on exhaustion) fixed as above; thread answered.
 - `UserGlazingLibrary`'s doc comment cites `File.Replace(string, string, string)`; unchanged (still accurate in substance).
 
 ## Next step

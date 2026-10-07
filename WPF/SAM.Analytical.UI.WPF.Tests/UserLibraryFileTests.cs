@@ -454,6 +454,125 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
         }
 
+        // What File.Replace leaves after ERROR_UNABLE_TO_MOVE_REPLACEMENT_2: the previous file is already .bak, the new one is still the
+        // temporary file and there is no target.
+        private static void PartialSwap(UserLibraryFile file)
+        {
+            File.Move(file.Path, file.BackupPath, true);
+            throw new IOException("Unable to move the replacement file to the file to be replaced (simulated).", unchecked((int)0x80070499));
+        }
+
+        [Fact]
+        public void After_a_partial_swap_the_next_attempt_moves_the_new_file_in_and_the_previous_one_is_the_bak()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string previous = Hash(file.Path);
+
+            List<int> attempts = new List<int>();
+            file.BeforeReplace = attempt =>
+            {
+                attempts.Add(attempt);
+                if (attempt == 1)
+                {
+                    PartialSwap(file);
+                }
+            };
+
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A", "B"))));
+
+            Assert.Equal(new[] { 1, 2 }, attempts);
+            Assert.Equal(new[] { "A", "B" }, Names(file.Read()));
+            Assert.Equal(previous, Hash(file.BackupPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+        }
+
+        [Fact]
+        public void A_partial_swap_that_is_never_completed_puts_the_previous_file_back_before_failing()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string previous = Hash(file.Path);
+
+            file.BeforeReplace = attempt =>
+            {
+                if (attempt == 1)
+                {
+                    PartialSwap(file);
+                }
+
+                throw new IOException("still held", unchecked((int)0x80070020));
+            };
+
+            string error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B")));
+
+            Assert.Contains("still refused after 5 attempts", error);
+            Assert.Equal(previous, Hash(file.Path));
+            Assert.Equal(new[] { "A" }, Names(file.Read()));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+            Assert.False(File.Exists(file.LockPath));
+        }
+
+        [Fact]
+        public void A_partial_swap_followed_by_another_failure_puts_the_previous_file_back()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string previous = Hash(file.Path);
+
+            file.BeforeReplace = attempt =>
+            {
+                if (attempt == 1)
+                {
+                    PartialSwap(file);
+                }
+
+                throw new IOException("disk full");
+            };
+
+            string error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B")));
+
+            Assert.Equal("Test Library.json could not be written: disk full", error);
+            Assert.Equal(previous, Hash(file.Path));
+        }
+
+        [Fact]
+        public void When_the_previous_file_cannot_be_put_back_the_error_says_where_it_is()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string previous = Hash(file.Path);
+
+            string error;
+            FileStream held = null;
+            try
+            {
+                // The .bak is opened exclusively after the partial swap, so it cannot be copied back.
+                file.BeforeReplace = attempt =>
+                {
+                    if (attempt == 1)
+                    {
+                        File.Move(file.Path, file.BackupPath, true);
+                        held = new FileStream(file.BackupPath, FileMode.Open, FileAccess.Read, FileShare.None);
+                    }
+
+                    throw new IOException("disk full");
+                };
+
+                error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B")));
+            }
+            finally
+            {
+                held?.Dispose();
+            }
+
+            Assert.StartsWith("Test Library.json could not be written: disk full The previous Test Library.json could not be put back (", error);
+            Assert.EndsWith("); it is kept as Test Library.json.bak.", error);
+            Assert.False(File.Exists(file.Path));
+            Assert.Equal(previous, Hash(file.BackupPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+        }
+
         [Theory]
         [InlineData(unchecked((int)0x80070020), true)]  // sharing violation
         [InlineData(unchecked((int)0x80070021), true)]  // lock violation

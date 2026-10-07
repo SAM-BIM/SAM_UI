@@ -227,6 +227,7 @@ namespace SAM.Analytical.UI.WPF
             BeforeWrite?.Invoke(Path);
 
             string path_Temp = Path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            bool existed = File.Exists(Path);
             try
             {
                 File.WriteAllText(path_Temp, json);
@@ -258,6 +259,18 @@ namespace SAM.Analytical.UI.WPF
                     }
                 }
             }
+            catch (Exception exception) when (existed && !File.Exists(Path))
+            {
+                // A partial swap (ERROR_UNABLE_TO_MOVE_REPLACEMENT_2) moved the previous file to .bak, and no later attempt put the new one in
+                // place: put the previous one back, so a failed write leaves the file as it was.
+                string problem = RestoreFromBackup();
+                if (problem == null)
+                {
+                    throw;
+                }
+
+                throw new IOException(exception.Message + " " + problem, exception);
+            }
             finally
             {
                 if (File.Exists(path_Temp))
@@ -267,9 +280,24 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        // Puts the previous file (moved to .bak by a partial swap) back in place; null when it is back, otherwise why not.
+        private string RestoreFromBackup()
+        {
+            try
+            {
+                File.Copy(BackupPath, Path, false);
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return string.Format(CultureInfo.CurrentCulture, "The previous {0} could not be put back ({1}); it is kept as {0}.bak.", FileName, exception.Message);
+            }
+        }
+
         // The swap was refused because something holds the file or its .bak for a moment; the target and the temporary file are then intact, so
-        // trying again is safe. ERROR_UNABLE_TO_MOVE_REPLACEMENT_2 leaves the old file as .bak and no target, which the next attempt's Move restores.
-        // Anything else (access denied, a missing folder, a full disk) is not retried.
+        // trying again is safe. ERROR_UNABLE_TO_MOVE_REPLACEMENT_2 is a partial swap: the previous file is already .bak and there is no target, so
+        // the next attempt moves the new file in; if none succeeds, Write puts the previous file back (RestoreFromBackup). Anything else (access
+        // denied, a missing folder, a full disk) is not retried.
         internal static bool IsTransientReplaceFailure(IOException exception)
         {
             switch (exception.HResult)
