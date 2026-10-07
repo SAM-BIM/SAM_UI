@@ -432,6 +432,9 @@ namespace SAM.Analytical.UI.WPF
 
             SetRunning(true);
             UpdateRunText();
+
+            //The run panel sits below the form: bring it into view so the progress is seen without scrolling.
+            stackPanel_Run.BringIntoView();
         }
 
         private void UpdateRunText()
