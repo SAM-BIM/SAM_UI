@@ -49,8 +49,10 @@
                 <CheckBox x:Name="checkBox_RunUnmetHours" Grid.Row="4" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="False"/>
                 <Label Content="Remove TBD" Grid.Row="5"/>
                 <CheckBox x:Name="checkBox_RemoveTBD" Grid.Row="5" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="True"/>
-                <Label Content="Parallel" Grid.Row="6"/>
-                <CheckBox x:Name="checkBox_Parallel" Grid.Row="6" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="True"/>
+                <Label Content="Direct T3D" Grid.Row="6" ToolTip="Build the TAS3D model directly from the SAM geometry instead of through gbXML. Leave unchecked for the established gbXML route."/>
+                <CheckBox x:Name="checkBox_DirectT3D" Grid.Row="6" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="False"/>
+                <Label Content="Parallel" Grid.Row="7"/>
+                <CheckBox x:Name="checkBox_Parallel" Grid.Row="7" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="True"/>
             </Grid>
         </Grid>
     </Grid>

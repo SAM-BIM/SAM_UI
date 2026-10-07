@@ -111,6 +111,7 @@ namespace SAM.Analytical.UI.WPF
                 workflowSettings.UseWidths = checkBox_UseBEThickness.IsChecked.Value;
                 workflowSettings.UnmetHours = checkBox_RunUnmetHours.IsChecked.Value;
                 workflowSettings.RemoveExistingTBD = checkBox_RemoveTBD.IsChecked.Value;
+                workflowSettings.T3DRoute = checkBox_DirectT3D.IsChecked == true ? T3DRoute.Direct : T3DRoute.GbXML;
 
                 return workflowSettings;
             }
@@ -126,6 +127,9 @@ namespace SAM.Analytical.UI.WPF
                 if (workflowSettings is not null)
                 {
                     checkBox_AddIZAMs.IsChecked = workflowSettings.AddIZAMs;
+                    // Before the first read of the WorkflowSettings getter below: that getter writes every box back into
+                    // workflowSettings, so a box not yet updated would overwrite the route just supplied.
+                    checkBox_DirectT3D.IsChecked = workflowSettings.T3DRoute == T3DRoute.Direct;
                     checkBox_Sizing.IsChecked = WorkflowSettings.Sizing;
                     checkBox_Simulate.IsChecked = WorkflowSettings.Simulate;
                     checkBox_UseBEThickness.IsChecked = WorkflowSettings.UseWidths;
