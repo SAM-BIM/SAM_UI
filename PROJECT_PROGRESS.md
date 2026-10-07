@@ -6,7 +6,7 @@
 
 ## Last updated
 
-2026-10-06 (Q4 icon-redesign migration).
+2026-10-07 (SAM_UI#205 Direct T3D route selector).
 
 ## Current status
 
@@ -86,6 +86,22 @@ authoring machine) and must be transferred separately.
 - **Validation:** `msbuild SAM_UI.sln -p:Configuration=Release` (APPDATA/USERPROFILE redirected): 0 errors. PR CI build and spdx green.
 - **Unresolved issues, risks:** None introduced.
 - **Next step:** Review/merge of the deferred icon PR (SAM_UI#203) is the maintainer's call; untouched.
+
+## Q4 Direct T3D route selector in SAM_UI (2026-10-07)
+
+- **Status:** complete. SAM-BIM/SAM_UI#205 merged into `sow/2026-Q4` as merge commit `f19342af9988d5056e3110c581be5d675bb9ebe1` (PR head `6e67e3250aabe1fae46120f07fa64d63418f53b6`, Q4 base `aa49d444`); merge method: merge commit with `--match-head-commit` (repository convention). Remote and local `feature/direct-t3d-route-selector` removed. PR CI (`build`, `spdx`) green on the head; no review or Codex comments.
+- **Work completed:** a `Direct T3D` Boolean that only configures `WorkflowSettings.T3DRoute` (unchecked = `GbXML`, the default; checked = `Direct`); SAM_UI contains no Direct T3D generation logic (it lives in SAM_Tas, SAM_Tas#84). It was added to three places: Case Simulation (Create Simulate), Multiple Case Simulation (Simulate), and Simulate - Energy Simulation (`SimulateControl`, carried as `SimulateOptions.DirectT3D` through `SimulateInputs` and `PartOSimulationContext` into `RunPartOSimulation`).
+- **Important decisions and assumptions:**
+  - Direct must never be active by accident: new panels, options/settings saved before the setting existed, null/unrecognised stored values and an indeterminate box all read as `GbXML`. `SimulateOptions.DirectT3D` loads only from an explicit stored boolean `true`.
+  - Direct skips the SAM_UI-side gbXML export, so an unused export cannot fail or skip a Direct case: multi-case `Modify.RunWorkflow` via the new `TryExportGbXML` (single-case window uses the same overload; the single-model overload never exported), and `RunPartOSimulation` (no `.xml`, `Path_gbXML` null).
+  - In Energy Simulation Direct applies only with the TAS solar calculation method and no canonical TBD; the box is enabled only while Simulate is ticked with the TAS method.
+  - **Part O deliberately stays on gbXML**: the box is locked unchecked on the Part O route and the guided run never takes the option. Reasons: canonical/warm-start TBD is the product of the gbXML conversion and SAM_Tas refuses Direct with a canonical TBD; Part O case keys, lineage and resume files do not record the route; Direct is not validated against Approved Document O results.
+  - These dialogs do not persist `WorkflowSettings`; Case/Multiple Case start from `Query.DefaultWorkflowSettings()` each open, so no persistence was added there. Energy Simulation persists via its existing remembered `SimulateOptions`.
+  - Pre-existing quirk NOT fixed (out of scope): the `WorkflowSettings` setter in the Case/Multiple Case controls reads the getter, which writes every box back into the settings, so values supplied through the setter (`Sizing`, `Simulate`, ...) are not reflected. The route box is set before the first getter read to work around it for `T3DRoute`.
+- **Files changed:** `WPF/SAM.Analytical.UI.WPF/Controls/CaseSimulationControl.xaml(.cs)`, `Controls/MultipleCaseSimulationControl.xaml(.cs)`, `Controls/SimulateControl.xaml(.cs)`, `Windows/SimulateWindow.xaml.cs`, `Modify/RunWorkflow.cs`, `Modify/RunPartOSimulation.cs`, `Modify/Simulate.cs`, `SAM_UI/SAM.Analytical.UI/Classes/TBDConversionOptions.cs` (`SimulateOptions`), `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOSimulationContext.cs`; tests `DirectT3DRouteSelectorTests.cs`, `DirectT3DGbXMLExportTests.cs`, `DirectT3DEnergySimulationTests.cs` (new).
+- **Validation:** Release build 0 errors; full `SAM.Analytical.UI.WPF.Tests` 2485/2485 pass (baseline 2463 before the PR); `git diff --check` clean. Manual acceptance with licensed TAS passed (owner, 2026-10-07): gbXML vs Direct routes distinguished by the `.xml` file and workflow steps; a Part O run (`Iteration1b\tas`) correctly stayed on gbXML.
+- **Unresolved issues, risks:** very old fixed-parameter `.gh` files in SAM_Tas_Grasshopper were not tested (see that repo's record). Direct is not validated for Part O. The setter/getter quirk above remains.
+- **Next step:** if Direct is wanted for Part O, open a new Q4 PR that records the route in the run identity/case key, forces one route per optimisation, refuses the canonical warm-start path with Direct, and re-runs the Part O fixtures and an Approved Document O acceptance. Optionally fix the Case/Multiple Case setter/getter quirk separately.
 
 ## Late-Q3 documentation evidence - supplementary note (2026-10-06 deliverables)
 
