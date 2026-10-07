@@ -230,7 +230,10 @@
                         <Button x:Name="button_OutputDirectory" Grid.Row="1" Grid.Column="2" Content="…" Width="30" Height="22" Margin="0,6,0,0"/>
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Solar calculation" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <ComboBox x:Name="comboBox_SolarCalculationMethod" Grid.Row="2" Grid.Column="1" Width="160" Height="22" Margin="0,6,0,0" HorizontalAlignment="Left"/>
+                        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
+                            <ComboBox x:Name="comboBox_SolarCalculationMethod" Width="160" Height="22" Margin="0,6,0,0" HorizontalAlignment="Left"/>
+                            <CheckBox x:Name="checkBox_DirectT3D" Content="Direct T3D" Margin="14,6,0,0" VerticalAlignment="Center" IsChecked="False" ToolTip="Build the TAS3D model directly from the SAM geometry instead of through gbXML. Applies to the TAS solar calculation only. Leave unchecked for the established gbXML route; every round and result of this case then uses the route chosen here."/>
+                        </StackPanel>
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,6,0,0" Style="{StaticResource PartO.Caption}"
                                    Text="The rest of the case is fixed for Part O: a full-year simulation over days 1 to 365, no sizing, no exports, and the project name taken from the prepared model."/>

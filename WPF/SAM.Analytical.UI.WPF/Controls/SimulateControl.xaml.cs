@@ -509,16 +509,14 @@ namespace SAM.Analytical.UI.WPF
             EnableDirectT3D();
         }
 
-        private bool partOLocked = false;
-
         /// <summary>
         /// Direct T3D replaces the gbXML import into a TAS3D model, so it only has meaning where the TAS solar calculation
-        /// method simulates; it is not offered on the Part O route (see <see cref="LockPartOSettings"/>).
+        /// method simulates. It is the one conversion choice a person keeps on the Part O route too.
         /// </summary>
         private void EnableDirectT3D()
         {
             //Read from the selected item, not the ComboBox text: this also runs from SelectionChanged, where Text is not yet updated.
-            checkBox_DirectT3D.IsEnabled = !partOLocked && Simulate && Core.Query.Enum<SolarCalculationMethod>(comboBox_SolarCalculationMethod.SelectedItem as string) == SolarCalculationMethod.TAS;
+            checkBox_DirectT3D.IsEnabled = Simulate && Core.Query.Enum<SolarCalculationMethod>(comboBox_SolarCalculationMethod.SelectedItem as string) == SolarCalculationMethod.TAS;
         }
 
         private void checkBox_Simulate_Click(object sender, System.Windows.RoutedEventArgs e)
@@ -584,11 +582,8 @@ namespace SAM.Analytical.UI.WPF
             checkBox_UseWidths.IsEnabled = false;
             checkBox_UpdateConstructionLayersByPanelType.IsEnabled = false;
 
-            //Part O keeps its established gbXML route: its warm-start canonical TBD and its run lineage are the
-            //product of that conversion, and SAM_Tas refuses Direct together with a canonical TBD.
-            partOLocked = true;
-            checkBox_DirectT3D.IsChecked = false;
-            EnableDirectT3D();
+            //Direct T3D is deliberately NOT locked: which conversion produced a run is part of its case (the case key, the
+            //scenario fingerprint, the canonical TBD's fingerprint and the saved sidecar all carry it).
 
             checkBox_RoomDataSheets.IsEnabled = false;
             checkBox_CreateSAP.IsEnabled = false;

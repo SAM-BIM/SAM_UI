@@ -95,6 +95,12 @@ namespace SAM.Analytical.UI
         public bool DirectT3D { get; set; } = false;
 
         /// <summary>
+        /// Whether this case actually converts through Direct T3D: asked for, and with the TAS solar calculation - the only one
+        /// that converts the geometry into a T3D. This, not <see cref="DirectT3D"/> alone, is what identifies the case.
+        /// </summary>
+        public bool UsesDirectT3D => DirectT3D && SolarCalculationMethod == SolarCalculationMethod.TAS;
+
+        /// <summary>
         /// This case again, writing somewhere else - the <b>only</b> way an Approved Document O Iteration 3
         /// Candidate B is allowed to be built.
         ///

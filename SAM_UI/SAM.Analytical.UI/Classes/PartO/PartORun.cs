@@ -1012,6 +1012,7 @@ namespace SAM.Analytical.UI
                 Sizing = partORunResume.Sizing,
                 UseWidths = partORunResume.UseWidths,
                 UpdateConstructionLayersByPanelType = partORunResume.UpdateConstructionLayersByPanelType,
+                DirectT3D = partORunResume.DirectT3D,
             };
 
             return true;

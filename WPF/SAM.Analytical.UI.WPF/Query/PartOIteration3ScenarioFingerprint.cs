@@ -34,9 +34,12 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
+            //Direct T3D is stated only where it is used, so the fingerprint of a gbXML case is exactly what it always was.
+            string route = partOSimulationContext.UsesDirectT3D ? " | t3d=Direct" : string.Empty;
+
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "weather={0} | solar={1} | days {2}-{3} | unmetHours={4} | sizing={5} | useWidths={6} | updateConstructionLayersByPanelType={7}",
+                "weather={0} | solar={1} | days {2}-{3} | unmetHours={4} | sizing={5} | useWidths={6} | updateConstructionLayersByPanelType={7}{8}",
                 partOSimulationContext.WeatherData?.Name ?? "<none>",
                 partOSimulationContext.SolarCalculationMethod,
                 partOSimulationContext.SimulateFrom,
@@ -44,7 +47,8 @@ namespace SAM.Analytical.UI.WPF
                 partOSimulationContext.UnmetHours,
                 partOSimulationContext.Sizing,
                 partOSimulationContext.UseWidths,
-                partOSimulationContext.UpdateConstructionLayersByPanelType);
+                partOSimulationContext.UpdateConstructionLayersByPanelType,
+                route);
         }
     }
 }

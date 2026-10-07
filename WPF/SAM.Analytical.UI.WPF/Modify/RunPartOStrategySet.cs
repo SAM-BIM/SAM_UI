@@ -263,6 +263,7 @@ namespace SAM.Analytical.UI.WPF
                 Sizing = simulateOptions?.Sizing ?? false,
                 UseWidths = simulateOptions?.UseWidths ?? false,
                 UpdateConstructionLayersByPanelType = simulateOptions?.UpdateConstructionLayersByPanelType ?? true,
+                DirectT3D = partOSimulationCase.DirectT3D,
                 Path_DesignModel = path_Model,
             };
         }

@@ -25,6 +25,13 @@ namespace SAM.Analytical.UI.WPF
         public SolarCalculationMethod SolarCalculationMethod { get; set; } = SolarCalculationMethod.TAS;
 
         /// <summary>
+        /// Convert the geometry into a TAS3D model directly instead of through gbXML. False - the established gbXML route - unless a
+        /// person ticks it for this case: it is never remembered from an earlier session, so a Part O case starts on gbXML every
+        /// time. Only the TAS solar calculation converts through a T3D; see <see cref="PartOSimulationContext.UsesDirectT3D"/>.
+        /// </summary>
+        public bool DirectT3D { get; set; } = false;
+
+        /// <summary>
         /// The case the Simulate dialog would have opened with: the model's own weather, the remembered output
         /// folder where it still exists (else the model's folder), and the remembered solar method.
         /// </summary>

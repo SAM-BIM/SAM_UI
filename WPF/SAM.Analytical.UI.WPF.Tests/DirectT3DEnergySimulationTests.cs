@@ -18,7 +18,7 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// <summary>
     /// "Direct T3D" on the Simulate - Energy Simulation dialog. It is carried as <see cref="SimulateOptions.DirectT3D"/>
     /// (false by default and for options saved before it existed) and, for the TAS solar calculation only, becomes
-    /// <see cref="WorkflowSettings.T3DRoute"/> = <see cref="T3DRoute.Direct"/> with no gbXML written. Part O stays on gbXML.
+    /// <see cref="WorkflowSettings.T3DRoute"/> = <see cref="T3DRoute.Direct"/> with no gbXML written. The Part O case carries it too (see PartODirectT3DTests).
     /// </summary>
     [Collection(WpfCollection.Name)]
     public class DirectT3DEnergySimulationTests : IDisposable
@@ -165,23 +165,19 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
-        /// The Part O route keeps gbXML: the box is unchecked and locked, and changing the method cannot unlock it.
+        /// The Part O route does not lock the box: which conversion produced a run is part of its case, so it stays a choice.
         /// </summary>
         [WpfFact]
-        public void PartORoute_LocksTheBoxUnchecked()
+        public void PartORoute_KeepsTheBoxAvailable()
         {
             SimulateControl control = new();
             control.SimulateOptions = new SimulateOptions() { DirectT3D = true, SolarCalculationMethod = SolarCalculationMethod.TAS };
-            Assert.True(Box(control).IsChecked);
 
             control.LockPartOSettings();
-            Assert.False(Box(control).IsChecked);
-            Assert.False(Box(control).IsEnabled);
-            Assert.False(control.SimulateOptions.DirectT3D);
 
-            control.SolarCalculationMethod = SolarCalculationMethod.SAM;
-            control.SolarCalculationMethod = SolarCalculationMethod.TAS;
-            Assert.False(Box(control).IsEnabled);
+            Assert.True(Box(control).IsChecked);
+            Assert.True(Box(control).IsEnabled);
+            Assert.True(control.SimulateOptions.DirectT3D);
         }
 
         // ---- the run ----------------------------------------------------------------------------------
