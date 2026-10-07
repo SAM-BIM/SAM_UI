@@ -6,7 +6,7 @@
 **Status:** code, automated tests and a licensed real-app walk of the whole journey are complete; awaiting PR CI and
 review. Branch `feature/part-o-iteration3-journey` from `sow/2026-Q4` `45ab491c`.
 
-Presentation and routing only. Direct T3D, the simulation engine, TAS, TM59, the Iteration 3 pipeline and the
+Presentation and routing only (plus one defect in this PR's own first version, below). Direct T3D, the simulation engine, TAS, TM59, the Iteration 3 pipeline and the
 pre-flight authorities are not touched. No result, key, fingerprint or file name changes.
 
 ## Why
@@ -43,6 +43,25 @@ default Iteration 3 method could not run and the Hub did not say what to do abou
 4. **The Direct T3D box follows every change** (`Checked`/`Unchecked` instead of `Click`), so the collapsed Simulation
    case header always states the route. The route itself is untouched.
 
+5. **Follow-up after the owner's first run (same day), three changes:**
+   - **Defect fixed - Run acted on the wrong method.** `Iteration3Mode` returned the default whenever the Hub had selected
+     another method itself, and the command used that value for Run Iteration 3 and Open result. Pressing Run on the
+     automatically selected Route check therefore ran the manufacturer-guidance method and refused at Equipment
+     resolution ("no valid saved Part O dwelling strategy selections"). `Iteration3Mode` is now the method on screen (what
+     actions use); `Iteration3ModeCarried` is the chosen one (what the next showing starts from). Found by the owner running
+     Iteration 2 and then Iteration 3 on a model that carries results, where Mixed Design is not offered so the automatic
+     choice applies.
+   - **No pop-up in the middle of a run.** A completed Prepare & Run no longer stops on a message box ("Model successfuly
+     converted", time elapsed, pre-simulation warnings) between TAS and the TM59 result. Its notes are kept on the Hub line
+     ("2 notes - see Show details") and in its full text (`CompletedOutcome`, `NotesText`). A run that did NOT complete still
+     shows its refusal box, because the run stops there. Review iteration (Accept) and the Iteration 3 replace confirmations
+     are decisions and are unchanged.
+   - **The steps are a checklist, not red text.** The missing-rooms refusal is no longer shown as a refusal. The panel says what
+     the method needs, then lists the steps with where each stands (done / current / later), and the current one has a button:
+     **Remove Results...** (new `PartOWorkflowAction.RemoveResults`, the existing command; opening the cleaned copy ends the Hub,
+     as it replaces the model) or **Choose cooling control rooms (Mixed Design)...**. The automatic-selection notice points to
+     the checklist instead of repeating it.
+
 ## Decisions and assumptions
 
 - **Not built: a default cooling control room chosen by the Hub.** The room is an engineering choice that changes
@@ -68,7 +87,9 @@ default Iteration 3 method could not run and the Hub did not say what to do abou
 
 ## Validation
 
-- Release build 0 errors. Full `SAM.Analytical.UI.WPF.Tests`: 2513/2513 pass (2501 before; +12). `git diff --check` clean.
+- Release build 0 errors. Full `SAM.Analytical.UI.WPF.Tests`: 2515 tests; 2514 pass in the full run and the one failure
+  (`PartOWorkflowSimplificationTests.The_progress_window_keeps_its_content_after_standing_aside_for_a_dialog`) passes 3/3 on its
+  own - a load-dependent flake, unrelated. (2501 before; +14.) `git diff --check` clean.
   The first run of the suite failed 3 room-binding tests, which is what led to limiting the automatic choice to
   missing steps: an invalid saved room must keep Run off for the method that is wrong.
 - Licensed real-app walk (UI Automation, Direct T3D on, `C:\TasOut\direct-parto\it3\p3`): cleaned copy of the model ->
@@ -78,6 +99,9 @@ default Iteration 3 method could not run and the Hub did not say what to do abou
   completion; `.t3d` in Iteration1a/2/3, no `.xml`. The collapsed header showed "Direct T3D" after a UIA toggle (it
   did not before).
 - The new outcome line (`MixedDesignSavedOutcome`) was added after that walk and is covered by a unit test only.
+- Second real-app run on the owner's own model (`Direct-partO-dwellings1.json`, which carries results; Direct T3D on): Iteration 2
+  ran straight through to TM59 with no message box; the Hub showed the checklist with **Remove Results...** on step 1 and the
+  Route check selected; **Run Iteration 3** ran the Route check (heading "Route check", completed) instead of refusing.
 
 ## Unresolved issues, risks
 

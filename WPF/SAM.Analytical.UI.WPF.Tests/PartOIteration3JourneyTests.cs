@@ -61,7 +61,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             string advice = Query.PartOIteration3ProductMethodAdvice(PartOMixedDesignFixture.Baseline(), null, out bool offerMixedDesign);
 
             Assert.True(offerMixedDesign);
-            Assert.Contains("1. Choose a cooling control room for each dwelling", advice);
+            Assert.Contains("1. Choose a cooling control room for each dwelling in Mixed Design", advice);
             Assert.Contains("Save selection", advice);
             Assert.Contains("2. Choose Iteration 2", advice);
             Assert.DoesNotContain("Remove Results", advice);
@@ -73,7 +73,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             string advice = Query.PartOIteration3ProductMethodAdvice(Dirty(), null, out bool offerMixedDesign);
 
             Assert.False(offerMixedDesign);
-            Assert.Contains("1. Results > Part O > Remove Results", advice);
+            Assert.Contains("1. Save a copy of the model without its simulation results", advice);
             Assert.Contains("2. Choose a cooling control room", advice);
             Assert.Contains("3. Choose Iteration 2", advice);
         }
@@ -88,8 +88,8 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.False(offerMixedDesign);
             Assert.StartsWith("This method needs the cooling control rooms saved on the model to be part of the reference case", advice);
-            Assert.Contains("1. Choose Iteration 2", advice);
-            Assert.DoesNotContain("2.", advice);
+            Assert.Contains("1. The cooling control rooms are saved on the model.", advice);
+            Assert.Contains("2. Choose Iteration 2", advice);
         }
 
         [Fact]
@@ -132,6 +132,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Assert.True(window.CanRunIteration3);
                 Assert.Equal(1, window.Iteration3CheckedCount);
                 Assert.True(string.IsNullOrEmpty(window.Iteration3RefusalText));
+                Assert.Equal(PartOIteration3BehaviourMode.Parity, window.Iteration3Mode);
 
                 //Product methods are tried before validation methods; in this fixture the certified-efficiency method
                 //refuses too (its unit states no certified data), so the route check is what can run.
@@ -140,11 +141,18 @@ namespace SAM.Analytical.UI.WPF.Tests
                 //The notice names both methods, says why, and the Mixed Design step is on offer.
                 Assert.Contains("Selected product — manufacturer operating guidance", window.Iteration3AutomaticText);
                 Assert.Contains("Route check — design airflows, no product", window.Iteration3AutomaticText);
-                Assert.Contains("cooling control room", window.Iteration3AutomaticText);
-                Assert.True(window.Iteration3MixedDesignOffered);
+                Assert.Contains("listed below", window.Iteration3AutomaticText);
 
-                //Not carried: the next showing starts from the default and decides again.
-                Assert.Equal(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance, window.Iteration3Mode);
+                //The steps for the method that cannot run yet are shown, calmly, with the Mixed Design step offered.
+                Assert.Contains("cooling control room", window.Iteration3StepsText);
+                Assert.True(window.Iteration3MixedDesignOffered);
+                Assert.False(window.Iteration3RemoveResultsOffered);
+
+                //Run and Open result act on the method that is on screen ...
+                Assert.Equal(PartOIteration3BehaviourMode.Parity, window.Iteration3Mode);
+
+                //... but only a method a person chose is carried: the next showing starts from the default and decides again.
+                Assert.Equal(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance, window.Iteration3ModeCarried);
             }
         }
 
@@ -172,11 +180,57 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Assert.False(window.Iteration3MethodIsAutomatic);
                 Assert.Equal(PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance, window.Iteration3EffectiveMode);
                 Assert.False(window.CanRunIteration3);
-                Assert.Contains("Mixed Design", window.Iteration3RefusalText);
-                Assert.Contains("Save selection", window.Iteration3RefusalText);
+                Assert.True(string.IsNullOrEmpty(window.Iteration3RefusalText));
+                Assert.Contains("Mixed Design", window.Iteration3StepsText);
+                Assert.Contains("Save selection", window.Iteration3StepsText);
                 Assert.True(window.Iteration3MixedDesignOffered);
                 Assert.Equal(string.Empty, window.Iteration3AutomaticText);
             }
+        }
+
+        [WpfFact]
+        public void OnAModelThatCarriesResults_TheFirstStepIsRemoveResults_AndMixedDesignIsNotOffered()
+        {
+            var test = WithoutSavedRooms();
+            using (test.Host)
+            {
+                PartOWorkflowWindow window = new()
+                {
+                    AnalyticalModel = Dirty(),
+                    PartORun = test.Run,
+                    VentilationUnitCatalogue = test.Catalogue,
+                    Iteration3Eligibility = test.Eligibility,
+                };
+                window.CompleteInitialisation();
+
+                Assert.True(window.Iteration3RemoveResultsOffered);
+                Assert.False(window.Iteration3MixedDesignOffered);
+                Assert.Contains("Save a copy of the model without its simulation results", window.Iteration3StepsText);
+
+                //Only the current step carries a button, and it is the first.
+                Assert.Contains("\u2192 1.", window.Iteration3StepsText);
+                Assert.Contains("\u25CB 2.", window.Iteration3StepsText);
+            }
+        }
+
+        [Fact]
+        public void ACompletedRunsNotes_AreKeptOnTheHubLine_NotInABox()
+        {
+            PartOSimulationOutcome partOSimulationOutcome = new();
+            partOSimulationOutcome.Notes.Add("Pre-simulation check (warning): Studio 1_0 Space ...");
+            partOSimulationOutcome.Notes.Add("Pre-simulation check (warning): Bathroom_2 Space ...");
+
+            string notes = Modify.NotesText(partOSimulationOutcome);
+            Assert.Contains("Studio 1_0", notes);
+
+            PartOWorkflowOutcome partOWorkflowOutcome = Modify.CompletedOutcome("Iteration 1a", TimeSpan.FromMinutes(1), null, 2, notes);
+
+            Assert.Contains("2 notes", partOWorkflowOutcome.Detail);
+            Assert.DoesNotContain("shown", partOWorkflowOutcome.Detail);
+            Assert.Contains("Notes from the simulation", partOWorkflowOutcome.ToolTip);
+            Assert.Contains("Bathroom_2", partOWorkflowOutcome.ToolTip);
+
+            Assert.Null(Modify.NotesText(new PartOSimulationOutcome()));
         }
 
         [WpfFact]

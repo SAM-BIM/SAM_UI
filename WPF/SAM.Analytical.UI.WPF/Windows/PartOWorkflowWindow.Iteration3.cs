@@ -56,8 +56,6 @@ namespace SAM.Analytical.UI.WPF
 
         private bool iteration3Automatic;
 
-        private bool mixedDesignOffered;
-
         private bool writing_Iteration3;
 
         private void InitialiseIteration3()
@@ -168,12 +166,12 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// The Iteration 3 method chosen. Carried across showings by the caller. A method the Hub selected itself
-        /// is not a choice, so it is not carried: the next showing starts from the default and decides again.
+        /// The Iteration 3 method the Hub is ON - the one Run Iteration 3 and Open result act on, whether a person chose it
+        /// or the Hub selected it. What is carried to the next showing is <see cref="Iteration3ModeCarried"/>.
         /// </summary>
         public PartOIteration3BehaviourMode Iteration3Mode
         {
-            get => iteration3Automatic ? Iteration3DefaultMode : iteration3Mode;
+            get => iteration3Mode;
             set
             {
                 iteration3Mode = value;
@@ -184,6 +182,12 @@ namespace SAM.Analytical.UI.WPF
                 RefreshIteration3();
             }
         }
+
+        /// <summary>
+        /// The method to carry to the next showing: the one a person chose. A method the Hub selected itself is not a
+        /// choice, so it is not carried - the next showing starts from the default and decides again.
+        /// </summary>
+        public PartOIteration3BehaviourMode Iteration3ModeCarried => iteration3Automatic ? Iteration3DefaultMode : iteration3Mode;
 
         /// <summary>The chosen method's pre-flight, or null where Iteration 3 cannot run at all. Exposed for tests.</summary>
         internal PartOIteration3Preflight? Iteration3Preflight => Preflight(iteration3Mode);
@@ -350,19 +354,13 @@ namespace SAM.Analytical.UI.WPF
                 expander_It3Units.Header = string.Format(CultureInfo.CurrentCulture, "Show all {0} units", count);
                 listBox_It3Units.ItemsSource = partOIteration3Preflight.Units;
 
-                textBlock_It3Refusal.Text = RefusalText(partOIteration3Preflight, out bool offerMixedDesign);
-
-                mixedDesignOffered = offerMixedDesign;
-            }
-
-            if (partOIteration3Preflight is null)
-            {
-                mixedDesignOffered = false;
+                //A missing step is shown as the journey it is (RefreshSteps), not as a red refusal.
+                textBlock_It3Refusal.Text = IsMissingRooms(partOIteration3Preflight) ? string.Empty : Refusal(partOIteration3Preflight);
             }
 
             RefreshAutomaticNotice(canRun);
 
-            button_It3MixedDesign.Visibility = mixedDesignOffered ? Visibility.Visible : Visibility.Collapsed;
+            RefreshSteps(canRun);
 
             //The two actions.
             bool reviewable = partOIteration3PairingStatus?.IsReviewable ?? false;
@@ -540,21 +538,85 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// <see cref="Refusal(PartOIteration3Preflight)"/>, with the one refusal that is a missing STEP rather than
-        /// a fault - no saved cooling control rooms - replaced by the steps that supply them
-        /// (<see cref="Query.PartOIteration3ProductMethodAdvice"/>).
+        /// Whether the method is refused for the one reason that is a missing STEP rather than a fault: no saved
+        /// cooling control rooms. It is shown as the steps that supply them
+        /// (<see cref="Query.PartOIteration3ProductMethodSteps"/>), not as a refusal.
         /// </summary>
-        private string RefusalText(PartOIteration3Preflight partOIteration3Preflight, out bool offerMixedDesign)
+        private static bool IsMissingRooms(PartOIteration3Preflight? partOIteration3Preflight)
         {
-            offerMixedDesign = false;
+            return partOIteration3Preflight is not null && !partOIteration3Preflight.CanRun && partOIteration3Preflight.Refusals.Contains(Query.PartOIteration3NoDwellingStrategiesRefusal);
+        }
 
-            if (partOIteration3Preflight is not null && !partOIteration3Preflight.CanRun && partOIteration3Preflight.Refusals.Contains(Query.PartOIteration3NoDwellingStrategiesRefusal))
+        /// <summary>
+        /// The journey to a runnable manufacturer-guidance method, where that is what is missing: what the method needs,
+        /// then each step in order - done, current, later - with a button on the current one where the Hub can do it.
+        /// Shown for the method a person chose, or for the default while another is selected on their behalf.
+        /// </summary>
+        private void RefreshSteps(bool canRun)
+        {
+            stackPanel_It3StepRows.Children.Clear();
+            button_It3RemoveResults.Visibility = Visibility.Collapsed;
+            button_It3MixedDesign.Visibility = Visibility.Collapsed;
+
+            PartOIteration3Preflight? partOIteration3Preflight = canRun ? Preflight(iteration3Automatic ? Iteration3DefaultMode : iteration3Mode) : null;
+
+            if (!IsMissingRooms(partOIteration3Preflight))
             {
-                return Query.PartOIteration3ProductMethodAdvice(analyticalModel, partORun, out offerMixedDesign);
+                border_It3Steps.Visibility = Visibility.Collapsed;
+                textBlock_It3StepsLead.Text = string.Empty;
+
+                return;
             }
 
-            return Refusal(partOIteration3Preflight);
+            List<PartOIteration3Step> steps = Query.PartOIteration3ProductMethodSteps(analyticalModel, partORun, out string lead);
+
+            textBlock_It3StepsLead.Text = lead;
+
+            for (int i = 0; i < steps.Count; i++)
+            {
+                PartOIteration3Step step = steps[i];
+
+                (string glyph, Brush brush, FontWeight fontWeight) = step.State switch
+                {
+                    PartOIteration3StepState.Done => ("✓", (Brush)new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32)), FontWeights.Normal),
+                    PartOIteration3StepState.Current => ("→", new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)), FontWeights.SemiBold),
+                    _ => ("○", new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77)), FontWeights.Normal),
+                };
+
+                Grid grid = new() { Margin = new Thickness(0, 2, 0, 2) };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                grid.Children.Add(new TextBlock { Text = glyph, Foreground = brush, FontWeight = fontWeight });
+
+                TextBlock textBlock = new() { Text = string.Format(CultureInfo.CurrentCulture, "{0}. {1}", i + 1, step.Text), Foreground = brush, FontWeight = fontWeight, TextWrapping = TextWrapping.Wrap };
+                Grid.SetColumn(textBlock, 1);
+                grid.Children.Add(textBlock);
+
+                stackPanel_It3StepRows.Children.Add(grid);
+
+                if (step.State == PartOIteration3StepState.Current && step.ButtonText is not null)
+                {
+                    Button button = step.Action == PartOWorkflowAction.RemoveResults ? button_It3RemoveResults : step.Action == PartOWorkflowAction.MixedDesign ? button_It3MixedDesign : null;
+
+                    if (button is not null)
+                    {
+                        button.Content = step.ButtonText;
+                        button.Visibility = Visibility.Visible;
+                    }
+                }
+            }
+
+            border_It3Steps.Visibility = Visibility.Visible;
         }
+
+        /// <summary>The steps as shown - the sentence, then one line per step - or empty. Exposed for tests.</summary>
+        internal string Iteration3StepsText => border_It3Steps.Visibility == Visibility.Visible
+            ? string.Join("\n", new[] { textBlock_It3StepsLead.Text }.Concat(stackPanel_It3StepRows.Children.OfType<Grid>().Select(x => string.Join(" ", x.Children.OfType<TextBlock>().Select(y => y.Text)))))
+            : string.Empty;
+
+        /// <summary>Whether the panel offers to open Remove Results. Exposed for tests.</summary>
+        internal bool Iteration3RemoveResultsOffered => button_It3RemoveResults.Visibility == Visibility.Visible;
 
         /// <summary>
         /// Opens on a method that can run. Where nobody chose a method and the default cannot run - typically
@@ -636,19 +698,16 @@ namespace SAM.Analytical.UI.WPF
             }
 
             PartOIteration3Preflight preflight_Default = Preflight(Iteration3DefaultMode);
-            string why = RefusalText(preflight_Default, out bool offerMixedDesign);
-
-            if (offerMixedDesign)
-            {
-                mixedDesignOffered = true;
-            }
+            string why = IsMissingRooms(preflight_Default)
+                ? "What the first method needs is listed below."
+                : Refusal(preflight_Default).Replace("This method cannot run yet: ", string.Empty);
 
             textBlock_It3Automatic.Text = string.Format(
                 CultureInfo.CurrentCulture,
-                "'{0}' cannot run yet, so '{1}' is selected because it can run now. Choose another method above at any time.\n\n{2}",
+                "'{0}' cannot run yet, so '{1}' is selected because it can run now. Choose another method above at any time. {2}",
                 Query.PartOIteration3MethodLabel(Iteration3DefaultMode),
                 Query.PartOIteration3MethodLabel(iteration3Mode),
-                string.IsNullOrWhiteSpace(why) ? string.Empty : why.Replace("This method cannot run yet: ", string.Empty)).TrimEnd();
+                why).TrimEnd();
 
             border_It3Automatic.Visibility = Visibility.Visible;
         }
@@ -663,6 +722,13 @@ namespace SAM.Analytical.UI.WPF
         private void button_It3MixedDesign_Click(object sender, RoutedEventArgs e)
         {
             Action = PartOWorkflowAction.MixedDesign;
+
+            DialogResult = true;
+        }
+
+        private void button_It3RemoveResults_Click(object sender, RoutedEventArgs e)
+        {
+            Action = PartOWorkflowAction.RemoveResults;
 
             DialogResult = true;
         }

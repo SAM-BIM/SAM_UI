@@ -289,9 +289,21 @@
                             </Expander>
                             <TextBlock x:Name="textBlock_It3Refusal" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
 
-                            <!-- Where the refusal is the missing cooling control rooms: the step that supplies them. -->
-                            <Button x:Name="button_It3MixedDesign" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,6,0,0" Height="24" Padding="10,0" Click="button_It3MixedDesign_Click"
-                                    ToolTip="Open Mixed Design to choose a cooling control room for each dwelling and save the selection. The Hub reopens afterwards.">Choose cooling control rooms (Mixed Design)…</Button>
+                            <!-- Where the refusal is a missing STEP (no saved cooling control rooms) it is shown as the journey it is:
+                                 what the method needs, then each step in order with where it stands, and a button on the current one.
+                                 Calm, not red - nothing is wrong, something is still to be done. -->
+                            <Border x:Name="border_It3Steps" Visibility="Collapsed" Margin="0,8,0,0" Padding="10,8" CornerRadius="3" BorderThickness="1" Background="#F7F9FC" BorderBrush="#C9D3E3">
+                                <StackPanel>
+                                    <TextBlock x:Name="textBlock_It3StepsLead" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="#333333"/>
+                                    <StackPanel x:Name="stackPanel_It3StepRows" Margin="0,6,0,0"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Button x:Name="button_It3RemoveResults" Visibility="Collapsed" Height="26" Padding="12,0" Margin="0,0,8,0" Click="button_It3RemoveResults_Click"
+                                                ToolTip="Opens Remove Results: saves a cleaned copy of the open model (it is not changed) that you can open for Mixed Design."/>
+                                        <Button x:Name="button_It3MixedDesign" Visibility="Collapsed" Height="26" Padding="12,0" Click="button_It3MixedDesign_Click"
+                                                ToolTip="Open Mixed Design to choose a cooling control room for each dwelling and save the selection. The Hub reopens afterwards."/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
 
                             <Grid Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>

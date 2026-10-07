@@ -2014,7 +2014,7 @@ namespace SAM.Analytical.UI.WPF.Windows
         /// </summary>
         private void RibbonButton_PartOWorkflow_Click(object sender, RoutedEventArgs e)
         {
-            Modify.RunPartOWorkflow(uIAnalyticalModel, partORun, windowHandle);
+            Modify.RunPartOWorkflow(uIAnalyticalModel, partORun, windowHandle, Open);
 
             //The workflow can leave the run in any of its states - prepared, completed, or dropped - and a
             //cancelled dialog raises no modification, so the Results-tab gates are refreshed here for the

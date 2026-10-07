@@ -4,6 +4,7 @@
 using SAM.Core.UI;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace SAM.Analytical.UI.WPF
@@ -64,7 +65,8 @@ namespace SAM.Analytical.UI.WPF
         /// </param>
         /// <param name="partORun">The session's Part O run.</param>
         /// <param name="owner">Owner window for the dialogs.</param>
-        public static void RunPartOWorkflow(this UIAnalyticalModel? uIAnalyticalModel, PartORun partORun, IWin32Window? owner = null)
+        /// <param name="open">Opens a saved model in the application window (the File &gt; Open path); lets the Hub offer Remove Results, whose cleaned copy is opened that way.</param>
+        public static void RunPartOWorkflow(this UIAnalyticalModel? uIAnalyticalModel, PartORun partORun, IWin32Window? owner = null, Func<string, bool>? open = null)
         {
             if (uIAnalyticalModel?.JSAMObject is null || partORun is null)
             {
@@ -162,7 +164,10 @@ namespace SAM.Analytical.UI.WPF
                 partOEquipmentSelection = partOWorkflowWindow.EquipmentSelection;
                 partOProjectTestVentilationUnit = partOWorkflowWindow.ProjectTestVentilationUnit;
                 stated_ProjectTestVentilationUnit = true;
-                partOIteration3BehaviourMode = partOWorkflowWindow.Iteration3Mode;
+                PartOIteration3BehaviourMode partOIteration3BehaviourMode_OnScreen = partOWorkflowWindow.Iteration3Mode;
+
+                //What is carried is the method a person chose; a method the Hub selected itself is decided again next time.
+                partOIteration3BehaviourMode = partOWorkflowWindow.Iteration3ModeCarried;
                 partOSimulationCase = partOWorkflowWindow.SimulationCase;
 
                 //Which case the person was working in, so the reopened Hub's primary Review action opens THAT
@@ -210,11 +215,11 @@ namespace SAM.Analytical.UI.WPF
                         break;
 
                     case PartOWorkflowAction.Iteration3:
-                        partOWorkflowOutcome = RunPartOIteration3Case(partORun, partOIteration3BehaviourMode, owner) ?? partOWorkflowOutcome;
+                        partOWorkflowOutcome = RunPartOIteration3Case(partORun, partOIteration3BehaviourMode_OnScreen, owner) ?? partOWorkflowOutcome;
                         break;
 
                     case PartOWorkflowAction.Iteration3Review:
-                        partOWorkflowOutcome = ReviewPartOIteration3Case(partORun, partOIteration3BehaviourMode, owner) ?? partOWorkflowOutcome;
+                        partOWorkflowOutcome = ReviewPartOIteration3Case(partORun, partOIteration3BehaviourMode_OnScreen, owner) ?? partOWorkflowOutcome;
                         break;
 
                     case PartOWorkflowAction.MixedDesign:
@@ -234,10 +239,47 @@ namespace SAM.Analytical.UI.WPF
                         }
                         break;
 
+                    case PartOWorkflowAction.RemoveResults:
+                        {
+                            //The existing Remove Results command. The open model is never changed; if the person opens the
+                            //saved copy it replaces this model (the File > Open path), so there is nothing left for the Hub
+                            //to reopen over.
+                            bool opened = false;
+
+                            RemovePartOResults(uIAnalyticalModel, owner, open is null ? null : x => opened = open(x));
+
+                            if (opened)
+                            {
+                                return;
+                            }
+                        }
+                        break;
+
                     default:
                         return;
                 }
             }
+        }
+
+        /// <summary>
+        /// The notes a completed run produced (pre-simulation warnings, spaces with no TAS zone identity), as the text
+        /// the Hub keeps under its line - capped like the box that used to interrupt the run with them, the
+        /// remainder counted rather than dropped.
+        /// </summary>
+        internal static string? NotesText(PartOSimulationOutcome partOSimulationOutcome)
+        {
+            if (partOSimulationOutcome is null || partOSimulationOutcome.Notes.Count == 0)
+            {
+                return null;
+            }
+
+            const int count_Shown = 10;
+
+            string result = string.Join("\n", partOSimulationOutcome.Notes.Take(count_Shown));
+
+            return partOSimulationOutcome.Notes.Count > count_Shown
+                ? result + string.Format("\n... and {0} more.", partOSimulationOutcome.Notes.Count - count_Shown)
+                : result;
         }
 
         private static bool HasSavedStrategies(AnalyticalModel? analyticalModel)
@@ -340,13 +382,11 @@ namespace SAM.Analytical.UI.WPF
 
                 elapsed_Simulation = partOProgressHost.State.Duration(1);
 
-                if (partOSimulationOutcome.NeedsAttention || !partORun.CanAssess)
+                //A run that completed is never interrupted: its notes are carried to the Hub line and its details
+                //(CompletedOutcome), and the TM59 result follows. Only a run that did not complete stops for a box.
+                if (!partORun.CanAssess)
                 {
-                    //Failed only where the run cannot be assessed; a completed run with notes did complete.
-                    if (!partORun.CanAssess)
-                    {
-                        partOProgressHost.State.Fail();
-                    }
+                    partOProgressHost.State.Fail();
 
                     partOProgressHost.Hide();
 
@@ -358,13 +398,7 @@ namespace SAM.Analytical.UI.WPF
                         MessageBox.Show(text, "Part O — Prepare & Run");
                     }
 
-                    //Back only where there is still a stage to watch. A cancelled or uncompleted run goes
-                    //nowhere after this box, so showing the window again only flashed it up before it
-                    //closed - after the "Simulation cancelled" message had already ended the operation.
-                    if (partORun.CanAssess)
-                    {
-                        partOProgressHost.Show();
-                    }
+                    //An uncompleted run goes nowhere after this box, so the progress window is not shown again.
                 }
 
                 if (partORun.CanAssess)
@@ -386,7 +420,7 @@ namespace SAM.Analytical.UI.WPF
             }
 
             //The verdict is the summary the result window was given - see CompletedOutcome.
-            return CompletedOutcome(name, elapsed_Simulation ?? partOSimulationOutcome.Elapsed, partOTM59ResultSummary, partOSimulationOutcome.Notes.Count);
+            return CompletedOutcome(name, elapsed_Simulation ?? partOSimulationOutcome.Elapsed, partOTM59ResultSummary, partOSimulationOutcome.Notes.Count, NotesText(partOSimulationOutcome));
         }
 
         /// <summary>

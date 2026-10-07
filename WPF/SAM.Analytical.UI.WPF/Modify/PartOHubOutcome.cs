@@ -129,11 +129,16 @@ namespace SAM.Analytical.UI.WPF
         /// After Prepare &amp; Run assessed its results: "✕ Iteration 1a completed — TM59 FAIL", worded from the
         /// summary the result window was given.
         /// </summary>
-        internal static PartOWorkflowOutcome CompletedOutcome(string? name, TimeSpan elapsed_Simulation, PartOTM59ResultSummary? partOTM59ResultSummary, int count_Notes)
+        internal static PartOWorkflowOutcome CompletedOutcome(string? name, TimeSpan elapsed_Simulation, PartOTM59ResultSummary? partOTM59ResultSummary, int count_Notes, string? notes_Text = null)
         {
             name = Name(name);
 
-            string notes = count_Notes != 0 ? string.Format(" · {0} shown", UI.Query.PartOCount(count_Notes, "note was", "notes were")) : string.Empty;
+            //The notes no longer interrupt the run with a box: they are kept here, under Show details and on the tooltip.
+            string notes = count_Notes != 0 ? string.Format(" · {0} - see Show details", UI.Query.PartOCount(count_Notes, "note", "notes")) : string.Empty;
+
+            string? Full(string? reason) => string.IsNullOrWhiteSpace(notes_Text)
+                ? reason
+                : string.Join("\n\n", new[] { reason, "Notes from the simulation:\n" + notes_Text }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
             if (partOTM59ResultSummary is null)
             {
@@ -141,7 +146,8 @@ namespace SAM.Analytical.UI.WPF
                     PartOWorkflowOutcomeKind.Information,
                     "○",
                     string.Format("{0} completed — results ready to review", name),
-                    string.Format("TAS simulation {0}{1}", PartOProgressState.Format(elapsed_Simulation), notes))
+                    string.Format("TAS simulation {0}{1}", PartOProgressState.Format(elapsed_Simulation), notes),
+                    Full(null))
                 {
                     RunState = PartORunState.WorkflowCompleted,
                 };
@@ -152,7 +158,7 @@ namespace SAM.Analytical.UI.WPF
                 partOTM59ResultSummary.Glyph,
                 string.Format("{0} completed — TM59 {1}", name, partOTM59ResultSummary.VerdictText),
                 string.Format("TAS simulation {0}{1}{2}", PartOProgressState.Format(elapsed_Simulation), Counts(partOTM59ResultSummary), notes),
-                partOTM59ResultSummary.Reason)
+                Full(partOTM59ResultSummary.Reason))
             {
                 RunState = PartORunState.WorkflowCompleted,
             };

@@ -43,5 +43,11 @@ namespace SAM.Analytical.UI
         /// which the Iteration 3 manufacturer-guidance method needs. The Hub reopens afterwards, re-inspected.
         /// </summary>
         [Description("Mixed Design — cooling control rooms")] MixedDesign,
+
+        /// <summary>
+        /// Remove Results (<c>Modify.RemovePartOResults</c>): save a copy of the model without its simulation
+        /// results, which Mixed Design needs. Opening the copy replaces the model, so the Hub does not reopen.
+        /// </summary>
+        [Description("Remove Results")] RemoveResults,
     }
 }
