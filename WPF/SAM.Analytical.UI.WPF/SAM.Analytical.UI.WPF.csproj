@@ -98,6 +98,19 @@
     <Reference Include="SAM.Analytical.Tas.TM59">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.TM59.dll</HintPath>
     </Reference>
+    <!-- Simulate > Optimisation: SAM_Tas' GenOptDocument.RunNative over the SAM.Math optimisation kernel. The
+         optimisation, the Variables.txt/TasGenExecute protocol, retries and validation all live there; this
+         assembly only builds the document from the window and presents the kernel's progress and result.
+         SAM.Math is referenced under an extern alias: as a global namespace it would capture every unqualified
+         Math.Min/Abs/Round in this assembly's SAM.* namespaces, which mean System.Math. Only the optimisation files
+         import it (extern alias SAMMath). -->
+    <Reference Include="SAM.Analytical.Tas.GenOpt">
+      <HintPath>..\..\..\SAM_Tas\build\SAM.Analytical.Tas.GenOpt.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Math">
+      <HintPath>..\..\..\SAM\build\SAM.Math.dll</HintPath>
+      <Aliases>SAMMath</Aliases>
+    </Reference>
     <Reference Include="SAM.Architectural">
       <HintPath>..\..\..\SAM\build\SAM.Architectural.dll</HintPath>
     </Reference>

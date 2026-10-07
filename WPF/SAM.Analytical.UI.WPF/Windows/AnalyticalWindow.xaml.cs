@@ -703,6 +703,11 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_EnergySimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EnergySimulation);
             RibbonButton_EnergySimulation.Click += RibbonButton_EnergySimulation_Click;
 
+            RibbonButton_Optimisation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Optimisation);
+            RibbonButton_Optimisation.Click += RibbonButton_Optimisation_Click;
+            RibbonButton_Optimisation.ToolTipTitle = "Optimisation";
+            RibbonButton_Optimisation.ToolTipDescription = "Run a Tas script (TasGenExecute) again and again on a Tas project folder, changing its parameters to minimise one output - the native SAM optimiser (golden section or GPS Hooke-Jeeves). Works on Tas files, not on the open model. Not the Part O Optimise (2B) command.";
+
             RibbonButton_EditLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_EditLibrary.Click += RibbonButton_EditLibrary_Click;
 
@@ -2266,6 +2271,33 @@ namespace SAM.Analytical.UI.WPF.Windows
             RefreshPartOButtons();
         }
 
+        private void RibbonButton_Optimisation_Click(object sender, RoutedEventArgs e)
+        {
+            //A missing SAM.Analytical.Tas.GenOpt.dll or a stale SAM.Math.dll fails when the window's types are first
+            //reached, i.e. inside ShowTasOptimisation; say where the assemblies came from instead of crashing.
+            try
+            {
+                ShowTasOptimisation();
+            }
+            catch (Exception exception) when (Query.IsTasOptimisationLoadFailure(exception))
+            {
+                MessageBox.Show(this, Query.TasOptimisationLoadFailure(exception), "Optimisation", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private void ShowTasOptimisation()
+        {
+            string? path = uIAnalyticalModel?.Path;
+
+            TasOptimisationWindow tasOptimisationWindow = new TasOptimisationWindow(string.IsNullOrWhiteSpace(path) ? null : System.IO.Path.GetDirectoryName(path))
+            {
+                Owner = this,
+            };
+
+            tasOptimisationWindow.ShowDialog();
+        }
+
         private void RibbonButton_ExportAnalyticalModel_Click(object sender, RoutedEventArgs e)
         {
             Modify.Export(uIAnalyticalModel);
@@ -3218,6 +3250,8 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_OpenTSD.IsEnabled = true;
             RibbonButton_OpenTBD.IsEnabled = true;
             RibbonButton_OpenT3D.IsEnabled = true;
+            //Optimisation works on a Tas project folder, not on the open model.
+            RibbonButton_Optimisation.IsEnabled = true;
             RibbonButton_NewAnalyticalModel.IsEnabled = true;
             RibbonButton_OpenAnalyticalModel.IsEnabled = true;
             RibbonButton_EditLibrary.IsEnabled = true;
