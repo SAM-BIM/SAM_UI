@@ -205,6 +205,20 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
+        /// Mixed Design saved cooling control rooms on the open model. It claims nothing about the run, which the model
+        /// change may have dropped - it states the next step, which is the same either way: prepare Iteration 2 again so
+        /// the reference case carries the rooms.
+        /// </summary>
+        internal static PartOWorkflowOutcome MixedDesignSavedOutcome()
+        {
+            return new PartOWorkflowOutcome(
+                PartOWorkflowOutcomeKind.Information,
+                "○",
+                "Cooling control rooms saved on the model",
+                "Next: choose Iteration 2 and Prepare & Run, so the reference case carries them · Iteration 3 then runs against it");
+        }
+
+        /// <summary>
         /// The TAS run was cancelled. The simulation adopts nothing on cancel, so the preparation - adopted at
         /// the review, or reused - is still the run's, and the line holds only while it is.
         /// </summary>

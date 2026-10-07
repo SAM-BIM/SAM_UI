@@ -37,5 +37,11 @@ namespace SAM.Analytical.UI
         /// stage record is the diagnosis.
         /// </summary>
         [Description("Iteration 3 — open result")] Iteration3Review,
+
+        /// <summary>
+        /// Open Mixed Design (<c>Modify.RunPartOMixedDesign</c>) to choose each dwelling's cooling control room,
+        /// which the Iteration 3 manufacturer-guidance method needs. The Hub reopens afterwards, re-inspected.
+        /// </summary>
+        [Description("Mixed Design — cooling control rooms")] MixedDesign,
     }
 }

@@ -258,6 +258,12 @@
                                 <StackPanel x:Name="stackPanel_It3MethodsAdvanced" Margin="0,4,0,0"/>
                             </Expander>
 
+                            <!-- Shown only where the method was chosen for the person: the product method could not run
+                                 and another could. Says which, why, and what the product method needs. -->
+                            <Border x:Name="border_It3Automatic" Visibility="Collapsed" Margin="0,8,0,0" Padding="8,5" CornerRadius="3" BorderThickness="1" Background="#FFF8E1" BorderBrush="#FFD54F">
+                                <TextBlock x:Name="textBlock_It3Automatic" TextWrapping="Wrap" FontSize="11.5" Foreground="#444444"/>
+                            </Border>
+
                             <TextBlock x:Name="textBlock_It3Explanation" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#555555"/>
 
                             <TextBlock x:Name="textBlock_It3UnitsHeading" Margin="0,8,0,2" FontWeight="SemiBold"/>
@@ -282,6 +288,10 @@
                                 </ListBox>
                             </Expander>
                             <TextBlock x:Name="textBlock_It3Refusal" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="Firebrick"/>
+
+                            <!-- Where the refusal is the missing cooling control rooms: the step that supplies them. -->
+                            <Button x:Name="button_It3MixedDesign" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,6,0,0" Height="24" Padding="10,0" Click="button_It3MixedDesign_Click"
+                                    ToolTip="Open Mixed Design to choose a cooling control room for each dwelling and save the selection. The Hub reopens afterwards.">Choose cooling control rooms (Mixed Design)…</Button>
 
                             <Grid Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>
@@ -334,7 +344,13 @@
                                     ToolTipService.ShowOnDisabled="True">Optimise (2B)…</Button>
                             <TextBlock x:Name="textBlock_OptimiseCaption" Style="{StaticResource PartO.Caption}" FontSize="10.5" TextAlignment="Center" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <!-- Iteration 3 has its own panel above, with its own two actions. -->
+                        <!-- Iteration 3 has its own panel above, with its own two actions - and this jump to it, because
+                             on a typical screen it sits below the fold, under the readiness list and the equipment selection. -->
+                        <StackPanel x:Name="stackPanel_GoToIteration3" Margin="0,0,8,0" Width="120" Visibility="Collapsed">
+                            <Button x:Name="button_GoToIteration3" Height="28" Click="button_GoToIteration3_Click"
+                                    ToolTip="Scroll to the Iteration 3 panel: choose the method and run the explicit system case.">Iteration 3 ↓</Button>
+                            <TextBlock Style="{StaticResource PartO.Caption}" FontSize="10.5" TextAlignment="Center" Margin="0,2,0,0" Text="Explicit system case"/>
+                        </StackPanel>
                     </StackPanel>
                     <Button x:Name="button_Close" IsCancel="True" Width="80" Height="28" HorizontalAlignment="Right" VerticalAlignment="Top" Click="button_Close_Click">Close</Button>
                 </Grid>

@@ -217,10 +217,32 @@ namespace SAM.Analytical.UI.WPF
                         partOWorkflowOutcome = ReviewPartOIteration3Case(partORun, partOIteration3BehaviourMode, owner) ?? partOWorkflowOutcome;
                         break;
 
+                    case PartOWorkflowAction.MixedDesign:
+                        //The existing Mixed Design command, unchanged. Its only write is the saved selection, which the
+                        //session reports as a model change - so the Hub, reopened below, is re-inspected over what is
+                        //true now (the run it held may have been dropped by that change).
+                        {
+                            bool saved_Before = HasSavedStrategies(uIAnalyticalModel.JSAMObject);
+
+                            RunPartOMixedDesign(uIAnalyticalModel, owner);
+
+                            //Said only where this visit is what saved them; a visit that changed nothing leaves the line as it was.
+                            if (!saved_Before && HasSavedStrategies(uIAnalyticalModel.JSAMObject))
+                            {
+                                partOWorkflowOutcome = MixedDesignSavedOutcome();
+                            }
+                        }
+                        break;
+
                     default:
                         return;
                 }
             }
+        }
+
+        private static bool HasSavedStrategies(AnalyticalModel? analyticalModel)
+        {
+            return analyticalModel?.GetValue<PartODwellingStrategySet>(Analytical.AnalyticalModelParameter.PartODwellingStrategies)?.IsValid == true;
         }
 
         /// <summary>
