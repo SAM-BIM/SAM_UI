@@ -26,6 +26,13 @@ namespace SAM.Analytical.UI.WPF
         public bool Sizing { get; set; } = true;
         public bool UpdateConstructionLayersByPanelType { get; set; } = true;
 
+        /// <summary>
+        /// Build the TAS3D model directly from the SAM geometry instead of through gbXML (WorkflowSettings.T3DRoute.Direct).
+        /// False - the gbXML route - is the default and what an options file written before this existed means;
+        /// only an explicit stored true selects Direct.
+        /// </summary>
+        public bool DirectT3D { get; set; } = false;
+
         public TextMap TextMap { get; set; } = Analytical.Query.DefaultInternalConditionTextMap_TM59();
 
         public SimulateOptions()
@@ -54,6 +61,7 @@ namespace SAM.Analytical.UI.WPF
                 Sizing = simulateOptions.Sizing;
                 CreatePartL = simulateOptions.CreatePartL;
                 UpdateConstructionLayersByPanelType = simulateOptions.UpdateConstructionLayersByPanelType;
+                DirectT3D = simulateOptions.DirectT3D;
             }
         }
 
@@ -162,6 +170,8 @@ namespace SAM.Analytical.UI.WPF
                 UpdateConstructionLayersByPanelType = jObject["UpdateConstructionLayersByPanelType"]?.GetValue<bool>() ?? default(bool);
             }
 
+            DirectT3D = jObject["DirectT3D"] is JsonValue jsonValue_DirectT3D && jsonValue_DirectT3D.TryGetValue(out bool directT3D) && directT3D;
+
             return true;
         }
 
@@ -228,6 +238,8 @@ namespace SAM.Analytical.UI.WPF
             result.Add("Sizing", Sizing);
 
             result.Add("UpdateConstructionLayersByPanelType", UpdateConstructionLayersByPanelType);
+
+            result.Add("DirectT3D", DirectT3D);
 
             if (TextMap != null)
             {
