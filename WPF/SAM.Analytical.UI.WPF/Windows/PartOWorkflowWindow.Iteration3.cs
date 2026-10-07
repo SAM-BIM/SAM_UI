@@ -109,6 +109,7 @@ namespace SAM.Analytical.UI.WPF
             }
 
             comboBox_SolarCalculationMethod.SelectionChanged += (s, e) => RefreshSimulationCase();
+            checkBox_DirectT3D.Click += (s, e) => RefreshSimulationCase();
             textBox_OutputDirectory.TextChanged += (s, e) => RefreshSimulationCase();
 
             button_OutputDirectory.Click += (s, e) =>
@@ -503,11 +504,16 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
+                SolarCalculationMethod solarCalculationMethod = comboBox_SolarCalculationMethod.SelectedItem is string text ? Core.Query.Enum<SolarCalculationMethod>(text) : SolarCalculationMethod.Undefined;
+
                 return new PartOSimulationCase
                 {
                     WeatherData = selectSAMObjectComboBoxControl_Weather.GetJSAMObject<WeatherData>(),
                     OutputDirectory = textBox_OutputDirectory.Text?.Trim(),
-                    SolarCalculationMethod = comboBox_SolarCalculationMethod.SelectedItem is string text ? Core.Query.Enum<SolarCalculationMethod>(text) : SolarCalculationMethod.Undefined,
+                    SolarCalculationMethod = solarCalculationMethod,
+
+                    //Direct T3D converts the geometry into a T3D, which only the TAS solar calculation does.
+                    DirectT3D = checkBox_DirectT3D.IsChecked == true && solarCalculationMethod == SolarCalculationMethod.TAS,
                 };
             }
 
@@ -534,6 +540,7 @@ namespace SAM.Analytical.UI.WPF
 
                     textBox_OutputDirectory.Text = partOSimulationCase.OutputDirectory ?? string.Empty;
                     comboBox_SolarCalculationMethod.SelectedItem = Core.Query.Description(partOSimulationCase.SolarCalculationMethod == SolarCalculationMethod.Undefined ? SolarCalculationMethod.TAS : partOSimulationCase.SolarCalculationMethod);
+                    checkBox_DirectT3D.IsChecked = partOSimulationCase.DirectT3D;
                 }
                 finally
                 {
@@ -569,6 +576,9 @@ namespace SAM.Analytical.UI.WPF
 
             PartOSimulationCase partOSimulationCase = SimulationCase;
 
+            //Offered only where it has meaning: the TAS solar calculation is the one that converts through a T3D.
+            checkBox_DirectT3D.IsEnabled = partOSimulationCase.SolarCalculationMethod == SolarCalculationMethod.TAS;
+
             string refusal = partOSimulationCase.Refusal();
 
             if (!simulationCase_Stated)
@@ -584,7 +594,7 @@ namespace SAM.Analytical.UI.WPF
 
             run_SimulationCaseSummary.Text = refusal is not null
                 ? string.Format(" — {0}", refusal)
-                : string.Format(" — {0} · {1} solar", weather, Core.Query.Description(partOSimulationCase.SolarCalculationMethod));
+                : string.Format(" — {0} · {1} solar{2}", weather, Core.Query.Description(partOSimulationCase.SolarCalculationMethod), partOSimulationCase.DirectT3D ? " · Direct T3D" : string.Empty);
 
             textBlock_SimulationCaseHeader.ToolTip = refusal ?? string.Format(
                 "Weather: {0}\nSolar calculation: {1}\nOutput folder: {2}\nFull year, days 1 to 365.",

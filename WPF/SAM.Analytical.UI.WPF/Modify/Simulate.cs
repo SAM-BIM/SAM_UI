@@ -221,6 +221,7 @@ namespace SAM.Analytical.UI.WPF
             simulateOptions.WeatherData = new WeatherData(partOSimulationCase.WeatherData);
             simulateOptions.OutputDirectory = partOSimulationCase.OutputDirectory;
             simulateOptions.SolarCalculationMethod = partOSimulationCase.SolarCalculationMethod;
+            simulateOptions.DirectT3D = partOSimulationCase.DirectT3D;
 
             //Remembered under the Part O key, exactly as the dialog's OK remembered it.
             ActiveSetting.Setting.SetValue(AnalyticalSettingParameter.SimulateOptions_PartO, simulateOptions);
@@ -245,6 +246,7 @@ namespace SAM.Analytical.UI.WPF
                 Sizing = simulateOptions.Sizing,
                 UseWidths = simulateOptions.UseWidths,
                 SolarCalculationMethod = simulateOptions.SolarCalculationMethod,
+                DirectT3D = simulateOptions.DirectT3D,
                 UpdateConstructionLayersByPanelType = simulateOptions.UpdateConstructionLayersByPanelType,
                 TextMap = null,
                 WeatherData = simulateOptions.WeatherData,
@@ -329,6 +331,7 @@ namespace SAM.Analytical.UI.WPF
                         {
                             WeatherData = simulateInputs.WeatherData,
                             SolarCalculationMethod = simulateInputs.SolarCalculationMethod,
+                            DirectT3D = simulateInputs.DirectT3D,
                         }));
                     if (refusal_Directories is not null)
                     {
@@ -427,8 +430,7 @@ namespace SAM.Analytical.UI.WPF
                 UseWidths = useWidths,
                 UpdateConstructionLayersByPanelType = updateConstructionLayersByPanelType,
 
-                // The ordinary Energy Simulation command only: a Part O run stays on the gbXML route.
-                DirectT3D = simulateInputs.DirectT3D && partORun is null,
+                DirectT3D = simulateInputs.DirectT3D,
             };
 
             DateTime dateTime = DateTime.Now;

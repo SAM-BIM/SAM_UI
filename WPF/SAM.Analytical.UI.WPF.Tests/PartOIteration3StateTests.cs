@@ -147,13 +147,14 @@ namespace SAM.Analytical.UI.WPF.Tests
             partOSimulationContext.Sizing = false;
             partOSimulationContext.UseWidths = true;
             partOSimulationContext.UpdateConstructionLayersByPanelType = false;
+            partOSimulationContext.DirectT3D = true;
 
             PartOSimulationContext result = partOSimulationContext.Copy("Flat-It3B");
 
             HashSet<string> moved = ["ProjectName"];
 
             //Derived from the properties above, so it follows them rather than being carried.
-            HashSet<string> derived = ["IsFullYear"];
+            HashSet<string> derived = ["IsFullYear", "UsesDirectT3D"];
 
             int count = 0;
 
