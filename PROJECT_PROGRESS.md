@@ -87,6 +87,16 @@ authoring machine) and must be transferred separately.
 - **Unresolved issues, risks:** None introduced.
 - **Next step:** Review/merge of the deferred icon PR (SAM_UI#203) is the maintainer's call; untouched.
 
+## Late-Q3 documentation evidence - supplementary note (2026-10-06 deliverables)
+
+Supplements "Late-Q3 local entries" above; adds only the verification evidence that was in the uncommitted Q3 `PROJECT_PROGRESS.md`. All artifacts are outside Git on the authoring machine and must be transferred separately.
+
+- **External root:** `C:\TasOut\parto-documentation\`. Authoring/QA files per deliverable are under `source\` (ReportLab builders, source report snapshots, SHA-256 source manifest, computed data) and `assets\` (illustrations).
+- **Standalone Part O guide:** `SAM_UI-Part-O-Standalone-Guide.pdf`; 20 pages, 585,487 bytes; 20 bookmarks, 6 external source links; QA summary and final PDF SHA-256 in `source\VALIDATION.txt`. Basis: tracked `documentation/user-guides/Part-O-Prepare-and-Run.md` at `f6fab16`, the published wiki and the CIBSE/GOV.UK publication pages. Recomputed from the saved `SAM_daily\2026-09-29 partOi` reports: 8,760 h per unit; peak 38.1 C at zero-based hour 4935. Later acceptance evidence used: `C:\TasOut\parto-nuaire-acceptance-2026-10-05-selected` (explicit cooling-room provenance, UNAVAILABLE hourly states). SAM example reports use TM59:2017; CIBSE's 2026 publication information states TM59:2017 remains required for Part O compliance.
+- **Part O training manual rev 2:** `SAM_UI-Part-O-Training-Manual-v2.pdf` (v1 retained); 20 pages, 20 bookmarks, 5 external reference links, 585,548 bytes; final hash in `source\VALIDATION-v2.txt`. Built by `source\revise_v2.py`, which generates `source\build_guide_v2.py` from the preserved v1 builder; separate v2 computed-data, manifest and README files accompany it. Original and v2 numerical datasets compared equal.
+- **User Libraries and Builder training manual:** `SAM_UI-User-Libraries-and-Builder-Training-Manual.pdf`; 22 A4 pages, 22 bookmarks, 2 unique source links, 449,733 bytes; SHA-256 `df0d8dfca829e06efa1d45f963706bc7aa60d429b9b5497df6ec16d91e4ff891`. Authoring: `user-libraries\source\build_manual.py`, guide snapshot, interface-capture harness, calculation JSON, `VALIDATION.txt`; illustrations under `assets`. Basis: `documentation/user-guides/SAM-User-Libraries-and-Builder-User-Guide.md` and the published wiki. Independently verified illustrative Uw = 1.200362557679631 W/(m2 K) (assumed data, not certified performance). Rebuild with the bundled Python runtime and ReportLab, then repeat PDF QA.
+- **Next step:** before switching machine, transfer the external documentation folder; for future edits regenerate from the builders above and repeat visual QA.
+
 ---
 
 # Historical record - 2026-Q3 (frozen)
