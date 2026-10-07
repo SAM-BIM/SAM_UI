@@ -190,7 +190,16 @@ namespace SAM.Analytical.UI.WPF
                 switch (partOWorkflowWindow.Action)
                 {
                     case PartOWorkflowAction.PrepareAndRun:
-                        partOWorkflowOutcome = PrepareAndRun(uIAnalyticalModel, partORun, partOWorkflowWindow.Request, partOWorkflowWindow.Inspection, ventilationUnitCatalogue, partOSimulationCase, partOWorkflowWindow.Scenario, owner);
+                        {
+                            partOWorkflowOutcome = PrepareAndRun(uIAnalyticalModel, partORun, partOWorkflowWindow.Request, partOWorkflowWindow.Inspection, ventilationUnitCatalogue, partOSimulationCase, partOWorkflowWindow.Scenario, owner, open, out bool previousResultOpened);
+
+                            //The person asked for the result already saved for this design. It replaced the open model (the
+                            //File > Open path), so there is nothing left for the Hub to reopen over.
+                            if (previousResultOpened)
+                            {
+                                return;
+                            }
+                        }
                         break;
 
                     case PartOWorkflowAction.ReviewResults:
@@ -289,12 +298,11 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         private static PartOExistingResultsDecision DecideExistingResults(PartORun partORun, bool reuse, PartOSimulationCase? partOSimulationCase, PartOWorkflowScenario? partOWorkflowScenario, string name, IWin32Window? owner)
         {
-            if (partOSimulationCase is null || partOSimulationCase.WeatherData is null || string.IsNullOrWhiteSpace(partOSimulationCase.OutputDirectory) || PartOOutputPaths.CaseOfScenario(partOWorkflowScenario) is not PartOOutputCase partOOutputCase)
+            PartOOutputPaths? partOOutputPaths = OutputPathsOf(partOSimulationCase, partOWorkflowScenario);
+            if (partOOutputPaths is null)
             {
                 return PartOExistingResultsDecision.None;
             }
-
-            PartOOutputPaths? partOOutputPaths = PartOOutputPaths.Create(partOSimulationCase.OutputDirectory, partOOutputCase);
 
             //The key Simulate claims with: the TAS case, which the output folder is not part of.
             string? caseKey = Query.PartOSimulationCaseKey(new PartOSimulationCase
@@ -305,6 +313,20 @@ namespace SAM.Analytical.UI.WPF
             });
 
             return ResolveExistingPartOResults(partOOutputPaths, reuse ? partORun.Guid_OutputRun : Guid.Empty, caseKey, x => ConfirmReplacePartOResults(name, x, true, owner));
+        }
+
+        /// <summary>
+        /// The case folder a Prepare &amp; Run of this scenario would write into, or null where the case, the folder or the weather
+        /// cannot be said (the run itself refuses those, as it always did).
+        /// </summary>
+        private static PartOOutputPaths? OutputPathsOf(PartOSimulationCase? partOSimulationCase, PartOWorkflowScenario? partOWorkflowScenario)
+        {
+            if (partOSimulationCase is null || partOSimulationCase.WeatherData is null || string.IsNullOrWhiteSpace(partOSimulationCase.OutputDirectory) || PartOOutputPaths.CaseOfScenario(partOWorkflowScenario) is not PartOOutputCase partOOutputCase)
+            {
+                return null;
+            }
+
+            return PartOOutputPaths.Create(partOSimulationCase.OutputDirectory, partOOutputCase);
         }
 
         private static bool HasSavedStrategies(AnalyticalModel? analyticalModel)
@@ -343,10 +365,19 @@ namespace SAM.Analytical.UI.WPF
         /// </para>
         /// </summary>
         /// <returns>The line the Hub shows about what happened (see PartOHubOutcome), or null where nothing was started.</returns>
-        private static PartOWorkflowOutcome? PrepareAndRun(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, PartOWorkflowInspection? partOWorkflowInspection, VentilationUnitCatalogue ventilationUnitCatalogue, PartOSimulationCase? partOSimulationCase, PartOWorkflowScenario? partOWorkflowScenario, IWin32Window? owner)
+        private static PartOWorkflowOutcome? PrepareAndRun(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOWorkflowRequest partOWorkflowRequest, PartOWorkflowInspection? partOWorkflowInspection, VentilationUnitCatalogue ventilationUnitCatalogue, PartOSimulationCase? partOSimulationCase, PartOWorkflowScenario? partOWorkflowScenario, IWin32Window? owner, Func<string, bool>? open, out bool previousResultOpened)
         {
+            previousResultOpened = false;
+
             string iteration = partOWorkflowScenario?.ToString() ?? "Part O iteration";
             string name = partOWorkflowScenario?.Name ?? iteration;
+
+            //This design already has a saved result in the folder: open it, or run again (which then meets the replacement
+            //question below). Nothing is changed, deleted or run by asking.
+            if (!HandlePreviousPartOResult(OutputPathsOf(partOSimulationCase, partOWorkflowScenario), uIAnalyticalModel.JSAMObject, iteration, open, x => ConfirmOpenPreviousPartOResult(name, x, owner), out previousResultOpened, out PartOWorkflowOutcome? partOWorkflowOutcome_Previous))
+            {
+                return partOWorkflowOutcome_Previous;
+            }
 
             bool reuse = ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, partOWorkflowInspection?.ReusePreparation ?? false);
 
