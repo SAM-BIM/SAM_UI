@@ -3,6 +3,7 @@
 
 extern alias SAMMath;
 
+using SAM.Analytical.Tas.GenOpt;
 using SAMMath::SAM.Math;
 using System.Collections.Generic;
 using System.Globalization;
@@ -64,7 +65,7 @@ namespace SAM.Analytical.UI.WPF
             OptimisationTraceEntry entry = optimisationProgress.Entry;
             Last = entry;
 
-            if (!double.IsNaN(entry.Objective) && (Lowest == null || entry.Objective < Lowest.Objective))
+            if (NativeGenOptOutcome.IsLower(entry, Lowest))
             {
                 Lowest = entry;
             }

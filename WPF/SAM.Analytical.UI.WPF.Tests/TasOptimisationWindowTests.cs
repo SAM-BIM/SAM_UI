@@ -521,6 +521,21 @@ namespace SAM.Analytical.UI.WPF.Tests
             ];
 
             Assert.Empty(members.Intersect(forbidden));
+
+            // PR6: success, withholding, the best point, the running lowest and the refusal wording are SAM_Tas' rules.
+            Assert.Contains("SAM.Analytical.Tas.GenOpt.NativeGenOptOutcome::.ctor", members);
+            Assert.Contains("SAM.Analytical.Tas.GenOpt.NativeGenOptOutcome::IsLower", members);
+            Assert.Contains("SAM.Analytical.Tas.GenOpt.NativeGenOptOutcome::RefusalMessage", members);
+        }
+
+        [Fact]
+        public void A_SAM_Analytical_Tas_GenOpt_without_the_shared_result_rules_is_reported_as_a_load_failure()
+        {
+            // The probe reaches NativeGenOptOutcome, so a pre-PR6 assembly fails it like a stale SAM.Math does.
+            Assert.Null(Query.TasOptimisationAssemblyFailure());
+            TypeLoadException stale = new TypeLoadException("Could not load type 'SAM.Analytical.Tas.GenOpt.NativeGenOptOutcome'.");
+            Assert.True(Query.IsTasOptimisationLoadFailure(stale));
+            Assert.StartsWith("Simulate > Optimisation could not load its assemblies.", TasOptimisationReport.Message(stale));
         }
     }
 }

@@ -42,7 +42,7 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// Validates the definition exactly as <see cref="GenOptDocument.RunNative"/> does before it creates a folder or
         /// starts a process, by calling the same SAM_Tas conversions. It throws what they throw:
-        /// <see cref="GenOptCompatibilityException"/> for an invalid or Java-incompatible setting and
+        /// <see cref="GenOptCompatibilityException"/> for an invalid setting, or one GenOpt itself would not accept, and
         /// <see cref="NotSupportedException"/> for an algorithm the native optimiser does not run. Nothing is created.
         /// </summary>
         public void Validate()

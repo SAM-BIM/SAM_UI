@@ -17,7 +17,7 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// <summary>
     /// <see cref="TasOptimisationReport"/> and <see cref="TasOptimisationProgressState"/> over REAL SAM.Math kernel
     /// results: the kernel runs here with a delegate evaluator, so every outcome is the kernel's own, not a stand-in.
-    /// The rules are those of the SAM_Tas Grasshopper component (SAM_Tas_Grasshopper#11).
+    /// The rules are SAM_Tas' NativeGenOptOutcome (PR6), shared with the SAM_Tas Grasshopper component.
     /// </summary>
     public class TasOptimisationReportTests
     {
@@ -96,7 +96,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             TasOptimisationReport report = new TasOptimisationReport(result, parameterNames, objectiveNames, null, false);
 
-            Assert.Same(result.Minimum, TasOptimisationReport.Best(result));
+            Assert.Same(result.Minimum, NativeGenOptOutcome.Best(result));
             Assert.Equal(result.Minimum.Coordinates, report.BestPoint);
             Assert.Null(report.Interval);
         }
@@ -207,7 +207,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Null(result.Minimum);
             Assert.True(result.Entries.Count > 1);
 
-            Assert.Same(result.Entries[0], TasOptimisationReport.Best(result));
+            Assert.Same(result.Entries[0], NativeGenOptOutcome.Best(result));
+            Assert.Equal(result.Entries[0].Coordinates, new TasOptimisationReport(result, parameterNames, objectiveNames, null, false).BestPoint);
         }
 
         [Fact]
@@ -215,7 +216,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             OptimisationResult result = Run(new GoldenSectionAlgorithm(), Quadratic, evaluate: request => ObjectiveEvaluation.Success(request.Simulation == 1 ? double.NaN : Quadratic(request.Coordinates[0]), 0));
 
-            OptimisationTraceEntry best = TasOptimisationReport.Best(result);
+            OptimisationTraceEntry best = NativeGenOptOutcome.Best(result);
             Assert.NotNull(best);
             Assert.False(double.IsNaN(best.Objective));
             Assert.Equal(result.Entries.Where(x => !double.IsNaN(x.Objective)).Min(x => x.Objective), best.Objective);

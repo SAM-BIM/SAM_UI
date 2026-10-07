@@ -99,6 +99,8 @@ namespace SAM.Analytical.UI.WPF
             GC.KeepAlive(new SAMMath::SAM.Math.GoldenSection());
             GC.KeepAlive(global::SAM.Analytical.Tas.GenOpt.Convert.NativeAlgorithmTypes);
             GC.KeepAlive(typeof(global::SAM.Analytical.Tas.GenOpt.NativeGenOptRun));
+            // PR6: a SAM.Analytical.Tas.GenOpt.dll from before the shared result rules is stale too.
+            GC.KeepAlive(typeof(global::SAM.Analytical.Tas.GenOpt.NativeGenOptOutcome));
             GC.KeepAlive(typeof(SAMMath::SAM.Math.OptimisationProgress));
         }
 

@@ -20,7 +20,7 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public sealed class TasOptimisationInput
     {
-        /// <summary>The algorithms the native optimiser runs (SAM_Tas <c>Convert.ToSAM_Optimiser</c>; GPSCoordinateSearch is refused there, D3).</summary>
+        /// <summary>The algorithms the native optimiser runs (SAM_Tas <c>Convert.ToSAM_Optimiser</c>; GPSCoordinateSearch is refused there as unsupported, D3).</summary>
         public static readonly IReadOnlyList<AlgorithmType> AlgorithmTypes = Array.AsReadOnly(new[] { AlgorithmType.GoldenSection, AlgorithmType.GPSHookeJeeves });
 
         /// <summary>The window opens on this example's form values.</summary>
