@@ -198,7 +198,11 @@ namespace SAM.Analytical.UI.WPF
         /// <see cref="SimulatePartO(UIAnalyticalModel, PartORun, PartOSimulationCase)"/> with the TAS workflow step
         /// supplied - the one seam <see cref="RunPartOSimulation"/> already has, for a test. Null is TAS.
         /// </summary>
-        internal static PartOSimulationOutcome SimulatePartO(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOSimulationCase partOSimulationCase, PartOWorkflowRunner partOWorkflowRunner)
+        /// <param name="replaceExistingResults">
+        /// The person confirmed replacing another run's results in this case's folder. They are removed here - just before
+        /// TAS starts, and only now, so a review cancelled after confirming leaves every file in place.
+        /// </param>
+        internal static PartOSimulationOutcome SimulatePartO(UIAnalyticalModel uIAnalyticalModel, PartORun partORun, PartOSimulationCase partOSimulationCase, PartOWorkflowRunner partOWorkflowRunner, bool replaceExistingResults = false)
         {
             AnalyticalModel analyticalModel = partORun?.State == PartORunState.Prepared ? partORun.AnalyticalModel_Prepared : null;
 
@@ -253,6 +257,7 @@ namespace SAM.Analytical.UI.WPF
                 ZoneCategory = null,
                 Simulate = simulateOptions.Simulate,
                 PartOOutputCase = PartOOutputPaths.CaseOf(partORun.PreparationContext),
+                ReplaceExistingResults = replaceExistingResults,
             };
 
             return Simulate(uIAnalyticalModel, partORun, analyticalModel, simulateInputs, true, partOWorkflowRunner);
@@ -281,6 +286,9 @@ namespace SAM.Analytical.UI.WPF
             public WeatherData WeatherData;
             public string ZoneCategory;
             public bool Simulate;
+
+            /// <summary>Another run's results in the case folder are to be replaced (confirmed by the person); see <see cref="SimulatePartO"/>.</summary>
+            public bool ReplaceExistingResults;
 
             /// <summary>
             /// The Part O case this run is, where it is the guided Part O route - and then
@@ -325,14 +333,26 @@ namespace SAM.Analytical.UI.WPF
                 PartOOutputPaths partOOutputPaths = PartOOutputPaths.Create(outputDirectory, partOOutputCase);
                 if (partOOutputPaths is not null)
                 {
-                    string refusal_Directories = partORun is null
-                        ? partOOutputPaths.TryCreateDirectories()
-                        : partOOutputPaths.TryClaimRun(partORun.Guid_OutputRun, caseKey: Query.PartOSimulationCaseKey(new PartOSimulationCase
+                    string refusal_Directories;
+                    if (partORun is null)
+                    {
+                        refusal_Directories = partOOutputPaths.TryCreateDirectories();
+                    }
+                    else
+                    {
+                        string caseKey = Query.PartOSimulationCaseKey(new PartOSimulationCase
                         {
                             WeatherData = simulateInputs.WeatherData,
                             SolarCalculationMethod = simulateInputs.SolarCalculationMethod,
                             DirectT3D = simulateInputs.DirectT3D,
-                        }));
+                        });
+
+                        //A replacement the person confirmed: the case's generated files go now, then the folder is claimed
+                        //for this run. Otherwise the claim refuses another run's evidence, as it always did.
+                        refusal_Directories = simulateInputs.ReplaceExistingResults
+                            ? partOOutputPaths.TryReplaceGenerated(out int _) ?? partOOutputPaths.TryClaimRun(partORun.Guid_OutputRun, replaceExisting: true, caseKey: caseKey)
+                            : partOOutputPaths.TryClaimRun(partORun.Guid_OutputRun, caseKey: caseKey);
+                    }
                     if (refusal_Directories is not null)
                     {
                         partOSimulationOutcome.Ran = true;

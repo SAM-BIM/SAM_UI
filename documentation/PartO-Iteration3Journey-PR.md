@@ -62,6 +62,25 @@ default Iteration 3 method could not run and the Hub did not say what to do abou
      as it replaces the model) or **Choose cooling control rooms (Mixed Design)...**. The automatic-selection notice points to
      the checklist instead of repeating it.
 
+6. **Acceptance blocker: Prepare & Run refused a folder with an earlier session's results and left only another folder.**
+   Every new session is a new run, and the output-folder guard (SAM_UI#194) refuses a case folder owned by another run - and it
+   did so after the Review window, with a bare message. Now:
+   - **Asked first.** When Prepare & Run is pressed, the case folder is derived from the scenario (`PartOOutputPaths.CaseOfScenario`)
+     and read without changing anything (`PartOOutputPaths.Occupancy`). If another run's results are there, a window
+     (`PartOReplaceResultsWindow`) names the case and the folder, says how many generated files it holds and when they were last
+     written, and offers **Replace existing results** or **Cancel** (Cancel is the default and Escape).
+   - **Nothing is deleted until TAS is about to start.** Confirming only carries the decision; the files are removed in
+     `Modify.Simulate` at the point where the folder is claimed. Cancelling the window, or cancelling the Review after confirming,
+     leaves every file as it was.
+   - **What is removed, and what is not.** `PartOOutputPaths.TryReplaceGenerated` removes the case's `tas`, `reports` and
+     `diagnostics` folders and its `PartOCase.json` marker - nothing else: any other file in the case folder, every other case's
+     folder (e.g. Iteration 3) and everything outside the output folder stay. A file in use refuses with "could not be removed, so
+     nothing was run". The design model is never written.
+   - **Same folder, no new folder.** The new run claims the same case folder.
+   - **Iteration 3 is consistent.** It uses the same window with its own meaning (replacing keeps the folder - it holds every
+     method's record - and overwrites only what the new run writes; this behaviour is unchanged). The older "A completed result
+     already exists - run it again?" box is not asked a second time after the Replace window was just confirmed.
+
 ## Decisions and assumptions
 
 - **Not built: a default cooling control room chosen by the Hub.** The room is an engineering choice that changes
@@ -83,13 +102,19 @@ default Iteration 3 method could not run and the Hub did not say what to do abou
 `Query/PartOIteration3GuidanceResolution.cs` (the refusal text is now a shared constant, unchanged),
 `Windows/PartOWorkflowWindow.xaml`, `Windows/PartOWorkflowWindow.Iteration3.cs`, `Modify/RunPartOWorkflow.cs`,
 `Modify/PartOHubOutcome.cs`; tests `PartOIteration3JourneyTests.cs` (new), `PartOIteration3RoomBindingTests.cs`
-(fixture builder made `internal`).
+(fixture builder made `internal`), `PartOHubOutcomeTests.cs` (the pinned notes wording).
+Replace-existing-results blocker: `SAM_UI/SAM.Analytical.UI/Classes/PartO/PartOOutputOccupancy.cs` (new) and `PartOOutputPaths.cs`
+(`Occupancy`, `TryReplaceGenerated`, `CaseOfScenario`; `TryClaimRun` now asks `Occupancy`, same rule); `WPF/.../Windows/PartOReplaceResultsWindow.xaml(.cs)`
+(new), `Modify/ConfirmReplacePartOResults.cs` (new), `Modify/RunPartOWorkflow.cs`, `Modify/Simulate.cs`, `Modify/PartOIteration3.cs`;
+tests `PartOReplaceExistingResultsTests.cs` (new) and one test in `PartODesignModelProtectionTests.cs`.
 
 ## Validation
 
-- Release build 0 errors. Full `SAM.Analytical.UI.WPF.Tests`: 2515 tests; 2514 pass in the full run and the one failure
-  (`PartOWorkflowSimplificationTests.The_progress_window_keeps_its_content_after_standing_aside_for_a_dialog`) passes 3/3 on its
-  own - a load-dependent flake, unrelated. (2501 before; +14.) `git diff --check` clean.
+- Release build 0 errors. Full `SAM.Analytical.UI.WPF.Tests`: **2531/2531** pass (2501 before; +30). New: `PartOReplaceExistingResultsTests`
+  (no results / marker only / same run - nothing asked; another run - confirm and cancel, cancel changes nothing, confirming alone
+  deletes nothing; what a replacement removes and keeps; the claim afterwards; a locked file; the scenario names its folder; the
+  window's words) and an end-to-end test through the production simulation core in a second session
+  (`A_new_session_is_refused_the_folder_of_an_earlier_run_unless_the_replacement_was_confirmed`). `git diff --check` clean.
   The first run of the suite failed 3 room-binding tests, which is what led to limiting the automatic choice to
   missing steps: an invalid saved room must keep Run off for the method that is wrong.
 - Licensed real-app walk (UI Automation, Direct T3D on, `C:\TasOut\direct-parto\it3\p3`): cleaned copy of the model ->
@@ -102,6 +127,50 @@ default Iteration 3 method could not run and the Hub did not say what to do abou
 - Second real-app run on the owner's own model (`Direct-partO-dwellings1.json`, which carries results; Direct T3D on): Iteration 2
   ran straight through to TM59 with no message box; the Hub showed the checklist with **Remove Results...** on step 1 and the
   Route check selected; **Run Iteration 3** ran the Route check (heading "Route check", completed) instead of refusing.
+
+- Third real-app run (Direct T3D on, one output folder `C:\TasOut\direct-parto\it3\p5`, the owner's model, UI Automation): a fresh folder ran with
+  no question; a **new session** into the same folder showed the Replace window **before the Review**; **Cancel** left the folder
+  byte-identical; **Replace then Cancel at the Review** also left it identical; **Replace then Accept** completed Iteration 2 in the
+  same folder (stale file gone, a non-SAM `my-notes.txt` kept, design file hash unchanged, `.t3d` present, no `.xml`, no numbered
+  folder). Iteration 3 (Route check) in another new session showed the same window with its own wording and, after Replace,
+  completed with no further message box (the autopilot logs any box). The output folder held only `Iteration2` and `Iteration3`.
+
+## Investigation: reopening the saved result model (no feature built)
+
+**Does opening `<output>\Iteration2\tas\<name>.sam` restore the completed run? Yes**, verified in the real app. The Hub says
+"Saved Iteration 2 results reopened - ready to review"; Review Results is enabled and reproduces the TM59 verdict (FAIL, 3 pass / 2 fail /
+1 not assessed) with no simulation (only a TSD document server starts, to read the results); Iteration 3 is enabled, names the reference
+"Iteration 2 ... reopened from the saved run, so it does not need to be run again" and lists the Route check result saved earlier
+("Result available ... reference FAIL / system FAIL"). **Not restored or limited:** Prepare & Run is disabled ("This is a Part O result.
+Part O cases run from a design model ... derived from the design model 'model1.json', which has changed since"); Optimise (2B) says "Needs a
+live run"; the Scenario box shows Iteration 1a although the reference is Iteration 2; the Hub's Simulation case header shows no Direct T3D
+(the case is re-created, not restored) although the restored run was Direct.
+
+**What exists that could match a saved run to its design and case:**
+- the output folder's `PartOCase.json` marker: case folder, the run's Guid, and the TAS case key (weather identity | solar method | `T3D=Direct`);
+- the `<name>.partorun.json` sidecar (`PartORunResume:v2`): iteration, whether a catalogue was offered, dwelling-zone and ventilation-system Guids, the
+  TAS case (solar method, days, `DirectT3D`), the TSD's length and timestamp and the prepared model's fingerprint - a resume is refused if either changed;
+- the result `.sam`: `SimulationResultProvenance` (model fingerprint, TSD length and timestamp) and **`PartOBaselineReference`**, which records the
+  design the result came from - its model Guid, name, relative path and a fingerprint (FNV-1a over the cluster, material and profile libraries,
+  location and the model's parameter sets, less provenance, scenarios and view settings);
+- `Analytical.Query.PartOModelResolution` already finds the design by that relative path and judges Resolved / Changed / Unknown by recomputing the fingerprint.
+
+**How SAM can tell the design changed - and why today's check cannot be used as it is.** The mechanism exists (the fingerprint above), but it
+reports "changed" for a design that was not touched: for the owner's unmodified file the recorded fingerprint (`675bd9cf...`) and the file's
+current one (`15fc1cc5...`) differ. The cause, found with a probe over the saved result and the file: the Hub writes a Part O Equipment Selection onto
+the open design with **new Guids every session** (selection `38cb489f...` in the file vs `4d42acc8...` in the result, and every product reference),
+and that parameter is part of the fingerprint. So the same design gives a different fingerprint each time it is run, and any "previous run
+still current?" test built on it would always answer "stale".
+
+**Proposed smallest UX (not implemented):** when Prepare & Run is pressed and the case folder holds a run of the same case, ask once, before the
+Replace window: **"Previous compatible run found (Iteration 2, 7 Oct 16:46) - [Reopen previous run] / [Run again]"**. Reopen restores the
+run exactly as File > Open of the saved `.sam` does (nothing is simulated); Run again goes on to the Replace window above. "Compatible" must mean all of:
+(1) same case folder and scenario; (2) the marker's TAS case key equals the Hub's current one (weather, solar method, Direct T3D); (3) the sidecar is valid
+(TSD length and timestamp unchanged, prepared-model fingerprint unchanged); (4) the design is unchanged by a **stable** design key. Rule 4 needs one
+decision before any build: compute the design key without the per-session Guids - exclude `Part O Equipment Selection` (and the other Part O inputs
+written by the Hub) from the design fingerprint and compare their meaning (mode, product Model/Reference, project test unit values, dwelling strategies)
+separately - and record the new key in `PartOBaselineReference` (a SAM change, so a separate PR; old results without it are simply "not matched").
+Until rule 4 is settled the Hub should say nothing rather than offer a match it cannot defend.
 
 ## Unresolved issues, risks
 

@@ -282,6 +282,31 @@ namespace SAM.Analytical.UI.WPF
                 : result;
         }
 
+        /// <summary>
+        /// Whether the case folder Prepare &amp; Run is about to write into holds another run's results, and - if so - what the
+        /// person decided (<see cref="ResolveExistingPartOResults"/>). Quiet where the case, the folder or the weather
+        /// cannot be said: the run itself refuses those, as it always did.
+        /// </summary>
+        private static PartOExistingResultsDecision DecideExistingResults(PartORun partORun, bool reuse, PartOSimulationCase? partOSimulationCase, PartOWorkflowScenario? partOWorkflowScenario, string name, IWin32Window? owner)
+        {
+            if (partOSimulationCase is null || partOSimulationCase.WeatherData is null || string.IsNullOrWhiteSpace(partOSimulationCase.OutputDirectory) || PartOOutputPaths.CaseOfScenario(partOWorkflowScenario) is not PartOOutputCase partOOutputCase)
+            {
+                return PartOExistingResultsDecision.None;
+            }
+
+            PartOOutputPaths? partOOutputPaths = PartOOutputPaths.Create(partOSimulationCase.OutputDirectory, partOOutputCase);
+
+            //The key Simulate claims with: the TAS case, which the output folder is not part of.
+            string? caseKey = Query.PartOSimulationCaseKey(new PartOSimulationCase
+            {
+                WeatherData = partOSimulationCase.WeatherData,
+                SolarCalculationMethod = partOSimulationCase.SolarCalculationMethod,
+                DirectT3D = partOSimulationCase.DirectT3D,
+            });
+
+            return ResolveExistingPartOResults(partOOutputPaths, reuse ? partORun.Guid_OutputRun : Guid.Empty, caseKey, x => ConfirmReplacePartOResults(name, x, true, owner));
+        }
+
         private static bool HasSavedStrategies(AnalyticalModel? analyticalModel)
         {
             return analyticalModel?.GetValue<PartODwellingStrategySet>(Analytical.AnalyticalModelParameter.PartODwellingStrategies)?.IsValid == true;
@@ -324,6 +349,20 @@ namespace SAM.Analytical.UI.WPF
             string name = partOWorkflowScenario?.Name ?? iteration;
 
             bool reuse = ReuseWithCurrentOptimisation(partORun, partOWorkflowRequest, partOWorkflowInspection?.ReusePreparation ?? false);
+
+            //The case folder this run will write into already holds another run's results: ask NOW, before anything is
+            //reviewed, rather than refuse after the review and leave only another folder. Nothing is deleted here - a
+            //confirmed replacement is carried to the point where TAS is about to start (Simulate), so cancelling the
+            //review after confirming leaves every file where it was.
+            bool replaceExisting = false;
+
+            PartOExistingResultsDecision partOExistingResultsDecision = DecideExistingResults(partORun, reuse, partOSimulationCase, partOWorkflowScenario, name, owner);
+            if (partOExistingResultsDecision == PartOExistingResultsDecision.Cancel)
+            {
+                return ReplaceDeclinedOutcome(iteration);
+            }
+
+            replaceExisting = partOExistingResultsDecision == PartOExistingResultsDecision.Replace;
 
             PartOSimulationOutcome partOSimulationOutcome;
             PartOTM59ResultSummary? partOTM59ResultSummary = null;
@@ -378,7 +417,7 @@ namespace SAM.Analytical.UI.WPF
                 //The SAM Check gate, the TAS workflow, the run completion and the run's own persisted evidence -
                 //all of it the same core the Simulate dialog used, with the three inputs it left open taken
                 //from the Hub's Simulation case. See Modify.SimulatePartO.
-                partOSimulationOutcome = SimulatePartO(uIAnalyticalModel, partORun, partOSimulationCase);
+                partOSimulationOutcome = SimulatePartO(uIAnalyticalModel, partORun, partOSimulationCase, null, replaceExisting);
 
                 elapsed_Simulation = partOProgressHost.State.Duration(1);
 
