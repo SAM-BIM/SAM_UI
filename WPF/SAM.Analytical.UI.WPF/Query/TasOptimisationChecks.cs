@@ -74,12 +74,30 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>The Tas files TasGenExecute would receive from <paramref name="directory"/>: its top-level files of SAM_Tas' Tas types.</summary>
         public static List<string> TasOptimisationTasFiles(string directory)
         {
+            return TasOptimisationTasFiles(directory, out _);
+        }
+
+        /// <summary>
+        /// As <see cref="TasOptimisationTasFiles(string)"/>; <paramref name="error"/> says why a folder that exists could
+        /// not be listed (no list permission, a disconnected share, an I/O error), in which case the list is empty.
+        /// </summary>
+        public static List<string> TasOptimisationTasFiles(string directory, out string? error)
+        {
+            error = null;
             if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
             {
                 return new List<string>();
             }
 
-            return Directory.GetFiles(directory, "*", SearchOption.TopDirectoryOnly).Where(NativeGenOptWorkspace.IsTasFile).Select(Path.GetFileName).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList()!;
+            try
+            {
+                return Directory.GetFiles(directory, "*", SearchOption.TopDirectoryOnly).Where(NativeGenOptWorkspace.IsTasFile).Select(Path.GetFileName).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList()!;
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                error = exception.Message;
+                return new List<string>();
+            }
         }
 
         /// <summary>Where the run folder will be created: the runs folder if one is given, else SAM_Tas' default.</summary>
@@ -113,7 +131,12 @@ namespace SAM.Analytical.UI.WPF
                 return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder does not exist: '" + directory + "'.");
             }
 
-            List<string> names = TasOptimisationTasFiles(directory);
+            List<string> names = TasOptimisationTasFiles(directory, out string? error);
+            if (error != null)
+            {
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder cannot be read: " + error);
+            }
+
             if (names.Count == 0)
             {
                 return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder holds no Tas file (" + string.Join(", ", NativeGenOptWorkspace.TasFileExtensions) + ") at its top level, so TasGenExecute would receive none.");

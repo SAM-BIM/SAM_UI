@@ -176,6 +176,23 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [WpfFact]
+        public void A_Tas_folder_that_cannot_be_listed_blocks_the_run_instead_of_failing_the_window()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            using (workspace.DenyListing())
+            {
+                //Proposed as the open model's folder (the constructor), then chosen in the form (Refresh).
+                TasOptimisationWindow window = new TasOptimisationWindow(workspace.Directory) { TasGenExecutePath = TasOptimisationWorkspace.StubExecutable };
+                Assert.Equal(string.Empty, window.Input.Directory);
+
+                window.SetInput(workspace.Input());
+
+                Assert.Contains(window.Checks, x => x.Title == "Tas project folder" && x.Status == TasOptimisationCheckStatus.Blocked && x.Detail.StartsWith("The folder cannot be read: "));
+                Assert.False(Control<Button>(window, "button_Run").IsEnabled);
+            }
+        }
+
+        [WpfFact]
         public void The_form_is_remembered_for_the_session_only()
         {
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();

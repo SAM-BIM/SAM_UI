@@ -74,6 +74,29 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [Fact]
+        public void A_folder_that_exists_but_cannot_be_listed_is_blocked_rather_than_thrown()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            using (workspace.DenyListing())
+            {
+                //The situation: the folder is there, but listing it throws.
+                Assert.True(Directory.Exists(workspace.Directory));
+                Assert.Throws<UnauthorizedAccessException>(() => Directory.GetFiles(workspace.Directory));
+
+                Assert.Empty(Query.TasOptimisationTasFiles(workspace.Directory, out string error));
+                Assert.False(string.IsNullOrWhiteSpace(error));
+                Assert.Empty(Query.TasOptimisationTasFiles(workspace.Directory));
+
+                List<TasOptimisationCheck> checks = workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
+                TasOptimisationCheck check = Check(checks, "Tas project folder");
+
+                Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
+                Assert.Equal("The folder cannot be read: " + error, check.Detail);
+                Assert.False(checks.CanRun());
+            }
+        }
+
+        [Fact]
         public void A_missing_or_empty_script_is_blocked()
         {
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();

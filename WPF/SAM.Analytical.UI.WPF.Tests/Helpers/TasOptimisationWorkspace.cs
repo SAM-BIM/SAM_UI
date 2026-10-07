@@ -75,6 +75,46 @@ namespace SAM.Analytical.UI.WPF.Tests
             return System.IO.Directory.GetDirectories(RunsDirectory, name, SearchOption.AllDirectories).FirstOrDefault();
         }
 
+        /// <summary>
+        /// Denies the current user permission to LIST this folder (it still exists and its files can be opened by path),
+        /// as an ACL or a disconnected share can. Restored on dispose.
+        /// </summary>
+        public IDisposable DenyListing()
+        {
+            DirectoryInfo directoryInfo = new DirectoryInfo(Directory);
+            System.Security.AccessControl.FileSystemAccessRule fileSystemAccessRule = new System.Security.AccessControl.FileSystemAccessRule(
+                System.Security.Principal.WindowsIdentity.GetCurrent().User,
+                System.Security.AccessControl.FileSystemRights.ListDirectory,
+                System.Security.AccessControl.AccessControlType.Deny);
+
+            System.Security.AccessControl.DirectorySecurity directorySecurity = directoryInfo.GetAccessControl();
+            directorySecurity.AddAccessRule(fileSystemAccessRule);
+            directoryInfo.SetAccessControl(directorySecurity);
+
+            return new Restore(() =>
+            {
+                System.Security.AccessControl.DirectorySecurity directorySecurity_Restore = directoryInfo.GetAccessControl();
+                directorySecurity_Restore.RemoveAccessRule(fileSystemAccessRule);
+                directoryInfo.SetAccessControl(directorySecurity_Restore);
+            });
+        }
+
+        private sealed class Restore : IDisposable
+        {
+            private Action action;
+
+            public Restore(Action action)
+            {
+                this.action = action;
+            }
+
+            public void Dispose()
+            {
+                action?.Invoke();
+                action = null;
+            }
+        }
+
         public void Dispose()
         {
             try
