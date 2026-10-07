@@ -75,6 +75,9 @@ namespace SAM.Analytical.UI.WPF
     /// <item><description>the file is re-read UNDER the lock, and a file that exists but cannot be read is never overwritten;</description></item>
     /// <item><description>a write is verified (it must read back), goes to a temporary file and is swapped in atomically
     /// (<see cref="File.Replace(string, string, string, bool)"/>), keeping the previous file as <c>.bak</c>; temporary files are always removed;</description></item>
+    /// <item><description>a swap refused because another program briefly holds the file or its <c>.bak</c> (Windows refuses to replace a
+    /// <c>.bak</c> that anything has open; an antivirus or DLP scan of the file the previous save just rotated is enough) is retried a few
+    /// times within half a second (<see cref="ReplaceAttempts"/>); any other failure, or one that outlasts the retries, is reported;</description></item>
     /// <item><description>readers share with a concurrent atomic replace (a brief sharing violation is retried);</description></item>
     /// <item><description>change notifications are raised after the lock is released, each handler isolated (<see cref="Notify"/>).</description></item>
     /// </list>
@@ -112,10 +115,19 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         internal Action<string> BeforeWrite { get; set; }
 
+        /// <summary>
+        /// TESTS ONLY: called with the attempt number (1, 2, ...) just before each attempt to swap the temporary file in, so a test can hold the
+        /// file or its <c>.bak</c> open the way another program does. Never set outside tests.
+        /// </summary>
+        internal Action<int> BeforeReplace { get; set; }
+
+        /// <summary>How many times a swap refused by a transient hold (see <see cref="IsTransientReplaceFailure"/>) is attempted in all.</summary>
+        internal const int ReplaceAttempts = 5;
+
         /// <summary>The same engine on another file that is only ever changed while this file's lock is held (the archive).</summary>
         internal UserLibraryFile Companion(string path, string libraryName, string noun)
         {
-            return new UserLibraryFile(path, libraryName, noun, lockTimeout) { BeforeWrite = BeforeWrite };
+            return new UserLibraryFile(path, libraryName, noun, lockTimeout) { BeforeWrite = BeforeWrite, BeforeReplace = BeforeReplace };
         }
 
         /// <summary>Reads the file as it is on disk now. A missing file is an empty library; an unreadable one says why.</summary>
@@ -218,13 +230,32 @@ namespace SAM.Analytical.UI.WPF
             try
             {
                 File.WriteAllText(path_Temp, json);
-                if (File.Exists(Path))
+                for (int attempt = 1; ; attempt++)
                 {
-                    File.Replace(path_Temp, Path, BackupPath, true);
-                }
-                else
-                {
-                    File.Move(path_Temp, Path);
+                    try
+                    {
+                        BeforeReplace?.Invoke(attempt);
+                        if (File.Exists(Path))
+                        {
+                            File.Replace(path_Temp, Path, BackupPath, true);
+                        }
+                        else
+                        {
+                            File.Move(path_Temp, Path);
+                        }
+
+                        break;
+                    }
+                    catch (IOException exception) when (IsTransientReplaceFailure(exception))
+                    {
+                        if (attempt >= ReplaceAttempts)
+                        {
+                            throw new IOException(string.Format(CultureInfo.CurrentCulture, "{0} (still refused after {1} attempts; another program may be holding {2} or {2}.bak open)", exception.Message, attempt, FileName), exception);
+                        }
+
+                        // 25, 50, 100, 200 ms: under 0.4 s in all. A scan holding the file usually lets go within a few tens of milliseconds.
+                        Thread.Sleep(25 << (attempt - 1));
+                    }
                 }
             }
             finally
@@ -233,6 +264,24 @@ namespace SAM.Analytical.UI.WPF
                 {
                     File.Delete(path_Temp);
                 }
+            }
+        }
+
+        // The swap was refused because something holds the file or its .bak for a moment; the target and the temporary file are then intact, so
+        // trying again is safe. ERROR_UNABLE_TO_MOVE_REPLACEMENT_2 leaves the old file as .bak and no target, which the next attempt's Move restores.
+        // Anything else (access denied, a missing folder, a full disk) is not retried.
+        internal static bool IsTransientReplaceFailure(IOException exception)
+        {
+            switch (exception.HResult)
+            {
+                case unchecked((int)0x80070020): // ERROR_SHARING_VIOLATION
+                case unchecked((int)0x80070021): // ERROR_LOCK_VIOLATION
+                case unchecked((int)0x80070497): // ERROR_UNABLE_TO_REMOVE_REPLACED
+                case unchecked((int)0x80070498): // ERROR_UNABLE_TO_MOVE_REPLACEMENT
+                case unchecked((int)0x80070499): // ERROR_UNABLE_TO_MOVE_REPLACEMENT_2
+                    return true;
+                default:
+                    return false;
             }
         }
 
