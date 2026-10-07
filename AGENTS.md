@@ -44,6 +44,14 @@ code + tests + evidence → final PR CI → merge →
 
 Never change `PROJECT_PROGRESS.md` on a PR branch.
 
+The closeout is written only after the merge SHA is known, so it cannot be
+part of the reviewed PR; putting it in the PR would force another review/CI
+cycle merely for a progress-file update. Direct commits to `sow/2026-Q4`
+are therefore allowed for this one case: the post-merge, docs-only
+`PROJECT_PROGRESS.md` closeout. This exception does not cover code, tests,
+workflows or any other file. All code changes still go through a feature
+branch and a PR.
+
 Do not record trivial actions such as opening files,
 searching the repository, or reading documentation.
 
