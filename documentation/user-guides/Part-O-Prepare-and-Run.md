@@ -69,7 +69,7 @@ Under **Simulation case**, set **Weather**, **Solar calculation** and a fresh **
 
 Leave **Direct T3D** unchecked for the established gbXML route. Check it to build the TAS3D model directly from the SAM geometry; this applies to the TAS solar calculation only, and the collapsed **Simulation case** header states the route in use. The choice is not remembered between separate openings of the command, so check it each time you need it.
 
-> **IMPORTANT:** A fresh output root is the simplest choice for each new run. If you press **Prepare & Run** with a case folder that already holds results from an earlier session, SAM asks first, **before** the Review window: **Part O — Replace existing results** names the case and folder and says how many generated files it holds and when they were last written. **Cancel** (the default) changes nothing. **Replace existing results** removes only that case's `tas`, `reports` and `diagnostics` folders and its `PartOCase.json` marker, and only when TAS is about to start, so cancelling the Review afterwards still leaves every file as it was. Other files in the folder, other iterations' folders and your design model are never touched. If a file is in use, SAM says it could not be removed and runs nothing. A retry of the same run and case may reuse its folder. Keep the result model with its associated output tree.
+> **IMPORTANT:** A fresh output root is the simplest choice for each new run. If you press **Prepare & Run** with a case folder that already holds results from an earlier session, SAM first checks whether the saved result was made from this same design (see **Previous result found** under "Reviewing a completed run later"); if it was not, or cannot be shown to be, SAM asks, **before** the Review window: **Part O — Replace existing results** names the case and folder and says how many generated files it holds and when they were last written. **Cancel** (the default) changes nothing. **Replace existing results** removes only that case's `tas`, `reports` and `diagnostics` folders and its `PartOCase.json` marker, and only when TAS is about to start, so cancelling the Review afterwards still leaves every file as it was. Other files in the folder, other iterations' folders and your design model are never touched. If a file is in use, SAM says it could not be removed and runs nothing. A retry of the same run and case may reuse its folder. Keep the result model with its associated output tree.
 
 # Part 2 — Test and escalate
 
@@ -165,7 +165,13 @@ To review a completed run without simulating again, open its **result model**, t
 
 When it works, the Hub reads "Saved Iteration N results reopened - ready to review". **Review Results** opens TM59 without a new simulation, and **Open result** reopens an existing Iteration 3 comparison. Limits of a reopened run: it is for review, not a new baseline, so **Prepare & Run** is disabled for it (start new cases from the design model); **Optimise (2B)** needs a live run; the **Scenario** box and the **Direct T3D** header describe the case being set up, not the reopened run.
 
-Automatic "previous run found" from the design model is not available yet; open the saved result model as above.
+**Previous result found.** Open your design model, choose a case and press **Prepare & Run** with the output folder of an earlier run. Where that case already holds a saved result that SAM can confirm was made from this same design (by the design key it recorded; names and paths are not used), SAM shows **Previous *case* result found** with three choices:
+
+- **Open previous result** opens `<case>\tas\<name>.sam` for review. TAS is not run, and your design model is replaced in the window by the saved result (the File > Open path); to start a new case, reopen the design.
+- **Run again** carries on as ever - including the **Replace existing results** question, so nothing is removed without that confirmation.
+- **Cancel** does nothing.
+
+The offer appears only for results saved with a design key and still valid for review. A result saved earlier, before the key existed, or one made from a different design or edited since, is not offered: open it by hand as above, or run again.
 
 If evidence is missing, stale or mismatched, restore the matching result model and output tree or rerun from the design. A moved tree can be valid when its relative references and file identities still match. Replacing a completed Iteration 3 result requires explicit confirmation; use **Open result** for ordinary review.
 
@@ -180,6 +186,7 @@ Iteration 2 uses SAM's established Part O product representation. Iteration 3 us
 | No eligible dwelling or wrong room count | Zone membership and **Dwelling = Yes**. |
 | Missing or unclassified TM59 rooms | Run **Map IC (TM59)**; verify room use and internal conditions. |
 | Iteration 3 run disabled | Complete an eligible 1a/2 reference; for the product method, assign a product and a saved cooling control room to each cooled dwelling. |
+| Prepare & Run offers "Previous result found" | The case folder holds a saved result of this same design. **Open previous result** reviews it without simulating; **Run again** continues to the replace question; **Cancel** does nothing. |
 | Prepare & Run asks to replace existing results | The case folder holds an earlier session's results. **Cancel** keeps everything; **Replace existing results** removes only that case's `tas`, `reports` and `diagnostics` folders and marker. Or choose a fresh output root. |
 | Reopened a model and Part O asks to simulate again | Open the saved result `<name>.sam` in `<case>\tas`, not the design or `.prepared.sam`, with its `.tsd` unchanged beside it. |
 | Result file missing, stale or mismatched | Restore the matching saved model and output tree, or rerun from the clean design. |
