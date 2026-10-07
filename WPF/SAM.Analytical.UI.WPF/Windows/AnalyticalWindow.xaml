@@ -500,6 +500,10 @@
                 <RibbonGroup x:Name="RibbonGroup_Simulate_Simulate" Header="Simulate">
                     <RibbonButton x:Name="RibbonButton_SolarSimulation" Label="Solar Simulation" />
                     <RibbonButton x:Name="RibbonButton_EnergySimulation" Label="Energy Simulation" />
+                    <!-- Energy Simulation is the single run; Optimisation runs a Tas project again and again (the native SAM
+                         optimiser over TasGenExecute). It works on a Tas project folder, not on the open model, so it
+                         is always available. Not the Part O Optimise (2B) command on the Results tab. -->
+                    <RibbonButton x:Name="RibbonButton_Optimisation" Label="Optimisation" ToolTipService.ShowOnDisabled="True" />
                 </RibbonGroup>
             </RibbonTab>
             <RibbonTab x:Name="RibbonTab_Results" Header="Results">
