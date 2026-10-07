@@ -333,6 +333,132 @@ namespace SAM.Analytical.UI
         }
 
         /// <summary>
+        /// What this case folder holds, for the run (and TAS case) asking - read only, nothing is created, claimed or
+        /// removed. The answer <see cref="TryClaimRun"/> refuses on, given up front so a person can be asked first.
+        /// Never throws: a folder that cannot be read is reported as occupied by something that is not the run's, so
+        /// it is asked about rather than silently written into.
+        /// </summary>
+        /// <param name="guid_Run">The run asking, or <see cref="Guid.Empty"/> for one not yet prepared - which owns nothing.</param>
+        /// <param name="caseKey">The run's TAS case key, or null where it is not compared.</param>
+        public PartOOutputOccupancy Occupancy(Guid guid_Run, string caseKey = null)
+        {
+            try
+            {
+                Guid guid_Owner = Guid.Empty;
+                string previousCaseKey = null;
+                if (File.Exists(Path_Marker))
+                {
+                    JsonObject marker = JsonNode.Parse(File.ReadAllText(Path_Marker)) as JsonObject;
+                    Guid.TryParse(marker?["Run"]?.GetValue<string>(), out guid_Owner);
+                    previousCaseKey = marker?["CaseKey"]?.GetValue<string>();
+                }
+
+                int count_Generated = 0;
+                int count_Other = 0;
+                DateTime? lastWriteUtc = null;
+
+                if (Directory.Exists(Directory_Case))
+                {
+                    string[] directories_Generated = [Directory_Tas, Directory_Reports, Directory_Diagnostics];
+
+                    foreach (string path in Directory.EnumerateFiles(Directory_Case, "*", SearchOption.AllDirectories))
+                    {
+                        string fullPath = Path.GetFullPath(path);
+
+                        if (string.Equals(fullPath, Path.GetFullPath(Path_Marker), StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        if (System.Linq.Enumerable.Any(directories_Generated, x => fullPath.StartsWith(Path.GetFullPath(x) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            count_Generated++;
+                        }
+                        else
+                        {
+                            count_Other++;
+                        }
+
+                        DateTime lastWrite = File.GetLastWriteTimeUtc(fullPath);
+                        if (lastWriteUtc is null || lastWrite > lastWriteUtc)
+                        {
+                            lastWriteUtc = lastWrite;
+                        }
+                    }
+                }
+
+                bool owned = guid_Owner == guid_Run && (caseKey is null || string.Equals(caseKey, previousCaseKey, StringComparison.Ordinal));
+
+                return new PartOOutputOccupancy(Directory_Case, count_Generated, count_Other, lastWriteUtc, owned);
+            }
+            catch
+            {
+                return new PartOOutputOccupancy(Directory_Case, 0, 1, null, false);
+            }
+        }
+
+        /// <summary>
+        /// Removes what a run generated into this case: its <c>tas</c>, <c>reports</c> and <c>diagnostics</c> folders and
+        /// its case marker - and nothing else. Any other file or folder in the case folder, every other case's folder and
+        /// everything outside the output folder are left exactly as they are. The caller asks first: this deletes files.
+        /// Returns null on success, otherwise why something could not be removed (a file in use, a protected folder).
+        /// </summary>
+        /// <param name="count_Files">How many generated files were removed.</param>
+        public string TryReplaceGenerated(out int count_Files)
+        {
+            count_Files = 0;
+
+            try
+            {
+                foreach (string directory in new[] { Directory_Tas, Directory_Reports, Directory_Diagnostics })
+                {
+                    if (!Directory.Exists(directory))
+                    {
+                        continue;
+                    }
+
+                    int count = System.Linq.Enumerable.Count(Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories));
+
+                    Directory.Delete(directory, true);
+
+                    count_Files += count;
+                }
+
+                if (File.Exists(Path_Marker))
+                {
+                    File.Delete(Path_Marker);
+                }
+
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return string.Format("The existing results in '{0}' could not be removed, so nothing was run. ({1})", Directory_Case, exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// The case folder a scenario writes to - 1b for natural ventilation, Iteration 2 where a manufacturer unit is
+        /// selected, otherwise 1a - known BEFORE the iteration is prepared, which is what lets the Hub ask about an occupied
+        /// folder before anything is reviewed. It agrees with <see cref="CaseOf"/> for the
+        /// context that preparing the scenario produces.
+        /// </summary>
+        public static PartOOutputCase? CaseOfScenario(PartOWorkflowScenario partOWorkflowScenario)
+        {
+            if (partOWorkflowScenario?.Option is null)
+            {
+                return null;
+            }
+
+            if (partOWorkflowScenario.Option.PartOVentilationMode != PartOVentilationMode.MVHR)
+            {
+                return PartOOutputCase.Iteration1b;
+            }
+
+            return partOWorkflowScenario.SelectVentilationUnit ? PartOOutputCase.Iteration2 : PartOOutputCase.Iteration1a;
+        }
+
+        /// <summary>
         /// Claims this case folder for one prepared run before any result is written. An earlier case marker
         /// without an owner is treated as occupied when it contains evidence. A retry by the same run is safe.
         /// </summary>
@@ -354,11 +480,9 @@ namespace SAM.Analytical.UI
                     previousCaseKey = marker?["CaseKey"]?.GetValue<string>();
                 }
 
-                bool occupied = Directory.Exists(Directory_Case)
-                    && System.Linq.Enumerable.Any(Directory.EnumerateFiles(Directory_Case, "*", SearchOption.AllDirectories),
-                        path => !string.Equals(Path.GetFullPath(path), Path.GetFullPath(Path_Marker), StringComparison.OrdinalIgnoreCase));
+                PartOOutputOccupancy partOOutputOccupancy = Occupancy(guid_Run, caseKey);
 
-                if (occupied && (guid_Owner != guid_Run || (caseKey is not null && !string.Equals(caseKey, previousCaseKey, StringComparison.Ordinal))) && !replaceExisting)
+                if (partOOutputOccupancy.NeedsReplacement && !replaceExisting)
                 {
                     return string.Format("The Part O output folder '{0}' already contains run evidence. Choose a fresh output folder to preserve it.", Directory_Case);
                 }

@@ -42,7 +42,19 @@ namespace SAM.Analytical.UI.WPF
 
         private readonly Dictionary<PartOIteration3BehaviourMode, TextBlock> textBlocks_MethodStatus = [];
 
-        private PartOIteration3BehaviourMode iteration3Mode = PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance;
+        /// <summary>The method every showing starts on, and the one a product-method run is for.</summary>
+        internal const PartOIteration3BehaviourMode Iteration3DefaultMode = PartOIteration3BehaviourMode.SelectedProductManufacturerGuidance;
+
+        private PartOIteration3BehaviourMode iteration3Mode = Iteration3DefaultMode;
+
+        /// <summary>
+        /// Whether a person chose the method (a click, or a method carried from an earlier showing). Where none was
+        /// chosen and the default cannot run while another method can, the Hub selects that one itself rather than
+        /// open on a refusal - see <see cref="ApplyAutomaticIteration3Method"/>.
+        /// </summary>
+        private bool iteration3Mode_Stated;
+
+        private bool iteration3Automatic;
 
         private bool writing_Iteration3;
 
@@ -77,6 +89,7 @@ namespace SAM.Analytical.UI.WPF
                     }
 
                     iteration3Mode = (PartOIteration3BehaviourMode)((RadioButton)s).Tag;
+                    iteration3Mode_Stated = true;
 
                     //Choosing a method is working in Iteration 3.
                     iteration3InFocus = true;
@@ -109,7 +122,10 @@ namespace SAM.Analytical.UI.WPF
             }
 
             comboBox_SolarCalculationMethod.SelectionChanged += (s, e) => RefreshSimulationCase();
-            checkBox_DirectT3D.Click += (s, e) => RefreshSimulationCase();
+            //Checked / Unchecked rather than Click: a click is only one way to change the box (the keyboard and UI
+            //Automation change it without one), and the header and the case it stands for must follow every change.
+            checkBox_DirectT3D.Checked += (s, e) => RefreshSimulationCase();
+            checkBox_DirectT3D.Unchecked += (s, e) => RefreshSimulationCase();
             textBox_OutputDirectory.TextChanged += (s, e) => RefreshSimulationCase();
 
             button_OutputDirectory.Click += (s, e) =>
@@ -149,19 +165,29 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
-        /// <summary>The Iteration 3 method chosen. Carried across showings by the caller.</summary>
+        /// <summary>
+        /// The Iteration 3 method the Hub is ON - the one Run Iteration 3 and Open result act on, whether a person chose it
+        /// or the Hub selected it. What is carried to the next showing is <see cref="Iteration3ModeCarried"/>.
+        /// </summary>
         public PartOIteration3BehaviourMode Iteration3Mode
         {
             get => iteration3Mode;
             set
             {
                 iteration3Mode = value;
+                iteration3Mode_Stated = value != Iteration3DefaultMode;
 
                 UpdateMethodSelection();
 
                 RefreshIteration3();
             }
         }
+
+        /// <summary>
+        /// The method to carry to the next showing: the one a person chose. A method the Hub selected itself is not a
+        /// choice, so it is not carried - the next showing starts from the default and decides again.
+        /// </summary>
+        public PartOIteration3BehaviourMode Iteration3ModeCarried => iteration3Automatic ? Iteration3DefaultMode : iteration3Mode;
 
         /// <summary>The chosen method's pre-flight, or null where Iteration 3 cannot run at all. Exposed for tests.</summary>
         internal PartOIteration3Preflight? Iteration3Preflight => Preflight(iteration3Mode);
@@ -186,6 +212,21 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>The refusal the chosen method's pre-flight shows, or empty. Exposed for tests.</summary>
         internal string Iteration3RefusalText => textBlock_It3Refusal.Text;
+
+        /// <summary>The method the Hub is on, whether chosen or selected for the person. Exposed for tests.</summary>
+        internal PartOIteration3BehaviourMode Iteration3EffectiveMode => iteration3Mode;
+
+        /// <summary>Whether the Hub selected the method itself. Exposed for tests.</summary>
+        internal bool Iteration3MethodIsAutomatic => iteration3Automatic;
+
+        /// <summary>What the notice about an automatically selected method says, or empty. Exposed for tests.</summary>
+        internal string Iteration3AutomaticText => border_It3Automatic.Visibility == Visibility.Visible ? textBlock_It3Automatic.Text : string.Empty;
+
+        /// <summary>Whether the panel offers to open Mixed Design for the missing cooling control rooms. Exposed for tests.</summary>
+        internal bool Iteration3MixedDesignOffered => button_It3MixedDesign.Visibility == Visibility.Visible;
+
+        /// <summary>Whether the jump to the Iteration 3 panel is offered. Exposed for tests.</summary>
+        internal bool GoToIteration3Offered => stackPanel_GoToIteration3.Visibility == Visibility.Visible;
 
         private PartOIteration3Preflight? Preflight(PartOIteration3BehaviourMode partOIteration3BehaviourMode)
         {
@@ -247,6 +288,8 @@ namespace SAM.Analytical.UI.WPF
             bool canRun = partOIteration3Eligibility?.CanRun ?? false;
             bool anyRecorded = partOIteration3Eligibility is not null && partOIteration3Eligibility.PairingStatuses.Exists(x => x.Exists);
 
+            ApplyAutomaticIteration3Method(canRun);
+
             //The reference case, in the engineer's terms.
             if (partORun is not null && (canRun || anyRecorded))
             {
@@ -270,6 +313,10 @@ namespace SAM.Analytical.UI.WPF
             //a method that already has a record. Before that it was a heading over a refusal, on a model that
             //had not run its Iteration 1a yet. The eligibility is unchanged; only its visibility is.
             border_Iteration3.Visibility = canRun || anyRecorded ? Visibility.Visible : Visibility.Collapsed;
+
+            //The panel sits below the readiness list and the equipment selection, which on most screens is below
+            //the fold: the actions row offers the way down to it, wherever it is relevant.
+            stackPanel_GoToIteration3.Visibility = border_Iteration3.Visibility;
 
             //Every method's own line: a completed result, a last attempt that did not complete, or nothing.
             foreach (KeyValuePair<PartOIteration3BehaviourMode, TextBlock> keyValuePair in textBlocks_MethodStatus)
@@ -307,8 +354,13 @@ namespace SAM.Analytical.UI.WPF
                 expander_It3Units.Header = string.Format(CultureInfo.CurrentCulture, "Show all {0} units", count);
                 listBox_It3Units.ItemsSource = partOIteration3Preflight.Units;
 
-                textBlock_It3Refusal.Text = Refusal(partOIteration3Preflight);
+                //A missing step is shown as the journey it is (RefreshSteps), not as a red refusal.
+                textBlock_It3Refusal.Text = IsMissingRooms(partOIteration3Preflight) ? string.Empty : Refusal(partOIteration3Preflight);
             }
+
+            RefreshAutomaticNotice(canRun);
+
+            RefreshSteps(canRun);
 
             //The two actions.
             bool reviewable = partOIteration3PairingStatus?.IsReviewable ?? false;
@@ -485,11 +537,205 @@ namespace SAM.Analytical.UI.WPF
                 units_Refused.Count > 1 ? " Each unit's reason is in the unit list." : string.Empty);
         }
 
+        /// <summary>
+        /// Whether the method is refused for the one reason that is a missing STEP rather than a fault: no saved
+        /// cooling control rooms. It is shown as the steps that supply them
+        /// (<see cref="Query.PartOIteration3ProductMethodSteps"/>), not as a refusal.
+        /// </summary>
+        private static bool IsMissingRooms(PartOIteration3Preflight? partOIteration3Preflight)
+        {
+            return partOIteration3Preflight is not null && !partOIteration3Preflight.CanRun && partOIteration3Preflight.Refusals.Contains(Query.PartOIteration3NoDwellingStrategiesRefusal);
+        }
+
+        /// <summary>
+        /// The journey to a runnable manufacturer-guidance method, where that is what is missing: what the method needs,
+        /// then each step in order - done, current, later - with a button on the current one where the Hub can do it.
+        /// Shown for the method a person chose, or for the default while another is selected on their behalf.
+        /// </summary>
+        private void RefreshSteps(bool canRun)
+        {
+            stackPanel_It3StepRows.Children.Clear();
+            button_It3RemoveResults.Visibility = Visibility.Collapsed;
+            button_It3MixedDesign.Visibility = Visibility.Collapsed;
+
+            PartOIteration3Preflight? partOIteration3Preflight = canRun ? Preflight(iteration3Automatic ? Iteration3DefaultMode : iteration3Mode) : null;
+
+            if (!IsMissingRooms(partOIteration3Preflight))
+            {
+                border_It3Steps.Visibility = Visibility.Collapsed;
+                textBlock_It3StepsLead.Text = string.Empty;
+
+                return;
+            }
+
+            List<PartOIteration3Step> steps = Query.PartOIteration3ProductMethodSteps(analyticalModel, partORun, out string lead);
+
+            textBlock_It3StepsLead.Text = lead;
+
+            for (int i = 0; i < steps.Count; i++)
+            {
+                PartOIteration3Step step = steps[i];
+
+                (string glyph, Brush brush, FontWeight fontWeight) = step.State switch
+                {
+                    PartOIteration3StepState.Done => ("✓", (Brush)new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32)), FontWeights.Normal),
+                    PartOIteration3StepState.Current => ("→", new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)), FontWeights.SemiBold),
+                    _ => ("○", new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x77)), FontWeights.Normal),
+                };
+
+                Grid grid = new() { Margin = new Thickness(0, 2, 0, 2) };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                grid.Children.Add(new TextBlock { Text = glyph, Foreground = brush, FontWeight = fontWeight });
+
+                TextBlock textBlock = new() { Text = string.Format(CultureInfo.CurrentCulture, "{0}. {1}", i + 1, step.Text), Foreground = brush, FontWeight = fontWeight, TextWrapping = TextWrapping.Wrap };
+                Grid.SetColumn(textBlock, 1);
+                grid.Children.Add(textBlock);
+
+                stackPanel_It3StepRows.Children.Add(grid);
+
+                if (step.State == PartOIteration3StepState.Current && step.ButtonText is not null)
+                {
+                    Button button = step.Action == PartOWorkflowAction.RemoveResults ? button_It3RemoveResults : step.Action == PartOWorkflowAction.MixedDesign ? button_It3MixedDesign : null;
+
+                    if (button is not null)
+                    {
+                        button.Content = step.ButtonText;
+                        button.Visibility = Visibility.Visible;
+                    }
+                }
+            }
+
+            border_It3Steps.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>The steps as shown - the sentence, then one line per step - or empty. Exposed for tests.</summary>
+        internal string Iteration3StepsText => border_It3Steps.Visibility == Visibility.Visible
+            ? string.Join("\n", new[] { textBlock_It3StepsLead.Text }.Concat(stackPanel_It3StepRows.Children.OfType<Grid>().Select(x => string.Join(" ", x.Children.OfType<TextBlock>().Select(y => y.Text)))))
+            : string.Empty;
+
+        /// <summary>Whether the panel offers to open Remove Results. Exposed for tests.</summary>
+        internal bool Iteration3RemoveResultsOffered => button_It3RemoveResults.Visibility == Visibility.Visible;
+
+        /// <summary>
+        /// Opens on a method that can run. Where nobody chose a method and the default cannot run - typically
+        /// because the reference case has no product or no saved cooling control rooms - the first method that
+        /// can run is selected instead, product methods before validation methods, and
+        /// <see cref="RefreshAutomaticNotice"/> says so and why. A method a person chose is never replaced.
+        /// Pre-flights are cached per method, so this costs another walk only where the default is refused.
+        /// </summary>
+        private void ApplyAutomaticIteration3Method(bool canRun)
+        {
+            iteration3Automatic = false;
+
+            if (!canRun || iteration3Mode_Stated)
+            {
+                return;
+            }
+
+            PartOIteration3BehaviourMode partOIteration3BehaviourMode = Iteration3DefaultMode;
+
+            PartOIteration3Preflight preflight_Default = Preflight(Iteration3DefaultMode);
+
+            //Only where the default is missing a STEP (no saved cooling control rooms, no product yet). A fault - an
+            //invalid saved room, a product the catalogue does not hold - leaves the default selected and refused, so
+            //Run stays off for the method that is wrong rather than quietly running another.
+            if (preflight_Default is not null && !preflight_Default.CanRun && IsMissingStep(preflight_Default))
+            {
+                foreach (bool validation in new[] { false, true })
+                {
+                    PartOIteration3BehaviourMode? partOIteration3BehaviourMode_Runnable = Query.PartOIteration3BehaviourModes.Where(x => x != Iteration3DefaultMode && Query.IsPartOIteration3ValidationMethod(x) == validation).Cast<PartOIteration3BehaviourMode?>().FirstOrDefault(x => Preflight(x.Value)?.CanRun ?? false);
+
+                    if (partOIteration3BehaviourMode_Runnable.HasValue)
+                    {
+                        partOIteration3BehaviourMode = partOIteration3BehaviourMode_Runnable.Value;
+                        break;
+                    }
+                }
+            }
+
+            iteration3Automatic = partOIteration3BehaviourMode != Iteration3DefaultMode;
+
+            if (partOIteration3BehaviourMode != iteration3Mode)
+            {
+                iteration3Mode = partOIteration3BehaviourMode;
+
+                UpdateMethodSelection();
+            }
+        }
+
+        /// <summary>
+        /// Whether a method's refusal is a missing step rather than a fault: no cooling control rooms saved, or no
+        /// unit has a product yet. Both are put right by doing the next step of the journey, not by correcting data.
+        /// </summary>
+        private static bool IsMissingStep(PartOIteration3Preflight partOIteration3Preflight)
+        {
+            if (partOIteration3Preflight.Refusals.Contains(Query.PartOIteration3NoDwellingStrategiesRefusal))
+            {
+                return true;
+            }
+
+            List<PartOIteration3PreflightUnit> units_Refused = partOIteration3Preflight.Units.FindAll(x => !x.IsReady);
+
+            return units_Refused.Count != 0 && units_Refused.Count == partOIteration3Preflight.Units.Count && units_Refused.TrueForAll(x => x.Product == "No product selected")
+                && partOIteration3Preflight.Refusals.TrueForAll(x => units_Refused.Exists(y => y.Refusal == x));
+        }
+
+        /// <summary>
+        /// The notice over the method's explanation when the Hub selected it: the default method, why it cannot run,
+        /// and that the choice is the person's to change. Also keeps the Mixed Design step on offer while the default
+        /// is what is missing it.
+        /// </summary>
+        private void RefreshAutomaticNotice(bool canRun)
+        {
+            if (!iteration3Automatic || !canRun)
+            {
+                border_It3Automatic.Visibility = Visibility.Collapsed;
+                textBlock_It3Automatic.Text = string.Empty;
+
+                return;
+            }
+
+            PartOIteration3Preflight preflight_Default = Preflight(Iteration3DefaultMode);
+            string why = IsMissingRooms(preflight_Default)
+                ? "What the first method needs is listed below."
+                : Refusal(preflight_Default).Replace("This method cannot run yet: ", string.Empty);
+
+            textBlock_It3Automatic.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                "'{0}' cannot run yet, so '{1}' is selected because it can run now. Choose another method above at any time. {2}",
+                Query.PartOIteration3MethodLabel(Iteration3DefaultMode),
+                Query.PartOIteration3MethodLabel(iteration3Mode),
+                why).TrimEnd();
+
+            border_It3Automatic.Visibility = Visibility.Visible;
+        }
+
         private void button_It3Review_Click(object sender, RoutedEventArgs e)
         {
             Action = PartOWorkflowAction.Iteration3Review;
 
             DialogResult = true;
+        }
+
+        private void button_It3MixedDesign_Click(object sender, RoutedEventArgs e)
+        {
+            Action = PartOWorkflowAction.MixedDesign;
+
+            DialogResult = true;
+        }
+
+        private void button_It3RemoveResults_Click(object sender, RoutedEventArgs e)
+        {
+            Action = PartOWorkflowAction.RemoveResults;
+
+            DialogResult = true;
+        }
+
+        private void button_GoToIteration3_Click(object sender, RoutedEventArgs e)
+        {
+            border_Iteration3.BringIntoView();
         }
 
         //---------------------------------------------------------------------------------------------
