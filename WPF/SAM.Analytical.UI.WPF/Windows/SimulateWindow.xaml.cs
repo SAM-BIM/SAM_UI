@@ -259,6 +259,19 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        public bool DirectT3D
+        {
+            get
+            {
+                return simulateControl.DirectT3D;
+            }
+
+            set
+            {
+                simulateControl.DirectT3D = value;
+            }
+        }
+
         public bool UpdateConstructionLayersByPanelType
         {
             get

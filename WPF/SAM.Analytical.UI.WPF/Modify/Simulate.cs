@@ -148,6 +148,7 @@ namespace SAM.Analytical.UI.WPF
                 Sizing = simulateWindow.Sizing,
                 UseWidths = simulateWindow.UseWidths,
                 SolarCalculationMethod = simulateWindow.SolarCalculationMethod,
+                DirectT3D = simulateWindow.DirectT3D,
                 UpdateConstructionLayersByPanelType = simulateWindow.UpdateConstructionLayersByPanelType,
                 TextMap = simulateWindow.SelectedTextMap,
                 WeatherData = simulateWindow.SelectedWeatherData,
@@ -272,6 +273,7 @@ namespace SAM.Analytical.UI.WPF
             public bool Sizing;
             public bool UseWidths;
             public SolarCalculationMethod SolarCalculationMethod;
+            public bool DirectT3D;
             public bool UpdateConstructionLayersByPanelType;
             public TextMap TextMap;
             public WeatherData WeatherData;
@@ -424,6 +426,9 @@ namespace SAM.Analytical.UI.WPF
                 Sizing = sizing,
                 UseWidths = useWidths,
                 UpdateConstructionLayersByPanelType = updateConstructionLayersByPanelType,
+
+                // The ordinary Energy Simulation command only: a Part O run stays on the gbXML route.
+                DirectT3D = simulateInputs.DirectT3D && partORun is null,
             };
 
             DateTime dateTime = DateTime.Now;

@@ -34,6 +34,7 @@
                 <CheckBox x:Name="checkBox_CreateTPD" Content="Create TPD" HorizontalAlignment="Left" Margin="13,155,0,0" VerticalAlignment="Top" Checked="checkBox_CreateTPD_Checked" Unchecked="checkBox_CreateTPD_Unchecked"/>
                 <CheckBox x:Name="checkBox_Sizing" Content="Sizing" HorizontalAlignment="Left" Margin="13,95,0,0" VerticalAlignment="Top"/>
                 <CheckBox x:Name="checkBox_UseWidths" Content="Use Widths" HorizontalAlignment="Left" Margin="13,10,0,0" VerticalAlignment="Top"/>
+                <CheckBox x:Name="checkBox_DirectT3D" Content="Direct T3D" HorizontalAlignment="Left" Margin="171,10,0,0" VerticalAlignment="Top" IsChecked="False" ToolTip="Build the TAS3D model directly from the SAM geometry instead of through gbXML. Applies to the TAS solar calculation method only. Leave unchecked for the established gbXML route."/>
                 <Label x:Name="label_FullYearSimulation_From" Content="From:" HorizontalAlignment="Left" Margin="171,109,0,0" VerticalAlignment="Top"/>
                 <TextBox x:Name="textBox_FullYearSimulation_From" HorizontalAlignment="Left" Height="23" Margin="216,109,0,0" TextWrapping="Wrap" Text="1" VerticalAlignment="Top" Width="30" PreviewTextInput="textBox_FullYearSimulation_From_PreviewTextInput"/>
                 <Label  x:Name="label_FullYearSimulation_To" Content="To:" HorizontalAlignment="Left" Margin="249,109,0,0" VerticalAlignment="Top"/>
