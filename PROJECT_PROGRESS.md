@@ -6,7 +6,7 @@
 
 ## Last updated
 
-2026-10-07 (SAM_UI#205 Direct T3D selector; SAM_UI#206 Direct T3D in Part O; SAM_UI#207 Part O Iteration 3 journey and replace-existing-results; SAM_UI#208 Part O Prepare & Run guide update; SAM_UI#209 Part O "Previous result found"; SAM_UI#210 native Optimisation, Java-free GenOpt PR5).
+2026-10-07 (SAM_UI#205 Direct T3D selector; SAM_UI#206 Direct T3D in Part O; SAM_UI#207 Part O Iteration 3 journey and replace-existing-results; SAM_UI#208 Part O Prepare & Run guide update; SAM_UI#209 Part O "Previous result found"; SAM_UI#210 native Optimisation, Java-free GenOpt PR5); 2026-10-08 (SAM_UI#211 user-library file-replace race).
 
 ## Current status
 
@@ -152,6 +152,17 @@ authoring machine) and must be transferred separately.
 - **Wiki:** the Part O Wiki was published twice from the merged guide with `documentation/publish-part-o-wiki.ps1` (clone of `SAM_UI.wiki.git`, commit + push): `3a82d6c` (#208 guide, which resolves the "Wiki is stale" risk in the #208 entry) and `525b965` (#209 guide). Page is byte-identical to the merged guide; live page checked (headings, 3 tables, no raw markdown, new section present, "not available yet" gone). The Wiki is a manual publish: re-run the script after any guide change.
 - **Unresolved issues, risks:** (1) Offering reads the candidate result `.sam` and hashes the design on each Prepare & Run press where a result exists (seconds on a large model). (2) Results saved before SAM#184 are never offered. (3) Direct T3D box still resets to Off on each Hub open (SAM_UI#206 carry-over). (4) `ThermalSourceTests` async-status flake under full-suite load.
 - **Next step:** none required for this stream. Optional: remember Direct T3D / output folder across Hub openings; Cancel and legacy-result real-app walk if ever wanted.
+
+## Q4 user-library file-replace race fix (2026-10-08)
+
+- **Status:** complete, closed. SAM-BIM/SAM_UI#211 (`fix/user-construction-file-replace-race`) merged into `sow/2026-Q4` as merge commit `b1c77bc3e64b2d06401c89a8215bb20969e66d9a` (parents: Q4 base `a74938ff` + reviewed PR head `8f79cc5f6c85b87bcf537b4c8f78f2b8dfe8520e`; merge tree `8e3594c9` identical to the head tree); merge method: merge commit with `--match-head-commit`. PR CI (`build`, `spdx`) green on the head; post-merge `Build (Windows)` on `b1c77bc3` green. Codex review: P1 (a partial swap could leave no library file when retries ran out) fixed on the branch, thread resolved. Feature branch deleted locally and on origin. Record: `documentation/UserLibrary-FileReplaceRace-PR.md`.
+- **Root cause:** Windows `File.Replace` fails with `0x80070497` (ERROR_UNABLE_TO_REMOVE_REPLACED) while any process has the existing `.bak` open, even with full sharing (and `0x80070020` while the target is open without delete sharing). Each save rotates the just-closed previous file to `.bak`; Defender real-time protection and Endpoint DLP open freshly written files. Reproduced with a standalone replica and no SAM code (28/4000 swaps with a `.bak`, 1/4000 without, 0/4000 with a bounded retry). No in-process reader and no SAM stream-lifetime/sharing defect. **Product defect, environment-triggered** (quick successive saves/renames/removes of constructions or glazing systems on a scanned machine).
+- **Work completed:** `UserLibraryFile.Write` (shared by My constructions, the glazing library and the removed-archive companion) retries only momentary-hold codes (`0x80070020`, `0x80070021`, `0x80070497`, `0x80070498`, `0x80070499`), at most 5 attempts with 25/50/100/200 ms (< 0.4 s); any other failure is reported at once; exhaustion keeps the OS message plus attempt count and likely cause. After a partial swap (`0x80070499`, previous file already `.bak`) the next attempt moves the new file in; if none does, the previous file is copied back from `.bak` before the error (if that fails too, the error says it is kept as `.bak`). Test-only seam `BeforeReplace(attempt)`; no public API change.
+- **Decisions:** bounded retry is the fix because the holder is another process (lifetime/sharing fixes do not apply); security software was not changed.
+- **Files changed (3):** `WPF/SAM.Analytical.UI.WPF/Classes/UserLibrary/UserLibraryFile.cs`, `WPF/SAM.Analytical.UI.WPF.Tests/UserLibraryFileTests.cs` (+18 cases, real Windows refusals via the seam), `documentation/UserLibrary-FileReplaceRace-PR.md`.
+- **Validation:** Release Rebuild `SAM_UI.sln` 0 errors (`APPDATA`/`USERPROFILE` redirected to a scratch profile seeded with a copy of `%APPDATA%\SAM\resources` and `Documents\SAM\resources`; real `NUGET_PACKAGES`). Isolated stress (fresh process, `--filter FullyQualifiedName~UserConstructionCandidateTests`): before 25/30 (5 failures, exact message), after 50/50 and again 50/50 on the final code. Full suite 2635/2635. Mutations (no retry, retry everything, no restore) all caught.
+- **Unresolved issues, risks:** a save can take up to ~0.4 s longer while another program holds the file; a longer hold still fails (clearer message). Separate, not fixed: a load-dependent `ThermalSourceTests.A_source_with_nothing_to_offer_says_why_and_adds_no_candidates` flake (seen once in a full-suite run, 10/10 alone).
+- **Next step:** none for this fix. PR6 (SAM_UI#212) is to be brought up to this baseline and revalidated.
 
 ## Q4 native Optimisation in SAM_UI - Java-free GenOpt PR5 (2026-10-07)
 
