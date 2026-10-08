@@ -99,10 +99,16 @@ These are untouched in behaviour and are covered by the unchanged tests listed u
 
 1. **The Objective box is editable.** The plan calls for a ComboBox of the output names bound to `Primary`. A
    read-only box would have no place to *name* the objective, and a person who brings their own script has to rename
-   `Result` first. So the box lists the named outputs and also accepts a typed name: a name that is one of the
-   outputs selects it; any other name renames the current objective (or creates it when there is none). The previous
-   objective stays as a recorded output. Text search is off, so typing never selects by prefix. Enter and leaving the
-   box commit; Enter is handled so it cannot trigger the default Run button.
+   `Result` first. So the box lists the named outputs and also accepts a typed name:
+   - a name that matches one of the outputs **ignoring case** (after trimming) selects that output, under its own
+     spelling: typing `cost` when `Cost` exists makes `Cost` the objective and changes nothing else;
+   - any other name is a **new output**: it is added, becomes the objective, and the previous objective **stays** as a
+     recorded output. Nothing is renamed or removed (so fixing a typo adds the corrected output and leaves the old one
+     to be removed from Recorded outputs).
+
+   Text search is off, so typing never selects by prefix. Enter and leaving the box commit; Enter is handled so it
+   cannot trigger the default Run button. (The first version of this PR renamed the objective in place for a new
+   name, which lost the previous objective and matched names case-sensitively; both were corrected after review.)
 2. **Add output** adds a *recorded* output; the objective is only ever chosen in the Objective box.
 3. **Removing the objective output** (reachable through `RemoveOutput`, and through any state loaded from an example
    or session) makes the first remaining output the objective, as before. The objective itself has no ✕ in the UI: to
@@ -135,8 +141,8 @@ was not rebuilt here.
 | Check | Result |
 |---|---|
 | Release build, `SAM_UI.sln` (Rebuild) | **0 errors** |
-| `TasOptimisation*` tests | **92/92** |
-| Full `SAM.Analytical.UI.WPF.Tests` | **2654/2654** (the stated baseline is 2636; the current `sow/2026-Q4` has 2637 because SAM_UI#213 added one test; this PR adds **16** window tests and 1 opt-in screenshot harness that passes doing nothing without `SAM_OPT_SCREENSHOTS`, so 2637 + 17 = 2654). The ThermalSource flake did not recur. |
+| `TasOptimisation*` tests | **96/96** |
+| Full `SAM.Analytical.UI.WPF.Tests` | **2658/2658** (the stated baseline is 2636; the current `sow/2026-Q4` has 2637 because SAM_UI#213 added one test; this PR adds **20** window test cases (16 facts + a 4-case theory) and 1 opt-in screenshot harness that passes doing nothing without `SAM_OPT_SCREENSHOTS`, so 2637 + 21 = 2658). The ThermalSource flake did not recur. |
 | `git diff --check` | clean |
 
 **Unchanged tests, passing as before** (these prove the no-behaviour-change scope):
@@ -154,11 +160,14 @@ was not rebuilt here.
 **Updated for wording:** the ribbon tooltip, the opening state, the readiness titles and summary, the report headlines
 and lines, "Best so far", and the problem labels of `TasOptimisationInput`.
 
-**New tests** (16, all `[WpfFact]`):
+**New tests** (20 cases, all `[WpfFact]` / `[WpfTheory]`):
 - **Objective box ⇄ `Primary` flag:**
   - choosing Cost puts Cost first in the definition and makes the old objective a recorded output;
   - a picked entry of the opened drop-down does the same;
-  - a typed new name renames the objective, and an existing name selects it;
+  - a genuinely new typed name becomes the objective and the previous objective is kept as a recorded output (the
+    definition minimises the new one and still records the old);
+  - an existing name selects that output, **case-insensitively** (`cost`, `COST`, `  co2 `, `result`): same outputs,
+    same order and spelling, only the objective moves (4 cases);
   - an empty box changes nothing;
   - removing the objective output re-selects one;
   - Add output is recorded only;
@@ -187,8 +196,13 @@ and lines, "Best so far", and the problem labels of `TasOptimisationInput`.
 |---|---|
 | M2: primary objective not moved first (`if (index > 0)` made unreachable) | **caught, 5 tests failed**: `TasOptimisationInputTests.The_primary_objective_is_passed_first_whatever_its_name_and_position`, `…Choosing_another_primary_output_reorders_only_that_one`, `TasOptimisationWindowTests.The_primary_objective_chosen_in_the_window_is_the_one_minimised`, and the two new Objective-box tests (`Choosing_an_output_in_the_Objective_box…`, `The_objective_chosen_in_the_Objective_box_is_the_one_the_run_minimises`) |
 | M5: Cancel does not cancel the token (`cancellationTokenSource.Cancel()` commented out) | **caught, 3 tests failed**: `Cancel_lets_the_running_evaluation_finish_and_starts_no_other`, `Closing_during_a_run_asks_then_stops_after_the_current_evaluation_and_closes`, and the new `The_result_card_uses_the_engineering_headline…` |
+| M7 (added after review): the Objective box matches names case-sensitively again | **caught, 4 tests failed**: all four cases of `Typing_the_name_of_an_existing_output_in_another_case_selects_that_output_and_loses_nothing` |
 
-Both files were restored from copies and the suite re-run green (2654/2654 above).
+M2 and M5 were re-run on the review-fix head: M2 is now caught by **9** tests (the 5 above plus the new-name test and
+three of the four case-insensitive cases, which also depend on the objective being moved first) and M5 by the same
+**3**.
+
+Each file was restored from a copy, the solution rebuilt and the suite re-run green (2658/2658 above).
 
 **Screenshots** (RenderTargetBitmap of the real window through the opt-in `TasOptimisationScreenshotHarness`, stored
 outside git in `C:\TasOut\ux-pr1\screenshots`; regenerate with `SAM_OPT_SCREENSHOTS=<folder>`):

@@ -609,26 +609,59 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [WpfFact]
-        public void Typing_a_new_name_in_the_Objective_box_renames_the_objective_and_an_existing_name_selects_it()
+        public void Typing_a_genuinely_new_name_in_the_Objective_box_makes_it_the_objective_and_keeps_the_old_one_as_recorded()
         {
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
             TasOptimisationWindow window = Window(workspace);
             ComboBox comboBox = Control<ComboBox>(window, "comboBox_Objective");
+            ItemsControl recorded = Control<ItemsControl>(window, "itemsControl_Objectives");
 
             window.CommitObjective("Energy");
 
-            Assert.Equal(["Energy", "Cost", "CO2"], window.Input.Objectives.Select(x => x.Name));
-            Assert.Equal("Energy", window.Input.PrimaryObjective?.Name);
-            Assert.Equal(["Energy", "Cost", "CO2"], comboBox.Items.Cast<string>());
+            //Nothing is renamed or lost: Result is still an output, now recorded; Energy is new and is the objective.
+            Assert.Equal(["Result", "Cost", "CO2", "Energy"], window.Input.Objectives.Select(x => x.Name));
+            Assert.Equal(["Energy"], window.Input.Objectives.Where(x => x.Primary).Select(x => x.Name));
+            Assert.Equal(["Result", "Cost", "CO2"], recorded.Items.Cast<TasOptimisationObjectiveRow>().Select(x => x.Name));
+            Assert.Equal(["Result", "Cost", "CO2", "Energy"], comboBox.Items.Cast<string>());
+            Assert.Equal("Energy", comboBox.Text);
 
+            //The definition minimises Energy and still records the previous objective.
+            Assert.True(window.Input.TryGetDefinition(out TasOptimisationDefinition definition, out _));
+            Assert.Equal(["Energy", "Result", "Cost", "CO2"], definition.ObjectiveNames);
+
+            //An existing name selects that output.
             window.CommitObjective("CO2");
             Assert.Equal("CO2", window.Input.PrimaryObjective?.Name);
-            Assert.Equal(["Energy", "Cost", "CO2"], window.Input.Objectives.Select(x => x.Name));
+            Assert.Equal(["Result", "Cost", "CO2", "Energy"], window.Input.Objectives.Select(x => x.Name));
 
             //An empty box changes nothing and shows the objective again.
             window.CommitObjective("  ");
             Assert.Equal("CO2", comboBox.Text);
             Assert.Equal("CO2", window.Input.PrimaryObjective?.Name);
+        }
+
+        [WpfTheory]
+        [InlineData("cost", "Cost")]
+        [InlineData("COST", "Cost")]
+        [InlineData("  co2 ", "CO2")]
+        [InlineData("result", "Result")]
+        public void Typing_the_name_of_an_existing_output_in_another_case_selects_that_output_and_loses_nothing(string typed, string expected)
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            TasOptimisationWindow window = Window(workspace);
+            ComboBox comboBox = Control<ComboBox>(window, "comboBox_Objective");
+
+            window.CommitObjective(typed);
+
+            //The same three outputs, in the same order and spelling; only the objective moved.
+            Assert.Equal(["Result", "Cost", "CO2"], window.Input.Objectives.Select(x => x.Name));
+            Assert.Equal([expected], window.Input.Objectives.Where(x => x.Primary).Select(x => x.Name));
+            Assert.Equal(expected, comboBox.Text);
+            Assert.Equal(["Result", "Cost", "CO2"], comboBox.Items.Cast<string>());
+            Assert.Equal(new[] { "Result", "Cost", "CO2" }.Where(x => x != expected), Control<ItemsControl>(window, "itemsControl_Objectives").Items.Cast<TasOptimisationObjectiveRow>().Select(x => x.Name));
+            Assert.True(window.Input.TryGetDefinition(out TasOptimisationDefinition definition, out _));
+            Assert.Equal(expected, definition.ObjectiveNames[0]);
+            Assert.Equal(3, definition.ObjectiveNames.Count);
         }
 
         [WpfFact]

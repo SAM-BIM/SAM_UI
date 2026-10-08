@@ -388,9 +388,9 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// The Objective box names the output to minimise. A name that is one of the outputs makes that output the
-        /// objective; any other name renames the current objective (or creates it when there is none). The previous
-        /// objective stays as a recorded output.
+        /// The Objective box names the output to minimise. A name that matches one of the outputs, ignoring case, makes
+        /// that output the objective (under its own spelling). Any other name is a new output: it becomes the objective
+        /// and the previous objective stays, as a recorded output. Nothing is renamed or removed.
         /// </summary>
         internal void CommitObjective(string? text)
         {
@@ -402,22 +402,16 @@ namespace SAM.Analytical.UI.WPF
             string name = text?.Trim() ?? string.Empty;
             if (name.Length != 0)
             {
-                TasOptimisationObjectiveRow? match = objectiveRows.FirstOrDefault(x => x.Name?.Trim() == name);
-                TasOptimisationObjectiveRow? primary = objectiveRows.FirstOrDefault(x => x.Primary);
-                if (match != null)
+                TasOptimisationObjectiveRow? match = objectiveRows.FirstOrDefault(x => string.Equals(x.Name?.Trim(), name, StringComparison.OrdinalIgnoreCase));
+                if (match == null)
                 {
-                    foreach (TasOptimisationObjectiveRow tasOptimisationObjectiveRow in objectiveRows)
-                    {
-                        tasOptimisationObjectiveRow.Primary = tasOptimisationObjectiveRow == match;
-                    }
+                    match = new TasOptimisationObjectiveRow(name, true);
+                    objectiveRows.Add(match);
                 }
-                else if (primary != null)
+
+                foreach (TasOptimisationObjectiveRow tasOptimisationObjectiveRow in objectiveRows)
                 {
-                    primary.Name = name;
-                }
-                else
-                {
-                    objectiveRows.Add(new TasOptimisationObjectiveRow(name, true));
+                    tasOptimisationObjectiveRow.Primary = tasOptimisationObjectiveRow == match;
                 }
             }
 
