@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SAM.Analytical.UI.WPF"
         mc:Ignorable="d"
-        Title="Optimisation — Tas" MinHeight="560" MinWidth="720" Width="860" Height="800"
+        Title="Design Optimisation" MinHeight="560" MinWidth="720" Width="860" Height="800"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip" FontFamily="Roboto Light"
         x:Name="window">
     <Window.Resources>
@@ -13,6 +13,8 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/SAM.Analytical.UI.WPF;component/Themes/PartOStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <local:TasOptimisationAlgorithmNameConverter x:Key="TasOptimisation.AlgorithmName"/>
 
             <!-- A readiness or report line: glyph + title, then the detail. The state never depends on colour alone. -->
             <DataTemplate x:Key="TasOptimisation.CheckTemplate" DataType="{x:Type local:TasOptimisationCheck}">
@@ -38,264 +40,47 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- LAYOUT, top to bottom, in the order an engineer asks the questions: WHAT is optimised (the Tas project and
-         script, the algorithm, the parameters, the outputs), IS it ready (the readiness list), HOW is it going (the
-         run: progress and the live trace) and HOW did it end (the result). The actions sit outside the scroll region
-         and are always reachable. Reference material is one disclosure away. -->
+    <!-- LAYOUT: two tabs, in the order an engineer works. SETUP says WHAT is optimised (the Tas model, the design
+         variables, the objective, the method and when it stops) and whether it is ready; RUN & RESULTS says HOW it is
+         going and HOW it ended. Pressing Run switches to Run & Results. The footer (the readiness sentence, the first
+         problem, Run / Cancel / Close) stays outside the tabs and is always reachable. Reference material and the
+         implementation detail sit one disclosure away (Advanced, Diagnostics). -->
     <Grid Margin="12,10,12,10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ScrollViewer x:Name="scrollViewer" Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel>
-                <TextBlock Style="{StaticResource PartO.Caption}" FontSize="12" Margin="0,0,0,8"
-                           Text="Runs a Tas script (TasGenExecute) again and again on a Tas project, changing the parameters to minimise one output. The SAM optimiser drives it; Java GenOpt is not used. This is not the Part O Optimise (2B) command."/>
+        <TextBlock x:Name="textBlock_Intro" Grid.Row="0" Style="{StaticResource PartO.Caption}" FontSize="12" TextWrapping="Wrap"
+                   Text="Finds the design-variable values that give the lowest objective result. Each simulation runs your Tas script on a copy of the Tas project; your files are not changed."/>
 
-                <!-- WHAT (1): an example's form values. -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="72"/>
-                        <ColumnDefinition Width="260"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Example" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="comboBox_Example" Grid.Column="1" Height="24" VerticalContentAlignment="Center"/>
-                    <Button x:Name="button_LoadExample" Grid.Column="2" Height="24" Padding="10,0" Margin="6,0,0,0" Click="button_LoadExample_Click"
-                            ToolTip="Fill the algorithm, its settings, the parameters and the outputs with the example's values. Your Tas project folder and script are kept.">Load</Button>
-                    <TextBlock Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"
-                               Text="Values of the proven Systems Demo case. Choose your own Tas folder and script."/>
-                </Grid>
-
-                <!-- WHAT (2): the Tas project and the script. -->
-                <TextBlock Text="Tas project" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="72"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Folder" VerticalAlignment="Center"/>
-                    <TextBox x:Name="textBox_Directory" Grid.Row="0" Grid.Column="1" Height="24" VerticalContentAlignment="Center" TextChanged="Input_Changed"
-                             ToolTip="The folder that holds the Tas files (T3D, TBD, TPD, TSD, TWD) the script works on. Each run copies them into its own run folder; the originals are not changed."/>
-                    <Button x:Name="button_Directory" Grid.Row="0" Grid.Column="2" Content="Browse…" Height="24" Padding="10,0" Margin="6,0,0,0" Click="button_Directory_Click"/>
-
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Script" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                    <TextBox x:Name="textBox_ScriptPath" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,6,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed"
-                             ToolTip="The TasGenExecute script (C#), run once for every evaluation."/>
-                    <Button x:Name="button_ScriptPath" Grid.Row="1" Grid.Column="2" Content="Browse…" Height="24" Padding="10,0" Margin="6,6,0,0" Click="button_ScriptPath_Click"/>
-
-                    <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="2,4,0,0" Style="{StaticResource PartO.Caption}"
-                               Text="The script reads each parameter as Variables[&quot;name&quot;].VariableValue and writes each output with ScriptOutput.SetValue(&quot;name&quot;, value)."/>
-                </Grid>
-
-                <!-- WHAT (3): the algorithm, its own settings, and when it stops. -->
-                <TextBlock Text="Algorithm" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="72"/>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Algorithm" VerticalAlignment="Center"/>
-                    <ComboBox x:Name="comboBox_Algorithm" Grid.Column="1" Height="24" VerticalContentAlignment="Center" SelectionChanged="comboBox_Algorithm_SelectionChanged"/>
-                    <TextBlock x:Name="textBlock_Algorithm" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"/>
-                </Grid>
-
-                <Grid x:Name="grid_GoldenSection" Margin="72,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="90"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="AbsDiffFunction" VerticalAlignment="Center"/>
-                    <TextBox x:Name="textBox_AbsDiffFunction" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
-                    <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"
-                               Text="Stops when the objective values differ by less than this."/>
-                </Grid>
-
-                <Grid x:Name="grid_HookeJeeves" Margin="72,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="90"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="MeshSizeDivider" VerticalAlignment="Center"/>
-                    <TextBox x:Name="textBox_MeshSizeDivider" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
-                    <TextBlock Grid.Row="0" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Each step reduction divides the step by this (an integer, at least 2)."/>
-
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="InitialMeshSizeExponent" VerticalAlignment="Center" Margin="0,4,0,0"/>
-                    <TextBox x:Name="textBox_InitialMeshSizeExponent" Grid.Row="1" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
-                    <TextBlock Grid.Row="1" Grid.Column="2" Margin="10,4,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Integer, at least 0."/>
-
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="MeshSizeExponentIncrement" VerticalAlignment="Center" Margin="0,4,0,0"/>
-                    <TextBox x:Name="textBox_MeshSizeExponentIncrement" Grid.Row="2" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
-                    <TextBlock Grid.Row="2" Grid.Column="2" Margin="10,4,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Integer, at least 1."/>
-
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="NumberOfStepReduction" VerticalAlignment="Center" Margin="0,4,0,0"/>
-                    <TextBox x:Name="textBox_NumberOfStepReduction" Grid.Row="3" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
-                    <TextBlock Grid.Row="3" Grid.Column="2" Margin="10,4,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Stops once the step has been reduced this many times (an integer, at least 1)."/>
-                </Grid>
-
-                <Grid Margin="72,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="90"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Max simulations (MaxIte)" VerticalAlignment="Center"/>
-                    <TextBox x:Name="textBox_MaxIterations" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
-                    <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"
-                               Text="The run also stops at this many Tas simulations."/>
-                </Grid>
-
-                <!-- WHAT (4): the parameters. Golden section reads only the bounds, so Start and Step are shown as not
-                     applicable for it rather than as editable values it would ignore. -->
-                <Grid Margin="0,14,0,4">
-                    <TextBlock Text="Parameters" Style="{StaticResource PartO.SectionHeading}" Margin="0" VerticalAlignment="Center"/>
-                    <Button x:Name="button_AddParameter" HorizontalAlignment="Right" Height="22" Padding="10,0" Click="button_AddParameter_Click">Add parameter</Button>
-                </Grid>
-                <Grid Margin="0,0,0,2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="30"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Name" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}"/>
-                    <TextBlock Grid.Column="1" Text="Start" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
-                    <TextBlock Grid.Column="2" Text="Min" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
-                    <TextBlock Grid.Column="3" Text="Max" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
-                    <TextBlock Grid.Column="4" Text="Step" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
-                </Grid>
-                <ItemsControl x:Name="itemsControl_Parameters" Focusable="False">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type local:TasOptimisationParameterRow}">
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="100"/>
-                                    <ColumnDefinition Width="100"/>
-                                    <ColumnDefinition Width="100"/>
-                                    <ColumnDefinition Width="100"/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox Grid.Column="0" Height="22" VerticalContentAlignment="Center" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
-                                         ToolTip="The name the script reads: Variables[&quot;name&quot;]."/>
-                                <TextBox Grid.Column="1" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Start, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
-                                         Visibility="{Binding StartAndStepApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="The start value (GenOpt Ini)."/>
-                                <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Text="not used" FontStyle="Italic" Foreground="{StaticResource PartO.Brush.Subtle}"
-                                           Visibility="{Binding StartAndStepNotApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="Golden section uses only the bounds: Start does not apply."/>
-                                <TextBox Grid.Column="2" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Minimum, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed" ToolTip="Lower bound."/>
-                                <TextBox Grid.Column="3" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Maximum, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed" ToolTip="Upper bound."/>
-                                <TextBox Grid.Column="4" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Step, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
-                                         Visibility="{Binding StartAndStepApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="The pattern-search step."/>
-                                <TextBlock Grid.Column="4" Margin="10,0,0,0" VerticalAlignment="Center" Text="not used" FontStyle="Italic" Foreground="{StaticResource PartO.Brush.Subtle}"
-                                           Visibility="{Binding StartAndStepNotApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="Golden section uses only the bounds: Step does not apply."/>
-                                <Button Grid.Column="5" Width="22" Height="22" HorizontalAlignment="Right" Content="✕" Click="button_RemoveParameter_Click" ToolTip="Remove this parameter."/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock x:Name="textBlock_Parameters" Style="{StaticResource PartO.Caption}" Margin="0,0,0,0"/>
-
-                <!-- WHAT (5): the outputs, one of them the primary (minimised) objective. -->
-                <Grid Margin="0,14,0,4">
-                    <TextBlock Text="Outputs" Style="{StaticResource PartO.SectionHeading}" Margin="0" VerticalAlignment="Center"/>
-                    <Button x:Name="button_AddObjective" HorizontalAlignment="Right" Height="22" Padding="10,0" Click="button_AddObjective_Click">Add output</Button>
-                </Grid>
-                <Grid Margin="0,0,0,2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="110"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="30"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Primary objective" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}"/>
-                    <TextBlock Grid.Column="1" Text="Name" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}"/>
-                </Grid>
-                <ItemsControl x:Name="itemsControl_Objectives" Focusable="False">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type local:TasOptimisationObjectiveRow}">
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <RadioButton Grid.Column="0" GroupName="TasOptimisationPrimaryObjective" VerticalAlignment="Center" Content="minimise"
-                                             IsChecked="{Binding Primary, Mode=TwoWay}" Checked="Input_Changed"
-                                             ToolTip="The output the optimiser minimises. The others are recorded for every evaluation."/>
-                                <TextBox Grid.Column="1" Height="22" VerticalContentAlignment="Center" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
-                                         ToolTip="The name the script writes: ScriptOutput.SetValue(&quot;name&quot;, value)."/>
-                                <Button Grid.Column="2" Width="22" Height="22" HorizontalAlignment="Right" Content="✕" Click="button_RemoveObjective_Click" ToolTip="Remove this output."/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock x:Name="textBlock_Objectives" Style="{StaticResource PartO.Caption}"/>
-
-                <!-- IS IT READY: each line is a SAM_Tas rule or a file check; the run starts only with no ✕. -->
-                <TextBlock Text="Readiness" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
-                <ItemsControl x:Name="itemsControl_Checks" Focusable="False" ItemTemplate="{StaticResource TasOptimisation.CheckTemplate}"/>
-
-                <!-- HOW IS IT GOING: shown from the first run on. The kernel reports a point after its evaluation, so
-                     the line under the bar is the last point reported, never a point being evaluated. -->
-                <StackPanel x:Name="stackPanel_Run" Visibility="Collapsed" Margin="0,14,0,0">
-                    <TextBlock Text="Run" Style="{StaticResource PartO.SectionHeading}"/>
-                    <TextBlock x:Name="textBlock_RunStatus" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{StaticResource PartO.Brush.Text}"/>
-                    <ProgressBar x:Name="progressBar_Run" Height="6" Margin="0,6,0,6" IsIndeterminate="False"/>
-                    <TextBlock x:Name="textBlock_RunSimulation" TextWrapping="Wrap" Foreground="{StaticResource PartO.Brush.Text}"/>
-                    <TextBlock x:Name="textBlock_RunLast" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" Margin="0,2,0,0"/>
-                    <TextBlock x:Name="textBlock_RunLowest" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" Margin="0,2,0,0"/>
-                    <TextBlock x:Name="textBlock_RunNote" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" Margin="0,4,0,6"
-                               Text="Cancel takes effect when the current Tas evaluation finishes - a running TasGenExecute simulation is never interrupted."/>
-                    <DataGrid x:Name="dataGrid_Trace" Height="220" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
-                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource PartO.Brush.Border}"
-                              BorderBrush="{StaticResource PartO.Brush.Border}" SelectionMode="Single" FontSize="11"/>
-                </StackPanel>
-
-                <!-- HOW DID IT END: the kernel's outcome, best point and run folder. -->
-                <Border x:Name="border_Result" Visibility="Collapsed" Margin="0,12,0,0" Padding="10,8" CornerRadius="4" BorderThickness="1"
-                        Background="{StaticResource PartO.Brush.Surface}" BorderBrush="{StaticResource PartO.Brush.Border}">
-                    <StackPanel>
+        <TabControl x:Name="tabControl_Main" Grid.Row="1" Margin="0,8,0,0" Padding="0">
+            <!-- ============================== SETUP ============================== -->
+            <TabItem x:Name="tabItem_Setup" Header="Setup" IsSelected="True">
+                <ScrollViewer x:Name="scrollViewer_Setup" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="10,10,12,10">
+                        <!-- An example's form values. -->
                         <Grid>
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="260"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="textBlock_ResultGlyph" Style="{StaticResource PartO.StatusGlyph}" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="textBlock_ResultHeadline" Grid.Column="1" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{StaticResource PartO.Brush.Text}"/>
+                            <TextBlock Grid.Column="0" Text="Example" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="comboBox_Example" Grid.Column="1" Height="24" VerticalContentAlignment="Center"/>
+                            <Button x:Name="button_LoadExample" Grid.Column="2" Height="24" Padding="10,0" Margin="6,0,0,0" Click="button_LoadExample_Click"
+                                    ToolTip="Fill the method, its settings, the design variables and the outputs with the example's values. Your Tas project and Tas script are kept.">Load</Button>
+                            <TextBlock Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"
+                                       Text="Values of the proven Systems Demo case. Choose your own Tas project and script."/>
                         </Grid>
-                        <ItemsControl x:Name="itemsControl_Result" Focusable="False" Margin="0,6,0,0" ItemTemplate="{StaticResource TasOptimisation.CheckTemplate}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <Button x:Name="button_OpenRunFolder" Height="24" Padding="10,0" Margin="0,0,8,0" Click="button_OpenRunFolder_Click">Open run folder</Button>
-                            <Button x:Name="button_CopySummary" Height="24" Padding="10,0" Click="button_CopySummary_Click">Copy summary</Button>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
 
-                <!-- ADVANCED / DETAILS: what is rarely changed, and the reference text. -->
-                <Expander x:Name="expander_Advanced" Header="Advanced / Details" Margin="0,12,0,4" Foreground="{StaticResource PartO.Brush.Muted}">
-                    <StackPanel Margin="18,4,0,0">
+                        <!-- MODEL -->
+                        <TextBlock Text="Model" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="90"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
@@ -303,29 +88,278 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Tas project" VerticalAlignment="Center"/>
+                            <TextBox x:Name="textBox_Directory" Grid.Row="0" Grid.Column="1" Height="24" VerticalContentAlignment="Center" TextChanged="Input_Changed"
+                                     ToolTip="The folder that holds the Tas files (T3D, TBD, TPD, TSD, TWD) the script works on. Each simulation runs on a copy of them in its own folder; the originals are not changed."/>
+                            <Button x:Name="button_Directory" Grid.Row="0" Grid.Column="2" Content="Browse…" Height="24" Padding="10,0" Margin="6,0,0,0" Click="button_Directory_Click"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Tas script" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                            <TextBox x:Name="textBox_ScriptPath" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,6,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed"
+                                     ToolTip="The C# script that Tas runs once for every simulation. It reads each design variable as Variables[&quot;name&quot;].VariableValue and writes each output with ScriptOutput.SetValue(&quot;name&quot;, value). The names must match the ones listed below."/>
+                            <Button x:Name="button_ScriptPath" Grid.Row="1" Grid.Column="2" Content="Browse…" Height="24" Padding="10,0" Margin="6,6,0,0" Click="button_ScriptPath_Click"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="2,6,0,0" Text="Simulation engine: Tas (script)" Style="{StaticResource PartO.Caption}"/>
+                        </Grid>
+
+                        <!-- DESIGN VARIABLES. Golden section reads only the bounds, so Start and Step are shown as not
+                             used for it rather than as editable values it would ignore. -->
+                        <Grid Margin="0,14,0,4">
+                            <TextBlock Text="Design variables" Style="{StaticResource PartO.SectionHeading}" Margin="0" VerticalAlignment="Center"/>
+                            <Button x:Name="button_AddParameter" HorizontalAlignment="Right" Height="22" Padding="10,0" Click="button_AddParameter_Click">Add design variable</Button>
+                        </Grid>
+                        <Grid Margin="0,0,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="30"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Name" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}"/>
+                            <TextBlock Grid.Column="1" Text="Start" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="2" Text="Minimum" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="3" Text="Maximum" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="4" Text="Step" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                        </Grid>
+                        <ItemsControl x:Name="itemsControl_Parameters" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:TasOptimisationParameterRow}">
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="30"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Height="22" VerticalContentAlignment="Center" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                                 ToolTip="The name of the design variable, as the Tas script reads it."/>
+                                        <TextBox Grid.Column="1" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Start, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                                 Visibility="{Binding StartAndStepApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="The value the search starts from. GenOpt: Ini"/>
+                                        <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Text="not used" FontStyle="Italic" Foreground="{StaticResource PartO.Brush.Subtle}"
+                                                   Visibility="{Binding StartAndStepNotApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="Golden section uses only the minimum and maximum: the start value does not apply."/>
+                                        <TextBox Grid.Column="2" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Minimum, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed" ToolTip="Lowest value the design variable may take. GenOpt: Min"/>
+                                        <TextBox Grid.Column="3" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Maximum, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed" ToolTip="Highest value the design variable may take. GenOpt: Max"/>
+                                        <TextBox Grid.Column="4" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Step, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                                 Visibility="{Binding StartAndStepApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="The size of the first move of the pattern search. GenOpt: Step"/>
+                                        <TextBlock Grid.Column="4" Margin="10,0,0,0" VerticalAlignment="Center" Text="not used" FontStyle="Italic" Foreground="{StaticResource PartO.Brush.Subtle}"
+                                                   Visibility="{Binding StartAndStepNotApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="Golden section uses only the minimum and maximum: the step does not apply."/>
+                                        <Button Grid.Column="5" Width="22" Height="22" HorizontalAlignment="Right" Content="✕" Click="button_RemoveParameter_Click" ToolTip="Remove this design variable."/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="textBlock_Parameters" Style="{StaticResource PartO.Caption}"/>
+
+                        <!-- OBJECTIVE: the one output that is minimised. Type its name or pick one of the outputs. -->
+                        <TextBlock Text="Objective" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="260"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Minimise" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="comboBox_Objective" Grid.Column="1" Height="24" IsEditable="True" IsTextSearchEnabled="False" VerticalContentAlignment="Center"
+                                      SelectionChanged="comboBox_Objective_SelectionChanged" LostKeyboardFocus="comboBox_Objective_LostKeyboardFocus" KeyDown="comboBox_Objective_KeyDown"
+                                      ToolTip="The output the optimiser makes as low as possible. Pick one of the outputs, or type the name of the output the Tas script writes."/>
+                            <TextBlock x:Name="textBlock_Objectives" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}"/>
+                        </Grid>
+
+                        <!-- RECORDED OUTPUTS: the remaining outputs. -->
+                        <Grid Margin="0,14,0,0">
+                            <TextBlock Text="Recorded outputs" Style="{StaticResource PartO.SectionHeading}" Margin="0" VerticalAlignment="Center"/>
+                            <Button x:Name="button_AddObjective" HorizontalAlignment="Right" Height="22" Padding="10,0" Click="button_AddObjective_Click">Add output</Button>
+                        </Grid>
+                        <TextBlock Style="{StaticResource PartO.Caption}" Margin="0,0,0,4" Text="Recorded for every simulation, not optimised."/>
+                        <ItemsControl x:Name="itemsControl_Objectives" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:TasOptimisationObjectiveRow}">
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="30"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Height="22" VerticalContentAlignment="Center" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                                 ToolTip="The name of the output, as the Tas script writes it."/>
+                                        <Button Grid.Column="1" Width="22" Height="22" HorizontalAlignment="Right" Content="✕" Click="button_RemoveObjective_Click" ToolTip="Remove this output."/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- METHOD: how the search proceeds, and its own settings. -->
+                        <TextBlock Text="Method" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="260"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Method" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="comboBox_Algorithm" Grid.Column="1" Height="24" VerticalContentAlignment="Center" SelectionChanged="comboBox_Algorithm_SelectionChanged">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource TasOptimisation.AlgorithmName}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock x:Name="textBlock_Algorithm" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}"/>
+                        </Grid>
+
+                        <Grid x:Name="grid_GoldenSection" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170"/>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Objective tolerance" VerticalAlignment="Center" ToolTip="GenOpt: AbsDiffFunction"/>
+                            <TextBox x:Name="textBox_AbsDiffFunction" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: AbsDiffFunction"/>
+                            <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"
+                                       Text="The search stops when the objective values differ by less than this."/>
+                        </Grid>
+
+                        <Grid x:Name="grid_HookeJeeves" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170"/>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Runs folder" VerticalAlignment="Center" Foreground="{StaticResource PartO.Brush.Text}"/>
-                            <TextBox x:Name="textBox_RunsDirectory" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
-                            <Button x:Name="button_RunsDirectory" Grid.Row="0" Grid.Column="2" Content="Browse…" Height="22" Padding="10,0" Margin="6,0,0,0" Click="button_RunsDirectory_Click"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="2,2,0,6" Style="{StaticResource PartO.Caption}"
-                                       Text="Each run gets its own folder here. Empty: SAM_NativeGenOpt in the Tas project folder. Keep the path short: Tas refuses very long paths."/>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Step reduction factor" VerticalAlignment="Center" ToolTip="GenOpt: MeshSizeDivider"/>
+                            <TextBox x:Name="textBox_MeshSizeDivider" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MeshSizeDivider"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Each step reduction divides the step by this (a whole number, at least 2)."/>
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="MaxEqualResults" VerticalAlignment="Center" Foreground="{StaticResource PartO.Brush.Text}"/>
-                            <TextBox x:Name="textBox_MaxEqualResults" Grid.Row="2" Grid.Column="1" Width="90" HorizontalAlignment="Left" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="2,2,0,6" Style="{StaticResource PartO.Caption}"
-                                       Text="A GenOpt setting kept for compatibility: at least 2, with no effect on golden section or Hooke-Jeeves."/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Step reductions" VerticalAlignment="Center" Margin="0,4,0,0" ToolTip="GenOpt: NumberOfStepReduction"/>
+                            <TextBox x:Name="textBox_NumberOfStepReduction" Grid.Row="1" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: NumberOfStepReduction"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2" Margin="10,4,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="The search stops once the step has been reduced this many times (a whole number, at least 1)."/>
                         </Grid>
-                        <TextBlock Style="{StaticResource PartO.Caption}" Margin="0,4,0,0"
-                                   Text="The SAM optimiser (SAM.Math) evaluates each point with TasGenExecute.exe in a fresh folder of the run, one evaluation at a time, and retries a failed evaluation once. Golden section and GPS Hooke-Jeeves are offered; other GenOpt algorithms are not run by the native optimiser. Each output is read from the line 'name::value' TasGenExecute writes."/>
-                        <TextBlock x:Name="textBlock_Assemblies" Style="{StaticResource PartO.Caption}" Margin="0,6,0,0"/>
-                    </StackPanel>
-                </Expander>
-            </StackPanel>
-        </ScrollViewer>
 
-        <!-- WHAT NEXT: the next-step line and the actions, outside the scroll region. -->
-        <Border Grid.Row="1" Margin="0,8,0,0" Padding="0,8,0,0" BorderBrush="{StaticResource PartO.Brush.Border}" BorderThickness="0,1,0,0">
+                        <!-- STOPPING -->
+                        <TextBlock Text="Stopping" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170"/>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Maximum simulations" VerticalAlignment="Center" ToolTip="GenOpt: MaxIte"/>
+                            <TextBox x:Name="textBox_MaxIterations" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MaxIte"/>
+                            <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"
+                                       Text="The run also stops after this many Tas simulations."/>
+                        </Grid>
+
+                        <!-- ADVANCED: what is rarely changed. -->
+                        <Expander x:Name="expander_Advanced" Header="Advanced" IsExpanded="False" Margin="0,14,0,0" Foreground="{StaticResource PartO.Brush.Muted}">
+                            <StackPanel Margin="18,6,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Runs folder" VerticalAlignment="Center" Foreground="{StaticResource PartO.Brush.Text}"/>
+                                    <TextBox x:Name="textBox_RunsDirectory" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed"/>
+                                    <Button x:Name="button_RunsDirectory" Grid.Row="0" Grid.Column="2" Content="Browse…" Height="22" Padding="10,0" Margin="6,0,0,0" Click="button_RunsDirectory_Click"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="2,2,0,6" Style="{StaticResource PartO.Caption}"
+                                               Text="Each run gets its own folder here. Empty: SAM_NativeGenOpt in the Tas project folder. Keep the path short: Tas refuses very long paths."/>
+                                </Grid>
+                                <Grid x:Name="grid_HookeJeevesAdvanced">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Initial step exponent" VerticalAlignment="Center" Foreground="{StaticResource PartO.Brush.Text}" ToolTip="GenOpt: InitialMeshSizeExponent"/>
+                                    <TextBox x:Name="textBox_InitialMeshSizeExponent" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: InitialMeshSizeExponent"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Hooke–Jeeves only. A whole number, at least 0."/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Step exponent increment" VerticalAlignment="Center" Margin="0,4,0,0" Foreground="{StaticResource PartO.Brush.Text}" ToolTip="GenOpt: MeshSizeExponentIncrement"/>
+                                    <TextBox x:Name="textBox_MeshSizeExponentIncrement" Grid.Row="1" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MeshSizeExponentIncrement"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="2" Margin="10,4,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Hooke–Jeeves only. A whole number, at least 1."/>
+                                </Grid>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- CHECKS: each line is a SAM_Tas rule or a file check; the run starts only with no ✕. -->
+                        <TextBlock Text="Checks" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
+                        <ItemsControl x:Name="itemsControl_Checks" Focusable="False" ItemTemplate="{StaticResource TasOptimisation.CheckTemplate}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============================== RUN & RESULTS ============================== -->
+            <TabItem x:Name="tabItem_Run" Header="Run &amp; Results">
+                <ScrollViewer x:Name="scrollViewer_Run" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="10,10,12,10">
+                        <TextBlock x:Name="textBlock_RunEmpty" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" FontSize="12"
+                                   Text="No run yet. Set up the optimisation on the Setup tab and press Run optimisation: the progress, the trace of simulations and the result appear here."/>
+
+                        <!-- HOW IS IT GOING: shown from the first run on. The kernel reports a point after its simulation, so
+                             the line under the bar is the last point reported, never a point being simulated. -->
+                        <StackPanel x:Name="stackPanel_Run" Visibility="Collapsed">
+                            <TextBlock Text="Progress" Style="{StaticResource PartO.SectionHeading}"/>
+                            <TextBlock x:Name="textBlock_RunStatus" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{StaticResource PartO.Brush.Text}"/>
+                            <ProgressBar x:Name="progressBar_Run" Height="6" Margin="0,6,0,6" IsIndeterminate="False"/>
+                            <TextBlock x:Name="textBlock_RunSimulation" TextWrapping="Wrap" Foreground="{StaticResource PartO.Brush.Text}"/>
+                            <TextBlock x:Name="textBlock_RunLast" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="textBlock_RunLowest" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="textBlock_RunNote" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}" Margin="0,4,0,6"
+                                       Text="Cancel takes effect when the current Tas simulation finishes - a running simulation is never interrupted."/>
+                            <CheckBox x:Name="checkBox_SearchDetails" Content="Show search details" Margin="0,0,0,4" Checked="checkBox_SearchDetails_Changed" Unchecked="checkBox_SearchDetails_Changed"
+                                      ToolTip="Adds the search's iteration counter and the event that produced each simulation to the trace."/>
+                            <DataGrid x:Name="dataGrid_Trace" Height="220" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                                      HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource PartO.Brush.Border}"
+                                      BorderBrush="{StaticResource PartO.Brush.Border}" SelectionMode="Single" FontSize="11"/>
+                        </StackPanel>
+
+                        <!-- HOW DID IT END: the outcome, the best design and the run folder. -->
+                        <Border x:Name="border_Result" Visibility="Collapsed" Margin="0,12,0,0" Padding="10,8" CornerRadius="4" BorderThickness="1"
+                                Background="{StaticResource PartO.Brush.Surface}" BorderBrush="{StaticResource PartO.Brush.Border}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="textBlock_ResultGlyph" Style="{StaticResource PartO.StatusGlyph}" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="textBlock_ResultHeadline" Grid.Column="1" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{StaticResource PartO.Brush.Text}"/>
+                                </Grid>
+                                <ItemsControl x:Name="itemsControl_Result" Focusable="False" Margin="0,6,0,0" ItemTemplate="{StaticResource TasOptimisation.CheckTemplate}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Button x:Name="button_OpenRunFolder" Height="24" Padding="10,0" Margin="0,0,8,0" Click="button_OpenRunFolder_Click">Open run folder</Button>
+                                    <Button x:Name="button_CopySummary" Height="24" Padding="10,0" Click="button_CopySummary_Click">Copy summary</Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- DIAGNOSTICS: the implementation detail behind a run, for support and for a stale installation. -->
+                        <Expander x:Name="expander_Diagnostics" Header="Diagnostics" IsExpanded="False" Margin="0,14,0,0" Foreground="{StaticResource PartO.Brush.Muted}">
+                            <TextBox x:Name="textBox_Diagnostics" Margin="18,6,0,0" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
+                                     FontSize="11" Foreground="{StaticResource PartO.Brush.Muted}"/>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- WHAT NEXT: the readiness sentence, the first problem and the actions, outside the tabs. -->
+        <Border Grid.Row="2" Margin="0,8,0,0" Padding="0,8,0,0" BorderBrush="{StaticResource PartO.Brush.Border}" BorderThickness="0,1,0,0">
             <StackPanel>
                 <TextBlock x:Name="textBlock_NextStep" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource PartO.Brush.Text}"/>
                 <Grid>
@@ -333,7 +367,7 @@
                         <Button x:Name="button_Run" MinWidth="150" Height="28" Margin="0,0,8,0" IsDefault="True" IsEnabled="False" Click="button_Run_Click"
                                 Style="{StaticResource PartO.PrimaryButton}" ToolTipService.ShowOnDisabled="True">Run optimisation</Button>
                         <Button x:Name="button_Cancel" MinWidth="110" Height="28" Visibility="Collapsed" Click="button_Cancel_Click"
-                                ToolTip="Stop after the current Tas evaluation. A running TasGenExecute simulation is never interrupted.">Cancel run</Button>
+                                ToolTip="Stop after the current Tas simulation. A running simulation is never interrupted.">Cancel run</Button>
                     </StackPanel>
                     <Button x:Name="button_Close" IsCancel="True" Width="80" Height="28" HorizontalAlignment="Right" VerticalAlignment="Top" Click="button_Close_Click">Close</Button>
                 </Grid>

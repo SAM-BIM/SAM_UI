@@ -28,11 +28,13 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(checks.CanRun());
             Assert.All(checks, x => Assert.Equal(TasOptimisationCheckStatus.Ready, x.Status));
-            Assert.Contains("Model.tbd", Check(checks, "Tas project folder").Detail);
-            Assert.Contains(workspace.RunsDirectory, Check(checks, "Tas project folder").Detail);
-            Assert.Equal("Script.txt", Check(checks, "Script").Detail);
-            Assert.Equal(TasOptimisationWorkspace.StubExecutable, Check(checks, "TasGenExecute").Detail);
-            Assert.Equal("GoldenSection · 1 parameter(s): Setpoint · minimises Result (also records Cost, CO2) · up to 2000 simulations", Check(checks, "Optimisation settings").Detail);
+            Assert.Contains("Model.tbd", Check(checks, "Tas project").Detail);
+            Assert.Contains(workspace.RunsDirectory, Check(checks, "Tas project").Detail);
+            Assert.Equal("Script.txt", Check(checks, "Tas script").Detail);
+            //The engine's path is for Diagnostics: the ready line says only that it is there.
+            Assert.Equal("Installed.", Check(checks, "Tas optimisation engine").Detail);
+            Assert.DoesNotContain(checks, x => x.Title.Contains(TasOptimisationWorkspace.StubExecutable) || x.Detail.Contains(TasOptimisationWorkspace.StubExecutable));
+            Assert.Equal("Golden section on Setpoint (\u22125 to 35), minimising Result; recording Cost, CO2; at most 2000 simulations.", Check(checks, "Setup").Detail);
         }
 
         [Fact]
@@ -41,9 +43,9 @@ namespace SAM.Analytical.UI.WPF.Tests
             List<TasOptimisationCheck> checks = TasOptimisationInput.Create(TasOptimisationInput.DefaultExample).TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
 
             Assert.False(checks.CanRun());
-            Assert.Equal(TasOptimisationCheckStatus.Blocked, Check(checks, "Tas project folder").Status);
-            Assert.Equal(TasOptimisationCheckStatus.Blocked, Check(checks, "Script").Status);
-            Assert.Equal(TasOptimisationCheckStatus.Ready, Check(checks, "Optimisation settings").Status);
+            Assert.Equal(TasOptimisationCheckStatus.Blocked, Check(checks, "Tas project").Status);
+            Assert.Equal(TasOptimisationCheckStatus.Blocked, Check(checks, "Tas script").Status);
+            Assert.Equal(TasOptimisationCheckStatus.Ready, Check(checks, "Setup").Status);
         }
 
         [Fact]
@@ -52,7 +54,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(tasFile: false);
             File.WriteAllText(Path.Combine(workspace.Directory, "notes.txt"), "x");
 
-            TasOptimisationCheck check = Check(workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Tas project folder");
+            TasOptimisationCheck check = Check(workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Tas project");
 
             Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
             Assert.Contains(".tbd", check.Detail);
@@ -88,7 +90,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Assert.Empty(Query.TasOptimisationTasFiles(workspace.Directory));
 
                 List<TasOptimisationCheck> checks = workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
-                TasOptimisationCheck check = Check(checks, "Tas project folder");
+                TasOptimisationCheck check = Check(checks, "Tas project");
 
                 Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
                 Assert.Equal("The folder cannot be read: " + error, check.Detail);
@@ -103,10 +105,10 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             TasOptimisationInput input = workspace.Input();
             input.ScriptPath = Path.Combine(workspace.Directory, "missing.txt");
-            Assert.Equal(TasOptimisationCheckStatus.Blocked, Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Script").Status);
+            Assert.Equal(TasOptimisationCheckStatus.Blocked, Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Tas script").Status);
 
             File.WriteAllText(workspace.ScriptPath, "   ");
-            Assert.Contains("empty", Check(workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Script").Detail);
+            Assert.Contains("empty", Check(workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Tas script").Detail);
         }
 
         [Fact]
@@ -115,7 +117,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
             string path = Path.Combine(workspace.Directory, "TasGenExecute.exe");
 
-            TasOptimisationCheck check = Check(workspace.Input().TasOptimisationChecks(path), "TasGenExecute");
+            TasOptimisationCheck check = Check(workspace.Input().TasOptimisationChecks(path), "Tas optimisation engine");
 
             Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
             Assert.Contains(path, check.Detail);
@@ -126,7 +128,10 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
 
-            Assert.Contains(Analytical.Tas.GenOpt.Query.TasGenOptExecutePath(), Check(workspace.Input().TasOptimisationChecks(), "TasGenExecute").Detail);
+            //Installed or not, the installed engine is the one checked: a missing one is named by its path (an error needs it), an installed one is not.
+            TasOptimisationCheck check = Check(workspace.Input().TasOptimisationChecks(), "Tas optimisation engine");
+            Assert.Equal(File.Exists(Analytical.Tas.GenOpt.Query.TasGenOptExecutePath()), check.Status == TasOptimisationCheckStatus.Ready);
+            Assert.True(check.Status == TasOptimisationCheckStatus.Ready ? check.Detail == "Installed." : check.Detail.Contains(Analytical.Tas.GenOpt.Query.TasGenOptExecutePath()));
         }
 
         [Fact]
@@ -136,11 +141,13 @@ namespace SAM.Analytical.UI.WPF.Tests
             TasOptimisationInput input = workspace.Input();
             input.Parameters.Add(new TasOptimisationParameterRow("Other", "0", "0", "1", "1"));
 
-            TasOptimisationCheck check = Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Optimisation settings");
+            TasOptimisationCheck check = Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Setup");
 
             GenOptCompatibilityException expected = Assert.Throws<GenOptCompatibilityException>(() => Analytical.Tas.GenOpt.Convert.ToSAM_Optimiser(new GoldenSectionAlgorithm(), new OptimizationSettings(), 2));
             Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
-            Assert.Equal("Invalid GenOpt settings for the native route: " + expected.Message, check.Detail);
+            //SAM_Tas' message word for word, without the internal "Invalid GenOpt settings for the native route" prefix.
+            Assert.Equal(expected.Message, check.Detail);
+            Assert.DoesNotContain("native route", check.Detail);
             Assert.False(Directory.Exists(workspace.RunsDirectory));
         }
 
@@ -152,7 +159,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             input.Parameters[0].Minimum = "a";
             input.MaxIterations = "many";
 
-            TasOptimisationCheck check = Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Optimisation settings");
+            TasOptimisationCheck check = Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Setup");
 
             Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
             Assert.Equal(2, check.Detail.Split(Environment.NewLine).Length);
@@ -166,7 +173,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             List<TasOptimisationCheck> checks = workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
 
             Assert.True(checks.CanRun());
-            Assert.Equal(["Parameter 'Setpoint'", "Output 'Cost'", "Output 'CO2'"], checks.Where(x => x.Status == TasOptimisationCheckStatus.Warning).Select(x => x.Title));
+            Assert.Equal(["Design variable 'Setpoint'", "Output 'Cost'", "Output 'CO2'"], checks.Where(x => x.Status == TasOptimisationCheckStatus.Warning).Select(x => x.Title));
+
+            //The warning names the problem; the script's syntax is in the Script field's tooltip, not here.
+            Assert.All(checks.Where(x => x.Status == TasOptimisationCheckStatus.Warning), x => Assert.DoesNotContain("SetValue", x.Detail + x.Title));
+            Assert.All(checks.Where(x => x.Status == TasOptimisationCheckStatus.Warning), x => Assert.DoesNotContain("VariableValue", x.Detail + x.Title));
             Assert.DoesNotContain(checks, x => x.Title == "Output 'Result'");
         }
 

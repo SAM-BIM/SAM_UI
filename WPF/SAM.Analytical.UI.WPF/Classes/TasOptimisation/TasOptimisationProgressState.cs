@@ -37,7 +37,7 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>Simulations counted by the kernel so far.</summary>
         public int Simulations { get; private set; }
 
-        /// <summary>The simulation limit (MaxIte).</summary>
+        /// <summary>The simulation limit (Maximum simulations).</summary>
         public int MaximumSimulations { get; private set; }
 
         /// <summary>The last entry reported.</summary>
@@ -78,7 +78,7 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>"Simulation n (limit m)".</summary>
         public string SimulationText()
         {
-            return string.Format(CultureInfo.InvariantCulture, "Simulation {0} (limit {1})", Simulations, MaximumSimulations);
+            return string.Format(CultureInfo.InvariantCulture, "Simulation {0} (limit {1})", TasOptimisationReport.Count(Simulations), TasOptimisationReport.Count(MaximumSimulations));
         }
 
         /// <summary>The last reported point, e.g. "Simulation 4: Setpoint = 10 -> Result = 7360.04".</summary>
@@ -87,7 +87,7 @@ namespace SAM.Analytical.UI.WPF
             return Last == null ? null : Text(Last);
         }
 
-        /// <summary>The lowest point so far.</summary>
+        /// <summary>The best (lowest-objective) point so far.</summary>
         public string? LowestText()
         {
             return Lowest == null ? null : Text(Lowest);
@@ -99,7 +99,7 @@ namespace SAM.Analytical.UI.WPF
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "Simulation {0}: {1} -> {2}",
-                optimisationTraceEntry.Simulation,
+                TasOptimisationReport.Count(optimisationTraceEntry.Simulation),
                 TasOptimisationReport.Text(ParameterNames, optimisationTraceEntry.Coordinates),
                 TasOptimisationReport.Text(ObjectiveNames, objective));
         }

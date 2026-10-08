@@ -182,7 +182,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.False(input.TryGetDefinition(out TasOptimisationDefinition definition, out List<string> problems));
             Assert.Null(definition);
-            Assert.Contains(problems, x => x.Contains("Start") && x.Contains("'ten' is not a number"));
+            Assert.Contains(problems, x => x.Contains("Design variable 1 (Setpoint) start") && x.Contains("'ten' is not a number"));
         }
 
         [Fact]
@@ -207,7 +207,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             input.Parameters[0].Maximum = "3,5";
 
             Assert.False(input.TryGetDefinition(out _, out List<string> problems));
-            Assert.Contains(problems, x => x.Contains("Max") && x.Contains("'.' as the decimal separator"));
+            Assert.Contains(problems, x => x.Contains("Design variable 1 (Setpoint) maximum") && x.Contains("'.' as the decimal separator"));
         }
 
         // ---- the primary objective -----------------------------------------------------------------------
@@ -254,7 +254,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             }
 
             Assert.False(input.TryGetDefinition(out _, out List<string> problems));
-            Assert.Contains(problems, x => x.Contains("primary objective"));
+            Assert.Contains(problems, x => x == "Choose the output to minimise (the objective).");
         }
 
         [Fact]

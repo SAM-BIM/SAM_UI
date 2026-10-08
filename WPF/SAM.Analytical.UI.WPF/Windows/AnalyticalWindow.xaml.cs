@@ -706,7 +706,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_Optimisation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_Optimisation);
             RibbonButton_Optimisation.Click += RibbonButton_Optimisation_Click;
             RibbonButton_Optimisation.ToolTipTitle = "Optimisation";
-            RibbonButton_Optimisation.ToolTipDescription = "Run a Tas script (TasGenExecute) again and again on a Tas project folder, changing its parameters to minimise one output - the native SAM optimiser (golden section or GPS Hooke-Jeeves). Works on Tas files, not on the open model. Not the Part O Optimise (2B) command.";
+            RibbonButton_Optimisation.ToolTipDescription = "Find the design-variable values that minimise an objective by running a Tas model repeatedly. Works on a Tas project folder, not on the open model. Not the Part O Optimise (2B) command.";
 
             RibbonButton_EditLibrary.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_EditLibrary);
             RibbonButton_EditLibrary.Click += RibbonButton_EditLibrary_Click;
