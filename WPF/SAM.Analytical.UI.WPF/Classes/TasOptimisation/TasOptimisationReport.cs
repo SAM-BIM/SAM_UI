@@ -15,8 +15,8 @@ namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
     /// How one Simulate &gt; Optimisation run ended, read from the SAM.Math kernel's <see cref="OptimisationResult"/> and
-    /// nothing else (no GenOpt output file is read). It is presentation only: the outcome, the best point and the
-    /// messages. The rules are those of the SAM_Tas Grasshopper GenOpt component (SAM_Tas_Grasshopper#11), so a run
+    /// nothing else (no GenOpt output file is read). It is presentation only: the headline, status and lines. The rules
+    /// are SAM_Tas' <see cref="NativeGenOptOutcome"/> (PR6), shared with the Grasshopper GenOpt component, so a run
     /// reads the same in both places:
     /// <list type="bullet">
     /// <item>Success, the simulation limit and a golden-section nullspace stop are normal ends and report a best point
@@ -63,8 +63,11 @@ namespace SAM.Analytical.UI.WPF
                 throw new ArgumentNullException(nameof(result));
             }
 
+            NativeGenOptOutcome nativeGenOptOutcome = new NativeGenOptOutcome(result, cancelRequested);
+
             Result = result;
             Outcome = result.Outcome;
+            Successful = nativeGenOptOutcome.Successful;
             Simulations = result.Simulations;
             Retries = result.Retries;
             FailedSimulation = result.FailedSimulation;
@@ -78,20 +81,17 @@ namespace SAM.Analytical.UI.WPF
             switch (result.Outcome)
             {
                 case OptimisationOutcome.Success:
-                    Successful = true;
                     Status = TasOptimisationCheckStatus.Ready;
                     Headline = string.Format(CultureInfo.InvariantCulture, "Finished: Success after {0} simulations", result.Simulations);
                     break;
 
                 case OptimisationOutcome.MaximumSimulationsReached:
-                    Successful = true;
                     Status = TasOptimisationCheckStatus.Warning;
                     Headline = string.Format(CultureInfo.InvariantCulture, "Stopped at the simulation limit ({0} simulations)", result.Simulations);
                     lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "The simulation limit was reached before the stopping criterion was met; the lowest point found is reported."));
                     break;
 
                 case OptimisationOutcome.Nullspace:
-                    Successful = true;
                     Status = TasOptimisationCheckStatus.Warning;
                     Headline = string.Format(CultureInfo.InvariantCulture, "Stopped on equal objective values after {0} simulations", result.Simulations);
                     lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "Golden section stopped on two consecutive equal objective values (nullspace); the lowest point found is reported."));
@@ -122,9 +122,8 @@ namespace SAM.Analytical.UI.WPF
                     break;
             }
 
-            if (Successful && cancelRequested)
+            if (nativeGenOptOutcome.Withheld)
             {
-                Successful = false;
                 Status = TasOptimisationCheckStatus.Warning;
                 Headline = "Cancelled as the run finished";
                 lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "Cancelled by user as the run finished (kernel outcome: " + result.Outcome + "). The result is withheld; the evaluation folders remain in the run folder."));
@@ -132,7 +131,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (Successful)
             {
-                OptimisationTraceEntry? best = Best(result);
+                OptimisationTraceEntry? best = nativeGenOptOutcome.BestEntry;
                 if (best != null)
                 {
                     BestPoint = best.Coordinates;
@@ -142,10 +141,10 @@ namespace SAM.Analytical.UI.WPF
                     lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Best objective", Text(ObjectiveNames, best.Outputs)));
                 }
 
-                if (result.Interval != null)
+                if (nativeGenOptOutcome.Interval != null)
                 {
-                    Interval = result.Interval;
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Final interval", string.Format(CultureInfo.InvariantCulture, "[{0}, {1}]", result.Interval.Lower, result.Interval.Upper)));
+                    Interval = nativeGenOptOutcome.Interval;
+                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Final interval", string.Format(CultureInfo.InvariantCulture, "[{0}, {1}]", Interval.Lower, Interval.Upper)));
                 }
             }
 
@@ -223,39 +222,6 @@ namespace SAM.Analytical.UI.WPF
             return stringBuilder.ToString();
         }
 
-        /// <summary>
-        /// The kernel's reported minimum (pattern search). Golden section reports none, so its best point is the lowest
-        /// objective among all entries, the first one on a tie, NaN skipped.
-        /// </summary>
-        public static OptimisationTraceEntry? Best(OptimisationResult result)
-        {
-            if (result == null)
-            {
-                return null;
-            }
-
-            if (result.Minimum != null)
-            {
-                return result.Minimum;
-            }
-
-            OptimisationTraceEntry? best = null;
-            foreach (OptimisationTraceEntry entry in result.Entries)
-            {
-                if (double.IsNaN(entry.Objective))
-                {
-                    continue;
-                }
-
-                if (best == null || entry.Objective < best.Objective)
-                {
-                    best = entry;
-                }
-            }
-
-            return best;
-        }
-
         /// <summary>"name = value" pairs, invariant round-trip numbers.</summary>
         public static string Text(IReadOnlyList<string>? names, IReadOnlyList<double>? values)
         {
@@ -267,7 +233,10 @@ namespace SAM.Analytical.UI.WPF
             return string.Join(", ", values.Select((x, i) => (names != null && i < names.Count ? names[i] : "#" + i) + " = " + x.ToString("R", CultureInfo.InvariantCulture)));
         }
 
-        /// <summary>A refusal or failure outside the kernel, worded as the SAM_Tas Grasshopper component words it.</summary>
+        /// <summary>
+        /// A refusal or failure outside the kernel: a stale or missing assembly first (SAM_UI's own check), otherwise SAM_Tas'
+        /// <see cref="NativeGenOptOutcome.RefusalMessage"/>, as the Grasshopper component words it.
+        /// </summary>
         public static string Message(Exception? exception)
         {
             if (Query.IsTasOptimisationLoadFailure(exception))
@@ -275,23 +244,15 @@ namespace SAM.Analytical.UI.WPF
                 return Query.TasOptimisationLoadFailure(exception);
             }
 
-            switch (exception)
-            {
-                case GenOptCompatibilityException _:
-                    return "Invalid GenOpt settings for the native route: " + exception.Message;
+            return RefusalMessage(exception);
+        }
 
-                case NotSupportedException _:
-                    return "Not supported by the native route: " + exception.Message;
-
-                case System.IO.FileNotFoundException fileNotFoundException:
-                    return exception.Message + " Path: '" + fileNotFoundException.FileName + "'.";
-
-                case System.IO.DirectoryNotFoundException _:
-                    return exception.Message;
-
-                default:
-                    return "Native optimisation failed (" + exception?.GetType().Name + "): " + exception?.Message;
-            }
+        // Its own method, never inlined, so Message still reports a stale SAM.Analytical.Tas.GenOpt.dll (one without
+        // NativeGenOptOutcome) through the load-failure branch instead of failing to compile.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static string RefusalMessage(Exception? exception)
+        {
+            return NativeGenOptOutcome.RefusalMessage(exception);
         }
     }
 }
