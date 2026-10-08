@@ -2,6 +2,7 @@
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Tas.GenOpt;
+using SAM.Core.Optimisation;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -14,10 +15,17 @@ namespace SAM.Analytical.UI.WPF
     {
         /// <summary>
         /// The readiness list of Simulate &gt; Optimisation (Design Optimisation), in the order the questions arise: the
-        /// Tas project, the Tas script, the Tas optimisation engine (TasGenExecute), the setup, then the non-blocking name
-        /// check. Nothing is created or started. The setup is judged by SAM_Tas
-        /// (<see cref="TasOptimisationDefinition.Validate"/>); its message is shown as it is, without the internal prefix
-        /// the Grasshopper wording adds. The engine's path is not part of a ready line: the window shows it under Diagnostics.
+        /// Tas project, the Tas script, the Tas optimisation engine (TasGenExecute), the setup, then the non-blocking
+        /// warnings. Nothing is created or started. The engine's path is not part of a ready line: the window shows it
+        /// under Diagnostics.
+        /// <para>
+        /// The setup is the form read as a SAM.Core.Optimisation definition (<see cref="TasOptimisationInput.TryGetDefinition"/>),
+        /// judged first by its own diagnostics against the Tas engine's capabilities (each error blocks, with its message and
+        /// hint), then by SAM_Tas exactly as <c>RunNative</c> judges the document before it creates anything
+        /// (<see cref="TasOptimisationGate"/>); a SAM_Tas refusal is shown as it is, without the internal prefix the
+        /// Grasshopper wording adds. The definition's warnings and SAM_Tas' script-name warnings
+        /// (<c>TasScriptDiagnostics</c>: a name the script never reads or writes) never block.
+        /// </para>
         /// </summary>
         /// <param name="tasOptimisationInput">The form.</param>
         /// <param name="tasGenExecutePath">TasGenExecute.exe; null for the installed one, which RunNative uses.</param>
@@ -39,18 +47,24 @@ namespace SAM.Analytical.UI.WPF
                 ? new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Tas optimisation engine", "Installed.")
                 : new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Tas optimisation engine", "TasGenExecute.exe was not found at '" + path_TasGenExecute + "'. It is installed with Tas (TasGenOpt)."));
 
-            TasOptimisationDefinition? tasOptimisationDefinition = null;
-            if (!tasOptimisationInput.TryGetDefinition(out tasOptimisationDefinition, out List<string> problems))
+            if (!tasOptimisationInput.TryGetDefinition(out OptimisationDefinition? optimisationDefinition, out List<string> problems) || optimisationDefinition == null)
             {
                 result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", string.Join(Environment.NewLine, problems)));
-                tasOptimisationDefinition = null;
+                return result;
+            }
+
+            List<OptimisationDiagnostic> diagnostics = optimisationDefinition.Diagnostics(Analytical.Tas.GenOpt.Query.TasOptimisationCapabilities());
+            List<OptimisationDiagnostic> errors = diagnostics.FindAll(x => x.Severity == DiagnosticSeverity.Error);
+            if (errors.Count != 0)
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", string.Join(Environment.NewLine, errors.ConvertAll(Text))));
             }
             else
             {
                 try
                 {
-                    tasOptimisationDefinition!.Validate();
-                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Setup", Summary(tasOptimisationDefinition)));
+                    GenOptDocument genOptDocument = TasOptimisationGate(optimisationDefinition, tasOptimisationInput.Directory?.Trim(), scriptText);
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Setup", Summary(optimisationDefinition, genOptDocument)));
                 }
                 catch (Exception exception) when (exception is InvalidOperationException || exception is NotSupportedException || exception is ArgumentException)
                 {
@@ -58,10 +72,41 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
+            foreach (OptimisationDiagnostic optimisationDiagnostic in diagnostics.FindAll(x => x.Severity == DiagnosticSeverity.Warning))
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, Title(optimisationDefinition, optimisationDiagnostic), Text(optimisationDiagnostic)));
+            }
+
             if (scriptText != null)
             {
-                result.AddRange(TasOptimisationChecks_Names(tasOptimisationInput, scriptText));
+                foreach (OptimisationDiagnostic optimisationDiagnostic in optimisationDefinition.TasScriptDiagnostics(scriptText))
+                {
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, Title(optimisationDefinition, optimisationDiagnostic), Text(optimisationDiagnostic)));
+                }
             }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The final SAM_Tas gate, with no folder created and no process started: builds the document SAM_Tas will run
+        /// (<c>ToGenOptDocument</c>, which refuses a definition with any diagnostic error) and applies the conversions
+        /// <see cref="GenOptDocument.RunNative"/> applies to it first (parameters, objectives, the kernel problem and the
+        /// optimiser). It throws what they throw: <see cref="GenOptCompatibilityException"/> for a setting SAM_Tas or
+        /// GenOpt would not accept, <see cref="NotSupportedException"/> for an algorithm the native optimiser does not run.
+        /// </summary>
+        /// <param name="optimisationDefinition">The definition.</param>
+        /// <param name="directory">The Tas project folder; it is not read.</param>
+        /// <param name="scriptText">The script text; null when it cannot be read yet (the script check says why).</param>
+        public static GenOptDocument TasOptimisationGate(OptimisationDefinition optimisationDefinition, string? directory, string? scriptText)
+        {
+            GenOptDocument result = optimisationDefinition.ToGenOptDocument(directory ?? string.Empty, scriptText ?? string.Empty);
+
+            List<NumberParameter> numberParameters = Analytical.Tas.GenOpt.Convert.NumberParameters(result.CommandFile.Parameters);
+            ObjectiveFunctionLocation objectiveFunctionLocation = result.ConfigFile.Simulation.ObjectiveFunctionLocation;
+            Analytical.Tas.GenOpt.Convert.Objectives(objectiveFunctionLocation);
+            Analytical.Tas.GenOpt.Convert.ToSAM_OptimisationProblem(numberParameters.Cast<IParameter>(), objectiveFunctionLocation);
+            Analytical.Tas.GenOpt.Convert.ToSAM_Optimiser(result.Algorithm, result.OptimizationSettings, numberParameters.Count);
 
             return result;
         }
@@ -181,37 +226,41 @@ namespace SAM.Analytical.UI.WPF
             return new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, Path.GetFileName(path));
         }
 
-        /// <summary>
-        /// A name the Tas script never mentions as a quoted literal: probably a typing mistake, which would make every
-        /// simulation fail. A warning only, as a script may build a name at run time. The script's syntax is not repeated
-        /// here: it is in the Script field's tooltip.
-        /// </summary>
-        private static List<TasOptimisationCheck> TasOptimisationChecks_Names(TasOptimisationInput tasOptimisationInput, string scriptText)
+        /// <summary>A diagnostic as a check line shows it: the message, then the hint when there is one.</summary>
+        private static string Text(OptimisationDiagnostic optimisationDiagnostic)
         {
-            List<TasOptimisationCheck> result = new List<TasOptimisationCheck>();
-
-            foreach (string name in tasOptimisationInput.Parameters.Select(x => x?.Name?.Trim()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct()!)
-            {
-                if (!Quoted(scriptText, name))
-                {
-                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Design variable '" + name + "'", string.Format(CultureInfo.InvariantCulture, "The Tas script never mentions \"{0}\". Check that the name matches the one the script reads.", name)));
-                }
-            }
-
-            foreach (string name in tasOptimisationInput.Objectives.Select(x => x?.Name?.Trim()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct()!)
-            {
-                if (!Quoted(scriptText, name))
-                {
-                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Output '" + name + "'", string.Format(CultureInfo.InvariantCulture, "The Tas script never mentions \"{0}\". Check that the name matches the one the script writes.", name)));
-                }
-            }
-
-            return result;
+            return string.IsNullOrWhiteSpace(optimisationDiagnostic.Hint) ? optimisationDiagnostic.Message : optimisationDiagnostic.Message + " " + optimisationDiagnostic.Hint;
         }
 
-        private static bool Quoted(string text, string name)
+        /// <summary>
+        /// The check title of a warning: what it is about, from its path ("Design variable 'Setpoint'", "Output 'Cost'"),
+        /// otherwise "Setup".
+        /// </summary>
+        private static string Title(OptimisationDefinition optimisationDefinition, OptimisationDiagnostic optimisationDiagnostic)
         {
-            return text.IndexOf("\"" + name + "\"", StringComparison.Ordinal) >= 0;
+            string path = optimisationDiagnostic.Path ?? string.Empty;
+            if (Index(path, "$.variables[") is int index_Variable && index_Variable < optimisationDefinition.Variables.Count)
+            {
+                return "Design variable '" + optimisationDefinition.Variables[index_Variable]?.Name + "'";
+            }
+
+            if (Index(path, "$.outputs[") is int index_Output && index_Output < optimisationDefinition.Outputs.Count)
+            {
+                return "Output '" + optimisationDefinition.Outputs[index_Output]?.Name + "'";
+            }
+
+            return "Setup";
+        }
+
+        private static int? Index(string path, string prefix)
+        {
+            if (!path.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            int end = path.IndexOf(']', prefix.Length);
+            return end > prefix.Length && int.TryParse(path.Substring(prefix.Length, end - prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out int result) ? result : (int?)null;
         }
 
         /// <summary>
@@ -231,17 +280,18 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>
         /// "Golden section on Setpoint (−5 to 35), minimising Result; recording Cost, CO2; at most 2000 simulations."
-        /// Numbers are the entered ones at full precision; the simulation limit is an integer.
+        /// Numbers are the entered ones at full precision; the simulation limit is the one SAM_Tas runs (the engine
+        /// default when the definition leaves it out), an integer.
         /// </summary>
-        private static string Summary(TasOptimisationDefinition tasOptimisationDefinition)
+        private static string Summary(OptimisationDefinition optimisationDefinition, GenOptDocument genOptDocument)
         {
-            IReadOnlyList<string> names_Objective = tasOptimisationDefinition.ObjectiveNames;
+            List<string> names_Objective = optimisationDefinition.TasOptimisationObjectiveNames();
 
             string text = string.Format(
                 CultureInfo.InvariantCulture,
                 "{0} on {1}, minimising {2}",
-                tasOptimisationDefinition.Algorithm.AlgorithmType.TasOptimisationAlgorithmName(),
-                string.Join(", ", tasOptimisationDefinition.NumberParameters.Select(x => string.Format(CultureInfo.InvariantCulture, "{0} ({1} to {2})", x.Name, Number(x.Min), Number(x.Max)))),
+                optimisationDefinition.Method.Algorithm.TasOptimisationAlgorithmName(),
+                string.Join(", ", optimisationDefinition.Variables.Select(x => string.Format(CultureInfo.InvariantCulture, "{0} ({1} to {2})", x.Name, Number(x.Minimum), Number(x.Maximum)))),
                 names_Objective.FirstOrDefault());
 
             if (names_Objective.Count > 1)
@@ -249,7 +299,7 @@ namespace SAM.Analytical.UI.WPF
                 text += "; recording " + string.Join(", ", names_Objective.Skip(1));
             }
 
-            return text + string.Format(CultureInfo.InvariantCulture, "; at most {0} simulations.", tasOptimisationDefinition.OptimizationSettings.MaxIterations);
+            return text + string.Format(CultureInfo.InvariantCulture, "; at most {0} simulations.", genOptDocument.OptimizationSettings.MaxIterations);
         }
 
         /// <summary>Full precision (round-trip), with a true minus sign.</summary>

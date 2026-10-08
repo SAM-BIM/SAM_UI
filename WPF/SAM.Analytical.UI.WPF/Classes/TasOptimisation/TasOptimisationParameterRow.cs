@@ -7,13 +7,15 @@ using System.Runtime.CompilerServices;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// One optimisation parameter as typed in Simulate &gt; Optimisation. The values are kept as text, exactly as
-    /// entered, and are read by <see cref="TasOptimisationInput.TryGetDefinition"/>. They become a SAM_Tas
-    /// NumberParameter (Ini, Min, Max, Step).
+    /// One design variable as typed in Simulate &gt; Optimisation. The values are kept as text, exactly as entered, and
+    /// are read by <see cref="TasOptimisationInput.TryGetDefinition"/> into a SAM.Core.Optimisation DesignVariable
+    /// (name, description, unit, start, minimum, maximum, step), which SAM_Tas runs as a NumberParameter.
     /// </summary>
     public sealed class TasOptimisationParameterRow : INotifyPropertyChanged
     {
         private string name = string.Empty;
+        private string description = string.Empty;
+        private string unit = string.Empty;
         private string start = string.Empty;
         private string minimum = string.Empty;
         private string maximum = string.Empty;
@@ -24,9 +26,11 @@ namespace SAM.Analytical.UI.WPF
         {
         }
 
-        public TasOptimisationParameterRow(string? name, string? start, string? minimum, string? maximum, string? step)
+        public TasOptimisationParameterRow(string? name, string? start, string? minimum, string? maximum, string? step, string? description = null, string? unit = null)
         {
             this.name = name ?? string.Empty;
+            this.description = description ?? string.Empty;
+            this.unit = unit ?? string.Empty;
             this.start = start ?? string.Empty;
             this.minimum = minimum ?? string.Empty;
             this.maximum = maximum ?? string.Empty;
@@ -34,7 +38,7 @@ namespace SAM.Analytical.UI.WPF
         }
 
         public TasOptimisationParameterRow(TasOptimisationParameterRow tasOptimisationParameterRow)
-            : this(tasOptimisationParameterRow?.name, tasOptimisationParameterRow?.start, tasOptimisationParameterRow?.minimum, tasOptimisationParameterRow?.maximum, tasOptimisationParameterRow?.step)
+            : this(tasOptimisationParameterRow?.name, tasOptimisationParameterRow?.start, tasOptimisationParameterRow?.minimum, tasOptimisationParameterRow?.maximum, tasOptimisationParameterRow?.step, tasOptimisationParameterRow?.description, tasOptimisationParameterRow?.unit)
         {
             startAndStepApplicable = tasOptimisationParameterRow?.startAndStepApplicable ?? true;
         }
@@ -45,6 +49,20 @@ namespace SAM.Analytical.UI.WPF
         {
             get => name;
             set => Set(ref name, value);
+        }
+
+        /// <summary>The design variable in engineering terms. Optional.</summary>
+        public string Description
+        {
+            get => description;
+            set => Set(ref description, value);
+        }
+
+        /// <summary>The unit as the definition declares it, for example "°C". Optional; it describes the values and is not converted.</summary>
+        public string Unit
+        {
+            get => unit;
+            set => Set(ref unit, value);
         }
 
         /// <summary>The start value (GenOpt Ini). Not used by golden section.</summary>

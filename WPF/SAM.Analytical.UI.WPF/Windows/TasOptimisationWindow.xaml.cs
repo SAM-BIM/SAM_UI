@@ -4,6 +4,7 @@
 extern alias SAMMath;
 
 using SAM.Analytical.Tas.GenOpt;
+using SAM.Core.Optimisation;
 using SAMMath::SAM.Math;
 using System;
 using System.Collections.Generic;
@@ -23,15 +24,17 @@ using System.Windows.Threading;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// Design Optimisation (Simulate &gt; Optimisation): the native SAM optimisation of a Tas project. The window collects
-    /// the existing SAM_Tas GenOpt configuration (<see cref="TasOptimisationInput"/>), lets SAM_Tas judge it, and runs
-    /// <see cref="GenOptDocument.RunNative"/> on a background thread: the SAM.Math kernel drives TasGenExecute.exe, one
+    /// Design Optimisation (Simulate &gt; Optimisation): the native SAM optimisation of a Tas project. The window is a form
+    /// over a SAM.Core.Optimisation definition (<see cref="TasOptimisationInput"/>) plus the local Tas settings; the
+    /// definition's own diagnostics and SAM_Tas judge it, SAM_Tas builds the document (<c>ToGenOptDocument</c>), and
+    /// <see cref="GenOptDocument.RunNative"/> runs on a background thread: the SAM.Math kernel drives TasGenExecute.exe, one
     /// simulation at a time. The window shows the kernel's own progress and result; it implements no optimisation,
-    /// file protocol, retry or parsing of its own. Java GenOpt is never used.
+    /// mapping, file protocol, retry or parsing of its own. Java GenOpt is never used.
     /// <para>
     /// Two tabs: Setup (what is optimised, and whether it is ready) and Run &amp; Results (progress, trace, result and
-    /// Diagnostics). Pressing Run switches to Run &amp; Results. The window is presentation only: the form model, the
-    /// SAM_Tas validation, the run path and the outcome rules are those of the native Optimisation PR5/PR6.
+    /// Diagnostics). Pressing Run switches to Run &amp; Results. The window is presentation only: the definition, its
+    /// diagnostics and the Tas mapping are SAM.Core.Optimisation's and SAM_Tas' (native Optimisation PR3/PR4); the run
+    /// path and the outcome rules are those of the Java-free GenOpt PR5/PR6.
     /// </para>
     /// <para>
     /// Cancellation is cooperative: Cancel (or closing the window) asks the kernel to stop; the running TasGenExecute
@@ -45,7 +48,7 @@ namespace SAM.Analytical.UI.WPF
     {
         private static TasOptimisationInput? session;
 
-        private readonly TasOptimisationInput tasOptimisationInput;
+        private TasOptimisationInput tasOptimisationInput;
         private readonly ObservableCollection<TasOptimisationParameterRow> parameterRows = new ObservableCollection<TasOptimisationParameterRow>();
         private readonly ObservableCollection<TasOptimisationObjectiveRow> objectiveRows = new ObservableCollection<TasOptimisationObjectiveRow>();
         private readonly ObservableCollection<TasOptimisationObjectiveRow> recordedRows = new ObservableCollection<TasOptimisationObjectiveRow>();
@@ -84,7 +87,7 @@ namespace SAM.Analytical.UI.WPF
             comboBox_Example.Items.Add(new ComboBoxItem() { Content = "Systems Demo – Hooke–Jeeves", Tag = TasOptimisationExample.SystemsDemoHookeJeeves });
             comboBox_Example.SelectedIndex = 0;
 
-            comboBox_Algorithm.ItemsSource = TasOptimisationInput.AlgorithmTypes;
+            comboBox_Algorithm.ItemsSource = TasOptimisationInput.OptimisationAlgorithms;
 
             itemsControl_Parameters.ItemsSource = parameterRows;
             itemsControl_Objectives.ItemsSource = recordedRows;
@@ -97,7 +100,16 @@ namespace SAM.Analytical.UI.WPF
             }
             else
             {
-                tasOptimisationInput = TasOptimisationInput.Create(TasOptimisationInput.DefaultExample);
+                try
+                {
+                    tasOptimisationInput = TasOptimisationInput.Create(TasOptimisationInput.DefaultExample);
+                }
+                catch (Exception exception) when (Query.IsTasOptimisationLoadFailure(exception))
+                {
+                    //A stale optimisation assembly: the window still opens, and its readiness list says what is wrong.
+                    tasOptimisationInput = new TasOptimisationInput();
+                }
+
                 if (!string.IsNullOrWhiteSpace(modelDirectory) && Query.TasOptimisationTasFiles(modelDirectory!).Count != 0)
                 {
                     tasOptimisationInput.Directory = modelDirectory!;
@@ -147,23 +159,10 @@ namespace SAM.Analytical.UI.WPF
             session = null;
         }
 
-        /// <summary>Replaces the form (tests, and Load example).</summary>
+        /// <summary>Replaces the form, its <see cref="TasOptimisationInput.Base"/> definition included (tests).</summary>
         internal void SetInput(TasOptimisationInput input)
         {
-            TasOptimisationInput copy = new TasOptimisationInput(input);
-            tasOptimisationInput.Directory = copy.Directory;
-            tasOptimisationInput.ScriptPath = copy.ScriptPath;
-            tasOptimisationInput.RunsDirectory = copy.RunsDirectory;
-            tasOptimisationInput.AlgorithmType = copy.AlgorithmType;
-            tasOptimisationInput.AbsDiffFunction = copy.AbsDiffFunction;
-            tasOptimisationInput.MeshSizeDivider = copy.MeshSizeDivider;
-            tasOptimisationInput.InitialMeshSizeExponent = copy.InitialMeshSizeExponent;
-            tasOptimisationInput.MeshSizeExponentIncrement = copy.MeshSizeExponentIncrement;
-            tasOptimisationInput.NumberOfStepReduction = copy.NumberOfStepReduction;
-            tasOptimisationInput.MaxIterations = copy.MaxIterations;
-            tasOptimisationInput.MaxEqualResults = copy.MaxEqualResults;
-            tasOptimisationInput.Parameters = copy.Parameters;
-            tasOptimisationInput.Objectives = copy.Objectives;
+            tasOptimisationInput = new TasOptimisationInput(input);
 
             Load(tasOptimisationInput);
             Refresh();
@@ -188,7 +187,7 @@ namespace SAM.Analytical.UI.WPF
             }
 
             TasOptimisationInput input = Read();
-            if (!input.TryGetDefinition(out TasOptimisationDefinition? tasOptimisationDefinition, out _) || tasOptimisationDefinition == null)
+            if (!input.TryGetDefinition(out OptimisationDefinition? optimisationDefinition, out _) || optimisationDefinition == null)
             {
                 return;
             }
@@ -199,25 +198,24 @@ namespace SAM.Analytical.UI.WPF
 
             session = new TasOptimisationInput(input);
 
-            string scriptText;
+            //SAM_Tas maps the definition to the document it runs (objective first, the method's settings, the variables).
+            GenOptDocument genOptDocument;
             try
             {
-                scriptText = System.IO.File.ReadAllText(input.ScriptPath.Trim());
+                genOptDocument = optimisationDefinition.ToGenOptDocument(directory, System.IO.File.ReadAllText(input.ScriptPath.Trim()));
             }
-            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidOperationException || exception is NotSupportedException || exception is ArgumentException)
             {
                 ShowResult(new TasOptimisationReport(exception));
                 return;
             }
 
-            GenOptDocument genOptDocument = tasOptimisationDefinition.ToGenOptDocument(directory, scriptText);
-
             cancellationTokenSource = new CancellationTokenSource();
             CancellationToken cancellationToken = cancellationTokenSource.Token;
 
-            TasOptimisationProgressState tasOptimisationProgressState = new TasOptimisationProgressState(tasOptimisationDefinition.ParameterNames, tasOptimisationDefinition.ObjectiveNames);
+            TasOptimisationProgressState tasOptimisationProgressState = new TasOptimisationProgressState(optimisationDefinition.TasOptimisationVariableNames(), optimisationDefinition.TasOptimisationObjectiveNames());
             this.tasOptimisationProgressState = tasOptimisationProgressState;
-            BeginRun(tasOptimisationDefinition);
+            BeginRun(optimisationDefinition);
 
             Progress<OptimisationProgress> progress = new Progress<OptimisationProgress>(x =>
             {
@@ -285,18 +283,18 @@ namespace SAM.Analytical.UI.WPF
             tasOptimisationInput.Directory = textBox_Directory.Text ?? string.Empty;
             tasOptimisationInput.ScriptPath = textBox_ScriptPath.Text ?? string.Empty;
             tasOptimisationInput.RunsDirectory = textBox_RunsDirectory.Text ?? string.Empty;
-            if (comboBox_Algorithm.SelectedItem is AlgorithmType algorithmType)
+            if (comboBox_Algorithm.SelectedItem is OptimisationAlgorithm optimisationAlgorithm)
             {
-                tasOptimisationInput.AlgorithmType = algorithmType;
+                tasOptimisationInput.OptimisationAlgorithm = optimisationAlgorithm;
             }
 
-            tasOptimisationInput.AbsDiffFunction = textBox_AbsDiffFunction.Text ?? string.Empty;
-            tasOptimisationInput.MeshSizeDivider = textBox_MeshSizeDivider.Text ?? string.Empty;
-            tasOptimisationInput.InitialMeshSizeExponent = textBox_InitialMeshSizeExponent.Text ?? string.Empty;
-            tasOptimisationInput.MeshSizeExponentIncrement = textBox_MeshSizeExponentIncrement.Text ?? string.Empty;
-            tasOptimisationInput.NumberOfStepReduction = textBox_NumberOfStepReduction.Text ?? string.Empty;
-            tasOptimisationInput.MaxIterations = textBox_MaxIterations.Text ?? string.Empty;
-            //MaxEqualResults has no control: it keeps the value the form was created with (SAM_Tas' default).
+            tasOptimisationInput.Tolerance = textBox_Tolerance.Text ?? string.Empty;
+            tasOptimisationInput.StepReductionFactor = textBox_StepReductionFactor.Text ?? string.Empty;
+            tasOptimisationInput.InitialStepExponent = textBox_InitialStepExponent.Text ?? string.Empty;
+            tasOptimisationInput.StepExponentIncrement = textBox_StepExponentIncrement.Text ?? string.Empty;
+            tasOptimisationInput.StepReductions = textBox_StepReductions.Text ?? string.Empty;
+            tasOptimisationInput.MaximumSimulations = textBox_MaximumSimulations.Text ?? string.Empty;
+            //MaxEqualResults is not part of the definition: SAM_Tas keeps its default.
             tasOptimisationInput.Parameters = parameterRows.ToList();
             tasOptimisationInput.Objectives = objectiveRows.ToList();
 
@@ -311,13 +309,13 @@ namespace SAM.Analytical.UI.WPF
                 textBox_Directory.Text = input.Directory;
                 textBox_ScriptPath.Text = input.ScriptPath;
                 textBox_RunsDirectory.Text = input.RunsDirectory;
-                comboBox_Algorithm.SelectedItem = input.AlgorithmType;
-                textBox_AbsDiffFunction.Text = input.AbsDiffFunction;
-                textBox_MeshSizeDivider.Text = input.MeshSizeDivider;
-                textBox_InitialMeshSizeExponent.Text = input.InitialMeshSizeExponent;
-                textBox_MeshSizeExponentIncrement.Text = input.MeshSizeExponentIncrement;
-                textBox_NumberOfStepReduction.Text = input.NumberOfStepReduction;
-                textBox_MaxIterations.Text = input.MaxIterations;
+                comboBox_Algorithm.SelectedItem = input.OptimisationAlgorithm;
+                textBox_Tolerance.Text = input.Tolerance;
+                textBox_StepReductionFactor.Text = input.StepReductionFactor;
+                textBox_InitialStepExponent.Text = input.InitialStepExponent;
+                textBox_StepExponentIncrement.Text = input.StepExponentIncrement;
+                textBox_StepReductions.Text = input.StepReductions;
+                textBox_MaximumSimulations.Text = input.MaximumSimulations;
 
                 parameterRows.Clear();
                 foreach (TasOptimisationParameterRow tasOptimisationParameterRow in input.Parameters)
@@ -341,8 +339,8 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// Rebuilds the Objective box and the Recorded outputs list from the output rows: the row flagged
-        /// <see cref="TasOptimisationObjectiveRow.Primary"/> is the objective, the others are recorded.
+        /// Rebuilds the Objective box, the objective's description and unit, and the Recorded outputs list from the output
+        /// rows: the row flagged <see cref="TasOptimisationObjectiveRow.Primary"/> is the objective, the others are recorded.
         /// </summary>
         private void SyncObjectives()
         {
@@ -351,6 +349,10 @@ namespace SAM.Analytical.UI.WPF
             {
                 recordedRows.Add(tasOptimisationObjectiveRow);
             }
+
+            TasOptimisationObjectiveRow? primary = objectiveRows.FirstOrDefault(x => x.Primary);
+            grid_Objective.DataContext = primary;
+            grid_Objective.IsEnabled = primary != null && !running;
 
             UpdateObjectiveChoices(true);
         }
@@ -425,7 +427,7 @@ namespace SAM.Analytical.UI.WPF
             TasOptimisationInput input = Read();
             input.UpdateApplicability();
 
-            bool goldenSection = input.AlgorithmType == AlgorithmType.GoldenSection;
+            bool goldenSection = input.OptimisationAlgorithm == OptimisationAlgorithm.GoldenSection;
             grid_GoldenSection.Visibility = goldenSection ? Visibility.Visible : Visibility.Collapsed;
             grid_HookeJeeves.Visibility = goldenSection ? Visibility.Collapsed : Visibility.Visible;
             grid_HookeJeevesAdvanced.Visibility = goldenSection ? Visibility.Collapsed : Visibility.Visible;
@@ -516,7 +518,7 @@ namespace SAM.Analytical.UI.WPF
             textBox_Diagnostics.Text = string.Join(Environment.NewLine + Environment.NewLine, lines);
         }
 
-        private void BeginRun(TasOptimisationDefinition tasOptimisationDefinition)
+        private void BeginRun(OptimisationDefinition optimisationDefinition)
         {
             traceRows.Clear();
             Report = null;
@@ -529,13 +531,13 @@ namespace SAM.Analytical.UI.WPF
             dataGrid_Trace.Columns.Add(Column("Event", "Event"));
             UpdateSearchDetails();
 
-            IReadOnlyList<string> names_Parameter = tasOptimisationDefinition.ParameterNames;
+            List<string> names_Parameter = optimisationDefinition.TasOptimisationVariableNames();
             for (int i = 0; i < names_Parameter.Count; i++)
             {
                 dataGrid_Trace.Columns.Add(Column(names_Parameter[i], string.Format(CultureInfo.InvariantCulture, "Coordinates[{0}]", i)));
             }
 
-            IReadOnlyList<string> names_Objective = tasOptimisationDefinition.ObjectiveNames;
+            List<string> names_Objective = optimisationDefinition.TasOptimisationObjectiveNames();
             for (int i = 0; i < names_Objective.Count; i++)
             {
                 dataGrid_Trace.Columns.Add(Column(i == 0 ? names_Objective[i] + " (objective)" : names_Objective[i], string.Format(CultureInfo.InvariantCulture, "Outputs[{0}]", i)));
@@ -545,7 +547,7 @@ namespace SAM.Analytical.UI.WPF
             textBlock_RunEmpty.Visibility = Visibility.Collapsed;
             border_Result.Visibility = Visibility.Collapsed;
             progressBar_Run.IsIndeterminate = true;
-            textBlock_RunStatus.Text = "Running: " + tasOptimisationDefinition.Algorithm.AlgorithmType.TasOptimisationAlgorithmName() + " on " + string.Join(", ", names_Parameter) + ", minimising " + names_Objective.FirstOrDefault() + ".";
+            textBlock_RunStatus.Text = "Running: " + optimisationDefinition.Method.Algorithm.TasOptimisationAlgorithmName() + " on " + string.Join(", ", names_Parameter) + ", minimising " + names_Objective.FirstOrDefault() + ".";
             textBlock_RunNote.Visibility = Visibility.Visible;
 
             stopwatch.Restart();
@@ -627,13 +629,15 @@ namespace SAM.Analytical.UI.WPF
             foreach (UIElement uIElement in new UIElement[]
             {
                 comboBox_Example, button_LoadExample, textBox_Directory, button_Directory, textBox_ScriptPath, button_ScriptPath,
-                comboBox_Algorithm, grid_GoldenSection, grid_HookeJeeves, grid_HookeJeevesAdvanced, textBox_MaxIterations,
-                button_AddParameter, itemsControl_Parameters, comboBox_Objective, button_AddObjective, itemsControl_Objectives,
+                comboBox_Algorithm, grid_GoldenSection, grid_HookeJeeves, grid_HookeJeevesAdvanced, textBox_MaximumSimulations,
+                button_AddParameter, itemsControl_Parameters, comboBox_Objective, grid_Objective, button_AddObjective, itemsControl_Objectives,
                 textBox_RunsDirectory, button_RunsDirectory,
             })
             {
                 uIElement.IsEnabled = !value;
             }
+
+            grid_Objective.IsEnabled = !value && grid_Objective.DataContext != null;
 
             button_Cancel.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
             button_Cancel.IsEnabled = value;
@@ -749,7 +753,16 @@ namespace SAM.Analytical.UI.WPF
             }
 
             TasOptimisationInput input = Read();
-            input.Load(tasOptimisationExample);
+            try
+            {
+                input.Load(tasOptimisationExample);
+            }
+            catch (Exception exception) when (Query.IsTasOptimisationLoadFailure(exception))
+            {
+                ShowResult(new TasOptimisationReport(exception));
+                return;
+            }
+
             Load(input);
             Refresh();
         }

@@ -104,7 +104,8 @@
                         </Grid>
 
                         <!-- DESIGN VARIABLES. Golden section reads only the bounds, so Start and Step are shown as not
-                             used for it rather than as editable values it would ignore. -->
+                             used for it rather than as editable values it would ignore. Description and Unit are the
+                             definition's own: the unit is shown as declared and never converted. -->
                         <Grid Margin="0,14,0,4">
                             <TextBlock Text="Design variables" Style="{StaticResource PartO.SectionHeading}" Margin="0" VerticalAlignment="Center"/>
                             <Button x:Name="button_AddParameter" HorizontalAlignment="Right" Height="22" Padding="10,0" Click="button_AddParameter_Click">Add design variable</Button>
@@ -112,17 +113,21 @@
                         <Grid Margin="0,0,0,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="1.6*"/>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="80"/>
                                 <ColumnDefinition Width="30"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Name" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}"/>
-                            <TextBlock Grid.Column="1" Text="Start" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
-                            <TextBlock Grid.Column="2" Text="Minimum" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
-                            <TextBlock Grid.Column="3" Text="Maximum" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
-                            <TextBlock Grid.Column="4" Text="Step" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="1" Text="Description" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="2" Text="Unit" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="3" Text="Start" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="4" Text="Minimum" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="5" Text="Maximum" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="6" Text="Step" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
                         </Grid>
                         <ItemsControl x:Name="itemsControl_Parameters" Focusable="False">
                             <ItemsControl.ItemTemplate>
@@ -130,25 +135,31 @@
                                     <Grid Margin="0,0,0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="1.6*"/>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="80"/>
                                             <ColumnDefinition Width="30"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox Grid.Column="0" Height="22" VerticalContentAlignment="Center" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
                                                  ToolTip="The name of the design variable, as the Tas script reads it."/>
-                                        <TextBox Grid.Column="1" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Start, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                        <TextBox Grid.Column="1" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                                 ToolTip="What the design variable is, in engineering terms. Optional."/>
+                                        <TextBox Grid.Column="2" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Unit, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                                 ToolTip="The unit of the values, as declared (for example °C). Optional; it labels the values and is never converted."/>
+                                        <TextBox Grid.Column="3" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Start, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
                                                  Visibility="{Binding StartAndStepApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="The value the search starts from. GenOpt: Ini"/>
-                                        <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Text="not used" FontStyle="Italic" Foreground="{StaticResource PartO.Brush.Subtle}"
+                                        <TextBlock Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Center" Text="not used" FontStyle="Italic" Foreground="{StaticResource PartO.Brush.Subtle}"
                                                    Visibility="{Binding StartAndStepNotApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="Golden section uses only the minimum and maximum: the start value does not apply."/>
-                                        <TextBox Grid.Column="2" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Minimum, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed" ToolTip="Lowest value the design variable may take. GenOpt: Min"/>
-                                        <TextBox Grid.Column="3" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Maximum, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed" ToolTip="Highest value the design variable may take. GenOpt: Max"/>
-                                        <TextBox Grid.Column="4" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Step, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                        <TextBox Grid.Column="4" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Minimum, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed" ToolTip="Lowest value the design variable may take. GenOpt: Min"/>
+                                        <TextBox Grid.Column="5" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Maximum, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed" ToolTip="Highest value the design variable may take. GenOpt: Max"/>
+                                        <TextBox Grid.Column="6" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Step, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
                                                  Visibility="{Binding StartAndStepApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="The size of the first move of the pattern search. GenOpt: Step"/>
-                                        <TextBlock Grid.Column="4" Margin="10,0,0,0" VerticalAlignment="Center" Text="not used" FontStyle="Italic" Foreground="{StaticResource PartO.Brush.Subtle}"
+                                        <TextBlock Grid.Column="6" Margin="10,0,0,0" VerticalAlignment="Center" Text="not used" FontStyle="Italic" Foreground="{StaticResource PartO.Brush.Subtle}"
                                                    Visibility="{Binding StartAndStepNotApplicable, Converter={StaticResource PartO.BooleanToVisibility}}" ToolTip="Golden section uses only the minimum and maximum: the step does not apply."/>
-                                        <Button Grid.Column="5" Width="22" Height="22" HorizontalAlignment="Right" Content="✕" Click="button_RemoveParameter_Click" ToolTip="Remove this design variable."/>
+                                        <Button Grid.Column="7" Width="22" Height="22" HorizontalAlignment="Right" Content="✕" Click="button_RemoveParameter_Click" ToolTip="Remove this design variable."/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -169,6 +180,22 @@
                                       ToolTip="The output the optimiser makes as low as possible. Pick one of the outputs, or type the name of the output the Tas script writes."/>
                             <TextBlock x:Name="textBlock_Objectives" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PartO.Caption}"/>
                         </Grid>
+                        <!-- The objective output's own description and unit (DataContext: the objective's row). -->
+                        <Grid x:Name="grid_Objective" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="30"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Description" VerticalAlignment="Center" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}"/>
+                            <TextBox x:Name="textBox_ObjectiveDescription" Grid.Column="1" Height="22" VerticalContentAlignment="Center" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                     ToolTip="What the objective output is, in engineering terms. Optional."/>
+                            <TextBlock Grid.Column="2" Text="Unit" Margin="10,0,6,0" VerticalAlignment="Center" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}"/>
+                            <TextBox x:Name="textBox_ObjectiveUnit" Grid.Column="3" Height="22" VerticalContentAlignment="Center" Text="{Binding Unit, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                     ToolTip="The unit of the objective output, as declared (for example GBP). Optional; it labels the values and is never converted."/>
+                        </Grid>
 
                         <!-- RECORDED OUTPUTS: the remaining outputs. -->
                         <Grid Margin="0,14,0,0">
@@ -176,17 +203,34 @@
                             <Button x:Name="button_AddObjective" HorizontalAlignment="Right" Height="22" Padding="10,0" Click="button_AddObjective_Click">Add output</Button>
                         </Grid>
                         <TextBlock Style="{StaticResource PartO.Caption}" Margin="0,0,0,4" Text="Recorded for every simulation, not optimised."/>
+                        <Grid Margin="0,0,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="1.6*"/>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="30"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Name" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}"/>
+                            <TextBlock Grid.Column="1" Text="Description" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                            <TextBlock Grid.Column="2" Text="Unit" FontSize="11" Foreground="{StaticResource PartO.Brush.Subtle}" Margin="6,0,0,0"/>
+                        </Grid>
                         <ItemsControl x:Name="itemsControl_Objectives" Focusable="False">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:TasOptimisationObjectiveRow}">
                                     <Grid Margin="0,0,0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="1.6*"/>
+                                            <ColumnDefinition Width="60"/>
                                             <ColumnDefinition Width="30"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox Grid.Column="0" Height="22" VerticalContentAlignment="Center" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
                                                  ToolTip="The name of the output, as the Tas script writes it."/>
-                                        <Button Grid.Column="1" Width="22" Height="22" HorizontalAlignment="Right" Content="✕" Click="button_RemoveObjective_Click" ToolTip="Remove this output."/>
+                                        <TextBox Grid.Column="1" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                                 ToolTip="What the output is, in engineering terms. Optional."/>
+                                        <TextBox Grid.Column="2" Height="22" Margin="6,0,0,0" VerticalContentAlignment="Center" Text="{Binding Unit, UpdateSourceTrigger=PropertyChanged}" TextChanged="Input_Changed"
+                                                 ToolTip="The unit of the output, as declared (for example GBP). Optional; it labels the values and is never converted."/>
+                                        <Button Grid.Column="3" Width="22" Height="22" HorizontalAlignment="Right" Content="✕" Click="button_RemoveObjective_Click" ToolTip="Remove this output."/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -218,7 +262,7 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Objective tolerance" VerticalAlignment="Center" ToolTip="GenOpt: AbsDiffFunction"/>
-                            <TextBox x:Name="textBox_AbsDiffFunction" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: AbsDiffFunction"/>
+                            <TextBox x:Name="textBox_Tolerance" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: AbsDiffFunction"/>
                             <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"
                                        Text="The search stops when the objective values differ by less than this."/>
                         </Grid>
@@ -234,11 +278,11 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Step reduction factor" VerticalAlignment="Center" ToolTip="GenOpt: MeshSizeDivider"/>
-                            <TextBox x:Name="textBox_MeshSizeDivider" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MeshSizeDivider"/>
+                            <TextBox x:Name="textBox_StepReductionFactor" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MeshSizeDivider"/>
                             <TextBlock Grid.Row="0" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Each step reduction divides the step by this (a whole number, at least 2)."/>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Step reductions" VerticalAlignment="Center" Margin="0,4,0,0" ToolTip="GenOpt: NumberOfStepReduction"/>
-                            <TextBox x:Name="textBox_NumberOfStepReduction" Grid.Row="1" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: NumberOfStepReduction"/>
+                            <TextBox x:Name="textBox_StepReductions" Grid.Row="1" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: NumberOfStepReduction"/>
                             <TextBlock Grid.Row="1" Grid.Column="2" Margin="10,4,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="The search stops once the step has been reduced this many times (a whole number, at least 1)."/>
                         </Grid>
 
@@ -251,7 +295,7 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Maximum simulations" VerticalAlignment="Center" ToolTip="GenOpt: MaxIte"/>
-                            <TextBox x:Name="textBox_MaxIterations" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MaxIte"/>
+                            <TextBox x:Name="textBox_MaximumSimulations" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MaxIte"/>
                             <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}"
                                        Text="The run also stops after this many Tas simulations."/>
                         </Grid>
@@ -286,17 +330,17 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Initial step exponent" VerticalAlignment="Center" Foreground="{StaticResource PartO.Brush.Text}" ToolTip="GenOpt: InitialMeshSizeExponent"/>
-                                    <TextBox x:Name="textBox_InitialMeshSizeExponent" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: InitialMeshSizeExponent"/>
+                                    <TextBox x:Name="textBox_InitialStepExponent" Grid.Row="0" Grid.Column="1" Height="22" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: InitialMeshSizeExponent"/>
                                     <TextBlock Grid.Row="0" Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Hooke–Jeeves only. A whole number, at least 0."/>
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Step exponent increment" VerticalAlignment="Center" Margin="0,4,0,0" Foreground="{StaticResource PartO.Brush.Text}" ToolTip="GenOpt: MeshSizeExponentIncrement"/>
-                                    <TextBox x:Name="textBox_MeshSizeExponentIncrement" Grid.Row="1" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MeshSizeExponentIncrement"/>
+                                    <TextBox x:Name="textBox_StepExponentIncrement" Grid.Row="1" Grid.Column="1" Height="22" Margin="0,4,0,0" VerticalContentAlignment="Center" TextChanged="Input_Changed" ToolTip="GenOpt: MeshSizeExponentIncrement"/>
                                     <TextBlock Grid.Row="1" Grid.Column="2" Margin="10,4,0,0" VerticalAlignment="Center" Style="{StaticResource PartO.Caption}" Text="Hooke–Jeeves only. A whole number, at least 1."/>
                                 </Grid>
                             </StackPanel>
                         </Expander>
 
-                        <!-- CHECKS: each line is a SAM_Tas rule or a file check; the run starts only with no ✕. -->
+                        <!-- CHECKS: each line is a file check, a rule of the Optimisation Definition or a SAM_Tas rule; the run starts only with no ✕. -->
                         <TextBlock Text="Checks" Style="{StaticResource PartO.SectionHeading}" Margin="0,14,0,4"/>
                         <ItemsControl x:Name="itemsControl_Checks" Focusable="False" ItemTemplate="{StaticResource TasOptimisation.CheckTemplate}"/>
                     </StackPanel>

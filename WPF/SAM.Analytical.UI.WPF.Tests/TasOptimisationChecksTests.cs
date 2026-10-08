@@ -2,6 +2,7 @@
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
 using SAM.Analytical.Tas.GenOpt;
+using SAM.Core.Optimisation;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,8 +13,9 @@ using Xunit;
 namespace SAM.Analytical.UI.WPF.Tests
 {
     /// <summary>
-    /// The Optimisation window's readiness list (<see cref="Query.TasOptimisationChecks"/>): file checks, SAM_Tas' own
-    /// verdict on the settings word for word, and the non-blocking name warning. Nothing is created or started.
+    /// The Optimisation window's readiness list (<see cref="Query.TasOptimisationChecks"/>): file checks, the
+    /// definition's own diagnostics (errors block with their message and hint), SAM_Tas' own verdict word for word, and
+    /// the non-blocking warnings (the definition's, and SAM_Tas' script-name check). Nothing is created or started.
     /// </summary>
     public class TasOptimisationChecksTests
     {
@@ -22,7 +24,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         [Fact]
         public void A_ready_form_has_no_blocking_line_and_names_what_will_run()
         {
-            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(script: "Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); \"Cost\" \"CO2\"");
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(script: "Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); ScriptOutput.SetValue(\"Cost\", 2); ScriptOutput.SetValue(\"CO2\", 3);");
 
             List<TasOptimisationCheck> checks = workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
 
@@ -135,15 +137,53 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [Fact]
-        public void A_setting_SAM_Tas_refuses_blocks_with_its_message_word_for_word_and_creates_nothing()
+        public void A_definition_error_blocks_with_its_message_and_hint_and_creates_nothing()
         {
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
             TasOptimisationInput input = workspace.Input();
             input.Parameters.Add(new TasOptimisationParameterRow("Other", "0", "0", "1", "1"));
 
+            List<TasOptimisationCheck> checks = input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
+            TasOptimisationCheck check = Check(checks, "Setup");
+
+            //Golden section on two variables: the definition's own OPT412, message then hint, before SAM_Tas is asked.
+            Assert.True(input.TryGetDefinition(out OptimisationDefinition definition, out _));
+            OptimisationDiagnostic expected = Assert.Single(definition.Diagnostics(Analytical.Tas.GenOpt.Query.TasOptimisationCapabilities()), x => x.Severity == DiagnosticSeverity.Error);
+            Assert.Equal("OPT412", expected.Code);
+            Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
+            Assert.Equal(expected.Message + " " + expected.Hint, check.Detail);
+            Assert.False(checks.CanRun());
+            Assert.False(Directory.Exists(workspace.RunsDirectory));
+        }
+
+        [Fact]
+        public void Every_definition_error_is_its_own_line()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            TasOptimisationInput input = workspace.Input(TasOptimisationExample.SystemsDemoHookeJeeves);
+            input.Parameters[0].Minimum = "40";
+            input.StepReductions = "0";
+
             TasOptimisationCheck check = Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Setup");
 
-            GenOptCompatibilityException expected = Assert.Throws<GenOptCompatibilityException>(() => Analytical.Tas.GenOpt.Convert.ToSAM_Optimiser(new GoldenSectionAlgorithm(), new OptimizationSettings(), 2));
+            Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
+            string[] lines = check.Detail.Split(Environment.NewLine);
+            Assert.Equal(2, lines.Length);
+            Assert.Contains(lines, x => x.Contains("range is invalid") && x.Contains("Swap the two values."));
+            Assert.Contains(lines, x => x.Contains("step reductions"));
+        }
+
+        [Fact]
+        public void A_setting_SAM_Tas_refuses_blocks_with_its_message_word_for_word_and_creates_nothing()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            TasOptimisationInput input = workspace.Input();
+            input.Parameters[0].Name = "Set,point";
+
+            TasOptimisationCheck check = Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Setup");
+
+            //The definition accepts the name; SAM_Tas does not (it becomes a Variables.txt CSV field).
+            GenOptCompatibilityException expected = Assert.Throws<GenOptCompatibilityException>(() => Analytical.Tas.GenOpt.Convert.NumberParameters([new NumberParameter() { Name = "Set,point" }]));
             Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
             //SAM_Tas' message word for word, without the internal "Invalid GenOpt settings for the native route" prefix.
             Assert.Equal(expected.Message, check.Detail);
@@ -157,7 +197,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
             TasOptimisationInput input = workspace.Input();
             input.Parameters[0].Minimum = "a";
-            input.MaxIterations = "many";
+            input.MaximumSimulations = "many";
 
             TasOptimisationCheck check = Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Setup");
 
@@ -166,19 +206,49 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [Fact]
-        public void Names_the_script_never_mentions_are_warnings_that_do_not_block()
+        public void Names_the_script_never_uses_are_SAM_Tas_warnings_that_do_not_block()
         {
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(script: "Variables[\"SetPoint\"]; ScriptOutput.SetValue(\"Result\", 1);");
 
-            List<TasOptimisationCheck> checks = workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
+            TasOptimisationInput input = workspace.Input();
+            List<TasOptimisationCheck> checks = input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
 
             Assert.True(checks.CanRun());
             Assert.Equal(["Design variable 'Setpoint'", "Output 'Cost'", "Output 'CO2'"], checks.Where(x => x.Status == TasOptimisationCheckStatus.Warning).Select(x => x.Title));
-
-            //The warning names the problem; the script's syntax is in the Script field's tooltip, not here.
-            Assert.All(checks.Where(x => x.Status == TasOptimisationCheckStatus.Warning), x => Assert.DoesNotContain("SetValue", x.Detail + x.Title));
-            Assert.All(checks.Where(x => x.Status == TasOptimisationCheckStatus.Warning), x => Assert.DoesNotContain("VariableValue", x.Detail + x.Title));
             Assert.DoesNotContain(checks, x => x.Title == "Output 'Result'");
+
+            //SAM_Tas' own wording (OPT501/OPT502), message then hint: a case-only difference is named.
+            Assert.True(input.TryGetDefinition(out OptimisationDefinition definition, out _));
+            List<OptimisationDiagnostic> expected = definition.TasScriptDiagnostics(File.ReadAllText(workspace.ScriptPath));
+            Assert.Equal(["OPT501", "OPT502", "OPT502"], expected.Select(x => x.Code));
+            Assert.Equal(expected.Select(x => x.Message + " " + x.Hint), checks.Where(x => x.Status == TasOptimisationCheckStatus.Warning).Select(x => x.Detail));
+            Assert.Contains("names are case-sensitive and the script uses \"SetPoint\"", Check(checks, "Design variable 'Setpoint'").Detail);
+        }
+
+        [Fact]
+        public void A_unit_the_definition_does_not_recognise_is_a_warning_that_does_not_block()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(script: "Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); ScriptOutput.SetValue(\"Cost\", 2); ScriptOutput.SetValue(\"CO2\", 3);");
+            TasOptimisationInput input = workspace.Input();
+            input.Parameters[0].Unit = "furlongs";
+
+            List<TasOptimisationCheck> checks = input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
+
+            Assert.True(checks.CanRun());
+            TasOptimisationCheck check = Assert.Single(checks, x => x.Status == TasOptimisationCheckStatus.Warning);
+            Assert.Equal("Design variable 'Setpoint'", check.Title);
+            Assert.StartsWith("Unit “furlongs” of Setpoint is not recognised", check.Detail);
+            Assert.Equal(TasOptimisationCheckStatus.Ready, Check(checks, "Setup").Status);
+        }
+
+        [Fact]
+        public void The_definition_and_its_checks_need_no_script_and_still_judge_the_setup()
+        {
+            //No script yet: the Setup line is judged all the same, and no name warning is guessed.
+            List<TasOptimisationCheck> checks = TasOptimisationInput.Create(TasOptimisationExample.SystemsDemoHookeJeeves).TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable);
+
+            Assert.Equal("Hooke\u2013Jeeves pattern search on Setpoint (\u22125 to 35), minimising Result; recording Cost, CO2; at most 2000 simulations.", Check(checks, "Setup").Detail);
+            Assert.DoesNotContain(checks, x => x.Status == TasOptimisationCheckStatus.Warning);
         }
 
         [Fact]
@@ -203,6 +273,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Contains("SAM.Math: ", text);
             Assert.Contains("SAM.Math.dll", text);
             Assert.Contains("SAM.Analytical.Tas.GenOpt.dll", text);
+            Assert.Contains("SAM.Core.Optimisation.dll", text);
         }
 
         [Fact]
