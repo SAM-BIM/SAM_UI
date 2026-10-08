@@ -41,10 +41,10 @@ UserConstruction race nor the ThermalSource flake recurred); `git diff --check` 
 - Release `MSBuild SAM_UI.sln /t:Rebuild` (VS 18; `APPDATA`/`USERPROFILE` redirected to a scratch profile seeded with a
   read-only copy of `%APPDATA%\SAM\resources` and `Documents\SAM\resources`; real `NUGET_PACKAGES`): 0 errors.
 - `--filter FullyQualifiedName~TasOptimisation`: **75/75** (74 before + 1 new).
-- Full suite `dotnet test SAM_UI.sln -c Release --no-build`: **2616/2618**. Both failures are unrelated, pre-existing
+- Full suite `dotnet test SAM_UI.sln -c Release --no-build` (superseded by the 2636/2636 above): **2616/2618**. Both failures are unrelated, pre-existing
   flakes outside the optimisation code:
   - `UserConstructionCandidateTests.Saved_constructions_follow_..._row_limit` - the user-library file-replace race,
-    fixed separately in SAM-BIM/SAM_UI#211 (this branch is deliberately not based on it);
+    fixed in SAM-BIM/SAM_UI#211, which this branch did not contain at that time (it does now; see above);
   - `ThermalSourceTests.A_source_with_nothing_to_offer_says_why_and_adds_no_candidates` - status text read before it
     updated under full-suite load; the class passed 10/10 when run alone; flagged as a separate task.
 - PR CI `spdx` green; `build` see the PR. `git diff --check` clean; SPDX headers present.
