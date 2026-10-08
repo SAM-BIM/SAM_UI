@@ -22,8 +22,9 @@ the Tas COM API. The planned AI exchange did not help: it edits only the definit
   The AI only ever returns definition JSON, which the strict reader and the diagnostics check. Nothing the AI writes
   is compiled or run.
 - **The AI is reached by copy and paste** (Copy prompt / Paste reply), not by SAM calling an AI service.
-- **"Apply best design" is part of V1.**
+- **"Apply best design" is part of V1**, including plant (TPD) controller setpoints (D2).
 - **First targets and measures** are listed below.
+- **Overheating (D1):** V1 counts occupied hours above 28 °C in occupied rooms; a TM59-style measure follows later.
 
 A hand-written script stays possible as "Advanced: own script" (today's `tas-script` engine).
 
@@ -67,7 +68,7 @@ recorded not enforced, continuous values only (no "construction A, B or C"), gol
 | target | Plant controller setpoint (plant room, controller) | TPD: set the controller setpoint (proven by the Systems Demo) | plant simulation |
 | measure | Annual heating demand (kWh) | TSD: building heating load summed over the year | building results |
 | measure | Annual cooling demand (kWh) | TSD: building cooling load summed over the year | building results |
-| measure | Overheating hours (h) | TSD: occupied hours above a threshold (see decision D1) | building results |
+| measure | Overheating hours (h) | TSD: occupied hours with the room resultant temperature above 28 °C, in occupied rooms; the value is the worst room's (D1) | building results |
 | measure | Plant energy, cost, CO2 (kWh, GBP, kgCO2e) | TPD annual result sets (as the Systems Demo script) | plant simulation |
 
 The generator decides the simulation chain from the bindings: any TBD target runs the building simulation (TBD → TSD);
@@ -84,7 +85,7 @@ Each step is its own PR, owner-reviewed, with the record/closeout rules of `AGEN
 | **PR7a** | SAM_Tas | **Spike, evidence only (licensed).** In TasGenExecute: edit the TBD, run the building simulation, read the TSD and run the TPD in one script; time per evaluation on the Systems Demo; the g-value method (R1); the overheating measure (D1). Result decides the blocks. |
 | **PR7b** | SAM_Tas | **Catalogue reader and script generator.** `Query.TasModelCatalogue(projectFolder)` (internal conditions, glazing constructions, TPD controllers; which measures exist). `Create.TasScript(definition)` from tested blocks for the V1 targets and measures. A new engine `tas-model` (bindings, generated script) beside `tas-script` (own script). A single-evaluation call for Test one simulation. Licensed proof per block: each target changes the result in the expected direction, and each measure equals what SAM_Tas' own readers report. |
 | **PR8** | SAM_UI | **The journey.** Setup lists "Can change" / "Can measure" with current values; Copy prompt / Paste reply (diagnostics shown on the reply); Open/Save definition (.json); generated script view; Test one simulation; duration estimate. Licensed acceptance on the Systems Demo and on a SAM-generated model. |
-| **PR9** | SAM_UI (+ SAM_Tas if needed) | **Apply best design** to the SAM model (internal condition setpoints, glazing) and the Tas files, then offer Energy Simulation. |
+| **PR9** | SAM_UI (+ SAM_Tas if needed) | **Apply best design** to the SAM model (internal condition setpoints, glazing) and the Tas files, and the plant controller setpoints to the TPD file (D2), then offer Energy Simulation. |
 | **PR10** | SAM_Deploy | **Shipping:** SAM.Core.Optimisation, SAM.Units, SAM.Math and SAM.Analytical.Tas.GenOpt beside every installed SAM_UI (was PR8). |
 
 PR5b (engineering formatting of results, raw-value tooltip, CSV trace, full-precision copy) can go at any point; it
@@ -102,9 +103,19 @@ touches only the results view.
 - **R4 Generated code in Tas.** The blocks run through TasGenExecute's own compiler, which changes with the Tas
   version. Each block is proven by a licensed run, and the test simulation catches a failure before a long run.
 
-## Decisions still open
+## Decisions (owner, 8 Oct 2026)
 
-- **D1 Overheating measure.** Proposed default: occupied hours with a resultant temperature above 28 °C, in the worst
-  zone, threshold editable. Alternatives: a TM59-style criterion, or the sum over zones.
-- **D2 Apply for plant targets.** The SAM model may not hold the TPD controllers. Proposed: apply them to the TPD file
-  only, and say so.
+- **D1 Overheating measure.** V1: occupied hours with the room resultant temperature above 28 °C, counted in occupied
+  rooms; the measure's value is the worst room's, and the threshold is a parameter of the measure (default 28 °C).
+  A TM59-style measure (the SAM_Tas TM59 criteria) is a later addition. PR7a confirms which TSD values give
+  "occupied" and the resultant temperature.
+- **D2 Plant targets.** Apply best design includes the TPD controller setpoints. The SAM model may not hold the TPD
+  controllers, so they are written to the TPD file, and the window says so.
+
+Nothing else is needed from the owner to start PR6. The remaining unknowns (R1, R2) are settled by the PR7a spike.
+
+## Continuity
+
+This file is the plan of record. On another computer: fetch `sow/2026-Q4` (after this PR merges) or the branch
+`docs/optimisation-model-bindings-plan`, read this file, then `PROJECT_PROGRESS.md` and `AGENTS.md`. Each PR keeps its
+own record in `documentation/`, as PR1–PR5a did.
