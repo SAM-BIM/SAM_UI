@@ -6,7 +6,7 @@
 
 ## Last updated
 
-2026-10-07 (SAM_UI#205 Direct T3D selector; SAM_UI#206 Direct T3D in Part O; SAM_UI#207 Part O Iteration 3 journey and replace-existing-results; SAM_UI#208 Part O Prepare & Run guide update; SAM_UI#209 Part O "Previous result found"; SAM_UI#210 native Optimisation, Java-free GenOpt PR5); 2026-10-08 (SAM_UI#211 user-library file-replace race).
+2026-10-07 (SAM_UI#205 Direct T3D selector; SAM_UI#206 Direct T3D in Part O; SAM_UI#207 Part O Iteration 3 journey and replace-existing-results; SAM_UI#208 Part O Prepare & Run guide update; SAM_UI#209 Part O "Previous result found"; SAM_UI#210 native Optimisation, Java-free GenOpt PR5); 2026-10-08 (SAM_UI#211 user-library file-replace race; SAM_UI#212 shared native result rules, Java-free GenOpt PR6).
 
 ## Current status
 
@@ -152,6 +152,17 @@ authoring machine) and must be transferred separately.
 - **Wiki:** the Part O Wiki was published twice from the merged guide with `documentation/publish-part-o-wiki.ps1` (clone of `SAM_UI.wiki.git`, commit + push): `3a82d6c` (#208 guide, which resolves the "Wiki is stale" risk in the #208 entry) and `525b965` (#209 guide). Page is byte-identical to the merged guide; live page checked (headings, 3 tables, no raw markdown, new section present, "not available yet" gone). The Wiki is a manual publish: re-run the script after any guide change.
 - **Unresolved issues, risks:** (1) Offering reads the candidate result `.sam` and hashes the design on each Prepare & Run press where a result exists (seconds on a large model). (2) Results saved before SAM#184 are never offered. (3) Direct T3D box still resets to Off on each Hub open (SAM_UI#206 carry-over). (4) `ThermalSourceTests` async-status flake under full-suite load.
 - **Next step:** none required for this stream. Optional: remember Direct T3D / output folder across Hub openings; Cancel and legacy-result real-app walk if ever wanted.
+
+## Q4 native Optimisation result rules from SAM_Tas - Java-free GenOpt PR6 (2026-10-08)
+
+- **Status:** complete, closed. SAM-BIM/SAM_UI#212 (`feature/native-optimisation-pr6-retire-legacy`) merged into `sow/2026-Q4` as merge commit `a985d7d98398b9d9f19162026e6383f8d1407e1d` (parents: Q4 base `49b7afc2` + reviewed PR head `9c01267685dccf0c3d6db899679154a127ed9c2c`; merge tree `8cfce99` identical to the head tree); merge method: merge commit with `--match-head-commit`. PR CI (`build`, `spdx`) green on the head; post-merge `Build (Windows)` on `a985d7d9` green (built against SAM_Tas `sow/2026-Q4` with SAM_Tas#87). Codex: P1 (record must hold the validation) and P2 (record described the pre-#211 tree) fixed, threads resolved. Feature branch deleted locally and on origin. Record: `documentation/NativeOptimisation-PR6.md`; full PR6 record: SAM_Tas `SAM_Tas/SAM.Analytical.Tas.GenOpt/NATIVE_GENOPT_PR6.md`.
+- **Programme context:** sixth PR of the Java-free GenOpt replacement, owner-approved order: SAM_Tas#87 (merge `8dffaa3d`; legacy Java route removed, GPSCoordinateSearch refused as unsupported, `NativeGenOptOutcome`) -> SAM_Tas_Grasshopper#12 (merge `c43c2cad`) -> this PR -> SAM#185 (comment only).
+- **Work completed (SAM_UI only):** `TasOptimisationReport` reads success / withholding / best point / interval / refusal wording from SAM_Tas `NativeGenOptOutcome` (own `Best` and refusal mapping removed; headline, status, lines and order unchanged; the stale-assembly message still comes first and the shared call is isolated so it works with a stale GenOpt assembly). `TasOptimisationProgressState` uses `IsLower`. The readiness probe also reaches `NativeGenOptOutcome`, so a pre-PR6 `SAM.Analytical.Tas.GenOpt.dll` is reported when the window opens. "Java-incompatible" wording removed.
+- **Decisions:** PR5's local result rules consolidated into SAM_Tas (not SAM.Math, to avoid a SAM.Math binary change); presentation stays in SAM_UI. The branch was brought up to the #211 baseline by merging `sow/2026-Q4` (`bd6bc75`, no conflicts); PR6 diff stayed the 8 PR6 files.
+- **Files changed (8):** `WPF/SAM.Analytical.UI.WPF/Classes/TasOptimisation/{TasOptimisationReport,TasOptimisationProgressState,TasOptimisationDefinition,TasOptimisationInput}.cs`, `Query/TasOptimisationAssemblies.cs`; tests `TasOptimisationReportTests.cs`, `TasOptimisationWindowTests.cs`; `documentation/NativeOptimisation-PR6.md`.
+- **Validation (on the #211 baseline):** Release Rebuild `SAM_UI.sln` 0 errors (APPDATA/USERPROFILE redirected to a seeded scratch profile, real `NUGET_PACKAGES`); `TasOptimisation*` 75/75; full suite 2636/2636; `git diff --check` clean. Licensed acceptance not rerun: report output and native execution unchanged; PR5 acceptance stands.
+- **Unresolved issues, risks:** SAM_UI now needs a PR6 `SAM.Analytical.Tas.GenOpt.dll` beside the app. **SAM_Deploy follow-up (separate task):** ship one current `SAM.Math.dll` to every SAM/Rhino location, the current `SAM.Analytical.Tas.GenOpt.dll` beside SAM_UI, and delete stale `GenOpt.bat`/`config.txt` from older installations. Separate flake task: `ThermalSourceTests.A_source_with_nothing_to_offer...` (seen once under load).
+- **Next step:** the SAM_Deploy shipping task before broad installer acceptance; then the AI-friendly declarative objective model phase when requested.
 
 ## Q4 user-library file-replace race fix (2026-10-08)
 
