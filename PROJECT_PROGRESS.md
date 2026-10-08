@@ -6,7 +6,7 @@
 
 ## Last updated
 
-2026-10-07 (SAM_UI#205 Direct T3D selector; SAM_UI#206 Direct T3D in Part O; SAM_UI#207 Part O Iteration 3 journey and replace-existing-results; SAM_UI#208 Part O Prepare & Run guide update; SAM_UI#209 Part O "Previous result found"; SAM_UI#210 native Optimisation, Java-free GenOpt PR5); 2026-10-08 (SAM_UI#211 user-library file-replace race; SAM_UI#212 shared native result rules, Java-free GenOpt PR6; SAM_UI#213 ThermalSource status race; SAM_UI#214 Design Optimisation language and information architecture; SAM_UI#215 Design Optimisation form edits an Optimisation Definition, native Optimisation PR5a; SAM_UI#216 native Optimisation plan: model bindings).
+2026-10-07 (SAM_UI#205 Direct T3D selector; SAM_UI#206 Direct T3D in Part O; SAM_UI#207 Part O Iteration 3 journey and replace-existing-results; SAM_UI#208 Part O Prepare & Run guide update; SAM_UI#209 Part O "Previous result found"; SAM_UI#210 native Optimisation, Java-free GenOpt PR5); 2026-10-08 (SAM_UI#211 user-library file-replace race; SAM_UI#212 shared native result rules, Java-free GenOpt PR6; SAM_UI#213 ThermalSource status race; SAM_UI#214 Design Optimisation language and information architecture; SAM_UI#215 Design Optimisation form edits an Optimisation Definition, native Optimisation PR5a; SAM_UI#216 native Optimisation plan: model bindings; SAM_UI#217 plan follow-up, construction and glazing choice).
 
 ## Current status
 
@@ -152,6 +152,17 @@ authoring machine) and must be transferred separately.
 - **Wiki:** the Part O Wiki was published twice from the merged guide with `documentation/publish-part-o-wiki.ps1` (clone of `SAM_UI.wiki.git`, commit + push): `3a82d6c` (#208 guide, which resolves the "Wiki is stale" risk in the #208 entry) and `525b965` (#209 guide). Page is byte-identical to the merged guide; live page checked (headings, 3 tables, no raw markdown, new section present, "not available yet" gone). The Wiki is a manual publish: re-run the script after any guide change.
 - **Unresolved issues, risks:** (1) Offering reads the candidate result `.sam` and hashes the design on each Prepare & Run press where a result exists (seconds on a large model). (2) Results saved before SAM#184 are never offered. (3) Direct T3D box still resets to Off on each Hub open (SAM_UI#206 carry-over). (4) `ThermalSourceTests` async-status flake under full-suite load.
 - **Next step:** none required for this stream. Optional: remember Direct T3D / output folder across Hub openings; Cancel and legacy-result real-app walk if ever wanted.
+
+## Q4 native Optimisation plan follow-up: construction and glazing choice (2026-10-08)
+
+- **Status:** complete, closed. SAM-BIM/SAM_UI#217 (`docs/optimisation-choice-followup`, docs only) merged into `sow/2026-Q4` as merge commit `a7b5f1e7df543db6cc99874e4522a0f491ed693f` (parents: `47144f0` + reviewed PR head `da51e87363333743a100e9f3a4a9ec0f78b34991`; merge tree identical to the head tree); merge method: merge commit with `--match-head-commit`, after the owner's explicit approval. PR CI (`build`, `spdx`) green on the head. Branch deleted locally and on origin.
+- **Work completed:** the plan of record `documentation/NativeOptimisation-Plan-ModelBindings.md` now holds the owner's 8 Oct follow-up (it was recorded only in the #216 entry below): a choice between 4-5 constructions or glazings from the user's libraries, added to the run's copy of the TBD and searched by "try every option" (one simulation per option); it removes R1; V1 runs a choice on its own; the definition shape from SAM#188 (`discrete` variable, target `options`, numbered 1 to n); not built yet; later candidates (shading options, geometry shading, more kernel algorithms). The V1 limits line, the PR6 row and R1 point to it; the status line says the plan is approved.
+- **Programme state:** PR6 (SAM#188, SAM.Core.Optimisation model bindings, merge `6e5727f6`) is merged and closed out on SAM `sow/2026-Q4` (closeout `4b2e6450`): targets and measures, capabilities with kinds, catalogue with current values, diagnostics OPT600-OPT615, AI text offering only catalogue items. SAM_UI was not changed by PR6; its `TasOptimisation*` tests passed 121/121 against the PR6 build.
+- **Decisions:** the owner chose a separate docs PR (not folded into PR8). Ordering of the choice PRs (try every option, TBD swap, window, Apply) is left to the owner; none is part of PR7a.
+- **Files changed (1):** `documentation/NativeOptimisation-Plan-ModelBindings.md`.
+- **Validation:** docs only; `git diff --check` clean; PR CI green.
+- **Unresolved issues, risks:** unchanged from the #216 entry (R1-R4); kinds and reference keys in SAM#188's fixtures are placeholders until PR7b.
+- **Next step:** PR7a, the SAM_Tas licensed spike (evidence only), when the owner authorises it. Hand-over prompt `SAM-BIM\NEXT_SESSION_PROMPT_PR7A.md` on the authoring laptop (local file, not in git; it points only to committed files). This supersedes the "not yet in the plan file" note and the PR6 next step in the #216 entry below.
 
 ## Q4 native Optimisation plan: model bindings instead of a hand-written script (2026-10-08)
 
