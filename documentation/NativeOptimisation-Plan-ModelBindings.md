@@ -3,7 +3,8 @@
 
 # Design Optimisation without a hand-written script: model bindings (plan, 8 Oct 2026)
 
-**Status:** proposed plan for owner approval. Merging this docs-only PR approves it. No code is written for it yet.
+**Status:** approved by the owner (SAM_UI#216, merged `4c296cd`). Updated on 8 Oct with the owner's follow-up on a
+construction and glazing choice (section at the end). PR6 is open as SAM#188.
 
 This plan replaces the remaining steps of the native Optimisation programme after PR5a (SAM_UI#215, merged
 `84df6141`). It supersedes the earlier PR6 (Definition tab) and PR7 (AI exchange), which assumed the user brings a
@@ -56,7 +57,8 @@ ticked).
    and its reports follow.
 
 V1 limits, stated in the window and in the AI prompt: minimise only (maximise = minimise the negative), limits are
-recorded not enforced, continuous values only (no "construction A, B or C"), golden section for one variable.
+recorded not enforced, continuous values only (no "construction A, B or C" yet: see "Follow-up: construction and
+glazing choice" below), golden section for one variable.
 
 ## First targets and measures (V1)
 
@@ -81,7 +83,7 @@ Each step is its own PR, owner-reviewed, with the record/closeout rules of `AGEN
 
 | PR | Repository | Content |
 |---|---|---|
-| **PR6** | SAM (SAM.Core.Optimisation) | **Bindings in the schema.** `DesignVariable.Target` and `OptimisationOutput.Measure` (a kind, the model item it refers to, and parameters such as a threshold). Strict reader, canonical writer, diagnostics (unknown kind, item not in the catalogue, unit/quantity of the kind). The catalogue (`OptimisationCatalogue`) gains targets and measures with current values, units and suggested ranges. The AI text offers only catalogue items. Still `sam.optimisation/1` (nothing is released yet). No execution. |
+| **PR6** | SAM (SAM.Core.Optimisation) | **Bindings in the schema.** `DesignVariable.Target` and `OptimisationOutput.Measure` (a kind, the model item it refers to, and parameters such as a threshold). Strict reader, canonical writer, diagnostics (unknown kind, item not in the catalogue, unit/quantity of the kind). The catalogue (`OptimisationCatalogue`) gains targets and measures with current values, units and suggested ranges. The AI text offers only catalogue items. Still `sam.optimisation/1` (nothing is released yet). No execution. A target can also carry an options list for a choice (see the follow-up below); the choice itself is not run. Opened as SAM#188 (record `documentation/OptimisationDefinition-Bindings-PR.md` in SAM). |
 | **PR7a** | SAM_Tas | **Spike, evidence only (licensed).** In TasGenExecute: edit the TBD, run the building simulation, read the TSD and run the TPD in one script; time per evaluation on the Systems Demo; the g-value method (R1); the overheating measure (D1). Result decides the blocks. |
 | **PR7b** | SAM_Tas | **Catalogue reader and script generator.** `Query.TasModelCatalogue(projectFolder)` (internal conditions, glazing constructions, TPD controllers; which measures exist). `Create.TasScript(definition)` from tested blocks for the V1 targets and measures. A new engine `tas-model` (bindings, generated script) beside `tas-script` (own script). A single-evaluation call for Test one simulation. Licensed proof per block: each target changes the result in the expected direction, and each measure equals what SAM_Tas' own readers report. |
 | **PR8** | SAM_UI | **The journey.** Setup lists "Can change" / "Can measure" with current values; Copy prompt / Paste reply (diagnostics shown on the reply); Open/Save definition (.json); generated script view; Test one simulation; duration estimate. Licensed acceptance on the Systems Demo and on a SAM-generated model. |
@@ -95,7 +97,8 @@ touches only the results view.
 
 - **R1 Glazing g-value.** TBD reports a construction's g-value (`GetGlazingValues`) but has no field to set it: it
   follows from the glazing layers. PR7a must find an exact, repeatable way (for example solving for the layer's solar
-  transmittance) or the target becomes "glazing solar transmittance" with the g-value reported.
+  transmittance) or the target becomes "glazing solar transmittance" with the g-value reported. The glazing choice
+  (follow-up below) avoids the problem, so a continuous g-value can become optional or later.
 - **R2 Duration.** Building-level targets run a full-year building simulation per evaluation (20 s on the Systems
   Demo; minutes on a real building). The test simulation measures it, and the window shows the estimate.
 - **R3 Names.** Bindings refer to model items by name (internal condition, construction, controller). A renamed item
@@ -113,6 +116,45 @@ touches only the results view.
   controllers, so they are written to the TPD file, and the window says so.
 
 Nothing else is needed from the owner to start PR6. The remaining unknowns (R1, R2) are settled by the PR7a spike.
+
+## Follow-up: construction and glazing choice (owner, 8 Oct 2026, after approving this plan)
+
+- **What.** A design variable can choose between 4–5 predefined constructions or glazings, taken from the user's
+  My constructions / My glazing libraries in SAM UI. SAM adds the options to the run's copy of the TBD (SAM_Tas
+  already has code to add unused constructions), and each simulation uses one of them.
+- **How it is searched.** A new "try every option" method: one simulation per option. Nothing else is needed for a
+  handful of options.
+- **Why.** It removes risk R1: the TBD has no g-value setter, but swapping a whole glazing construction needs none. A
+  continuous g-value target becomes optional or later.
+- **V1 limit.** A choice variable runs on its own. Mixing a choice with continuous variables (one optimisation per
+  option) comes later.
+- **Definition shape (in PR6, SAM#188).** The variable is `"discrete"` and its target carries `"options"`: the names of
+  the model items, in order. The options are numbered 1 to n, so the variable has `"minimum": 1` and `"maximum"` the
+  number of options; 1 is the first option. An engine says which target kinds accept options; the catalogue lists the
+  options available for each item. Example:
+
+  ```json
+  {
+    "name": "Glazing",
+    "type": "discrete",
+    "minimum": 1,
+    "maximum": 3,
+    "target": {
+      "kind": "tbd.glazing-construction.choice",
+      "reference": { "glazingConstruction": "Office glazing" },
+      "options": [ "Double low-e", "Triple low-e", "Double solar control" ]
+    }
+  }
+  ```
+
+  (The kind and key names are illustrative; SAM_Tas defines the real ones.)
+- **Not built yet.** PR6 defines and checks only the shape. Until an engine runs `"discrete"` variables, a choice is
+  readable but not runnable. The "try every option" method, adding the options to the TBD, and the choice in the
+  window and in Apply best design are later PRs, to be ordered with the owner. They are not part of PR7a.
+- **Later candidates, not now:**
+  - shading options: blind or shading-device control, or a choice between shading options;
+  - geometry-based shading such as overhang depth (the T3D must be regenerated for every simulation);
+  - more kernel algorithms (particle swarm, genetic), only when a real case needs them.
 
 ## Continuity
 
