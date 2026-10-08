@@ -14,8 +14,9 @@ using System.Text;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// How one Simulate &gt; Optimisation run ended, read from the SAM.Math kernel's <see cref="OptimisationResult"/> and
-    /// nothing else (no GenOpt output file is read). It is presentation only: the headline, status and lines. The rules
+    /// How one Design Optimisation (Simulate &gt; Optimisation) run ended, read from the SAM.Math kernel's <see cref="OptimisationResult"/> and
+    /// nothing else (no GenOpt output file is read). It is presentation only: the headline, status and lines (values at
+    /// full precision; the kernel's own bookkeeping is kept apart in <see cref="DiagnosticsText"/>). The rules
     /// are SAM_Tas' <see cref="NativeGenOptOutcome"/> (PR6), shared with the Grasshopper GenOpt component, so a run
     /// reads the same in both places:
     /// <list type="bullet">
@@ -43,6 +44,7 @@ namespace SAM.Analytical.UI.WPF
             BestObjectives = none;
             Status = TasOptimisationCheckStatus.Blocked;
             Headline = "The optimisation did not start";
+            DiagnosticsText = string.Empty;
             lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Error", Message(exception)));
         }
 
@@ -78,41 +80,47 @@ namespace SAM.Analytical.UI.WPF
             BestPoint = none;
             BestObjectives = none;
 
+            //What belongs to the kernel and not to the engineer: shown under Diagnostics, never in the result card.
+            StringBuilder stringBuilder_Diagnostics = new StringBuilder();
+            stringBuilder_Diagnostics.AppendLine("Kernel outcome: " + result.Outcome);
+            stringBuilder_Diagnostics.AppendLine("Kernel simulation count: " + Count(result.Simulations));
+
             switch (result.Outcome)
             {
                 case OptimisationOutcome.Success:
                     Status = TasOptimisationCheckStatus.Ready;
-                    Headline = string.Format(CultureInfo.InvariantCulture, "Finished: Success after {0} simulations", result.Simulations);
+                    Headline = string.Format(CultureInfo.InvariantCulture, "Optimum found after {0} simulations", Count(result.Simulations));
                     break;
 
                 case OptimisationOutcome.MaximumSimulationsReached:
                     Status = TasOptimisationCheckStatus.Warning;
-                    Headline = string.Format(CultureInfo.InvariantCulture, "Stopped at the simulation limit ({0} simulations)", result.Simulations);
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "The simulation limit was reached before the stopping criterion was met; the lowest point found is reported."));
+                    Headline = string.Format(CultureInfo.InvariantCulture, "Stopped at the simulation limit ({0} simulations) – best design so far", Count(result.Simulations));
+                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "The simulation limit was reached before the search had converged; the best design found so far is reported."));
                     break;
 
                 case OptimisationOutcome.Nullspace:
                     Status = TasOptimisationCheckStatus.Warning;
-                    Headline = string.Format(CultureInfo.InvariantCulture, "Stopped on equal objective values after {0} simulations", result.Simulations);
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "Golden section stopped on two consecutive equal objective values (nullspace); the lowest point found is reported."));
+                    Headline = string.Format(CultureInfo.InvariantCulture, "Stopped: golden section found equal objective values ({0} simulations)", Count(result.Simulations));
+                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "Golden section found two equal objective values in a row, so it cannot narrow the interval further; the best design found is reported."));
                     break;
 
                 case OptimisationOutcome.Cancelled:
                     Status = TasOptimisationCheckStatus.Warning;
                     Headline = "Cancelled";
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", string.Format(CultureInfo.InvariantCulture, "Cancelled by user. The running Tas evaluation was allowed to finish and no further one was started. No best point is reported; the completed evaluations remain in the run folder. (The kernel's simulation count, {0}, includes the number it had assigned when the cancel was observed.)", result.Simulations)));
+                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "Cancelled by user. The running Tas simulation was allowed to finish and no further one was started. No best design is reported; the completed simulations remain in the run folder."));
+                    stringBuilder_Diagnostics.AppendLine("The kernel's simulation count includes the number it had assigned when the cancel was observed.");
                     break;
 
                 case OptimisationOutcome.EvaluationFailed:
                     Status = TasOptimisationCheckStatus.Blocked;
-                    Headline = string.Format(CultureInfo.InvariantCulture, "A Tas evaluation failed (simulation {0})", result.FailedSimulation);
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Evaluation", string.Format(CultureInfo.InvariantCulture, "Tas evaluation failed at simulation {0}: {1}", result.FailedSimulation, result.FailureMessage)));
+                    Headline = string.Format(CultureInfo.InvariantCulture, "A Tas simulation failed (simulation {0})", Count(result.FailedSimulation));
+                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Simulation", string.Format(CultureInfo.InvariantCulture, "Tas simulation {0} failed: {1}", Count(result.FailedSimulation), result.FailureMessage)));
                     break;
 
                 case OptimisationOutcome.InitialPointInfeasible:
                     Status = TasOptimisationCheckStatus.Blocked;
-                    Headline = "The start point is outside the bounds";
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Outcome", "The initial point is outside the parameter bounds."));
+                    Headline = "Start values are outside the design-variable ranges";
+                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Outcome", "At least one start value is outside its minimum–maximum range. Change the start value or the range."));
                     break;
 
                 default:
@@ -126,8 +134,11 @@ namespace SAM.Analytical.UI.WPF
             {
                 Status = TasOptimisationCheckStatus.Warning;
                 Headline = "Cancelled as the run finished";
-                lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "Cancelled by user as the run finished (kernel outcome: " + result.Outcome + "). The result is withheld; the evaluation folders remain in the run folder."));
+                lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Outcome", "Cancelled by user as the run finished. The result is withheld; the simulation folders remain in the run folder."));
+                stringBuilder_Diagnostics.AppendLine("The kernel finished with outcome " + result.Outcome + " before the cancel took effect.");
             }
+
+            DiagnosticsText = stringBuilder_Diagnostics.ToString().TrimEnd();
 
             if (Successful)
             {
@@ -137,8 +148,14 @@ namespace SAM.Analytical.UI.WPF
                     BestPoint = best.Coordinates;
                     BestObjectives = best.Outputs;
                     BestSimulation = best.Simulation;
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Best point", Text(ParameterNames, best.Coordinates) + " (simulation " + best.Simulation.ToString(CultureInfo.InvariantCulture) + ")"));
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Best objective", Text(ObjectiveNames, best.Outputs)));
+                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Best design", Text(ParameterNames, best.Coordinates) + " (simulation " + Count(best.Simulation) + ")"));
+
+                    //The kernel minimises the first output; the others are recorded for every simulation.
+                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Objective", Text(ObjectiveNames.Take(1).ToList(), best.Outputs.Take(1).ToList())));
+                    if (best.Outputs.Count > 1)
+                    {
+                        lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Recorded outputs", Text(ObjectiveNames.Skip(1).ToList(), best.Outputs.Skip(1).ToList())));
+                    }
                 }
 
                 if (nativeGenOptOutcome.Interval != null)
@@ -150,7 +167,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (result.Retries > 0)
             {
-                lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Retries", string.Format(CultureInfo.InvariantCulture, "{0} evaluation(s) failed once and were retried.", result.Retries)));
+                lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Retries", string.Format(CultureInfo.InvariantCulture, "{0} simulation(s) failed once and were retried.", Count(result.Retries))));
             }
 
             if (!string.IsNullOrWhiteSpace(runDirectory))
@@ -185,7 +202,7 @@ namespace SAM.Analytical.UI.WPF
 
         public IReadOnlyList<string> ObjectiveNames { get; }
 
-        /// <summary>The best point's parameter values in coordinate order; empty unless <see cref="Successful"/>.</summary>
+        /// <summary>The best design's design-variable values in coordinate order; empty unless <see cref="Successful"/>.</summary>
         public IReadOnlyList<double> BestPoint { get; }
 
         /// <summary>The best point's outputs in output order (the first is the minimised one); empty unless <see cref="Successful"/>.</summary>
@@ -199,19 +216,24 @@ namespace SAM.Analytical.UI.WPF
 
         public string? RunDirectory { get; }
 
-        /// <summary>The report's lines after the headline: outcome notes, best point, interval, retries, run folder.</summary>
+        /// <summary>
+        /// What the kernel reports that an engineer does not need on the result card: its outcome code and simulation count
+        /// and how a cancel is counted. Shown under Diagnostics.
+        /// </summary>
+        public string DiagnosticsText { get; }
+
+        /// <summary>The report's lines after the headline: outcome notes, best design, objective, recorded outputs, interval, retries, run folder.</summary>
         public IReadOnlyList<TasOptimisationCheck> Lines => lines;
 
         /// <summary>The whole report as plain text, for the clipboard.</summary>
         public string ToText()
         {
             StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.AppendLine("SAM Optimisation (native)");
+            stringBuilder.AppendLine("Design Optimisation");
             stringBuilder.AppendLine(Headline);
-            stringBuilder.AppendLine("Outcome: " + Outcome);
             if (Result != null)
             {
-                stringBuilder.AppendLine("Simulations: " + Simulations.ToString(CultureInfo.InvariantCulture));
+                stringBuilder.AppendLine("Simulations: " + Count(Simulations));
             }
 
             foreach (TasOptimisationCheck line in lines)
@@ -219,10 +241,21 @@ namespace SAM.Analytical.UI.WPF
                 stringBuilder.AppendLine(line.Title + ": " + line.Detail);
             }
 
+            if (!string.IsNullOrWhiteSpace(DiagnosticsText))
+            {
+                stringBuilder.AppendLine("Diagnostics: " + DiagnosticsText.Replace(Environment.NewLine, "; "));
+            }
+
             return stringBuilder.ToString();
         }
 
-        /// <summary>"name = value" pairs, invariant round-trip numbers.</summary>
+        /// <summary>A simulation or retry count as an integer in invariant digits (never through a quantity formatter, whose Count means persons).</summary>
+        public static string Count(int value)
+        {
+            return value.ToString("D", CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>"name = value" pairs, invariant round-trip numbers (full precision).</summary>
         public static string Text(IReadOnlyList<string>? names, IReadOnlyList<double>? values)
         {
             if (values == null)

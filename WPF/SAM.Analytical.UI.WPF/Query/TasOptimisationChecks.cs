@@ -13,10 +13,11 @@ namespace SAM.Analytical.UI.WPF
     public static partial class Query
     {
         /// <summary>
-        /// The readiness list of Simulate &gt; Optimisation, in the order the questions arise: the Tas project folder,
-        /// the script, TasGenExecute, the optimisation settings, then the non-blocking name check. Nothing is created or
-        /// started. The settings are judged by SAM_Tas (<see cref="TasOptimisationDefinition.Validate"/>), and its message
-        /// is shown as it is.
+        /// The readiness list of Simulate &gt; Optimisation (Design Optimisation), in the order the questions arise: the
+        /// Tas project, the Tas script, the Tas optimisation engine (TasGenExecute), the setup, then the non-blocking name
+        /// check. Nothing is created or started. The setup is judged by SAM_Tas
+        /// (<see cref="TasOptimisationDefinition.Validate"/>); its message is shown as it is, without the internal prefix
+        /// the Grasshopper wording adds. The engine's path is not part of a ready line: the window shows it under Diagnostics.
         /// </summary>
         /// <param name="tasOptimisationInput">The form.</param>
         /// <param name="tasGenExecutePath">TasGenExecute.exe; null for the installed one, which RunNative uses.</param>
@@ -35,13 +36,13 @@ namespace SAM.Analytical.UI.WPF
 
             string path_TasGenExecute = string.IsNullOrWhiteSpace(tasGenExecutePath) ? Analytical.Tas.GenOpt.Query.TasGenOptExecutePath() : tasGenExecutePath!;
             result.Add(System.IO.File.Exists(path_TasGenExecute)
-                ? new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "TasGenExecute", path_TasGenExecute)
-                : new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "TasGenExecute", "TasGenExecute.exe was not found at '" + path_TasGenExecute + "'. It is installed with Tas (TasGenOpt)."));
+                ? new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Tas optimisation engine", "Installed.")
+                : new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Tas optimisation engine", "TasGenExecute.exe was not found at '" + path_TasGenExecute + "'. It is installed with Tas (TasGenOpt)."));
 
             TasOptimisationDefinition? tasOptimisationDefinition = null;
             if (!tasOptimisationInput.TryGetDefinition(out tasOptimisationDefinition, out List<string> problems))
             {
-                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Optimisation settings", string.Join(Environment.NewLine, problems)));
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", string.Join(Environment.NewLine, problems)));
                 tasOptimisationDefinition = null;
             }
             else
@@ -49,11 +50,11 @@ namespace SAM.Analytical.UI.WPF
                 try
                 {
                     tasOptimisationDefinition!.Validate();
-                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Optimisation settings", Summary(tasOptimisationDefinition)));
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Setup", Summary(tasOptimisationDefinition)));
                 }
                 catch (Exception exception) when (exception is InvalidOperationException || exception is NotSupportedException || exception is ArgumentException)
                 {
-                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Optimisation settings", TasOptimisationReport.Message(exception)));
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", SettingsMessage(exception)));
                 }
             }
 
@@ -118,7 +119,7 @@ namespace SAM.Analytical.UI.WPF
 
         private static TasOptimisationCheck TasOptimisationCheck_Directory(TasOptimisationInput tasOptimisationInput)
         {
-            const string title = "Tas project folder";
+            const string title = "Tas project";
 
             string directory = tasOptimisationInput.Directory?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(directory))
@@ -139,27 +140,27 @@ namespace SAM.Analytical.UI.WPF
 
             if (names.Count == 0)
             {
-                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder holds no Tas file (" + string.Join(", ", NativeGenOptWorkspace.TasFileExtensions) + ") at its top level, so TasGenExecute would receive none.");
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder holds no Tas file (" + string.Join(", ", NativeGenOptWorkspace.TasFileExtensions) + ") at its top level, so the simulations would have no model to run.");
             }
 
-            return new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, string.Join(", ", names) + ". Each run copies these into its own folder under " + tasOptimisationInput.TasOptimisationRunsDirectory() + "; the originals are not changed.");
+            return new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, string.Join(", ", names) + ". Each simulation runs on a copy under " + tasOptimisationInput.TasOptimisationRunsDirectory() + "; the originals are not changed.");
         }
 
         private static TasOptimisationCheck TasOptimisationCheck_Script(string scriptPath, out string? scriptText)
         {
-            const string title = "Script";
+            const string title = "Tas script";
 
             scriptText = null;
 
             string path = scriptPath?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(path))
             {
-                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "Choose the TasGenExecute script (C#) to run for each evaluation.");
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "Choose the Tas script (C#) to run for each simulation.");
             }
 
             if (!System.IO.File.Exists(path))
             {
-                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The script does not exist: '" + path + "'.");
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The Tas script does not exist: '" + path + "'.");
             }
 
             try
@@ -168,21 +169,22 @@ namespace SAM.Analytical.UI.WPF
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
-                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The script cannot be read: " + exception.Message);
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The Tas script cannot be read: " + exception.Message);
             }
 
             if (string.IsNullOrWhiteSpace(scriptText))
             {
                 scriptText = null;
-                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The script is empty.");
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The Tas script is empty.");
             }
 
             return new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, Path.GetFileName(path));
         }
 
         /// <summary>
-        /// A name the script never writes as a quoted literal: probably a typing mistake, which would make every evaluation
-        /// fail. A warning only, as a script may build a name at run time.
+        /// A name the Tas script never mentions as a quoted literal: probably a typing mistake, which would make every
+        /// simulation fail. A warning only, as a script may build a name at run time. The script's syntax is not repeated
+        /// here: it is in the Script field's tooltip.
         /// </summary>
         private static List<TasOptimisationCheck> TasOptimisationChecks_Names(TasOptimisationInput tasOptimisationInput, string scriptText)
         {
@@ -192,7 +194,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 if (!Quoted(scriptText, name))
                 {
-                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Parameter '" + name + "'", string.Format(CultureInfo.InvariantCulture, "The script never mentions \"{0}\". It reads each parameter as Variables[\"{0}\"]; check the name.", name)));
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Design variable '" + name + "'", string.Format(CultureInfo.InvariantCulture, "The Tas script never mentions \"{0}\". Check that the name matches the one the script reads.", name)));
                 }
             }
 
@@ -200,7 +202,7 @@ namespace SAM.Analytical.UI.WPF
             {
                 if (!Quoted(scriptText, name))
                 {
-                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Output '" + name + "'", string.Format(CultureInfo.InvariantCulture, "The script never mentions \"{0}\". It writes each output as ScriptOutput.SetValue(\"{0}\", value); check the name.", name)));
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Output '" + name + "'", string.Format(CultureInfo.InvariantCulture, "The Tas script never mentions \"{0}\". Check that the name matches the one the script writes.", name)));
                 }
             }
 
@@ -212,24 +214,48 @@ namespace SAM.Analytical.UI.WPF
             return text.IndexOf("\"" + name + "\"", StringComparison.Ordinal) >= 0;
         }
 
+        /// <summary>
+        /// A SAM_Tas refusal as the Setup line shows it: the message itself, without the "Invalid GenOpt settings for the
+        /// native route" or "Not supported by the native route" prefix that <see cref="TasOptimisationReport.Message"/>
+        /// adds for the Grasshopper wording. Other failures keep that wording.
+        /// </summary>
+        private static string SettingsMessage(Exception exception)
+        {
+            if (exception is GenOptCompatibilityException || exception is NotSupportedException)
+            {
+                return exception.Message;
+            }
+
+            return TasOptimisationReport.Message(exception);
+        }
+
+        /// <summary>
+        /// "Golden section on Setpoint (−5 to 35), minimising Result; recording Cost, CO2; at most 2000 simulations."
+        /// Numbers are the entered ones at full precision; the simulation limit is an integer.
+        /// </summary>
         private static string Summary(TasOptimisationDefinition tasOptimisationDefinition)
         {
             IReadOnlyList<string> names_Objective = tasOptimisationDefinition.ObjectiveNames;
 
             string text = string.Format(
                 CultureInfo.InvariantCulture,
-                "{0} · {1} parameter(s): {2} · minimises {3}",
-                tasOptimisationDefinition.Algorithm.AlgorithmType,
-                tasOptimisationDefinition.NumberParameters.Count,
-                string.Join(", ", tasOptimisationDefinition.ParameterNames),
+                "{0} on {1}, minimising {2}",
+                tasOptimisationDefinition.Algorithm.AlgorithmType.TasOptimisationAlgorithmName(),
+                string.Join(", ", tasOptimisationDefinition.NumberParameters.Select(x => string.Format(CultureInfo.InvariantCulture, "{0} ({1} to {2})", x.Name, Number(x.Min), Number(x.Max)))),
                 names_Objective.FirstOrDefault());
 
             if (names_Objective.Count > 1)
             {
-                text += " (also records " + string.Join(", ", names_Objective.Skip(1)) + ")";
+                text += "; recording " + string.Join(", ", names_Objective.Skip(1));
             }
 
-            return text + string.Format(CultureInfo.InvariantCulture, " · up to {0} simulations", tasOptimisationDefinition.OptimizationSettings.MaxIterations);
+            return text + string.Format(CultureInfo.InvariantCulture, "; at most {0} simulations.", tasOptimisationDefinition.OptimizationSettings.MaxIterations);
+        }
+
+        /// <summary>Full precision (round-trip), with a true minus sign.</summary>
+        private static string Number(double value)
+        {
+            return value.ToString("R", CultureInfo.InvariantCulture).Replace('-', '−');
         }
     }
 }

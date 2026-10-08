@@ -80,9 +80,14 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(lowest.Simulation, report.BestSimulation);
             Assert.Same(result.Interval, report.Interval);
             Assert.Equal(result.Simulations, report.Simulations);
-            Assert.Contains("Success after " + result.Simulations + " simulations", report.Headline);
-            Assert.Contains(report.Lines, x => x.Title == "Best point" && x.Detail.StartsWith("Setpoint = "));
-            Assert.Contains(report.Lines, x => x.Title == "Best objective" && x.Detail.StartsWith("Result = ") && x.Detail.Contains("Cost = "));
+            Assert.Equal("Optimum found after " + result.Simulations + " simulations", report.Headline);
+            Assert.Contains(report.Lines, x => x.Title == "Best design" && x.Detail.StartsWith("Setpoint = "));
+            Assert.Contains(report.Lines, x => x.Title == "Objective" && x.Detail.StartsWith("Result = ") && !x.Detail.Contains("Cost = "));
+            Assert.Contains(report.Lines, x => x.Title == "Recorded outputs" && x.Detail.StartsWith("Cost = ") && !x.Detail.Contains("Result = "));
+            Assert.DoesNotContain(report.Lines, x => x.Title == "Best point" || x.Title == "Best objective");
+
+            //Values stay at full precision in this PR.
+            Assert.Contains(lowest.Coordinates[0].ToString("R", System.Globalization.CultureInfo.InvariantCulture), report.Lines.Single(x => x.Title == "Best design").Detail);
             Assert.Contains(report.Lines, x => x.Title == "Final interval");
             Assert.Contains(report.Lines, x => x.Title == "Run folder" && x.Detail == @"C:\runs\r1");
         }
@@ -112,7 +117,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.True(report.Successful);
             Assert.Equal(TasOptimisationCheckStatus.Warning, report.Status);
             Assert.NotEmpty(report.BestPoint);
-            Assert.Contains("simulation limit", report.Headline);
+            Assert.Equal("Stopped at the simulation limit (" + report.Simulations + " simulations) \u2013 best design so far", report.Headline);
         }
 
         [Fact]
@@ -126,7 +131,10 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(report.Successful);
             Assert.Equal(TasOptimisationCheckStatus.Warning, report.Status);
-            Assert.Contains(report.Lines, x => x.Detail.Contains("nullspace"));
+            Assert.Equal("Stopped: golden section found equal objective values (" + report.Simulations + " simulations)", report.Headline);
+            Assert.Contains(report.Lines, x => x.Detail.Contains("two equal objective values"));
+            Assert.DoesNotContain("nullspace", string.Join(" ", report.Lines.Select(x => x.Detail)) + report.Headline, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Nullspace", report.DiagnosticsText);
         }
 
         [Fact]
@@ -153,6 +161,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Empty(report.BestObjectives);
             Assert.Contains(report.Lines, x => x.Detail.Contains("allowed to finish"));
             Assert.Contains(report.Lines, x => x.Title == "Run folder");
+
+            //The kernel's simulation-count bookkeeping is Diagnostics material, not part of the cancel text.
+            Assert.DoesNotContain(report.Lines, x => x.Detail.Contains("kernel", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains("Cancelled", report.DiagnosticsText);
+            Assert.Contains("simulation count includes the number it had assigned", report.DiagnosticsText);
         }
 
         [Fact]
@@ -167,6 +180,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Empty(report.BestPoint);
             Assert.Equal(OptimisationOutcome.Success, report.Outcome);
             Assert.Contains(report.Lines, x => x.Detail.Contains("withheld"));
+            Assert.DoesNotContain(report.Lines, x => x.Detail.Contains("kernel", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains("Success", report.DiagnosticsText);
         }
 
         [Fact]
@@ -179,7 +194,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.False(report.Successful);
             Assert.Equal(TasOptimisationCheckStatus.Blocked, report.Status);
-            Assert.Contains("simulation " + result.FailedSimulation, report.Headline);
+            Assert.Equal("A Tas simulation failed (simulation " + result.FailedSimulation + ")", report.Headline);
             Assert.Contains(report.Lines, x => x.Detail.Contains("TasGenExecute reported an error in Error.txt: boom"));
             Assert.Empty(report.BestPoint);
         }
@@ -195,7 +210,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.False(report.Successful);
             Assert.Equal(TasOptimisationCheckStatus.Blocked, report.Status);
-            Assert.Contains("outside the bounds", report.Headline);
+            Assert.Equal("Start values are outside the design-variable ranges", report.Headline);
         }
 
         // ---- the best-point rule -------------------------------------------------------------------------
@@ -233,6 +248,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Null(report.Result);
             Assert.Equal(OptimisationOutcome.Undefined, report.Outcome);
             Assert.Equal(TasOptimisationCheckStatus.Blocked, report.Status);
+            //A refusal outside the setup check keeps the Grasshopper component's wording.
             Assert.Equal("Invalid GenOpt settings for the native route: MaxIte must be at least 1; got 0.", Assert.Single(report.Lines).Detail);
         }
 
@@ -253,7 +269,9 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             string text = report.ToText();
 
+            Assert.StartsWith("Design Optimisation", text);
             Assert.Contains(report.Headline, text);
+            Assert.Contains("Diagnostics: ", text);
             Assert.All(report.Lines, x => Assert.Contains(x.Title + ": " + x.Detail, text));
         }
 
@@ -279,6 +297,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(progress.Reports.Last().Simulations, state.Simulations);
             Assert.Equal(new OptimizationSettings().MaxIterations, state.MaximumSimulations);
             Assert.StartsWith("Simulation ", state.LastText());
+            Assert.Equal("Simulation " + state.Simulations + " (limit " + state.MaximumSimulations + ")", state.SimulationText());
             Assert.Contains("Setpoint = ", state.LowestText());
             Assert.Contains("Result = ", state.LowestText());
         }

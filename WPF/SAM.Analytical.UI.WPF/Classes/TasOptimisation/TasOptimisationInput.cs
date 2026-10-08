@@ -10,8 +10,8 @@ using System.Linq;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// The Simulate &gt; Optimisation form: the Tas project folder, the script, the algorithm, its settings, the
-    /// parameters and the objectives, kept as entered. It is remembered for the current application session only.
+    /// The Design Optimisation (Simulate &gt; Optimisation) form: the Tas project folder, the script, the method, its
+    /// settings, the design variables (<see cref="Parameters"/>) and the outputs (<see cref="Objectives"/>), kept as entered. It is remembered for the current application session only.
     /// <para>
     /// Default values come from the SAM_Tas objects themselves (<see cref="GoldenSectionAlgorithm"/>,
     /// <see cref="GPSHookeJeevesAlgorithm"/>, <see cref="OptimizationSettings"/>); the parameter and objective values
@@ -75,10 +75,13 @@ namespace SAM.Analytical.UI.WPF
 
         public string NumberOfStepReduction { get; set; } = string.Empty;
 
-        /// <summary>GenOpt MaxIte: the simulation limit.</summary>
+        /// <summary>The simulation limit (GenOpt: MaxIte), shown as Maximum simulations.</summary>
         public string MaxIterations { get; set; } = string.Empty;
 
-        /// <summary>GenOpt MaxEqualResults: must be at least 2; no effect on the native algorithms.</summary>
+        /// <summary>
+        /// GenOpt MaxEqualResults: must be at least 2; no effect on the native algorithms. The window shows no control for it:
+        /// it keeps SAM_Tas' default (<see cref="OptimizationSettings"/>), so SAM_Tas validates the same value as before.
+        /// </summary>
         public string MaxEqualResults { get; set; } = string.Empty;
 
         public List<TasOptimisationParameterRow> Parameters { get; set; } = new List<TasOptimisationParameterRow>();
@@ -157,15 +160,15 @@ namespace SAM.Analytical.UI.WPF
             if (AlgorithmType == AlgorithmType.GPSHookeJeeves)
             {
                 GPSHookeJeevesAlgorithm gPSHookeJeevesAlgorithm = new GPSHookeJeevesAlgorithm();
-                gPSHookeJeevesAlgorithm.MeshSizeDivider = Number(MeshSizeDivider, "MeshSizeDivider", problems);
-                gPSHookeJeevesAlgorithm.InitialMeshSizeExponent = Number(InitialMeshSizeExponent, "InitialMeshSizeExponent", problems);
-                gPSHookeJeevesAlgorithm.MeshSizeExponentIncrement = Number(MeshSizeExponentIncrement, "MeshSizeExponentIncrement", problems);
-                gPSHookeJeevesAlgorithm.NumberOfStepReduction = Number(NumberOfStepReduction, "NumberOfStepReduction", problems);
+                gPSHookeJeevesAlgorithm.MeshSizeDivider = Number(MeshSizeDivider, "Step reduction factor", problems);
+                gPSHookeJeevesAlgorithm.InitialMeshSizeExponent = Number(InitialMeshSizeExponent, "Initial step exponent", problems);
+                gPSHookeJeevesAlgorithm.MeshSizeExponentIncrement = Number(MeshSizeExponentIncrement, "Step exponent increment", problems);
+                gPSHookeJeevesAlgorithm.NumberOfStepReduction = Number(NumberOfStepReduction, "Step reductions", problems);
                 algorithm = gPSHookeJeevesAlgorithm;
             }
             else if (AlgorithmType == AlgorithmType.GoldenSection)
             {
-                algorithm = new GoldenSectionAlgorithm() { AbsDiffFunction = Number(AbsDiffFunction, "AbsDiffFunction", problems) };
+                algorithm = new GoldenSectionAlgorithm() { AbsDiffFunction = Number(AbsDiffFunction, "Objective tolerance", problems) };
             }
             else
             {
@@ -175,7 +178,7 @@ namespace SAM.Analytical.UI.WPF
 
             OptimizationSettings optimizationSettings = new OptimizationSettings()
             {
-                MaxIterations = Integer(MaxIterations, "Max simulations (MaxIte)", problems),
+                MaxIterations = Integer(MaxIterations, "Maximum simulations", problems),
                 MaxEqualResults = Integer(MaxEqualResults, "MaxEqualResults", problems),
             };
 
@@ -183,17 +186,17 @@ namespace SAM.Analytical.UI.WPF
             for (int i = 0; i < Parameters.Count; i++)
             {
                 TasOptimisationParameterRow row = Parameters[i];
-                string label = string.Format(CultureInfo.InvariantCulture, "Parameter {0} ({1})", i + 1, string.IsNullOrWhiteSpace(row.Name) ? "no name" : row.Name.Trim());
+                string label = string.Format(CultureInfo.InvariantCulture, "Design variable {0} ({1})", i + 1, string.IsNullOrWhiteSpace(row.Name) ? "no name" : row.Name.Trim());
 
-                double minimum = Number(row.Minimum, label + " Min", problems);
-                double maximum = Number(row.Maximum, label + " Max", problems);
+                double minimum = Number(row.Minimum, label + " minimum", problems);
+                double maximum = Number(row.Maximum, label + " maximum", problems);
 
                 double start;
                 double step;
                 if (StartAndStepApplicable)
                 {
-                    start = Number(row.Start, label + " Start", problems);
-                    step = Number(row.Step, label + " Step", problems);
+                    start = Number(row.Start, label + " start", problems);
+                    step = Number(row.Step, label + " step", problems);
                 }
                 else
                 {
@@ -227,7 +230,7 @@ namespace SAM.Analytical.UI.WPF
             List<TasOptimisationObjectiveRow> rows_Primary = rows_Objective.FindAll(x => x.Primary);
             if (rows_Objective.Count != 0 && rows_Primary.Count != 1)
             {
-                problems.Add("Choose one output as the primary objective (the one that is minimised).");
+                problems.Add("Choose the output to minimise (the objective).");
             }
             else if (rows_Primary.Count == 1)
             {
