@@ -34,7 +34,7 @@ namespace SAM.Core.Mollier.UI.Grasshopper
         /// <summary>
         /// Provides an Icon for the component.
         /// </summary>
-        protected override System.Drawing.Bitmap Icon => Resources.SAM_Mollier;
+        protected override System.Drawing.Bitmap Icon => Resources.SAM_GH_GeometryConvert;
 
         public override GH_Exposure Exposure => GH_Exposure.primary;
 
