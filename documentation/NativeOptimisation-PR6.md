@@ -29,7 +29,14 @@ Code, tests and evidence complete; PR open for owner review. Not merged.
 TasOptimisationDefinition,TasOptimisationInput}.cs`, `Query/TasOptimisationAssemblies.cs`; tests
 `TasOptimisationReportTests.cs`, `TasOptimisationWindowTests.cs`; this record.
 
-## Validation (code head `3b84213`, against the PR6 SAM_Tas build `31ae7ef`)
+## Validation after the #211 baseline (head `bd6bc75`, 2026-10-08)
+
+`sow/2026-Q4` (now with SAM_UI#211, merge `b1c77bc3`, closeout `49b7afc2`) was merged into this branch (`bd6bc75`, no
+conflicts); the PR diff against Q4 is still exactly the 8 PR6 files. Against the PR6 SAM_Tas build: Release Rebuild
+`SAM_UI.sln` 0 errors; `TasOptimisation*` **75/75**; full suite **2636/2636** (2635 on Q4 + 1 PR6 test; neither the
+UserConstruction race nor the ThermalSource flake recurred); `git diff --check` clean.
+
+## Earlier validation (code head `3b84213`, against the PR6 SAM_Tas build `31ae7ef`)
 
 - Release `MSBuild SAM_UI.sln /t:Rebuild` (VS 18; `APPDATA`/`USERPROFILE` redirected to a scratch profile seeded with a
   read-only copy of `%APPDATA%\SAM\resources` and `Documents\SAM\resources`; real `NUGET_PACKAGES`): 0 errors.
