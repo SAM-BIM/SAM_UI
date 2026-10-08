@@ -91,6 +91,10 @@
       <HintPath>..\..\..\SAM\build\SAM.Math.dll</HintPath>
       <Aliases>SAMMath</Aliases>
     </Reference>
+    <!-- The definition the Design Optimisation form edits (SAM.Core.Optimisation) and its diagnostics. -->
+    <Reference Include="SAM.Core.Optimisation">
+      <HintPath>..\..\..\SAM\build\SAM.Core.Optimisation.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

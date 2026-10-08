@@ -111,6 +111,11 @@
       <HintPath>..\..\..\SAM\build\SAM.Math.dll</HintPath>
       <Aliases>SAMMath</Aliases>
     </Reference>
+    <!-- The Design Optimisation form edits a SAM.Core.Optimisation definition (schema sam.optimisation/1), which
+         SAM_Tas runs through ToGenOptDocument. The examples are that library's own fixtures (Resources\Optimisation). -->
+    <Reference Include="SAM.Core.Optimisation">
+      <HintPath>..\..\..\SAM\build\SAM.Core.Optimisation.dll</HintPath>
+    </Reference>
     <Reference Include="SAM.Architectural">
       <HintPath>..\..\..\SAM\build\SAM.Architectural.dll</HintPath>
     </Reference>
@@ -182,6 +187,12 @@
          build\ (and so into the installed %APPDATA%\SAM). Keep it at the version SAM.Core.Reporting.Pdf is built
          against: 6.2.0, the PDFsharp that SAM_Revit also uses. -->
     <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Simulate > Optimisation examples: byte-for-byte copies of SAM's SAM.Tests/Golden/Optimisation fixtures
+         (TasOptimisationInputTests checks they still are). -->
+    <EmbeddedResource Include="Resources\Optimisation\systems-demo-golden-section.json" LogicalName="SAM.Analytical.UI.WPF.Optimisation.systems-demo-golden-section.json" />
+    <EmbeddedResource Include="Resources\Optimisation\systems-demo-hooke-jeeves.json" LogicalName="SAM.Analytical.UI.WPF.Optimisation.systems-demo-hooke-jeeves.json" />
   </ItemGroup>
   <ItemGroup>
     <!-- Licences that must accompany the renderer: Noto Sans (SIL OFL 1.1, embedded in SAM.Core.Reporting.Pdf.dll;

@@ -11,7 +11,8 @@ namespace SAM.Analytical.UI.WPF.Tests
 {
     /// <summary>
     /// <b>Opt-in.</b> Renders the Design Optimisation window to PNG (RenderTargetBitmap) in the states a reviewer looks at: the opening
-    /// state, Hooke-Jeeves selected, after a run through SAM_Tas' stub TasGenExecute, and with Diagnostics open. Nothing is
+    /// state, Hooke-Jeeves selected, after a run through SAM_Tas' stub TasGenExecute, with Diagnostics open, and with a
+    /// definition error (golden section on two design variables). Nothing is
     /// run that needs Tas or a licence, and nothing is written beside the screenshots.
     /// <para>
     /// <c>SAM_OPT_SCREENSHOTS</c> is the folder the images go to. Without it this passes having done nothing.
@@ -50,7 +51,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(TasOptimisationWorkspace.StubScript(new[] { 4.968943799848584 }));
 
             //This script mentions every name, so the form reads as ready (it is never run).
-            using TasOptimisationWorkspace workspace_Ready = new TasOptimisationWorkspace("Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); \"Cost\" \"CO2\"");
+            using TasOptimisationWorkspace workspace_Ready = new TasOptimisationWorkspace("Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); ScriptOutput.SetValue(\"Cost\", 2); ScriptOutput.SetValue(\"CO2\", 3);");
 
             //1. Opening: the example, with no Tas project or script chosen yet.
             TasOptimisationWindow window = new TasOptimisationWindow() { TasGenExecutePath = TasOptimisationWorkspace.StubExecutable };
@@ -81,6 +82,14 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             ((CheckBox)window.FindName("checkBox_SearchDetails")).IsChecked = true;
             Render(window, directory, "5-search-details.png", 1100);
+            window.Close();
+
+            //6. A definition error (golden section on two design variables): the Setup check and the footer use its own wording.
+            TasOptimisationInput input = workspace_Ready.Input(TasOptimisationExample.SystemsDemoGoldenSection);
+            input.Parameters.Add(new TasOptimisationParameterRow("Airflow", string.Empty, "0.5", "2", string.Empty, "Supply airflow factor", "-"));
+            window = new TasOptimisationWindow() { TasGenExecutePath = TasOptimisationWorkspace.StubExecutable };
+            window.SetInput(input);
+            Render(window, directory, "6-definition-error.png", 1150);
             window.Close();
         }
     }

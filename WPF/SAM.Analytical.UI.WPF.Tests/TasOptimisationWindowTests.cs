@@ -4,6 +4,7 @@
 extern alias SAMMath;
 
 using SAM.Analytical.Tas.GenOpt;
+using SAM.Core.Optimisation;
 using SAMMath::SAM.Math;
 using System;
 using System.Collections.Generic;
@@ -21,8 +22,9 @@ using Xunit;
 namespace SAM.Analytical.UI.WPF.Tests
 {
     /// <summary>
-    /// Simulate &gt; Optimisation (Design Optimisation) end to end: the ribbon command, the window's opening state, and real runs of
-    /// GenOptDocument.RunNative through SAM_Tas' StubTasGenExecute - a child process that follows the TasGenExecute
+    /// Simulate &gt; Optimisation (Design Optimisation) end to end: the ribbon command, the window's opening state, the form
+    /// over the SAM.Core.Optimisation definition, and real runs of the document SAM_Tas builds from it
+    /// (ToGenOptDocument, then GenOptDocument.RunNative) through SAM_Tas' StubTasGenExecute - a child process that follows the TasGenExecute
     /// protocol - so the SAM.Math kernel, the SAM_Tas evaluator and the window's background run, progress and
     /// cancellation are all the production code. No Tas, licence or COM is needed.
     /// </summary>
@@ -117,7 +119,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             TasOptimisationWindow window = new TasOptimisationWindow();
 
             TasOptimisationInput input = window.Input;
-            Assert.Equal(AlgorithmType.GoldenSection, input.AlgorithmType);
+            Assert.Equal(OptimisationAlgorithm.GoldenSection, input.OptimisationAlgorithm);
             Assert.Equal((string.Empty, string.Empty), (input.Directory, input.ScriptPath));
             Assert.Equal("Setpoint", Assert.Single(input.Parameters).Name);
             Assert.False(input.Parameters[0].StartAndStepApplicable);
@@ -125,8 +127,8 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.Equal(Visibility.Visible, Control<Grid>(window, "grid_GoldenSection").Visibility);
             Assert.Equal(Visibility.Collapsed, Control<Grid>(window, "grid_HookeJeeves").Visibility);
-            Assert.Equal("0.1", Control<TextBox>(window, "textBox_AbsDiffFunction").Text);
-            Assert.Equal("2000", Control<TextBox>(window, "textBox_MaxIterations").Text);
+            Assert.Equal("0.1", Control<TextBox>(window, "textBox_Tolerance").Text);
+            Assert.Equal("2000", Control<TextBox>(window, "textBox_MaximumSimulations").Text);
             Assert.Equal("Result", Control<ComboBox>(window, "comboBox_Objective").Text);
             Assert.Equal(["Result", "Cost", "CO2"], Control<ComboBox>(window, "comboBox_Objective").Items.Cast<string>());
             Assert.Equal(["Cost", "CO2"], Control<ItemsControl>(window, "itemsControl_Objectives").Items.Cast<TasOptimisationObjectiveRow>().Select(x => x.Name));
@@ -143,17 +145,17 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             TasOptimisationWindow window = new TasOptimisationWindow();
 
-            Control<ComboBox>(window, "comboBox_Algorithm").SelectedItem = AlgorithmType.GPSHookeJeeves;
+            Control<ComboBox>(window, "comboBox_Algorithm").SelectedItem = OptimisationAlgorithm.HookeJeeves;
 
-            Assert.Equal(AlgorithmType.GPSHookeJeeves, window.Input.AlgorithmType);
+            Assert.Equal(OptimisationAlgorithm.HookeJeeves, window.Input.OptimisationAlgorithm);
             Assert.True(window.Input.Parameters[0].StartAndStepApplicable);
             Assert.Equal(Visibility.Collapsed, Control<Grid>(window, "grid_GoldenSection").Visibility);
             Assert.Equal(Visibility.Visible, Control<Grid>(window, "grid_HookeJeeves").Visibility);
-            Assert.Equal("4", Control<TextBox>(window, "textBox_NumberOfStepReduction").Text);
+            Assert.Equal("4", Control<TextBox>(window, "textBox_StepReductions").Text);
 
             //Its two exponent settings are Advanced, and only for it.
             Assert.Equal(Visibility.Visible, Control<Grid>(window, "grid_HookeJeevesAdvanced").Visibility);
-            Control<ComboBox>(window, "comboBox_Algorithm").SelectedItem = AlgorithmType.GoldenSection;
+            Control<ComboBox>(window, "comboBox_Algorithm").SelectedItem = OptimisationAlgorithm.GoldenSection;
             Assert.Equal(Visibility.Collapsed, Control<Grid>(window, "grid_HookeJeevesAdvanced").Visibility);
         }
 
@@ -168,8 +170,9 @@ namespace SAM.Analytical.UI.WPF.Tests
             Control<Button>(window, "button_LoadExample").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
 
             TasOptimisationInput input = window.Input;
-            Assert.Equal(AlgorithmType.GPSHookeJeeves, input.AlgorithmType);
+            Assert.Equal(OptimisationAlgorithm.HookeJeeves, input.OptimisationAlgorithm);
             Assert.Equal(("10", "2"), (input.Parameters[0].Start, input.Parameters[0].Step));
+            Assert.Equal("Systems Demo – heat pump controller setpoint (Hooke–Jeeves)", input.Base?.Name);
             Assert.Equal((workspace.Directory, workspace.ScriptPath), (input.Directory, input.ScriptPath));
         }
 
@@ -211,10 +214,12 @@ namespace SAM.Analytical.UI.WPF.Tests
             window.Close();
 
             TasOptimisationInput remembered = new TasOptimisationWindow().Input;
-            Assert.Equal((workspace.Directory, AlgorithmType.GPSHookeJeeves, "30"), (remembered.Directory, remembered.AlgorithmType, remembered.Parameters[0].Maximum));
+            Assert.Equal((workspace.Directory, OptimisationAlgorithm.HookeJeeves, "30"), (remembered.Directory, remembered.OptimisationAlgorithm, remembered.Parameters[0].Maximum));
+            //With the definition it was loaded from, so the fields the form does not show are remembered too.
+            Assert.Equal("Systems Demo – heat pump controller setpoint (Hooke–Jeeves)", remembered.Base?.Name);
 
             TasOptimisationWindow.ResetSession();
-            Assert.Equal(AlgorithmType.GoldenSection, new TasOptimisationWindow().Input.AlgorithmType);
+            Assert.Equal(OptimisationAlgorithm.GoldenSection, new TasOptimisationWindow().Input.OptimisationAlgorithm);
         }
 
         [WpfFact]
@@ -261,12 +266,24 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.StartsWith(workspace.RunsDirectory, report.RunDirectory);
             Assert.True(Directory.Exists(report.RunDirectory));
 
-            //The window adds nothing: the same document run directly gives the same trace, bit for bit.
-            Assert.True(workspace.Input().TryGetDefinition(out TasOptimisationDefinition definition, out _));
+            //The window adds nothing: the document SAM_Tas builds from the same definition, run directly, gives the same
+            //trace, bit for bit.
+            Assert.True(workspace.Input().TryGetDefinition(out OptimisationDefinition definition, out _));
             NativeGenOptRun direct = definition.ToGenOptDocument(workspace.Directory, File.ReadAllText(workspace.ScriptPath)).RunNative(Path.Combine(workspace.Directory, "direct"), TasOptimisationWorkspace.StubExecutable);
             Assert.Equal(direct.Result.Outcome, report.Outcome);
             Assert.Equal(direct.Result.Simulations, report.Simulations);
             Assert.Equal(direct.Result.Entries.Select(x => (x.Simulation, x.Coordinates[0], x.Outputs[0], x.Outputs[1], x.Outputs[2], x.Event)), report.Result.Entries.Select(x => (x.Simulation, x.Coordinates[0], x.Outputs[0], x.Outputs[1], x.Outputs[2], x.Event)));
+            Assert.Equal(direct.Result.Entries.Select(x => BitConverter.DoubleToInt64Bits(x.Objective)), report.Result.Entries.Select(x => BitConverter.DoubleToInt64Bits(x.Objective)));
+            Assert.Equal(["Setpoint"], direct.ParameterNames);
+
+            //Every evaluation's Variables.txt is byte for byte the one the direct run wrote.
+            string[] evaluations = Directory.GetDirectories(Path.Combine(report.RunDirectory, "evaluations")).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+            string[] evaluations_Direct = Directory.GetDirectories(direct.Workspace.EvaluationsDirectory).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+            Assert.Equal(evaluations_Direct.Select(Path.GetFileName), evaluations.Select(Path.GetFileName));
+            for (int i = 0; i < evaluations.Length; i++)
+            {
+                Assert.Equal(File.ReadAllBytes(Path.Combine(evaluations_Direct[i], "Variables.txt")), File.ReadAllBytes(Path.Combine(evaluations[i], "Variables.txt")));
+            }
 
             //Shown: the result panel with the outcome and the best point, and Run available again.
             Assert.Equal(Visibility.Visible, Control<Border>(window, "border_Result").Visibility);
@@ -466,21 +483,21 @@ namespace SAM.Analytical.UI.WPF.Tests
             string[] forbidden = ["AbsDiffFunction", "MeshSizeDivider", "NumberOfStepReduction", "InitialMeshSizeExponent", "MeshSizeExponentIncrement", "MaxIte", "MaxEqualResults", "Java"];
 
             //Every state: golden section, then Hooke-Jeeves (the labels of both are in the tree whichever is shown).
-            foreach (AlgorithmType algorithmType in TasOptimisationInput.AlgorithmTypes)
+            foreach (OptimisationAlgorithm optimisationAlgorithm in TasOptimisationInput.OptimisationAlgorithms)
             {
-                Control<ComboBox>(window, "comboBox_Algorithm").SelectedItem = algorithmType;
+                Control<ComboBox>(window, "comboBox_Algorithm").SelectedItem = optimisationAlgorithm;
                 foreach (string text in Texts(window))
                 {
                     Assert.DoesNotContain(forbidden, x => text.Contains(x));
                 }
             }
 
-            Assert.Equal("GenOpt: MeshSizeDivider", Control<TextBox>(window, "textBox_MeshSizeDivider").ToolTip);
-            Assert.Equal("GenOpt: AbsDiffFunction", Control<TextBox>(window, "textBox_AbsDiffFunction").ToolTip);
-            Assert.Equal("GenOpt: MaxIte", Control<TextBox>(window, "textBox_MaxIterations").ToolTip);
-            Assert.Equal("GenOpt: NumberOfStepReduction", Control<TextBox>(window, "textBox_NumberOfStepReduction").ToolTip);
-            Assert.Equal("GenOpt: InitialMeshSizeExponent", Control<TextBox>(window, "textBox_InitialMeshSizeExponent").ToolTip);
-            Assert.Equal("GenOpt: MeshSizeExponentIncrement", Control<TextBox>(window, "textBox_MeshSizeExponentIncrement").ToolTip);
+            Assert.Equal("GenOpt: MeshSizeDivider", Control<TextBox>(window, "textBox_StepReductionFactor").ToolTip);
+            Assert.Equal("GenOpt: AbsDiffFunction", Control<TextBox>(window, "textBox_Tolerance").ToolTip);
+            Assert.Equal("GenOpt: MaxIte", Control<TextBox>(window, "textBox_MaximumSimulations").ToolTip);
+            Assert.Equal("GenOpt: NumberOfStepReduction", Control<TextBox>(window, "textBox_StepReductions").ToolTip);
+            Assert.Equal("GenOpt: InitialMeshSizeExponent", Control<TextBox>(window, "textBox_InitialStepExponent").ToolTip);
+            Assert.Equal("GenOpt: MeshSizeExponentIncrement", Control<TextBox>(window, "textBox_StepExponentIncrement").ToolTip);
 
             Assert.Contains("Objective tolerance", Texts(window));
             Assert.Contains("Step reduction factor", Texts(window));
@@ -496,13 +513,13 @@ namespace SAM.Analytical.UI.WPF.Tests
             TasOptimisationWindow window = new TasOptimisationWindow();
             ComboBox comboBox = Control<ComboBox>(window, "comboBox_Algorithm");
 
-            Assert.Equal([AlgorithmType.GoldenSection, AlgorithmType.GPSHookeJeeves], comboBox.Items.Cast<AlgorithmType>());
+            Assert.Equal([OptimisationAlgorithm.GoldenSection, OptimisationAlgorithm.HookeJeeves], comboBox.Items.Cast<OptimisationAlgorithm>());
 
             TasOptimisationAlgorithmNameConverter converter = new TasOptimisationAlgorithmNameConverter();
-            Assert.Equal(["Golden section (one design variable)", "Hooke\u2013Jeeves pattern search"], comboBox.Items.Cast<AlgorithmType>().Select(x => converter.Convert(x, typeof(string), null, System.Globalization.CultureInfo.InvariantCulture)));
+            Assert.Equal(["Golden section (one design variable)", "Hooke\u2013Jeeves pattern search"], comboBox.Items.Cast<OptimisationAlgorithm>().Select(x => converter.Convert(x, typeof(string), null, System.Globalization.CultureInfo.InvariantCulture)));
 
             Assert.Contains("Narrows the range of one design variable", Control<TextBlock>(window, "textBlock_Algorithm").Text);
-            comboBox.SelectedItem = AlgorithmType.GPSHookeJeeves;
+            comboBox.SelectedItem = OptimisationAlgorithm.HookeJeeves;
             Assert.Contains("reducing the step as it converges", Control<TextBlock>(window, "textBlock_Algorithm").Text);
         }
 
@@ -514,18 +531,18 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.False(expander.IsExpanded);
             Assert.Equal("Advanced", expander.Header);
-            foreach (string name in new[] { "textBox_RunsDirectory", "textBox_InitialMeshSizeExponent", "textBox_MeshSizeExponentIncrement" })
+            foreach (string name in new[] { "textBox_RunsDirectory", "textBox_InitialStepExponent", "textBox_StepExponentIncrement" })
             {
                 Assert.True(Within(expander, Control<TextBox>(window, name)), name);
             }
 
-            Assert.False(Within(expander, Control<TextBox>(window, "textBox_MaxIterations")));
+            Assert.False(Within(expander, Control<TextBox>(window, "textBox_MaximumSimulations")));
         }
 
         [WpfFact]
         public void The_footer_says_what_will_run_when_the_form_is_ready()
         {
-            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(script: "Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); \"Cost\" \"CO2\"");
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(script: "Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); ScriptOutput.SetValue(\"Cost\", 2); ScriptOutput.SetValue(\"CO2\", 3);");
             TasOptimisationWindow window = Window(workspace);
 
             Assert.Equal("✓ Ready: Golden section on Setpoint (−5 to 35), minimising Result; recording Cost, CO2; at most 2000 simulations.", Control<TextBlock>(window, "textBlock_NextStep").Text);
@@ -539,7 +556,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         [WpfFact]
         public void Choosing_an_output_in_the_Objective_box_makes_it_the_first_output_of_the_definition()
         {
-            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(script: "Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); \"Cost\" \"CO2\"");
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(script: "Variables[\"Setpoint\"]; ScriptOutput.SetValue(\"Result\", 1); ScriptOutput.SetValue(\"Cost\", 2); ScriptOutput.SetValue(\"CO2\", 3);");
             TasOptimisationWindow window = Window(workspace);
             ComboBox comboBox = Control<ComboBox>(window, "comboBox_Objective");
 
@@ -550,8 +567,9 @@ namespace SAM.Analytical.UI.WPF.Tests
             //Bound to the Primary flag: exactly one output is flagged, and it is the one chosen.
             Assert.Equal("Cost", window.Input.PrimaryObjective?.Name);
             Assert.Equal(["Cost"], window.Input.Objectives.Where(x => x.Primary).Select(x => x.Name));
-            Assert.True(window.Input.TryGetDefinition(out TasOptimisationDefinition definition, out _));
-            Assert.Equal(["Cost", "Result", "CO2"], definition.ObjectiveNames);
+            Assert.True(window.Input.TryGetDefinition(out OptimisationDefinition definition, out _));
+            Assert.Equal("Cost", definition.Objective.Output);
+            Assert.Equal(["Cost", "Result", "CO2"], definition.TasOptimisationObjectiveNames());
 
             //The old objective is now a recorded output.
             Assert.Equal(["Result", "CO2"], Control<ItemsControl>(window, "itemsControl_Objectives").Items.Cast<TasOptimisationObjectiveRow>().Select(x => x.Name));
@@ -606,6 +624,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             TasOptimisationReport report = Assert.IsType<TasOptimisationReport>(window.Report);
             Assert.Equal(["Cost", "Result"], report.ObjectiveNames);
             Assert.Equal(-5.0, report.BestPoint[0]);
+
+            //The trace labels the outputs in the order SAM_Tas passed them: the objective first.
+            Assert.Equal(["Simulation", "Iteration", "Event", "Setpoint", "Cost (objective)", "Result"], Control<DataGrid>(window, "dataGrid_Trace").Columns.Select(x => (string)x.Header));
+            Assert.StartsWith("Best so far: Simulation ", Control<TextBlock>(window, "textBlock_RunLowest").Text);
+            Assert.Contains("-> Cost = ", Control<TextBlock>(window, "textBlock_RunLowest").Text);
         }
 
         [WpfFact]
@@ -626,8 +649,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal("Energy", comboBox.Text);
 
             //The definition minimises Energy and still records the previous objective.
-            Assert.True(window.Input.TryGetDefinition(out TasOptimisationDefinition definition, out _));
-            Assert.Equal(["Energy", "Result", "Cost", "CO2"], definition.ObjectiveNames);
+            Assert.True(window.Input.TryGetDefinition(out OptimisationDefinition definition, out _));
+            Assert.Equal(["Energy", "Result", "Cost", "CO2"], definition.TasOptimisationObjectiveNames());
 
             //An existing name selects that output.
             window.CommitObjective("CO2");
@@ -659,9 +682,9 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(expected, comboBox.Text);
             Assert.Equal(["Result", "Cost", "CO2"], comboBox.Items.Cast<string>());
             Assert.Equal(new[] { "Result", "Cost", "CO2" }.Where(x => x != expected), Control<ItemsControl>(window, "itemsControl_Objectives").Items.Cast<TasOptimisationObjectiveRow>().Select(x => x.Name));
-            Assert.True(window.Input.TryGetDefinition(out TasOptimisationDefinition definition, out _));
-            Assert.Equal(expected, definition.ObjectiveNames[0]);
-            Assert.Equal(3, definition.ObjectiveNames.Count);
+            Assert.True(window.Input.TryGetDefinition(out OptimisationDefinition definition, out _));
+            Assert.Equal(expected, definition.TasOptimisationObjectiveNames()[0]);
+            Assert.Equal(3, definition.TasOptimisationObjectiveNames().Count);
         }
 
         [WpfFact]
@@ -676,8 +699,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal("Cost", window.Input.PrimaryObjective?.Name);
             Assert.Single(window.Input.Objectives, x => x.Primary);
             Assert.Equal("Cost", Control<ComboBox>(window, "comboBox_Objective").Text);
-            Assert.True(window.Input.TryGetDefinition(out TasOptimisationDefinition definition, out _));
-            Assert.Equal(["Cost", "CO2"], definition.ObjectiveNames);
+            Assert.True(window.Input.TryGetDefinition(out OptimisationDefinition definition, out _));
+            Assert.Equal(["Cost", "CO2"], definition.TasOptimisationObjectiveNames());
 
             //Add output: a recorded output, never the objective.
             Control<Button>(window, "button_AddObjective").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
@@ -698,31 +721,117 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [WpfFact]
-        public async Task The_definition_keeps_the_SAM_Tas_default_for_MaxEqualResults_which_has_no_control()
+        public async Task MaxEqualResults_is_not_part_of_the_definition_and_SAM_Tas_keeps_its_default()
         {
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
             TasOptimisationWindow window = Window(workspace);
 
             Assert.Null(window.FindName("textBox_MaxEqualResults"));
+            Assert.Null(typeof(TasOptimisationInput).GetProperty("MaxEqualResults"));
             Assert.DoesNotContain(Texts(window), x => x.Contains("MaxEqualResults"));
 
             int expected = new OptimizationSettings().MaxEqualResults;
-            Assert.True(window.Input.TryGetDefinition(out TasOptimisationDefinition definition, out _));
-            Assert.Equal(expected, definition.OptimizationSettings.MaxEqualResults);
-            Assert.Equal(expected.ToString(System.Globalization.CultureInfo.InvariantCulture), window.Input.MaxEqualResults);
+            int MaxEqualResults() => window.Input.TryGetDefinition(out OptimisationDefinition definition, out _) ? definition.ToGenOptDocument(workspace.Directory, "s").OptimizationSettings.MaxEqualResults : -1;
+            Assert.Equal(expected, MaxEqualResults());
 
             //Through other edits, an example load, and a run.
             window.Input.Parameters[0].Maximum = "30";
-            Control<ComboBox>(window, "comboBox_Algorithm").SelectedItem = AlgorithmType.GPSHookeJeeves;
-            Assert.Equal(expected, window.Input.TryGetDefinition(out definition, out _) ? definition.OptimizationSettings.MaxEqualResults : -1);
+            Control<ComboBox>(window, "comboBox_Algorithm").SelectedItem = OptimisationAlgorithm.HookeJeeves;
+            Assert.Equal(expected, MaxEqualResults());
 
             Control<ComboBox>(window, "comboBox_Example").SelectedIndex = 1;
             Control<Button>(window, "button_LoadExample").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            Assert.Equal(expected, window.Input.TryGetDefinition(out definition, out _) ? definition.OptimizationSettings.MaxEqualResults : -1);
+            Assert.Equal(expected, MaxEqualResults());
 
             await window.RunAsync();
             Assert.NotNull(window.Report);
-            Assert.Equal(expected, window.Input.TryGetDefinition(out definition, out _) ? definition.OptimizationSettings.MaxEqualResults : -1);
+            Assert.Equal(expected, MaxEqualResults());
+        }
+
+        // ---- the form over the Optimisation Definition ----------------------------------------------------
+
+        [WpfFact]
+        public void The_Setup_tab_shows_each_design_variable_and_output_with_its_description_and_unit()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            TasOptimisationWindow window = Window(workspace);
+            window.Show();
+            try
+            {
+                Setup_tab_shows_description_and_unit(window);
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+
+        private static void Setup_tab_shows_description_and_unit(TasOptimisationWindow window)
+        {
+            window.UpdateLayout();
+
+            //Headings of the design variables, of the recorded outputs, and the objective's own labels.
+            Assert.Equal(3, Texts(window).Count(x => x == "Description"));
+            Assert.Equal(3, Texts(window).Count(x => x == "Unit"));
+
+            //The objective's own description and unit sit under the Objective box, bound to its row.
+            Grid grid = Control<Grid>(window, "grid_Objective");
+            Assert.Same(window.Input.PrimaryObjective, grid.DataContext);
+            Assert.True(grid.IsEnabled);
+            Assert.Equal("GBP", Control<TextBox>(window, "textBox_ObjectiveUnit").Text);
+            Assert.Equal("Annual cost; the script's objective value (equal to Cost)", Control<TextBox>(window, "textBox_ObjectiveDescription").Text);
+
+            //Choosing another objective shows that output's.
+            Control<ComboBox>(window, "comboBox_Objective").SelectedItem = "CO2";
+            window.UpdateLayout();
+            Assert.Equal("CO2", Assert.IsType<TasOptimisationObjectiveRow>(grid.DataContext).Name);
+            Assert.Equal(string.Empty, Control<TextBox>(window, "textBox_ObjectiveUnit").Text);
+
+            //What is typed there is the definition's.
+            Control<TextBox>(window, "textBox_ObjectiveUnit").Text = "kgCO2e";
+            window.Input.Parameters[0].Unit = "°C";
+            Assert.True(window.Input.TryGetDefinition(out OptimisationDefinition definition, out _));
+            Assert.Equal("kgCO2e", definition.Output("CO2").Unit);
+            Assert.Equal("°C", definition.Variables[0].Unit);
+            Assert.Equal("CO2", definition.Objective.Output);
+        }
+
+        [WpfFact]
+        public void A_definition_error_blocks_the_run_with_its_own_wording()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            TasOptimisationInput input = workspace.Input();
+            input.Parameters.Add(new TasOptimisationParameterRow("Other", "0", "0", "1", "1"));
+
+            TasOptimisationWindow window = new TasOptimisationWindow() { TasGenExecutePath = TasOptimisationWorkspace.StubExecutable };
+            window.SetInput(input);
+
+            TasOptimisationCheck check = Assert.Single(window.Checks, x => x.Title == "Setup");
+            Assert.Equal(TasOptimisationCheckStatus.Blocked, check.Status);
+            Assert.StartsWith("Golden section", check.Detail);
+            Assert.False(Control<Button>(window, "button_Run").IsEnabled);
+            Assert.StartsWith("✕ Before running - Setup: Golden section", Control<TextBlock>(window, "textBlock_NextStep").Text);
+
+            window.RunAsync().GetAwaiter().GetResult();
+            Assert.Null(window.Report);
+            Assert.False(Directory.Exists(workspace.RunsDirectory));
+        }
+
+        [WpfFact]
+        public async Task A_run_keeps_the_definition_the_form_was_loaded_from()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            TasOptimisationWindow window = Window(workspace);
+            window.Input.Parameters[0].Description = "Heating setpoint";
+
+            await window.RunAsync();
+
+            //Run remembers the form for the session, its definition included.
+            TasOptimisationInput remembered = new TasOptimisationWindow().Input;
+            Assert.True(remembered.TryGetDefinition(out OptimisationDefinition definition, out _));
+            Assert.Equal("Systems Demo – heat pump controller setpoint (golden section)", definition.Name);
+            Assert.Equal("Heating setpoint", definition.Variables[0].Description);
+            Assert.Equal(OptimisationQuantity.Currency, definition.Output("Cost").Quantity);
         }
 
         [WpfFact]
@@ -989,6 +1098,11 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.Contains("SAM.Analytical.Tas.GenOpt.GenOptDocument::RunNative", members);
 
+            // PR5a: the definition is mapped, judged and checked against the script by SAM_Tas' adapter (native Optimisation PR4).
+            Assert.Contains("SAM.Analytical.Tas.GenOpt.Convert::ToGenOptDocument", members);
+            Assert.Contains("SAM.Analytical.Tas.GenOpt.Query::TasOptimisationCapabilities", members);
+            Assert.Contains("SAM.Analytical.Tas.GenOpt.Query::TasScriptDiagnostics", members);
+
             string[] forbidden =
             [
                 "SAM.Analytical.Tas.GenOpt.GenOptDocument::Run",
@@ -1016,6 +1130,18 @@ namespace SAM.Analytical.UI.WPF.Tests
             TypeLoadException stale = new TypeLoadException("Could not load type 'SAM.Analytical.Tas.GenOpt.NativeGenOptOutcome'.");
             Assert.True(Query.IsTasOptimisationLoadFailure(stale));
             Assert.StartsWith("Simulate > Optimisation could not load its assemblies.", TasOptimisationReport.Message(stale));
+        }
+
+        [Fact]
+        public void A_SAM_Analytical_Tas_GenOpt_without_the_definition_adapter_is_reported_as_a_load_failure()
+        {
+            // The probe reaches the PR4 adapter and SAM.Core.Optimisation, so a pre-PR4 assembly fails it.
+            Assert.Null(Query.TasOptimisationAssemblyFailure());
+            MissingMethodException stale = new MissingMethodException("Method not found: 'SAM.Core.Optimisation.IOptimisationCapabilities SAM.Analytical.Tas.GenOpt.Query.TasOptimisationCapabilities()'.");
+            FileNotFoundException missing = new FileNotFoundException("Could not load file or assembly.", "SAM.Core.Optimisation, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null");
+            Assert.True(Query.IsTasOptimisationLoadFailure(stale));
+            Assert.True(Query.IsTasOptimisationLoadFailure(missing));
+            Assert.Contains("SAM.Core.Optimisation.dll", TasOptimisationReport.Message(missing));
         }
     }
 }

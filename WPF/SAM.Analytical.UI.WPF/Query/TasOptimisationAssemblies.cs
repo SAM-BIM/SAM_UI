@@ -15,11 +15,12 @@ namespace SAM.Analytical.UI.WPF
     public static partial class Query
     {
         /// <summary>The assemblies Simulate &gt; Optimisation needs beyond the rest of SAM_UI.</summary>
-        public static readonly IReadOnlyList<string> TasOptimisationAssemblyNames = Array.AsReadOnly(new[] { "SAM.Math", "SAM.Analytical.Tas.GenOpt" });
+        public static readonly IReadOnlyList<string> TasOptimisationAssemblyNames = Array.AsReadOnly(new[] { "SAM.Math", "SAM.Analytical.Tas.GenOpt", "SAM.Core.Optimisation" });
 
         /// <summary>
         /// True when <paramref name="exception"/> (or an inner one) is an assembly or type load failure: the symptom of a
-        /// missing SAM.Analytical.Tas.GenOpt.dll or of a stale SAM.Math.dll (one without the optimisation kernel) loaded
+        /// missing SAM.Analytical.Tas.GenOpt.dll or SAM.Core.Optimisation.dll, or of a stale SAM.Math.dll (one without the
+        /// optimisation kernel) or SAM.Analytical.Tas.GenOpt.dll (one without the Optimisation Definition adapter) loaded
         /// from an older SAM install. Every SAM assembly is version 1.0.0.0, so a stale copy loads silently and only
         /// fails when a newer type or member is reached.
         /// </summary>
@@ -49,7 +50,7 @@ namespace SAM.Analytical.UI.WPF
         {
             List<string> lines = new List<string>
             {
-                "Simulate > Optimisation could not load its assemblies. It needs SAM.Analytical.Tas.GenOpt.dll and a current SAM.Math.dll (one with the SAM optimisation kernel) beside the application. A stale SAM.Math.dll from an older SAM install is the known cause; this is a deployment problem, not a problem with the model.",
+                "Simulate > Optimisation could not load its assemblies. It needs a current SAM.Analytical.Tas.GenOpt.dll, SAM.Core.Optimisation.dll and a current SAM.Math.dll (one with the SAM optimisation kernel) beside the application. A stale SAM.Math.dll from an older SAM install is the known cause; this is a deployment problem, not a problem with the model.",
                 string.Empty,
                 "Error: " + Innermost(exception),
             };
@@ -102,6 +103,10 @@ namespace SAM.Analytical.UI.WPF
             // PR6: a SAM.Analytical.Tas.GenOpt.dll from before the shared result rules is stale too.
             GC.KeepAlive(typeof(global::SAM.Analytical.Tas.GenOpt.NativeGenOptOutcome));
             GC.KeepAlive(typeof(SAMMath::SAM.Math.OptimisationProgress));
+            // PR5a: the form edits a SAM.Core.Optimisation definition, which SAM_Tas' adapter (native Optimisation PR4) runs.
+            GC.KeepAlive(typeof(global::SAM.Core.Optimisation.OptimisationDefinition));
+            GC.KeepAlive(global::SAM.Analytical.Tas.GenOpt.Query.TasOptimisationCapabilities());
+            GC.KeepAlive(typeof(global::SAM.Analytical.Tas.GenOpt.TasOptimisationDefinitionException));
         }
 
         private static bool IsAssemblyName(string? fileName)
