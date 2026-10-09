@@ -107,6 +107,10 @@ namespace SAM.Analytical.UI.WPF
             GC.KeepAlive(typeof(global::SAM.Core.Optimisation.OptimisationDefinition));
             GC.KeepAlive(global::SAM.Analytical.Tas.GenOpt.Query.TasOptimisationCapabilities());
             GC.KeepAlive(typeof(global::SAM.Analytical.Tas.GenOpt.TasOptimisationDefinitionException));
+            // PR8: the "Tas model" engine (SAM_Tas PR7b-1) and the "try every option" kernel (SAM PR6b).
+            GC.KeepAlive(global::SAM.Analytical.Tas.GenOpt.Query.TasModelCapabilities());
+            GC.KeepAlive(typeof(global::SAM.Analytical.Tas.GenOpt.TasModelRunner));
+            GC.KeepAlive(new SAMMath::SAM.Math.TryEveryOption());
         }
 
         private static bool IsAssemblyName(string? fileName)

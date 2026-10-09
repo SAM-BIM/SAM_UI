@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Core.Optimisation;
 using System.ComponentModel;
+using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace SAM.Analytical.UI.WPF
@@ -10,6 +13,11 @@ namespace SAM.Analytical.UI.WPF
     /// One design variable as typed in Simulate &gt; Optimisation. The values are kept as text, exactly as entered, and
     /// are read by <see cref="TasOptimisationInput.TryGetDefinition"/> into a SAM.Core.Optimisation DesignVariable
     /// (name, description, unit, start, minimum, maximum, step), which SAM_Tas runs as a NumberParameter.
+    /// <para>
+    /// A row of the "tas-model" engine also says what it changes in the model (<see cref="Target"/>, from the model's
+    /// catalogue or a definition) and, for a choice, that it is <c>"discrete"</c> (<see cref="Type"/>). Those are the
+    /// row's own: renaming the row keeps them.
+    /// </para>
     /// </summary>
     public sealed class TasOptimisationParameterRow : INotifyPropertyChanged
     {
@@ -41,6 +49,10 @@ namespace SAM.Analytical.UI.WPF
             : this(tasOptimisationParameterRow?.name, tasOptimisationParameterRow?.start, tasOptimisationParameterRow?.minimum, tasOptimisationParameterRow?.maximum, tasOptimisationParameterRow?.step, tasOptimisationParameterRow?.description, tasOptimisationParameterRow?.unit)
         {
             startAndStepApplicable = tasOptimisationParameterRow?.startAndStepApplicable ?? true;
+            Target = tasOptimisationParameterRow?.Target == null ? null : new OptimisationTarget(tasOptimisationParameterRow.Target);
+            Type = tasOptimisationParameterRow?.Type;
+            Quantity = tasOptimisationParameterRow?.Quantity;
+            QuantityUnit = tasOptimisationParameterRow?.QuantityUnit;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -108,6 +120,46 @@ namespace SAM.Analytical.UI.WPF
         }
 
         public bool StartAndStepNotApplicable => !startAndStepApplicable;
+
+        /// <summary>What the variable changes in the model ("tas-model"); null for a variable a Tas script reads by name.</summary>
+        public OptimisationTarget? Target { get; set; }
+
+        /// <summary>The variable type; null for the default (continuous, or the loaded definition's type of the same name).</summary>
+        public DesignVariableType? Type { get; set; }
+
+        /// <summary>The declared quantity; null for the loaded definition's of the same name. It holds while the unit is <see cref="QuantityUnit"/>.</summary>
+        public OptimisationQuantity? Quantity { get; set; }
+
+        /// <summary>The unit <see cref="Quantity"/> was declared with: a different unit in the form drops the quantity.</summary>
+        public string? QuantityUnit { get; set; }
+
+        /// <summary>True for a choice between options (a <c>"discrete"</c> variable, numbered 1 to the number of options).</summary>
+        public bool IsChoice => Type == DesignVariableType.Discrete;
+
+        /// <summary>
+        /// What the variable changes, in words, for the line under the row: "Changes: Zone heating setpoint of internal
+        /// condition “Office”" or, for a choice, its numbered options. Empty for a script variable.
+        /// </summary>
+        public string BindingText
+        {
+            get
+            {
+                if (Target == null)
+                {
+                    return string.Empty;
+                }
+
+                string text = "Changes: " + Query.TasOptimisationBindingText(Target);
+                if (Target.Options != null && Target.Options.Count != 0)
+                {
+                    text += ". Options: " + string.Join("; ", Target.Options.Select((x, i) => (i + 1).ToString(CultureInfo.InvariantCulture) + " " + x));
+                }
+
+                return text;
+            }
+        }
+
+        public bool HasBinding => Target != null;
 
         private bool Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {

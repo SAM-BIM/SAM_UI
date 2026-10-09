@@ -29,12 +29,18 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         /// <param name="tasOptimisationInput">The form.</param>
         /// <param name="tasGenExecutePath">TasGenExecute.exe; null for the installed one, which RunNative uses.</param>
-        public static List<TasOptimisationCheck> TasOptimisationChecks(this TasOptimisationInput tasOptimisationInput, string? tasGenExecutePath = null)
+        /// <param name="tasModelSession">What the window has read of the Tas model ("tas-model" engine only); null when nothing.</param>
+        public static List<TasOptimisationCheck> TasOptimisationChecks(this TasOptimisationInput tasOptimisationInput, string? tasGenExecutePath = null, TasModelSession? tasModelSession = null)
         {
             List<TasOptimisationCheck> result = new List<TasOptimisationCheck>();
             if (tasOptimisationInput == null)
             {
                 return result;
+            }
+
+            if (tasOptimisationInput.IsTasModel)
+            {
+                return TasModelChecks(tasOptimisationInput, tasGenExecutePath, tasModelSession);
             }
 
             result.Add(TasOptimisationCheck_Directory(tasOptimisationInput));
@@ -111,6 +117,172 @@ namespace SAM.Analytical.UI.WPF
             return result;
         }
 
+        /// <summary>
+        /// The readiness list of the "tas-model" engine: the Tas project, the Tas model (read in the background; Tas and its
+        /// licence are needed), the Tas optimisation engine, then the setup: the form read as a definition, judged by its
+        /// own diagnostics against the "tas-model" capabilities and the model's catalogue (a name not in the model is
+        /// OPT609), then by SAM_Tas' runner, which resolves the glazing options and generates the script without starting
+        /// anything. Warnings never block. There is no script line: SAM_Tas writes the script.
+        /// </summary>
+        private static List<TasOptimisationCheck> TasModelChecks(TasOptimisationInput tasOptimisationInput, string? tasGenExecutePath, TasModelSession? tasModelSession)
+        {
+            List<TasOptimisationCheck> result = new List<TasOptimisationCheck>();
+
+            TasOptimisationCheck tasOptimisationCheck_Directory = TasOptimisationCheck_Directory(tasOptimisationInput);
+            result.Add(tasOptimisationCheck_Directory);
+
+            string directory = tasOptimisationInput.Directory?.Trim() ?? string.Empty;
+            TasModelSession? session = tasModelSession != null && tasModelSession.Folder != null && string.Equals(SafeFullPath(tasModelSession.Folder), SafeFullPath(directory), StringComparison.OrdinalIgnoreCase) ? tasModelSession : null;
+            result.Add(TasOptimisationCheck_Model(tasOptimisationCheck_Directory.Status == TasOptimisationCheckStatus.Blocked, session));
+
+            string path_TasGenExecute = string.IsNullOrWhiteSpace(tasGenExecutePath) ? Analytical.Tas.GenOpt.Query.TasGenOptExecutePath() : tasGenExecutePath!;
+            result.Add(System.IO.File.Exists(path_TasGenExecute)
+                ? new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Tas optimisation engine", "Installed.")
+                : new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Tas optimisation engine", "TasGenExecute.exe was not found at '" + path_TasGenExecute + "'. It is installed with Tas (TasGenOpt)."));
+
+            if (!tasOptimisationInput.TryGetDefinition(out OptimisationDefinition? optimisationDefinition, out List<string> problems) || optimisationDefinition == null)
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", string.Join(Environment.NewLine, problems)));
+                return result;
+            }
+
+            IOptimisationCapabilities capabilities = Analytical.Tas.GenOpt.Query.TasModelCapabilities();
+            OptimisationCatalogue? catalogue = session?.State == TasModelReadState.Ready ? session.Catalogue : null;
+            List<OptimisationDiagnostic> diagnostics = catalogue == null ? optimisationDefinition.Diagnostics(capabilities) : optimisationDefinition.Diagnostics(capabilities, catalogue);
+            List<OptimisationDiagnostic> errors = diagnostics.FindAll(x => x.Severity == DiagnosticSeverity.Error);
+            if (optimisationDefinition.Variables.Count == 0 && optimisationDefinition.Outputs.Count == 0 && errors.Count != 0)
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", "Add what may change (Can change) and what to measure (Can measure) from the model's lists, or paste an AI assistant's reply."));
+            }
+            else if (errors.Count != 0)
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", string.Join(Environment.NewLine, errors.ConvertAll(Text))));
+            }
+            else if (session == null || catalogue == null)
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", "The definition is checked against the model once the model has been read."));
+            }
+            else
+            {
+                try
+                {
+                    TasModelRunner tasModelRunner = session.CreateRunner(optimisationDefinition, directory, tasOptimisationInput.RunsDirectory, tasGenExecutePath);
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Setup", Summary(optimisationDefinition, tasModelRunner)));
+                }
+                catch (TasOptimisationDefinitionException tasOptimisationDefinitionException)
+                {
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", tasOptimisationDefinitionException.Message));
+                }
+                catch (Exception exception) when (exception is InvalidOperationException || exception is NotSupportedException || exception is ArgumentException || exception is System.IO.IOException)
+                {
+                    result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", exception.Message));
+                }
+            }
+
+            foreach (OptimisationDiagnostic optimisationDiagnostic in diagnostics.FindAll(x => x.Severity == DiagnosticSeverity.Warning))
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, Title(optimisationDefinition, optimisationDiagnostic), Text(optimisationDiagnostic)));
+            }
+
+            return result;
+        }
+
+        private static TasOptimisationCheck TasOptimisationCheck_Model(bool blocked_Directory, TasModelSession? tasModelSession)
+        {
+            const string title = "Tas model";
+
+            if (blocked_Directory)
+            {
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "Read once the Tas project folder is chosen.");
+            }
+
+            if (tasModelSession == null || tasModelSession.State == TasModelReadState.NotRead)
+            {
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "Not read yet. Press Read model to list what can change and what can be measured.");
+            }
+
+            switch (tasModelSession.State)
+            {
+                case TasModelReadState.Reading:
+                    return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "Reading the Tas model (Tas opens the files read-only)…");
+
+                case TasModelReadState.Failed:
+                    return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, tasModelSession.Error ?? "The Tas model could not be read.");
+            }
+
+            return new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, TasModelText(tasModelSession));
+        }
+
+        /// <summary>"Model.tbd, Model.tsd, Model.tpd: 7 internal conditions, 2 glazing constructions, 1 plant room with 6 controllers. Glazing pool: 25 systems."</summary>
+        public static string TasModelText(TasModelSession tasModelSession)
+        {
+            TasModelInventory? inventory = tasModelSession?.Inventory;
+            if (inventory == null)
+            {
+                return string.Empty;
+            }
+
+            List<string> files = new List<string> { inventory.TbdFileName, inventory.TsdFileName, inventory.TpdFileName }.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()!;
+            List<string> parts = new List<string>
+            {
+                Count(inventory.InternalConditions.Count, "internal condition"),
+                Count(inventory.GlazingConstructions.Count, "glazing construction"),
+            };
+
+            if (inventory.TpdFileName != null)
+            {
+                parts.Add(Count(inventory.PlantRooms.Count, "plant room") + " with " + Count(inventory.PlantRooms.Sum(x => x.Controllers.Count), "controller"));
+            }
+
+            string text = string.Join(", ", files) + ": " + string.Join(", ", parts) + ".";
+            text += tasModelSession!.PoolBusy
+                ? " Glazing pool: calculating…"
+                : " Glazing pool: " + Count(tasModelSession.Pool.Count, "system") + ".";
+            return text;
+        }
+
+        private static string Count(int count, string noun)
+        {
+            return count.ToString(CultureInfo.InvariantCulture) + " " + noun + (count == 1 ? string.Empty : "s");
+        }
+
+        private static string SafeFullPath(string path)
+        {
+            try
+            {
+                return string.IsNullOrWhiteSpace(path) ? string.Empty : System.IO.Path.GetFullPath(path);
+            }
+            catch (Exception exception) when (exception is ArgumentException || exception is NotSupportedException || exception is System.IO.PathTooLongException || exception is System.Security.SecurityException)
+            {
+                return path;
+            }
+        }
+
+        /// <summary>
+        /// "Try every option on Glazing (3 options), minimising Annual cooling demand; recording …; at most 2000
+        /// simulations." For values: "Golden section on Setpoint (−5 to 35), …". The limit is the one the kernel runs.
+        /// </summary>
+        private static string Summary(OptimisationDefinition optimisationDefinition, TasModelRunner tasModelRunner)
+        {
+            List<string> names_Objective = tasModelRunner.Kernel.OutputNames.ToList();
+
+            string text = string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} on {1}, minimising {2}",
+                optimisationDefinition.Method.Algorithm.TasOptimisationAlgorithmName(),
+                string.Join(", ", optimisationDefinition.Variables.Select(x => x.Target?.Options != null && x.Target.Options.Count != 0
+                    ? string.Format(CultureInfo.InvariantCulture, "{0} ({1} options)", x.Name, x.Target.Options.Count)
+                    : string.Format(CultureInfo.InvariantCulture, "{0} ({1} to {2})", x.Name, Number(x.Minimum), Number(x.Maximum)))),
+                names_Objective.FirstOrDefault());
+
+            if (names_Objective.Count > 1)
+            {
+                text += "; recording " + string.Join(", ", names_Objective.Skip(1));
+            }
+
+            return text + string.Format(CultureInfo.InvariantCulture, "; at most {0} simulations.", tasModelRunner.Kernel.Optimiser.MaximumSimulations);
+        }
+
         /// <summary>True when no check blocks the run.</summary>
         public static bool CanRun(this IEnumerable<TasOptimisationCheck> tasOptimisationChecks)
         {
@@ -169,7 +341,9 @@ namespace SAM.Analytical.UI.WPF
             string directory = tasOptimisationInput.Directory?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(directory))
             {
-                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "Choose the folder that holds the Tas files the script works on.");
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, tasOptimisationInput.IsTasModel
+                    ? "Choose the folder that holds the Tas model (its TBD, and the TSD and TPD when there are results and plant)."
+                    : "Choose the folder that holds the Tas files the script works on.");
             }
 
             if (!Directory.Exists(directory))

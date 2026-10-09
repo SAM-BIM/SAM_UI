@@ -47,6 +47,7 @@ namespace SAM.Analytical.UI.WPF
             }
 
             Base = tasOptimisationInput.Base == null ? null : new OptimisationDefinition(tasOptimisationInput.Base);
+            Engine = tasOptimisationInput.Engine;
             Directory = tasOptimisationInput.Directory;
             ScriptPath = tasOptimisationInput.ScriptPath;
             RunsDirectory = tasOptimisationInput.RunsDirectory;
@@ -62,10 +63,14 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
-        /// The methods the Tas engine runs (SAM_Tas <c>Query.TasOptimisationCapabilities</c>). A new list each time: no
-        /// static field of a SAM.Core.Optimisation type, so this class loads without that assembly until it is used.
+        /// The methods the "tas-script" engine runs (SAM_Tas <c>Query.TasOptimisationCapabilities</c>). A new list each
+        /// time: no static field of a SAM.Core.Optimisation type, so this class loads without that assembly until it is
+        /// used. The methods the form offers for its engine and variables are <see cref="OfferedAlgorithms"/>.
         /// </summary>
         public static IReadOnlyList<OptimisationAlgorithm> OptimisationAlgorithms => Array.AsReadOnly(new[] { OptimisationAlgorithm.GoldenSection, OptimisationAlgorithm.HookeJeeves });
+
+        /// <summary>The name a new "tas-model" definition gets.</summary>
+        public const string NewDefinitionName = "Design optimisation";
 
         /// <summary>
         /// The definition the form was last loaded from; null for a form that was never loaded. It keeps everything the form
@@ -73,10 +78,23 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public OptimisationDefinition? Base { get; private set; }
 
+        /// <summary>
+        /// The engine the definition runs on: "tas-script" (the user's own Tas script, the default) or "tas-model"
+        /// (SAM_Tas changes and reads the model through a generated script; every variable has a target and every output
+        /// a measure).
+        /// </summary>
+        public string Engine { get; set; } = Analytical.Tas.GenOpt.Query.TasOptimisationEngine;
+
+        /// <summary>True for the "tas-model" engine.</summary>
+        public bool IsTasModel => Query.IsTasModelEngine(Engine);
+
+        /// <summary>The methods the form offers for its engine and design variables (<see cref="Query.TasOptimisationAlgorithms"/>).</summary>
+        public IReadOnlyList<OptimisationAlgorithm> OfferedAlgorithms => Query.TasOptimisationAlgorithms(Engine, Parameters).AsReadOnly();
+
         /// <summary>The Tas project folder: its top-level T3D/TBD/TPD/TSD/TWD files are what TasGenExecute receives. A local setting, never part of the definition.</summary>
         public string Directory { get; set; } = string.Empty;
 
-        /// <summary>The TasGenExecute C# script. A local setting.</summary>
+        /// <summary>The TasGenExecute C# script ("tas-script" only). A local setting.</summary>
         public string ScriptPath { get; set; } = string.Empty;
 
         /// <summary>Parent folder of the run folders; empty for SAM_Tas' default (<c>SAM_NativeGenOpt</c> in the Tas project folder). A local setting.</summary>
@@ -106,8 +124,8 @@ namespace SAM.Analytical.UI.WPF
 
         public List<TasOptimisationObjectiveRow> Objectives { get; set; } = new List<TasOptimisationObjectiveRow>();
 
-        /// <summary>Golden section reads only the bounds; Start and Step apply to pattern search only.</summary>
-        public bool StartAndStepApplicable => OptimisationAlgorithm != OptimisationAlgorithm.GoldenSection;
+        /// <summary>Golden section reads only the bounds and try every option only the options; Start and Step apply to pattern search only.</summary>
+        public bool StartAndStepApplicable => OptimisationAlgorithm == OptimisationAlgorithm.HookeJeeves;
 
         public TasOptimisationObjectiveRow? PrimaryObjective => Objectives.Find(x => x.Primary);
 
@@ -116,6 +134,31 @@ namespace SAM.Analytical.UI.WPF
         {
             TasOptimisationInput result = new TasOptimisationInput();
             result.Load(tasOptimisationExample);
+            return result;
+        }
+
+        /// <summary>
+        /// A new, empty "tas-model" definition: no variables or outputs yet (they are picked from the model's catalogue, or
+        /// come from an AI reply or a file), golden section until the variables say otherwise. The local settings are
+        /// <paramref name="local"/>'s, when given.
+        /// </summary>
+        public static TasOptimisationInput CreateTasModel(TasOptimisationInput? local = null)
+        {
+            TasOptimisationInput result = new TasOptimisationInput();
+            result.Load(new OptimisationDefinition()
+            {
+                Name = NewDefinitionName,
+                Model = new OptimisationModel(Analytical.Tas.GenOpt.Query.TasModelEngine),
+                Method = new GoldenSectionMethod(),
+            });
+
+            if (local != null)
+            {
+                result.Directory = local.Directory;
+                result.ScriptPath = local.ScriptPath;
+                result.RunsDirectory = local.RunsDirectory;
+            }
+
             return result;
         }
 
@@ -141,11 +184,16 @@ namespace SAM.Analytical.UI.WPF
             }
 
             Base = new OptimisationDefinition(optimisationDefinition);
+            Engine = string.IsNullOrWhiteSpace(Base.Model?.Engine) ? Analytical.Tas.GenOpt.Query.TasOptimisationEngine : Base.Model!.Engine;
 
             SetMethodDefaults();
 
             switch (Base.Method)
             {
+                case TryEveryOptionMethod _:
+                    OptimisationAlgorithm = OptimisationAlgorithm.TryEveryOption;
+                    break;
+
                 case HookeJeevesMethod hookeJeevesMethod:
                     OptimisationAlgorithm = OptimisationAlgorithm.HookeJeeves;
                     StepReductionFactor = Text_Integer(hookeJeevesMethod.StepReductionFactor) ?? StepReductionFactor;
@@ -168,7 +216,13 @@ namespace SAM.Analytical.UI.WPF
 
             Parameters = (Base.Variables ?? new List<DesignVariable>())
                 .Where(x => x != null)
-                .Select(x => new TasOptimisationParameterRow(x.Name, x.Start == null ? string.Empty : Text(x.Start.Value), Text(x.Minimum), Text(x.Maximum), x.Step == null ? string.Empty : Text(x.Step.Value), x.Description, x.Unit))
+                .Select(x => new TasOptimisationParameterRow(x.Name, x.Start == null ? string.Empty : Text(x.Start.Value), Text(x.Minimum), Text(x.Maximum), x.Step == null ? string.Empty : Text(x.Step.Value), x.Description, x.Unit)
+                {
+                    //The binding and type travel with the row; the declared quantity stays with the name (PR5a decision 2:
+                    //a renamed row starts with none), so it comes from Base.
+                    Target = x.Target == null ? null : new OptimisationTarget(x.Target),
+                    Type = x.Type,
+                })
                 .ToList();
 
             string? objective = Base.Objective?.Output;
@@ -178,7 +232,10 @@ namespace SAM.Analytical.UI.WPF
             {
                 bool primary_Output = !primary && objective != null && optimisationOutput.Name == objective;
                 primary |= primary_Output;
-                Objectives.Add(new TasOptimisationObjectiveRow(optimisationOutput.Name, primary_Output, optimisationOutput.Description, optimisationOutput.Unit));
+                Objectives.Add(new TasOptimisationObjectiveRow(optimisationOutput.Name, primary_Output, optimisationOutput.Description, optimisationOutput.Unit)
+                {
+                    Measure = optimisationOutput.Measure == null ? null : new OptimisationMeasure(optimisationOutput.Measure),
+                });
             }
 
             UpdateApplicability();
@@ -191,6 +248,127 @@ namespace SAM.Analytical.UI.WPF
             {
                 tasOptimisationParameterRow.StartAndStepApplicable = StartAndStepApplicable;
             }
+        }
+
+        /// <summary>
+        /// Keeps the method one the form offers (<see cref="OfferedAlgorithms"/>): after a choice is added the method
+        /// becomes try every option, after it is removed golden section or Hooke–Jeeves. True when the method changed.
+        /// </summary>
+        public bool EnsureOfferedAlgorithm()
+        {
+            IReadOnlyList<OptimisationAlgorithm> offered = OfferedAlgorithms;
+            if (offered.Count == 0 || offered.Contains(OptimisationAlgorithm))
+            {
+                return false;
+            }
+
+            OptimisationAlgorithm = offered[0];
+            UpdateApplicability();
+            return true;
+        }
+
+        /// <summary>
+        /// Adds a design variable bound to a "Can change" item of the model's catalogue: its name (made unique), its
+        /// description, unit and quantity, and the target. A value starts at the current value within the suggested range
+        /// (a controller has no suggested range: the minimum and maximum are left for the user). A choice is a
+        /// <c>"discrete"</c> variable numbered 1 to the number of options, with every option the catalogue offers; the
+        /// method then becomes try every option.
+        /// </summary>
+        public TasOptimisationParameterRow AddTarget(OptimisationCatalogueEntry optimisationCatalogueEntry)
+        {
+            if (optimisationCatalogueEntry?.Target == null)
+            {
+                throw new ArgumentException("The catalogue entry has no target.", nameof(optimisationCatalogueEntry));
+            }
+
+            TasOptimisationParameterRow result;
+            OptimisationTarget optimisationTarget = new OptimisationTarget(optimisationCatalogueEntry.Target);
+            string name = UniqueName(optimisationCatalogueEntry.Name, Parameters.Select(x => x.Name));
+            if (optimisationCatalogueEntry.Options != null && optimisationCatalogueEntry.Options.Count != 0)
+            {
+                optimisationTarget.Options = optimisationCatalogueEntry.Options.ToList();
+                result = new TasOptimisationParameterRow(name, string.Empty, "1", optimisationTarget.Options.Count.ToString(CultureInfo.InvariantCulture), string.Empty, optimisationCatalogueEntry.Description, null)
+                {
+                    Type = DesignVariableType.Discrete,
+                    Quantity = OptimisationQuantity.Unspecified,
+                };
+            }
+            else
+            {
+                double? minimum = optimisationCatalogueEntry.Minimum;
+                double? maximum = optimisationCatalogueEntry.Maximum;
+                double? start = optimisationCatalogueEntry.Value;
+                result = new TasOptimisationParameterRow(
+                    name,
+                    start == null ? string.Empty : Text(start.Value),
+                    minimum == null ? string.Empty : Text(minimum.Value),
+                    maximum == null ? string.Empty : Text(maximum.Value),
+                    string.Empty,
+                    optimisationCatalogueEntry.Description,
+                    optimisationCatalogueEntry.Unit)
+                {
+                    Type = DesignVariableType.Continuous,
+                    Quantity = optimisationCatalogueEntry.Quantity,
+                    QuantityUnit = optimisationCatalogueEntry.Unit,
+                };
+            }
+
+            result.Target = optimisationTarget;
+            result.QuantityUnit = result.Quantity == OptimisationQuantity.Unspecified ? null : optimisationCatalogueEntry.Unit;
+            Parameters.Add(result);
+
+            EnsureOfferedAlgorithm();
+            UpdateApplicability();
+            return result;
+        }
+
+        /// <summary>
+        /// Adds an output bound to a "Can measure" item of the model's catalogue: its name (made unique), description,
+        /// unit, quantity and measure, with <paramref name="parameters"/> replacing the item's (for example another
+        /// overheating threshold). The first output becomes the objective.
+        /// </summary>
+        public TasOptimisationObjectiveRow AddMeasure(OptimisationCatalogueEntry optimisationCatalogueEntry, IDictionary<string, double>? parameters = null)
+        {
+            if (optimisationCatalogueEntry?.Measure == null)
+            {
+                throw new ArgumentException("The catalogue entry has no measure.", nameof(optimisationCatalogueEntry));
+            }
+
+            OptimisationMeasure optimisationMeasure = new OptimisationMeasure(optimisationCatalogueEntry.Measure);
+            foreach (KeyValuePair<string, double> keyValuePair in parameters ?? new Dictionary<string, double>())
+            {
+                optimisationMeasure.Parameters[keyValuePair.Key] = keyValuePair.Value;
+            }
+
+            string name = optimisationCatalogueEntry.Name;
+            if (optimisationMeasure.Parameters.Count != 0 && !optimisationMeasure.Parameters.SequenceEqual(optimisationCatalogueEntry.Measure.Parameters ?? new Dictionary<string, double>()))
+            {
+                name += " (" + string.Join(", ", optimisationMeasure.Parameters.Select(x => Text(x.Value))) + ")";
+            }
+
+            TasOptimisationObjectiveRow result = new TasOptimisationObjectiveRow(UniqueName(name, Objectives.Select(x => x.Name)), !Objectives.Any(x => x.Primary), optimisationCatalogueEntry.Description, optimisationCatalogueEntry.Unit)
+            {
+                Measure = optimisationMeasure,
+                Quantity = optimisationCatalogueEntry.Quantity,
+                QuantityUnit = optimisationCatalogueEntry.Unit,
+            };
+
+            Objectives.Add(result);
+            return result;
+        }
+
+        /// <summary><paramref name="name"/>, or "name 2", "name 3"… when the form already has it (names ignore case and spaces at the ends).</summary>
+        public static string UniqueName(string? name, IEnumerable<string?> names)
+        {
+            string value = string.IsNullOrWhiteSpace(name) ? "Item" : name!.Trim();
+            HashSet<string> taken = new HashSet<string>((names ?? Enumerable.Empty<string?>()).Where(x => x != null).Select(x => x!.Trim()), StringComparer.OrdinalIgnoreCase);
+            string result = value;
+            for (int i = 2; taken.Contains(result); i++)
+            {
+                result = value + " " + i.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -217,13 +395,23 @@ namespace SAM.Analytical.UI.WPF
             problems = new List<string>();
 
             OptimisationDefinition result = Base == null ? new OptimisationDefinition() : new OptimisationDefinition(Base);
+            string engine = string.IsNullOrWhiteSpace(Engine) ? Analytical.Tas.GenOpt.Query.TasOptimisationEngine : Engine;
             if (result.Model == null)
             {
-                result.Model = new OptimisationModel(Analytical.Tas.GenOpt.Query.TasOptimisationEngine);
+                result.Model = new OptimisationModel(engine);
+            }
+            else
+            {
+                result.Model.Engine = engine;
             }
 
             switch (OptimisationAlgorithm)
             {
+                case OptimisationAlgorithm.TryEveryOption when OfferedAlgorithms.Contains(OptimisationAlgorithm.TryEveryOption):
+                    //The options are the whole search: the method has no settings.
+                    result.Method = new TryEveryOptionMethod();
+                    break;
+
                 case OptimisationAlgorithm.HookeJeeves:
                     HookeJeevesMethod? hookeJeevesMethod_Base = Base?.Method as HookeJeevesMethod;
                     GPSHookeJeevesAlgorithm gPSHookeJeevesAlgorithm = new GPSHookeJeevesAlgorithm();
@@ -246,7 +434,7 @@ namespace SAM.Analytical.UI.WPF
                     break;
 
                 default:
-                    problems.Add(string.Format(CultureInfo.InvariantCulture, "The method {0} is not offered here. Choose {1}.", OptimisationAlgorithm, string.Join(" or ", OptimisationAlgorithms.Select(x => x.TasOptimisationAlgorithmName()))));
+                    problems.Add(string.Format(CultureInfo.InvariantCulture, "The method {0} is not offered here. Choose {1}.", OptimisationAlgorithm.TasOptimisationAlgorithmName(), string.Join(" or ", OfferedAlgorithms.Select(x => x.TasOptimisationAlgorithmName()))));
                     return false;
             }
 
@@ -288,10 +476,20 @@ namespace SAM.Analytical.UI.WPF
                 designVariable.Name = name;
                 designVariable.Description = Optional(row.Description);
                 designVariable.Unit = Optional(row.Unit);
-                if (designVariable.Unit != designVariable_Base?.Unit)
+
+                //A declared quantity follows the unit it was declared with: the row's own (picked from the model or loaded),
+                //otherwise the loaded definition's variable of the same name.
+                OptimisationQuantity quantity_Declared = row.Quantity ?? designVariable_Base?.Quantity ?? OptimisationQuantity.Unspecified;
+                string? unit_Declared = row.Quantity != null ? Optional(row.QuantityUnit) : designVariable_Base?.Unit;
+                designVariable.Quantity = designVariable.Unit == unit_Declared ? quantity_Declared : OptimisationQuantity.Unspecified;
+
+                //The row's binding and type are its own (renaming keeps them).
+                if (row.Type != null)
                 {
-                    designVariable.Quantity = OptimisationQuantity.Unspecified;
+                    designVariable.Type = row.Type.Value;
                 }
+
+                designVariable.Target = row.Target == null ? null : new OptimisationTarget(row.Target);
 
                 designVariable.Minimum = minimum ?? double.NaN;
                 designVariable.Maximum = maximum ?? double.NaN;
@@ -324,10 +522,12 @@ namespace SAM.Analytical.UI.WPF
                 optimisationOutput.Name = name;
                 optimisationOutput.Description = Optional(row.Description);
                 optimisationOutput.Unit = Optional(row.Unit);
-                if (optimisationOutput.Unit != optimisationOutput_Base?.Unit)
-                {
-                    optimisationOutput.Quantity = OptimisationQuantity.Unspecified;
-                }
+
+                OptimisationQuantity quantity_Declared = row.Quantity ?? optimisationOutput_Base?.Quantity ?? OptimisationQuantity.Unspecified;
+                string? unit_Declared = row.Quantity != null ? Optional(row.QuantityUnit) : optimisationOutput_Base?.Unit;
+                optimisationOutput.Quantity = optimisationOutput.Unit == unit_Declared ? quantity_Declared : OptimisationQuantity.Unspecified;
+
+                optimisationOutput.Measure = row.Measure == null ? null : new OptimisationMeasure(row.Measure);
 
                 result.Outputs.Add(optimisationOutput);
             }
