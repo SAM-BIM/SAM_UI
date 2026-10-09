@@ -303,7 +303,7 @@ namespace SAM.Analytical.UI.WPF
                     start == null ? string.Empty : Text(start.Value),
                     minimum == null ? string.Empty : Text(minimum.Value),
                     maximum == null ? string.Empty : Text(maximum.Value),
-                    string.Empty,
+                    minimum == null || maximum == null ? string.Empty : Text(DefaultStep(minimum.Value, maximum.Value)),
                     optimisationCatalogueEntry.Description,
                     optimisationCatalogueEntry.Unit)
                 {
@@ -355,6 +355,25 @@ namespace SAM.Analytical.UI.WPF
 
             Objectives.Add(result);
             return result;
+        }
+
+        /// <summary>
+        /// The first move of a pattern search over a suggested range: about an eighth of it, rounded to 1, 2 or 5 times a
+        /// power of ten (16 to 24 °C → 1, 21 to 28 °C → 1, 0 to 2 → 0.2). Golden section does not use it.
+        /// </summary>
+        public static double DefaultStep(double minimum, double maximum)
+        {
+            double range = System.Math.Abs(maximum - minimum);
+            if (double.IsNaN(range) || double.IsInfinity(range) || range == 0)
+            {
+                return 1;
+            }
+
+            double raw = range / 8;
+            double power = System.Math.Pow(10, System.Math.Floor(System.Math.Log10(raw)));
+            double fraction = raw / power;
+            double nice = fraction < 1.5 ? 1 : fraction < 3.5 ? 2 : fraction < 7.5 ? 5 : 10;
+            return double.Parse((nice * power).ToString("G15", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
         }
 
         /// <summary><paramref name="name"/>, or "name 2", "name 3"… when the form already has it (names ignore case and spaces at the ends).</summary>

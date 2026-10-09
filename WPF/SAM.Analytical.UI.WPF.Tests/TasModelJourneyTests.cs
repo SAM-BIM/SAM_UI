@@ -86,10 +86,13 @@ namespace SAM.Analytical.UI.WPF.Tests
             input.AddTarget(TasModelJourneyFixtures.Variable(catalogue, "Office Weekday heating setpoint"));
             Assert.Equal(OptimisationAlgorithm.GoldenSection, input.OptimisationAlgorithm);
 
-            //A second value: golden section takes one, so Hooke–Jeeves.
+            //A second value: golden section takes one, so Hooke–Jeeves, which runs at once: each picked value has a start and a step.
             input.AddTarget(TasModelJourneyFixtures.Variable(catalogue, "Office Weekday cooling setpoint"));
             Assert.Equal(OptimisationAlgorithm.HookeJeeves, input.OptimisationAlgorithm);
             Assert.True(input.StartAndStepApplicable);
+            input.AddMeasure(TasModelJourneyFixtures.Output(catalogue, "Annual cooling demand"));
+            Assert.Empty(Errors(Definition(input), catalogue));
+            Assert.Equal([1.0, 1.0], Definition(input).Variables.Select(x => x.Step!.Value));
 
             //Back to one value: Hooke–Jeeves is still offered and kept.
             input.Parameters.RemoveAt(1);
@@ -107,7 +110,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             TasOptimisationParameterRow row = input.AddTarget(TasModelJourneyFixtures.Variable(catalogue, "Office Weekday heating setpoint"));
 
-            Assert.Equal(("Office Weekday heating setpoint", "°C", "20", "16", "24", string.Empty), (row.Name, row.Unit, row.Start, row.Minimum, row.Maximum, row.Step));
+            Assert.Equal(("Office Weekday heating setpoint", "°C", "20", "16", "24", "1"), (row.Name, row.Unit, row.Start, row.Minimum, row.Maximum, row.Step));
             Assert.Equal("Changes: Zone heating setpoint of internal condition “Office Weekday”", row.BindingText);
             Assert.False(row.IsChoice);
 
@@ -121,6 +124,19 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.NotEmpty(Errors(definition, catalogue));
             input.AddMeasure(TasModelJourneyFixtures.Output(catalogue, "Annual heating demand"));
             Assert.Empty(Errors(Definition(input), catalogue));
+        }
+
+        [Theory]
+        [InlineData(16, 24, 1)]
+        [InlineData(21, 28, 1)]
+        [InlineData(0, 2, 0.2)]
+        [InlineData(-5, 35, 5)]
+        [InlineData(0, 100, 10)]
+        [InlineData(0.2, 0.6, 0.05)]
+        [InlineData(3, 3, 1)]
+        public void A_picked_value_steps_by_about_an_eighth_of_its_range_on_a_1_2_5_scale(double minimum, double maximum, double step)
+        {
+            Assert.Equal(step, TasOptimisationInput.DefaultStep(minimum, maximum));
         }
 
         [Fact]

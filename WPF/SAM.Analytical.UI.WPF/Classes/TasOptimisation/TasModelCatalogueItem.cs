@@ -59,7 +59,8 @@ namespace SAM.Analytical.UI.WPF
 
                 if (Entry.Value != null)
                 {
-                    parts.Add("now " + WithUnit(Entry.Value.Value));
+                    //A setpoint is shown exactly (it is the value the form starts from); a result as the results are (PR5b).
+                    parts.Add("now " + (IsTarget ? WithUnit(Entry.Value.Value) : new TasOptimisationFormatter(new OptimisationDefinition()).Text(Entry.Value.Value, Entry.Unit)));
                 }
                 else if (!IsTarget)
                 {

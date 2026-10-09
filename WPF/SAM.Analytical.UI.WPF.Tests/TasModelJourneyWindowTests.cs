@@ -191,7 +191,8 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(
                 ["Annual heating demand", "Annual cooling demand", "Overheating hours", "Annual plant energy", "Annual plant cost", "Annual plant CO2"],
                 window.CanMeasureItems.Select(x => x.Name));
-            Assert.Equal("now 15227.840663709641 kWh", Item(window.CanMeasureItems, "Annual heating demand").Detail);
+            Assert.Equal("now " + new TasOptimisationFormatter(new OptimisationDefinition()).Text(15227.840663709641, "kWh"), Item(window.CanMeasureItems, "Annual heating demand").Detail);
+            Assert.Equal("now 7,363 GBP", Item(window.CanMeasureItems, "Annual plant cost").Detail.Replace(CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator, ","));
             Assert.Equal("no stored result yet; in h", Item(window.CanMeasureItems, "Overheating hours").Detail);
             TasModelCatalogueItem overheating = Item(window.CanMeasureItems, "Overheating hours");
             Assert.Equal(("Threshold (°C)", "28"), (overheating.ParameterLabel, overheating.ParameterText));

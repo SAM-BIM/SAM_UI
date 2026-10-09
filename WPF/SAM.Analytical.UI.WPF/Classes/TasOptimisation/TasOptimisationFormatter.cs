@@ -152,6 +152,12 @@ namespace SAM.Analytical.UI.WPF
             return column?.Unit == null || double.IsNaN(value) || double.IsInfinity(value) ? number : number + " " + column.Unit;
         }
 
+        /// <summary>A value with a declared unit, by the same rule as a column: "15,227.8 kWh", "7,363 GBP".</summary>
+        public string Text(double value, string? unit)
+        {
+            return Text(Column(string.Empty, unit, false), value);
+        }
+
         /// <summary>"name = value unit" pairs for display, in column order.</summary>
         public string Pairs(IReadOnlyList<TasOptimisationColumn> columns, IReadOnlyList<double> values, int offset = 0)
         {
