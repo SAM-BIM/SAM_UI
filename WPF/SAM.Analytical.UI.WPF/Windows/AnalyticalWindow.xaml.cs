@@ -2290,7 +2290,8 @@ namespace SAM.Analytical.UI.WPF.Windows
         {
             string? path = uIAnalyticalModel?.Path;
 
-            TasOptimisationWindow tasOptimisationWindow = new TasOptimisationWindow(string.IsNullOrWhiteSpace(path) ? null : System.IO.Path.GetDirectoryName(path))
+            //The open model's glazing systems join the glazing pool of a glazing choice, as in the Glazing window.
+            TasOptimisationWindow tasOptimisationWindow = new TasOptimisationWindow(string.IsNullOrWhiteSpace(path) ? null : System.IO.Path.GetDirectoryName(path), uIAnalyticalModel?.JSAMObject)
             {
                 Owner = this,
             };

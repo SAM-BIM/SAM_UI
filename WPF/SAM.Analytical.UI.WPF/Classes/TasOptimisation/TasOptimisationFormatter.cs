@@ -21,12 +21,27 @@ namespace SAM.Analytical.UI.WPF
     /// </summary>
     public sealed class TasOptimisationColumn
     {
-        internal TasOptimisationColumn(string name, string? unit, int? decimals, bool integer)
+        internal TasOptimisationColumn(string name, string? unit, int? decimals, bool integer, IEnumerable<string>? options = null)
         {
             Name = name;
             Unit = unit;
             Decimals = decimals;
             Integer = integer;
+            Options = (options ?? Enumerable.Empty<string>()).ToList().AsReadOnly();
+        }
+
+        /// <summary>A choice's options in order: option k is <c>Options[k - 1]</c>. Empty for a value.</summary>
+        public IReadOnlyList<string> Options { get; }
+
+        /// <summary>The option a value names (a whole number from 1 to the number of options); null otherwise.</summary>
+        public string? Option(double value)
+        {
+            if (Options.Count == 0 || double.IsNaN(value) || double.IsInfinity(value) || value != System.Math.Floor(value) || value < 1 || value > Options.Count)
+            {
+                return null;
+            }
+
+            return Options[(int)value - 1];
         }
 
         public string Name { get; }
@@ -80,7 +95,7 @@ namespace SAM.Analytical.UI.WPF
             Culture = cultureInfo ?? CultureInfo.CurrentCulture;
             quantityFormatter = new QuantityFormatter(new DocumentOptions() { Culture = Culture, UnitSystem = UnitStyle.SI });
 
-            Variables = optimisationDefinition.Variables.Where(x => x != null).Select(x => Column(x.Name, x.Unit, x.Type == DesignVariableType.Discrete || x.Type == DesignVariableType.Integer)).ToList().AsReadOnly();
+            Variables = optimisationDefinition.Variables.Where(x => x != null).Select(x => Column(x.Name, x.Unit, x.Type == DesignVariableType.Discrete || x.Type == DesignVariableType.Integer, x.Target?.Options)).ToList().AsReadOnly();
 
             List<OptimisationOutput> outputs = new List<OptimisationOutput>();
             OptimisationOutput? objective = optimisationDefinition.Objective?.Output == null ? null : optimisationDefinition.Output(optimisationDefinition.Objective.Output);
@@ -126,7 +141,21 @@ namespace SAM.Analytical.UI.WPF
         public string Text(TasOptimisationColumn column, double value)
         {
             string number = Number(column, value);
+
+            //A choice names its option: "2: Triple low-e".
+            string? option = column?.Option(value);
+            if (option != null)
+            {
+                return number + ": " + option;
+            }
+
             return column?.Unit == null || double.IsNaN(value) || double.IsInfinity(value) ? number : number + " " + column.Unit;
+        }
+
+        /// <summary>A value with a declared unit, by the same rule as a column: "15,227.8 kWh", "7,363 GBP".</summary>
+        public string Text(double value, string? unit)
+        {
+            return Text(Column(string.Empty, unit, false), value);
         }
 
         /// <summary>"name = value unit" pairs for display, in column order.</summary>
@@ -218,7 +247,7 @@ namespace SAM.Analytical.UI.WPF
             return name + " - trace.csv";
         }
 
-        private TasOptimisationColumn Column(string name, string? unit, bool integer)
+        private TasOptimisationColumn Column(string name, string? unit, bool integer, IEnumerable<string>? options = null)
         {
             string? symbol = string.IsNullOrWhiteSpace(unit) ? null : unit!.Trim();
             int? decimals = null;
@@ -241,7 +270,7 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            return new TasOptimisationColumn(name ?? string.Empty, symbol, decimals, integer);
+            return new TasOptimisationColumn(name ?? string.Empty, symbol, decimals, integer, options);
         }
 
         private static string Csv(string field)

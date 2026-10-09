@@ -23,6 +23,9 @@ namespace SAM.Analytical.UI.WPF
                 case OptimisationAlgorithm.HookeJeeves:
                     return "Hooke–Jeeves pattern search";
 
+                case OptimisationAlgorithm.TryEveryOption:
+                    return scope ? "Try every option (one choice)" : "Try every option";
+
                 default:
                     return optimisationAlgorithm.ToString();
             }
