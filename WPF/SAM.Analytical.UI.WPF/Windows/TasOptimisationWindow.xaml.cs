@@ -61,6 +61,12 @@ namespace SAM.Analytical.UI.WPF
         private List<TasOptimisationCheck> tasOptimisationChecks = new List<TasOptimisationCheck>();
         private CancellationTokenSource? cancellationTokenSource;
         private TasOptimisationProgressState? tasOptimisationProgressState;
+
+        /// <summary>How the current run's values are shown, copied and exported (PR5b); null before the first run.</summary>
+        private TasOptimisationFormatter? tasOptimisationFormatter;
+
+        /// <summary>The name of the current run's definition, for the exported file name.</summary>
+        private string? definitionName;
         private bool loading;
         private bool syncingObjective;
         private bool running;
@@ -213,7 +219,12 @@ namespace SAM.Analytical.UI.WPF
             cancellationTokenSource = new CancellationTokenSource();
             CancellationToken cancellationToken = cancellationTokenSource.Token;
 
-            TasOptimisationProgressState tasOptimisationProgressState = new TasOptimisationProgressState(optimisationDefinition.TasOptimisationVariableNames(), optimisationDefinition.TasOptimisationObjectiveNames());
+            //Display only: the definition's declared units and SAM's engineering formatting; every value stays full precision.
+            TasOptimisationFormatter tasOptimisationFormatter = new TasOptimisationFormatter(optimisationDefinition);
+            this.tasOptimisationFormatter = tasOptimisationFormatter;
+            definitionName = optimisationDefinition.Name;
+
+            TasOptimisationProgressState tasOptimisationProgressState = new TasOptimisationProgressState(optimisationDefinition.TasOptimisationVariableNames(), optimisationDefinition.TasOptimisationObjectiveNames(), tasOptimisationFormatter);
             this.tasOptimisationProgressState = tasOptimisationProgressState;
             BeginRun(optimisationDefinition);
 
@@ -233,7 +244,7 @@ namespace SAM.Analytical.UI.WPF
             try
             {
                 NativeGenOptRun nativeGenOptRun = await Task.Run(() => genOptDocument.RunNative(runsDirectory, tasGenExecutePath, progress, cancellationToken));
-                tasOptimisationReport = new TasOptimisationReport(nativeGenOptRun, cancellationToken.IsCancellationRequested);
+                tasOptimisationReport = new TasOptimisationReport(nativeGenOptRun, cancellationToken.IsCancellationRequested, tasOptimisationFormatter);
             }
             catch (Exception exception)
             {
@@ -531,16 +542,17 @@ namespace SAM.Analytical.UI.WPF
             dataGrid_Trace.Columns.Add(Column("Event", "Event"));
             UpdateSearchDetails();
 
+            //Each value shown rounded with its unit; its tooltip and its copied cell are the full-precision value.
             List<string> names_Parameter = optimisationDefinition.TasOptimisationVariableNames();
             for (int i = 0; i < names_Parameter.Count; i++)
             {
-                dataGrid_Trace.Columns.Add(Column(names_Parameter[i], string.Format(CultureInfo.InvariantCulture, "Coordinates[{0}]", i)));
+                dataGrid_Trace.Columns.Add(ValueColumn(names_Parameter[i], string.Format(CultureInfo.InvariantCulture, "CoordinateTexts[{0}]", i), string.Format(CultureInfo.InvariantCulture, "CoordinateRaw[{0}]", i)));
             }
 
             List<string> names_Objective = optimisationDefinition.TasOptimisationObjectiveNames();
             for (int i = 0; i < names_Objective.Count; i++)
             {
-                dataGrid_Trace.Columns.Add(Column(i == 0 ? names_Objective[i] + " (objective)" : names_Objective[i], string.Format(CultureInfo.InvariantCulture, "Outputs[{0}]", i)));
+                dataGrid_Trace.Columns.Add(ValueColumn(i == 0 ? names_Objective[i] + " (objective)" : names_Objective[i], string.Format(CultureInfo.InvariantCulture, "OutputTexts[{0}]", i), string.Format(CultureInfo.InvariantCulture, "OutputRaw[{0}]", i)));
             }
 
             stackPanel_Run.Visibility = Visibility.Visible;
@@ -615,6 +627,8 @@ namespace SAM.Analytical.UI.WPF
             });
             itemsControl_Result.ItemsSource = tasOptimisationReport.Lines;
             button_OpenRunFolder.IsEnabled = !string.IsNullOrWhiteSpace(tasOptimisationReport.RunDirectory) && Directory.Exists(tasOptimisationReport.RunDirectory);
+            button_CopyTrace.IsEnabled = traceRows.Count > 0 && tasOptimisationFormatter != null;
+            button_ExportTrace.IsEnabled = button_CopyTrace.IsEnabled;
 
             //The result is on the Run & Results tab, also when the run never started: show it.
             tabControl_Main.SelectedItem = tabItem_Run;
@@ -653,6 +667,39 @@ namespace SAM.Analytical.UI.WPF
                 Header = header,
                 Binding = new Binding(path) { Mode = BindingMode.OneWay },
             };
+        }
+
+        /// <summary>A number column: the engineering text, right-aligned, with the full-precision value as its tooltip and its copied content.</summary>
+        private static DataGridTextColumn ValueColumn(string header, string textPath, string rawPath)
+        {
+            Style style = new Style(typeof(TextBlock));
+            style.Setters.Add(new Setter(HorizontalAlignmentProperty, HorizontalAlignment.Right));
+            style.Setters.Add(new Setter(ToolTipProperty, new Binding(rawPath) { Mode = BindingMode.OneWay }));
+
+            return new DataGridTextColumn()
+            {
+                Header = header,
+                Binding = new Binding(textPath) { Mode = BindingMode.OneWay },
+                ClipboardContentBinding = new Binding(rawPath) { Mode = BindingMode.OneWay },
+                ElementStyle = style,
+            };
+        }
+
+        /// <summary>The whole trace as tab-separated full-precision text with a header (Copy trace); empty before a run.</summary>
+        internal string TraceText()
+        {
+            return tasOptimisationFormatter == null ? string.Empty : tasOptimisationFormatter.TabText(traceRows.Select(x => x.Entry));
+        }
+
+        /// <summary>Writes the whole trace as CSV (UTF-8 with a byte order mark, so Excel reads units such as °C).</summary>
+        internal void ExportTrace(string path)
+        {
+            if (tasOptimisationFormatter == null)
+            {
+                return;
+            }
+
+            System.IO.File.WriteAllText(path, tasOptimisationFormatter.CsvText(traceRows.Select(x => x.Entry)), new System.Text.UTF8Encoding(true));
         }
 
         private void TasOptimisationWindow_Closing(object? sender, CancelEventArgs e)
@@ -910,6 +957,62 @@ namespace SAM.Analytical.UI.WPF
             catch (Exception exception) when (exception is Win32Exception || exception is InvalidOperationException)
             {
                 MessageBox.Show(this, "The run folder could not be opened: " + exception.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void button_CopyTrace_Click(object sender, RoutedEventArgs e)
+        {
+            string text = TraceText();
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            try
+            {
+                Clipboard.SetText(text);
+            }
+            catch (System.Runtime.InteropServices.ExternalException)
+            {
+                // The clipboard is busy; nothing is lost, the trace stays on screen.
+            }
+        }
+
+        private void button_ExportTrace_Click(object sender, RoutedEventArgs e)
+        {
+            if (tasOptimisationFormatter == null || traceRows.Count == 0)
+            {
+                return;
+            }
+
+            //The file goes where the user chooses; nothing about it is stored in the definition.
+            Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog()
+            {
+                Title = "Export the trace",
+                Filter = "CSV (comma-separated values) (*.csv)|*.csv",
+                DefaultExt = ".csv",
+                AddExtension = true,
+                FileName = TasOptimisationFormatter.CsvFileName(definitionName),
+            };
+
+            string? runDirectory = Report?.RunDirectory;
+            if (!string.IsNullOrWhiteSpace(runDirectory) && Directory.Exists(runDirectory))
+            {
+                saveFileDialog.InitialDirectory = runDirectory;
+            }
+
+            if (saveFileDialog.ShowDialog(this) != true)
+            {
+                return;
+            }
+
+            try
+            {
+                ExportTrace(saveFileDialog.FileName);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                MessageBox.Show(this, "The trace could not be saved: " + exception.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

@@ -18,7 +18,7 @@
 
             <!-- A readiness or report line: glyph + title, then the detail. The state never depends on colour alone. -->
             <DataTemplate x:Key="TasOptimisation.CheckTemplate" DataType="{x:Type local:TasOptimisationCheck}">
-                <Grid Margin="0,1,0,3" ToolTip="{Binding Detail}">
+                <Grid Margin="0,1,0,3" ToolTip="{Binding ToolTipText}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="150"/>
@@ -369,7 +369,7 @@
                                       ToolTip="Adds the search's iteration counter and the event that produced each simulation to the trace."/>
                             <DataGrid x:Name="dataGrid_Trace" Height="220" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
                                       HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource PartO.Brush.Border}"
-                                      BorderBrush="{StaticResource PartO.Brush.Border}" SelectionMode="Single" FontSize="11"/>
+                                      BorderBrush="{StaticResource PartO.Brush.Border}" SelectionMode="Extended" SelectionUnit="FullRow" ClipboardCopyMode="IncludeHeader" FontSize="11"/>
                         </StackPanel>
 
                         <!-- HOW DID IT END: the outcome, the best design and the run folder. -->
@@ -388,6 +388,10 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                     <Button x:Name="button_OpenRunFolder" Height="24" Padding="10,0" Margin="0,0,8,0" Click="button_OpenRunFolder_Click">Open run folder</Button>
                                     <Button x:Name="button_CopySummary" Height="24" Padding="10,0" Click="button_CopySummary_Click">Copy summary</Button>
+                                    <Button x:Name="button_CopyTrace" Height="24" Padding="10,0" Margin="8,0,0,0" IsEnabled="False" Click="button_CopyTrace_Click"
+                                            ToolTip="Copies every simulation of the trace at full precision, tab-separated with a header row, ready to paste into Excel.">Copy trace</Button>
+                                    <Button x:Name="button_ExportTrace" Height="24" Padding="10,0" Margin="8,0,0,0" IsEnabled="False" Click="button_ExportTrace_Click"
+                                            ToolTip="Saves every simulation of the trace as a CSV file: full precision, invariant numbers, names and units in the header.">Export trace (CSV)…</Button>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
