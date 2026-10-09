@@ -13,8 +13,9 @@ merged). **SAM_UI only**: SAM and SAM_Tas are unchanged.
 
 ## Current status
 
-PR open, **not merged**. Code, tests, mutations and licensed acceptance are complete; awaiting PR CI and **owner
-review**. Not split: the whole PR8 scope is here (the PR8a/PR8b split was not needed).
+PR open, **not merged**. Code, tests, mutations and licensed acceptance are complete; the ten owner decisions below were
+**approved by the owner on 2026-10-09** (implementation checked against them; no review findings or comments open); awaiting
+final PR CI on the head, then merge. Not split: the whole PR8 scope is here (the PR8a/PR8b split was not needed).
 
 ## What the window does now
 
@@ -76,7 +77,7 @@ The **Tas script** route is exactly as before: the same controls, examples, chec
 CSV are PR5b's. A choice is shown by option number **and name** ("3: Triple low-e") in the trace, progress lines and
 result card; the tooltip, Copy trace, Copy summary and CSV keep the bare number at full precision.
 
-## Owner decisions (chosen here; please confirm or redirect)
+## Owner decisions (APPROVED by the owner, 2026-10-09; not to be re-asked)
 
 1. **Opening engine.** A first opening on a model whose folder holds a TBD opens on "Tas model"; otherwise (no model,
    or a remembered session) the window opens as before (the Systems Demo script example).
@@ -247,6 +248,5 @@ traces, CSV, definitions, generated scripts, renders) is local in `C:\TasOut\pr8
 ## Next step
 
 1. PR CI (`build`, `spdx`) green on the head.
-2. **Owner review** of this PR and the owner decisions above. Merge (merge commit, `--match-head-commit`) only after
-   approval, then the `PROJECT_PROGRESS.md` closeout on SAM_UI `sow/2026-Q4` (`[skip ci]`).
+2. Owner review done: decisions approved 2026-10-09, merge authorised. Merge (merge commit, `--match-head-commit`), then the `PROJECT_PROGRESS.md` closeout on SAM_UI `sow/2026-Q4` (`[skip ci]`).
 3. Then PR9 (Apply best design) or PR7b-2 (SAM_Tas licensed acceptance matrix), in the owner's order.
