@@ -25,11 +25,24 @@ namespace SAM.Analytical.UI.WPF
             Detail = detail ?? string.Empty;
         }
 
+        /// <param name="raw">The detail at full precision, for the tooltip, when <paramref name="detail"/> is rounded for display.</param>
+        public TasOptimisationCheck(TasOptimisationCheckStatus status, string title, string detail, string? raw)
+            : this(status, title, detail)
+        {
+            Raw = raw;
+        }
+
         public TasOptimisationCheckStatus Status { get; }
 
         public string Title { get; }
 
         public string Detail { get; }
+
+        /// <summary>The detail with full-precision values when <see cref="Detail"/> is rounded for display; otherwise null.</summary>
+        public string? Raw { get; }
+
+        /// <summary>What the line's tooltip shows: the full-precision values when the detail is rounded, otherwise the detail.</summary>
+        public string ToolTipText => Raw ?? Detail;
 
         /// <summary>The state as a glyph, so it never depends on colour alone.</summary>
         public string Glyph => Status switch

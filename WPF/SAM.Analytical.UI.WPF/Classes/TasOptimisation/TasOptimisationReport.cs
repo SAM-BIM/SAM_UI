@@ -48,8 +48,11 @@ namespace SAM.Analytical.UI.WPF
             lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Error", Message(exception)));
         }
 
-        public TasOptimisationReport(NativeGenOptRun nativeGenOptRun, bool cancelRequested)
-            : this(nativeGenOptRun?.Result!, nativeGenOptRun?.ParameterNames, nativeGenOptRun?.ObjectiveNames, nativeGenOptRun?.Workspace?.RunDirectory, cancelRequested)
+        /// <param name="nativeGenOptRun">The run.</param>
+        /// <param name="cancelRequested">The user asked to stop before the run returned.</param>
+        /// <param name="tasOptimisationFormatter">Engineering display of the values (PR5b); null for full precision.</param>
+        public TasOptimisationReport(NativeGenOptRun nativeGenOptRun, bool cancelRequested, TasOptimisationFormatter? tasOptimisationFormatter = null)
+            : this(nativeGenOptRun?.Result!, nativeGenOptRun?.ParameterNames, nativeGenOptRun?.ObjectiveNames, nativeGenOptRun?.Workspace?.RunDirectory, cancelRequested, tasOptimisationFormatter)
         {
         }
 
@@ -58,7 +61,12 @@ namespace SAM.Analytical.UI.WPF
         /// <param name="objectiveNames">Objective names in output order; the first is the one minimised.</param>
         /// <param name="runDirectory">The run folder (project snapshot and evaluation folders).</param>
         /// <param name="cancelRequested">The user asked to stop before the run returned.</param>
-        public TasOptimisationReport(OptimisationResult result, IReadOnlyList<string>? parameterNames, IReadOnlyList<string>? objectiveNames, string? runDirectory, bool cancelRequested)
+        /// <param name="tasOptimisationFormatter">
+        /// Engineering display of the values (PR5b): each line's detail is rounded with its unit and its tooltip
+        /// (<see cref="TasOptimisationCheck.Raw"/>) and <see cref="ToText"/> keep full precision. Null for full precision
+        /// everywhere.
+        /// </param>
+        public TasOptimisationReport(OptimisationResult result, IReadOnlyList<string>? parameterNames, IReadOnlyList<string>? objectiveNames, string? runDirectory, bool cancelRequested, TasOptimisationFormatter? tasOptimisationFormatter = null)
         {
             if (result == null)
             {
@@ -148,20 +156,24 @@ namespace SAM.Analytical.UI.WPF
                     BestPoint = best.Coordinates;
                     BestObjectives = best.Outputs;
                     BestSimulation = best.Simulation;
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Best design", Text(ParameterNames, best.Coordinates) + " (simulation " + Count(best.Simulation) + ")"));
+                    string simulation = " (simulation " + Count(best.Simulation) + ")";
+                    lines.Add(Line("Best design", Text(ParameterNames, best.Coordinates) + simulation, tasOptimisationFormatter?.Pairs(tasOptimisationFormatter.Variables, best.Coordinates) + simulation, tasOptimisationFormatter));
 
                     //The kernel minimises the first output; the others are recorded for every simulation.
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Objective", Text(ObjectiveNames.Take(1).ToList(), best.Outputs.Take(1).ToList())));
+                    lines.Add(Line("Objective", Text(ObjectiveNames.Take(1).ToList(), best.Outputs.Take(1).ToList()), tasOptimisationFormatter?.Pairs(tasOptimisationFormatter.Outputs, best.Outputs.Take(1).ToList()), tasOptimisationFormatter));
                     if (best.Outputs.Count > 1)
                     {
-                        lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Recorded outputs", Text(ObjectiveNames.Skip(1).ToList(), best.Outputs.Skip(1).ToList())));
+                        lines.Add(Line("Recorded outputs", Text(ObjectiveNames.Skip(1).ToList(), best.Outputs.Skip(1).ToList()), tasOptimisationFormatter?.Pairs(tasOptimisationFormatter.Outputs, best.Outputs.Skip(1).ToList(), 1), tasOptimisationFormatter));
                     }
                 }
 
                 if (nativeGenOptOutcome.Interval != null)
                 {
                     Interval = nativeGenOptOutcome.Interval;
-                    lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Final interval", string.Format(CultureInfo.InvariantCulture, "[{0}, {1}]", Interval.Lower, Interval.Upper)));
+                    string raw = string.Format(CultureInfo.InvariantCulture, "[{0}, {1}]", TasOptimisationFormatter.Raw(Interval.Lower), TasOptimisationFormatter.Raw(Interval.Upper));
+                    TasOptimisationColumn? column = tasOptimisationFormatter?.Variables.FirstOrDefault();
+                    string? display = tasOptimisationFormatter == null || column == null ? null : "[" + tasOptimisationFormatter.Number(column, Interval.Lower) + ", " + tasOptimisationFormatter.Text(column, Interval.Upper) + "]";
+                    lines.Add(Line("Final interval", raw, display, tasOptimisationFormatter));
                 }
             }
 
@@ -236,9 +248,10 @@ namespace SAM.Analytical.UI.WPF
                 stringBuilder.AppendLine("Simulations: " + Count(Simulations));
             }
 
+            //Full precision, also where the window shows rounded values.
             foreach (TasOptimisationCheck line in lines)
             {
-                stringBuilder.AppendLine(line.Title + ": " + line.Detail);
+                stringBuilder.AppendLine(line.Title + ": " + (line.Raw ?? line.Detail));
             }
 
             if (!string.IsNullOrWhiteSpace(DiagnosticsText))
@@ -253,6 +266,17 @@ namespace SAM.Analytical.UI.WPF
         public static string Count(int value)
         {
             return value.ToString("D", CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// A result line: with a formatter, the detail is the engineering text and the full-precision text is kept for
+        /// the tooltip and the copied summary; without one, the detail is the full-precision text.
+        /// </summary>
+        private static TasOptimisationCheck Line(string title, string raw, string? display, TasOptimisationFormatter? tasOptimisationFormatter)
+        {
+            return tasOptimisationFormatter == null || display == null
+                ? new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, raw)
+                : new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, display, raw);
         }
 
         /// <summary>"name = value" pairs, invariant round-trip numbers (full precision).</summary>

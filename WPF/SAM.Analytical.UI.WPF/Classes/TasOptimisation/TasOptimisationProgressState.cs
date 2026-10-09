@@ -21,11 +21,18 @@ namespace SAM.Analytical.UI.WPF
     {
         private readonly List<TasOptimisationTraceRow> rows = new List<TasOptimisationTraceRow>();
 
-        public TasOptimisationProgressState(IReadOnlyList<string>? parameterNames, IReadOnlyList<string>? objectiveNames)
+        /// <param name="parameterNames">Parameter names in coordinate order.</param>
+        /// <param name="objectiveNames">Objective names in output order.</param>
+        /// <param name="tasOptimisationFormatter">Engineering display of the values (PR5b); null for full precision.</param>
+        public TasOptimisationProgressState(IReadOnlyList<string>? parameterNames, IReadOnlyList<string>? objectiveNames, TasOptimisationFormatter? tasOptimisationFormatter = null)
         {
             ParameterNames = parameterNames ?? new List<string>();
             ObjectiveNames = objectiveNames ?? new List<string>();
+            Formatter = tasOptimisationFormatter;
         }
+
+        /// <summary>How the values are shown; null for full precision.</summary>
+        public TasOptimisationFormatter? Formatter { get; }
 
         public IReadOnlyList<string> ParameterNames { get; }
 
@@ -70,7 +77,7 @@ namespace SAM.Analytical.UI.WPF
                 Lowest = entry;
             }
 
-            TasOptimisationTraceRow result = new TasOptimisationTraceRow(entry);
+            TasOptimisationTraceRow result = new TasOptimisationTraceRow(entry, Formatter);
             rows.Add(result);
             return result;
         }
@@ -100,8 +107,8 @@ namespace SAM.Analytical.UI.WPF
                 CultureInfo.InvariantCulture,
                 "Simulation {0}: {1} -> {2}",
                 TasOptimisationReport.Count(optimisationTraceEntry.Simulation),
-                TasOptimisationReport.Text(ParameterNames, optimisationTraceEntry.Coordinates),
-                TasOptimisationReport.Text(ObjectiveNames, objective));
+                Formatter == null ? TasOptimisationReport.Text(ParameterNames, optimisationTraceEntry.Coordinates) : Formatter.Pairs(Formatter.Variables, optimisationTraceEntry.Coordinates),
+                Formatter == null ? TasOptimisationReport.Text(ObjectiveNames, objective) : Formatter.Pairs(Formatter.Outputs, objective));
         }
     }
 }
