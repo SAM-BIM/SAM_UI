@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+#nullable enable
+
 using SAM.Analytical.Tas.GenOpt;
 using SAM.Core.Optimisation;
 using System;
@@ -61,7 +63,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         [WpfFact]
         public async Task Licensed_acceptance_of_the_tas_model_journey()
         {
-            string output = Environment.GetEnvironmentVariable("SAM_OPT_ACCEPTANCE");
+            string? output = Environment.GetEnvironmentVariable("SAM_OPT_ACCEPTANCE");
             if (string.IsNullOrWhiteSpace(output))
             {
                 return;

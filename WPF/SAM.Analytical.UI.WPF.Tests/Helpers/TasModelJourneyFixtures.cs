@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+#nullable enable
+
 using SAM.Analytical.Tas.GenOpt;
 using SAM.Core.Optimisation;
 using System;
@@ -134,7 +136,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// <summary>The SAM fixture folder in the sibling SAM checkout (SAM/SAM/SAM.Tests/Golden/Optimisation).</summary>
         public static string FixtureDirectory()
         {
-            for (DirectoryInfo directoryInfo = new DirectoryInfo(AppContext.BaseDirectory); directoryInfo != null; directoryInfo = directoryInfo.Parent)
+            for (DirectoryInfo? directoryInfo = new DirectoryInfo(AppContext.BaseDirectory); directoryInfo != null; directoryInfo = directoryInfo.Parent)
             {
                 string path = Path.Combine(directoryInfo.FullName, "SAM", "SAM", "SAM.Tests", "Golden", "Optimisation");
                 if (Directory.Exists(path))

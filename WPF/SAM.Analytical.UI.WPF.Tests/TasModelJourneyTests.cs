@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+#nullable enable
+
 using SAM.Analytical.Tas.GenOpt;
 using SAM.Core.Optimisation;
 using System;
@@ -24,7 +26,7 @@ namespace SAM.Analytical.UI.WPF.Tests
     {
         private static OptimisationDefinition Definition(TasOptimisationInput input)
         {
-            Assert.True(input.TryGetDefinition(out OptimisationDefinition definition, out List<string> problems), string.Join("; ", problems));
+            Assert.True(input.TryGetDefinition(out OptimisationDefinition? definition, out List<string> problems), string.Join("; ", problems));
             return Assert.IsType<OptimisationDefinition>(definition);
         }
 
@@ -175,6 +177,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal([OptimisationAlgorithm.TryEveryOption], input.OfferedAlgorithms);
             Assert.False(input.StartAndStepApplicable);
             Assert.EndsWith("Options: 1 Suncool Example; 2 Double B; 3 Triple low-e", row.BindingText);
+            Assert.Equal("Glazing of the 3 building elements using “Suncool Example”, chosen from real glazing systems in g order (frames kept).", row.Description);
 
             input.AddMeasure(TasModelJourneyFixtures.Output(catalogue, "Annual cooling demand"));
             OptimisationDefinition definition = Definition(input);

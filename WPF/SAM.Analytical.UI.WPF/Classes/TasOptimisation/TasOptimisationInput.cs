@@ -287,7 +287,11 @@ namespace SAM.Analytical.UI.WPF
             if (optimisationCatalogueEntry.Options != null && optimisationCatalogueEntry.Options.Count != 0)
             {
                 optimisationTarget.Options = optimisationCatalogueEntry.Options.ToList();
-                result = new TasOptimisationParameterRow(name, string.Empty, "1", optimisationTarget.Options.Count.ToString(CultureInfo.InvariantCulture), string.Empty, optimisationCatalogueEntry.Description, null)
+
+                //The options are listed under the row (BindingText): the description keeps what the choice is.
+                string description = optimisationCatalogueEntry.Description ?? string.Empty;
+                int index = description.IndexOf(" Options: ", StringComparison.Ordinal);
+                result = new TasOptimisationParameterRow(name, string.Empty, "1", optimisationTarget.Options.Count.ToString(CultureInfo.InvariantCulture), string.Empty, index < 0 ? description : description.Substring(0, index), null)
                 {
                     Type = DesignVariableType.Discrete,
                     Quantity = OptimisationQuantity.Unspecified,
