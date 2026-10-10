@@ -11,16 +11,16 @@ Energy Simulation → Simulate > Optimisation ("Tas model") → Run → **Apply 
 
 **Two repositories, merge order:**
 
-1. SAM_Tas, same branch name (`SAM_Tas/SAM.Analytical.Tas.GenOpt/NATIVE_OPTIMISATION_PR9.md`): the Tas file writers,
-   their protection, the run's file hashes, the 24 hours of a setpoint profile. **Merge first.**
-2. SAM_UI (this PR): the window, the plan shown before anything is written, the SAM model change, Energy Simulation
+1. SAM-BIM/SAM_Tas#93, same branch name (`SAM_Tas/SAM.Analytical.Tas.GenOpt/NATIVE_OPTIMISATION_PR9.md`): the Tas file
+   writers, their protection, the run's file hashes, the 24 hours of a setpoint profile. **Merge first.**
+2. SAM-BIM/SAM_UI#220 (this PR): the window, the plan shown before anything is written, the SAM model change, Energy Simulation
    offered. CI builds it against the SAM_Tas branch of the same name; after (1) merges it builds against `sow/2026-Q4`.
 
 SAM and SAM_Systems are unchanged. PR7b-2, the coordinated Tas units correction and SAM_Deploy PR10 are not part of PR9.
 
 ## Current status
 
-Both PRs open, **not merged**. Code, tests, mutations and licensed acceptance (harness and real application) are complete;
+SAM-BIM/SAM_Tas#93 and SAM-BIM/SAM_UI#220 open, **not merged**. Code, tests, mutations and licensed acceptance (harness and real application) are complete;
 awaiting final PR CI and **owner review** of the decisions below.
 
 ## What the user sees
