@@ -85,6 +85,14 @@ namespace SAM.Analytical.UI.WPF
         private bool glazingPoolRequested;
         private TasOptimisationAIReply? aiReply;
 
+        // "Apply best design" (PR9): the last "Tas model" run (its runner holds the inventory, the glazing options and the
+        // hashes of the files it evaluated), the plan on screen and whether it is being applied.
+        private TasModelRunner? lastTasModelRunner;
+        private OptimisationDefinition? lastTasModelDefinition;
+        private string? lastTasModelFolder;
+        private TasModelApplyPlan? applyPlan;
+        private bool applying;
+
         public TasOptimisationWindow()
             : this(null)
         {
@@ -227,6 +235,27 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>The last AI reply read; null before the first.</summary>
         internal TasOptimisationAIReply? AIReply => aiReply;
 
+        /// <summary>
+        /// The open model. "Apply best design" changes it (one Undo step) when the Tas project is its own folder; null
+        /// when no model is open.
+        /// </summary>
+        public UIAnalyticalModel? UIAnalyticalModel { get; set; }
+
+        /// <summary>True when the window was closed with "Run Energy Simulation…" after the best design was applied.</summary>
+        public bool EnergySimulationRequested { get; private set; }
+
+        /// <summary>The "Apply best design" plan on screen; null when none is.</summary>
+        internal TasModelApplyPlan? ApplyPlan => applyPlan;
+
+        /// <summary>How the last "Apply best design" ended; null before one.</summary>
+        internal TasModelApplyOutcome? ApplyOutcome { get; private set; }
+
+        /// <summary>Replaces the Tas writers and reader of "Apply best design" (tests); null for licensed Tas.</summary>
+        internal Action<TasModelDesignApplier>? ConfigureApplier { get; set; }
+
+        /// <summary>Calculates a new glazing system's aperture parameters for the model (tests); null for licensed Tas (TCD).</summary>
+        internal Func<ApertureConstruction, Core.MaterialLibrary, Analytical.Tas.ThermalTransmittanceCalculationResult?>? GlazingCalculator { get; set; }
+
         /// <summary>Forgets the session's form (tests).</summary>
         internal static void ResetSession()
         {
@@ -249,7 +278,7 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         internal async Task RunAsync()
         {
-            if (running)
+            if (running || applying)
             {
                 return;
             }
@@ -272,6 +301,11 @@ namespace SAM.Analytical.UI.WPF
 
             session = new TasOptimisationInput(input);
 
+            //Only the run that is about to start can be applied.
+            lastTasModelRunner = null;
+            lastTasModelDefinition = null;
+            lastTasModelFolder = null;
+
             Func<IProgress<OptimisationProgress>, CancellationToken, Task<NativeGenOptRun>> run;
             if (input.IsTasModel)
             {
@@ -290,6 +324,11 @@ namespace SAM.Analytical.UI.WPF
                 }
 
                 run = (progress_Run, cancellationToken_Run) => TasModelSession.RunSta(() => tasModelRunner.Run(progress_Run, cancellationToken_Run), "SAM optimisation run");
+
+                //What "Apply best design" needs of this run (its result decides whether there is anything to apply).
+                lastTasModelRunner = tasModelRunner;
+                lastTasModelDefinition = optimisationDefinition;
+                lastTasModelFolder = directory;
             }
             else
             {
@@ -652,8 +691,8 @@ namespace SAM.Analytical.UI.WPF
                 : "The optimiser looks for the design-variable values that give the lowest " + primary.Name.Trim() + ".";
 
             bool canRun = tasOptimisationChecks.CanRun();
-            button_Run.IsEnabled = !running && !testing && canRun;
-            button_TestSimulation.IsEnabled = input.IsTasModel && !running && !testing && canRun;
+            button_Run.IsEnabled = !running && !testing && !applying && canRun;
+            button_TestSimulation.IsEnabled = input.IsTasModel && !running && !testing && !applying && canRun;
             button_TestSimulation.ToolTip = button_TestSimulation.IsEnabled || testing
                 ? "Run one Tas simulation at the start values (option 1 for a choice): its outputs and how long it takes, so the run's duration can be estimated."
                 : "Available when the checks allow a run.";
@@ -734,6 +773,9 @@ namespace SAM.Analytical.UI.WPF
             stackPanel_Run.Visibility = Visibility.Visible;
             textBlock_RunEmpty.Visibility = Visibility.Collapsed;
             border_Result.Visibility = Visibility.Collapsed;
+            border_Apply.Visibility = Visibility.Collapsed;
+            applyPlan = null;
+            ApplyOutcome = null;
             progressBar_Run.IsIndeterminate = true;
             textBlock_RunStatus.Text = "Running: " + optimisationDefinition.Method.Algorithm.TasOptimisationAlgorithmName() + " on " + string.Join(", ", names_Parameter) + ", minimising " + names_Objective.FirstOrDefault() + ".";
             textBlock_RunNote.Visibility = Visibility.Visible;
@@ -805,6 +847,7 @@ namespace SAM.Analytical.UI.WPF
             button_OpenRunFolder.IsEnabled = !string.IsNullOrWhiteSpace(tasOptimisationReport.RunDirectory) && Directory.Exists(tasOptimisationReport.RunDirectory);
             button_CopyTrace.IsEnabled = traceRows.Count > 0 && tasOptimisationFormatter != null;
             button_ExportTrace.IsEnabled = button_CopyTrace.IsEnabled;
+            UpdateApplyButton();
 
             //The result is on the Run & Results tab, also when the run never started: show it.
             tabControl_Main.SelectedItem = tabItem_Run;
@@ -881,6 +924,13 @@ namespace SAM.Analytical.UI.WPF
 
         private void TasOptimisationWindow_Closing(object? sender, CancelEventArgs e)
         {
+            if (applying)
+            {
+                //The Tas files are being replaced; the outcome must be seen.
+                e.Cancel = true;
+                return;
+            }
+
             if (testing)
             {
                 //The test simulation cannot be interrupted; its result would have nowhere to go.
@@ -1956,6 +2006,183 @@ namespace SAM.Analytical.UI.WPF
             catch (Exception exception) when (exception is Win32Exception || exception is InvalidOperationException)
             {
                 MessageBox.Show(this, "The run folder could not be opened: " + exception.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        /// <summary>
+        /// "Apply best design…" is offered only for a "Tas model" run of this window whose result rules give a best point
+        /// (SAM_Tas' <c>NativeGenOptOutcome</c>: not cancelled, withheld or failed).
+        /// </summary>
+        private void UpdateApplyButton()
+        {
+            bool offered = Report != null && Report.Successful && Report.BestPoint.Count != 0 && lastTasModelRunner?.SourceHashes != null;
+            button_ApplyBest.Visibility = offered ? Visibility.Visible : Visibility.Collapsed;
+            button_ApplyBest.IsEnabled = offered && !running && !testing && !applying;
+        }
+
+        /// <summary>
+        /// Shows what "Apply best design" would do with the last run's best point: each item with its current value, the
+        /// best value and where it is written, or why it cannot be. Nothing is written.
+        /// </summary>
+        internal TasModelApplyPlan PrepareApply()
+        {
+            applyPlan = TasModelApplyPlan.Create(Report, lastTasModelDefinition, lastTasModelRunner, lastTasModelFolder, UIAnalyticalModel?.JSAMObject, UIAnalyticalModel?.Path, tasOptimisationFormatter);
+            ApplyOutcome = null;
+
+            ShowApply(applyPlan.Headline, applyPlan.Lines, applyPlan.Notes);
+            button_ApplyConfirm.Visibility = Visibility.Visible;
+            button_ApplyConfirm.IsEnabled = applyPlan.CanApply;
+            button_ApplyCancel.Visibility = Visibility.Visible;
+            button_ApplyCancel.Content = "Cancel";
+            button_EnergySimulation.Visibility = Visibility.Collapsed;
+            button_OpenBackup.Visibility = Visibility.Collapsed;
+            border_Apply.BringIntoView();
+
+            return applyPlan;
+        }
+
+        /// <summary>
+        /// Applies the plan on screen (<see cref="Modify.ApplyTasModelBestDesign"/>, on its own STA thread: Tas COM and TCD),
+        /// then puts the changed model in the window as one Undo step. Returns when the outcome is shown; null when there was
+        /// nothing to apply.
+        /// </summary>
+        internal async Task<TasModelApplyOutcome?> ApplyAsync()
+        {
+            TasModelApplyPlan? plan = applyPlan;
+            if (plan == null || !plan.CanApply || applying || running || testing)
+            {
+                return null;
+            }
+
+            SetApplying(true);
+            TasModelApplyOutcome outcome;
+            try
+            {
+                Action<TasModelDesignApplier>? configure = ConfigureApplier;
+                Func<ApertureConstruction, Core.MaterialLibrary, Analytical.Tas.ThermalTransmittanceCalculationResult?>? calculate = GlazingCalculator;
+                outcome = await TasModelSession.RunSta(() => Modify.ApplyTasModelBestDesign(plan, configure, calculate), "SAM apply best design");
+            }
+            catch (Exception exception)
+            {
+                outcome = new TasModelApplyOutcome(false, "The best design could not be applied: " + exception.Message, null);
+            }
+
+            //The model change: one Undo step, as the Glazing window's.
+            if (outcome.Succeeded && outcome.AnalyticalModel != null)
+            {
+                try
+                {
+                    UIAnalyticalModel!.SetJSAMObject(outcome.AnalyticalModel, new Core.UI.FullModification());
+                }
+                catch (Exception exception)
+                {
+                    outcome = new TasModelApplyOutcome(false, "The Tas files hold the best design, but the open model could not be changed (" + exception.Message + "). The original Tas files are in " + outcome.TasResult?.BackupFolder + ".", outcome.Lines, null, outcome.TasResult, true);
+                }
+            }
+
+            SetApplying(false);
+            ApplyOutcome = outcome;
+            applyPlan = null;
+
+            if (outcome.TasResult?.FilesReplaced.Count > 0 || outcome.ProjectChanged)
+            {
+                //The Tas files are no longer the ones this run (and the lists) read: applied once, and read again before another run.
+                lastTasModelRunner = null;
+                lastTasModelDefinition = null;
+                lastTasModelFolder = null;
+                tasModelSession.Reset();
+            }
+
+            ShowApply(outcome.Headline, outcome.Lines, Array.Empty<string>());
+            button_ApplyConfirm.Visibility = Visibility.Collapsed;
+            button_ApplyCancel.Content = "Close";
+            button_EnergySimulation.Visibility = outcome.Succeeded && outcome.AnalyticalModel != null ? Visibility.Visible : Visibility.Collapsed;
+            string? backup = outcome.TasResult?.BackupFolder;
+            button_OpenBackup.Visibility = !string.IsNullOrWhiteSpace(backup) && Directory.Exists(backup) ? Visibility.Visible : Visibility.Collapsed;
+            UpdateApplyButton();
+            Refresh();
+
+            return outcome;
+        }
+
+        /// <summary>Closes the window so the main window opens Energy Simulation on the model that now holds the best design.</summary>
+        internal void RequestEnergySimulation()
+        {
+            if (ApplyOutcome?.Succeeded != true || ApplyOutcome.AnalyticalModel == null)
+            {
+                return;
+            }
+
+            EnergySimulationRequested = true;
+            Close();
+        }
+
+        private void ShowApply(string headline, IReadOnlyList<TasOptimisationCheck> lines, IReadOnlyList<string> notes)
+        {
+            textBlock_ApplyHeadline.Text = headline;
+            itemsControl_Apply.ItemsSource = lines;
+            itemsControl_ApplyNotes.ItemsSource = notes;
+            border_Apply.Visibility = Visibility.Visible;
+            tabControl_Main.SelectedItem = tabItem_Run;
+        }
+
+        private void SetApplying(bool value)
+        {
+            applying = value;
+            progressBar_Apply.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+            button_ApplyConfirm.IsEnabled = !value && applyPlan?.CanApply == true;
+            button_ApplyCancel.IsEnabled = !value;
+            button_Close.IsEnabled = !value;
+            if (value)
+            {
+                button_Run.IsEnabled = false;
+                button_TestSimulation.IsEnabled = false;
+            }
+
+            if (value)
+            {
+                textBlock_ApplyHeadline.Text = "Applying: the Tas files are written as copies and read back before they replace the originals…";
+            }
+
+            UpdateApplyButton();
+        }
+
+        private void button_ApplyBest_Click(object sender, RoutedEventArgs e)
+        {
+            PrepareApply();
+        }
+
+        private async void button_ApplyConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            await ApplyAsync();
+        }
+
+        private void button_ApplyCancel_Click(object sender, RoutedEventArgs e)
+        {
+            applyPlan = null;
+            border_Apply.Visibility = Visibility.Collapsed;
+        }
+
+        private void button_EnergySimulation_Click(object sender, RoutedEventArgs e)
+        {
+            RequestEnergySimulation();
+        }
+
+        private void button_OpenBackup_Click(object sender, RoutedEventArgs e)
+        {
+            string? directory = ApplyOutcome?.TasResult?.BackupFolder;
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+            {
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(directory!) { UseShellExecute = true });
+            }
+            catch (Exception exception) when (exception is Win32Exception || exception is InvalidOperationException)
+            {
+                MessageBox.Show(this, "The backup folder could not be opened: " + exception.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

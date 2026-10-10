@@ -2290,13 +2290,22 @@ namespace SAM.Analytical.UI.WPF.Windows
         {
             string? path = uIAnalyticalModel?.Path;
 
-            //The open model's glazing systems join the glazing pool of a glazing choice, as in the Glazing window.
+            //The open model's glazing systems join the glazing pool of a glazing choice, as in the Glazing window; "Apply
+            //best design" changes the model (one Undo step) when the Tas project is its folder.
             TasOptimisationWindow tasOptimisationWindow = new TasOptimisationWindow(string.IsNullOrWhiteSpace(path) ? null : System.IO.Path.GetDirectoryName(path), uIAnalyticalModel?.JSAMObject)
             {
                 Owner = this,
+                UIAnalyticalModel = uIAnalyticalModel,
             };
 
             tasOptimisationWindow.ShowDialog();
+
+            //"Run Energy Simulation…" after the best design was applied: the ordinary Energy Simulation of the open model.
+            if (tasOptimisationWindow.EnergySimulationRequested)
+            {
+                uIAnalyticalModel?.Simulate(partORun);
+                RefreshPartOButtons();
+            }
         }
 
         private void RibbonButton_ExportAnalyticalModel_Click(object sender, RoutedEventArgs e)
