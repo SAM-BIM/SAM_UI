@@ -20,8 +20,10 @@ SAM and SAM_Systems are unchanged. PR7b-2, the coordinated Tas units correction 
 
 ## Current status
 
-SAM-BIM/SAM_Tas#93 and SAM-BIM/SAM_UI#220 open, **not merged**. Code, tests, mutations and licensed acceptance (harness and real application) are complete;
-awaiting final PR CI and **owner review** of the decisions below.
+SAM-BIM/SAM_Tas#93 and SAM-BIM/SAM_UI#220 open, **not merged**, mergeable; no reviews or comments yet. Code, tests,
+mutations and licensed acceptance (harness and real application) are complete. PR CI (`build`, `spdx`) was **green** on
+SAM_Tas `dd222a47` and SAM_UI `9b82509d` (2026-10-10); the commit that adds this status changes only the two records, so
+CI runs again on the new heads. **Blocker for merge: owner review** of the decisions below and the finding.
 
 ## What the user sees
 
@@ -219,10 +221,32 @@ optimised, applied, checked, and simulated again.
   here); both are unit-covered.
 - Unchanged from PR8: names, not identities, bind a definition (R3); the malformed `SIM_EXT_GLZ` Guid in SAM's library.
 
+## Outstanding owner decisions
+
+1. Approve or redirect decisions 1–12 above.
+2. The Sizing-TBD finding: option (a), (b) or (c), and its place in the order of PR7b-2, the Tas units correction and PR10.
+
 ## Next step
 
-1. PR CI (`build`, `spdx`) green on both heads.
-2. Owner review of both PRs and the decisions above (and the finding). Then merge **SAM_Tas first**, then SAM_UI (merge
-   commits, `--match-head-commit`), then the `PROJECT_PROGRESS.md` closeouts on both `sow/2026-Q4` branches (`[skip ci]`).
+1. Confirm PR CI (`build`, `spdx`) green on the current heads of both PRs (the records-only commit re-runs it).
+2. After the owner approves: merge **SAM_Tas#93 first**, then SAM_UI#220 (merge commits, `--match-head-commit`), each
+   only on a green head. Then the `PROJECT_PROGRESS.md` closeouts as direct docs-only `[skip ci]` commits on both
+   `sow/2026-Q4` branches, with the merge SHAs (never on the feature branches).
 3. Then, in the owner's order: the Sizing-TBD fix (finding), PR7b-2 (SAM_Tas licensed acceptance matrix), the Tas units
    correction, PR10 (SAM_Deploy shipping).
+
+## Hand-over (another session or computer)
+
+- Branch `feature/optimisation-apply-best-design` in SAM_Tas and SAM_UI, both pushed, cut from `a4cd6d32` / `828ed76a`
+  (the current `sow/2026-Q4` tips; no rebase needed as of 2026-10-10). SAM and SAM_Systems unchanged (`288c9f57`,
+  `5404926`).
+- Rebuild before testing: SAM_Tas `MSBuild SAM_Tas.sln -restore -p:Configuration=Release`, then
+  `dotnet test SAM_Tas/SAM.Analytical.Tas.GenOpt.Tests -c Release` (323) and
+  `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c Release` in SAM_UI (2784).
+- Licensed evidence is local to the authoring workstation (`C:\TasOut\pr9`: logs, renders, definitions, process logs,
+  registry exports, `app-smoke.ps1`, `mutate.ps1`); it is not needed to merge. To repeat it: set `SAM_APPLY_ACCEPTANCE`
+  (output folder; optional `SAM_APPLY_ACCEPTANCE_SAM`, `_DEMO`, `_CASES`) and run the `TasModelApplyAcceptanceHarness`
+  test with Tas licensed. Energy Simulation in the harness rewrites `HKCU\Software\EDSL\TasManager` `Path`; export it
+  before and re-import it after.
+- `gh pr create`/`gh pr view` can fail on these forks (SAML on the parent organisation): use
+  `gh api repos/SAM-BIM/<repo>/pulls/<n>` (`--input <json>` for create/patch) instead.
