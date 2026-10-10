@@ -49,9 +49,13 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// <param name="shareCooling">False: Studio 2_0 has a cooling profile of its own (same values), so Studio 1_0's is used once.</param>
         /// <param name="studio1">The name of the first studio (another name: the model is not the Tas model's).</param>
         /// <param name="cooling1">The hours of the "Cooling 23" profile (another value: the model is not the Tas model's).</param>
-        public static AnalyticalModel Model(bool shareCooling = true, string studio1 = Studio1, double[]? cooling1 = null)
+        /// <param name="glazing">The "GLZ" windows' construction (another one of the same name and Guid: the model changed since its Energy Simulation).</param>
+        /// <param name="materials">The model's materials (another "Clear6": the model changed since its Energy Simulation).</param>
+        /// <param name="glazingRooms">The studio of each "GLZ" window (0: Studio 1_0, 1: Studio 2_0); two in each by default.</param>
+        public static AnalyticalModel Model(bool shareCooling = true, string studio1 = Studio1, double[]? cooling1 = null, ApertureConstruction? glazing = null, MaterialLibrary? materials = null, int[]? glazingRooms = null)
         {
             AdjacencyCluster adjacencyCluster = new AdjacencyCluster();
+            List<Space> spaces = new List<Space>();
             foreach (string name in new[] { studio1, Studio2 })
             {
                 InternalCondition internalCondition = new InternalCondition(name);
@@ -63,15 +67,20 @@ namespace SAM.Analytical.UI.WPF.Tests
                 };
 
                 adjacencyCluster.AddObject(space);
+                spaces.Add(space);
             }
 
-            ApertureConstruction current = GlazingFixture.Current();
-            for (int i = 0; i < 4; i++)
+            // Each "GLZ" window's wall bounds one studio, as an external wall of an Energy Simulation model does.
+            ApertureConstruction current = glazing ?? GlazingFixture.Current();
+            int[] rooms = glazingRooms ?? GlazingRooms;
+            for (int i = 0; i < rooms.Length; i++)
             {
-                adjacencyCluster.AddObject(GlazingFixture.PanelWithWindow(current, i, out Aperture _));
+                Panel panel = GlazingFixture.PanelWithWindow(current, i, out Aperture _);
+                adjacencyCluster.AddObject(panel);
+                adjacencyCluster.AddRelation(spaces[rooms[i]], panel);
             }
 
-            adjacencyCluster.AddObject(GlazingFixture.PanelWithWindow(GlazingFixture.System(GlazingFixture.PaneOnlyGuid, "Other", ApertureType.Window, GlazingFixture.Clear, false), 4, out Aperture _));
+            adjacencyCluster.AddObject(GlazingFixture.PanelWithWindow(GlazingFixture.System(GlazingFixture.PaneOnlyGuid, "Other", ApertureType.Window, GlazingFixture.Clear, false), rooms.Length, out Aperture _));
 
             ProfileLibrary profileLibrary = new ProfileLibrary("Profiles");
             profileLibrary.Add(new Profile(SharedCooling, ProfileType.Cooling, cooling1 ?? CoolingHours()));
@@ -83,14 +92,31 @@ namespace SAM.Analytical.UI.WPF.Tests
             profileLibrary.Add(new Profile(Studio1Heating, ProfileType.Heating, new double[] { 21 }));
             profileLibrary.Add(new Profile(Studio2Heating, ProfileType.Heating, new double[] { 21 }));
 
-            return new AnalyticalModel("Apply", null, null, null, adjacencyCluster, GlazingFixture.ModelMaterials(), profileLibrary);
+            return new AnalyticalModel("Apply", null, null, null, adjacencyCluster, materials ?? GlazingFixture.ModelMaterials(), profileLibrary);
         }
+
+        /// <summary>The studios of the four "GLZ" windows in <see cref="Model"/>: two in Studio 1_0, two in Studio 2_0.</summary>
+        public static readonly int[] GlazingRooms = { 0, 0, 1, 1 };
 
         /// <summary>The TBD pane name SAM_Tas gives the model's "GLZ" windows.</summary>
         public static string Glazing => Query.TasPaneConstructionNames(GlazingFixture.Current())[0];
 
+        /// <summary>
+        /// "Windows: GLZ -pane" as the inventory reads it from the TBD an Energy Simulation of <see cref="Model"/> makes:
+        /// the model's pane and frame layers (SAM_Tas' description of them) and a pane zone surface per window in its studio.
+        /// </summary>
+        public static TasGlazingConstructionInfo GlazingInfo(string? name = null, IEnumerable<string>? elements = null)
+        {
+            ApertureConstruction current = GlazingFixture.Current();
+            MaterialLibrary materials = GlazingFixture.ModelMaterials();
+            return new TasGlazingConstructionInfo(name ?? Glazing, elements ?? new[] { "W1", "W2" }, 0.6, 1.4, 0.78,
+                Analytical.Tas.GenOpt.Query.TasMaterialLayers(current.PaneConstructionLayers, materials),
+                new[] { Analytical.Tas.GenOpt.Query.TasMaterialLayers(current.FrameConstructionLayers, materials) },
+                new Dictionary<string, int> { { Studio1, 2 }, { Studio2, 2 } });
+        }
+
         /// <summary>The Tas model SAM_Tas makes of <see cref="Model"/>, with Studio 1_0's cooling hours, heating and the controller as given.</summary>
-        public static TasModelInventory Inventory(double[]? cooling1 = null, double heating1 = 21, string? glazing = null, IEnumerable<string>? glazingElements = null, bool tpd = true, double controller = 3)
+        public static TasModelInventory Inventory(double[]? cooling1 = null, double heating1 = 21, string? glazing = null, IEnumerable<string>? glazingElements = null, bool tpd = true, double controller = 3, TasGlazingConstructionInfo? glazingInfo = null)
         {
             float[] hours1 = (cooling1 ?? CoolingHours()).Select(x => (float)x).ToArray();
             float[] hours2 = CoolingHours().Select(x => (float)x).ToArray();
@@ -106,7 +132,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 },
                 new[]
                 {
-                    new TasGlazingConstructionInfo(glazing ?? Glazing, glazingElements ?? new[] { "W1", "W2" }, 0.6, 1.4, 0.78),
+                    glazingInfo ?? GlazingInfo(glazing, glazingElements),
                 },
                 tpd ? new[] { new TasPlantRoomInfo("Plant Room", new[] { new TasPlantControllerInfo("HeatPumpController", "tpdTempSensor", controller) }) } : null)
             {
@@ -122,15 +148,24 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>A window system with low-e panes and a frame of its own (not the model's), as a library system has.</summary>
-        public static TasGlazingSystem Triple()
+        /// <param name="clear">The source's "Clear6" (another one: same name as the model's, other physics); the model's by default.</param>
+        /// <param name="lowE">False: the source does not define the system's "LowE6".</param>
+        public static TasGlazingSystem Triple(IMaterial? clear = null, bool lowE = true)
         {
             ApertureConstruction apertureConstruction = new ApertureConstruction(TripleGuid, "Triple low-e", ApertureType.Window,
                 new List<ConstructionLayer> { new ConstructionLayer(GlazingFixture.LowE, 0.006), new ConstructionLayer(GlazingFixture.Argon, 0.012), new ConstructionLayer(GlazingFixture.Clear, 0.006) },
                 new List<ConstructionLayer> { new ConstructionLayer(SystemFrame, 0.08) });
             apertureConstruction.SetValue(ApertureConstructionParameter.DefaultFrameWidth, 0.09);
 
-            MaterialLibrary materialLibrary = GlazingFixture.ModelMaterials();
-            materialLibrary.Add(GlazingFixture.LowEGlass());
+            MaterialLibrary materialLibrary = new MaterialLibrary("My glazing systems");
+            materialLibrary.Add(clear ?? GlazingFixture.ClearGlass());
+            materialLibrary.Add(GlazingFixture.ArgonGas());
+            materialLibrary.Add(GlazingFixture.FrameOpaque());
+            if (lowE)
+            {
+                materialLibrary.Add(GlazingFixture.LowEGlass());
+            }
+
             materialLibrary.Add(new OpaqueMaterial(Guid.NewGuid(), SystemFrame, SystemFrame, "System frame", 0.2, 1000, 700));
 
             return new TasGlazingSystem(TripleGuid, "Triple low-e", "My glazing systems", "Window", true, 0.36886733770370483, 0.997646152973175, 0.7281997203826904)
@@ -210,13 +245,13 @@ namespace SAM.Analytical.UI.WPF.Tests
         /// Runs <paramref name="json"/> through SAM_Tas' runner and the stub TasGenExecute (the stub's objective is a
         /// quadratic around <paramref name="center"/>), and returns the runner and the window's report of the run.
         /// </summary>
-        public static TasOptimisationReport Run(string json, string project, TasModelInventory inventory, double center, out TasModelRunner runner, out OptimisationDefinition definition)
+        public static TasOptimisationReport Run(string json, string project, TasModelInventory inventory, double center, out TasModelRunner runner, out OptimisationDefinition definition, TasGlazingSystem? triple = null)
         {
             definition = Read(json);
             TasModelRunSettings settings = new TasModelRunSettings(project, Path.Combine(project, "SAM_NativeGenOpt"), TasOptimisationWorkspace.StubExecutable)
             {
                 Inventory = inventory,
-                GlazingPool = new List<TasGlazingSystem> { Triple() },
+                GlazingPool = new List<TasGlazingSystem> { triple ?? Triple() },
             };
 
             runner = new TasModelRunner(definition, settings) { GlazingWriter = (tbd, options) => { } };

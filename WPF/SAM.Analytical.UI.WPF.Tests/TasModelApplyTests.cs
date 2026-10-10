@@ -5,6 +5,7 @@
 
 using SAM.Analytical.Tas.GenOpt;
 using SAM.Analytical.UI.WPF.Tests.Helpers;
+using SAM.Core;
 using SAM.Core.Optimisation;
 using System;
 using System.Collections.Generic;
@@ -99,6 +100,10 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal("tbd", Text(Path.Combine(outcome.TasResult!.BackupFolder!, TasModelApplyFixtures.Tbd)));
             Assert.Equal("tpd", Text(Path.Combine(project, TasModelApplyFixtures.Tpd)));
             Assert.Contains(outcome.Lines, x => x.Detail.StartsWith("SAM model: space “Studio 1_0” now uses “Cooling 23 - Studio 1_0”", StringComparison.Ordinal));
+
+            // Undo is the model's only: the plan and the outcome say the Tas files stay as written.
+            Assert.Contains(plan.Notes, x => x.Contains("Undo restores the open model only, not the Tas files", StringComparison.Ordinal));
+            Assert.Contains(outcome.Lines, x => x.Title == "Undo" && x.Status == TasOptimisationCheckStatus.Warning && x.Detail.StartsWith("Undo restores the open model only, not the Tas files", StringComparison.Ordinal));
         }
 
         [Fact]
@@ -193,6 +198,111 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(5, model.AdjacencyCluster.GetApertures().Count(x => x.TypeGuid == GlazingFixture.CurrentGuid || x.TypeGuid == GlazingFixture.PaneOnlyGuid));
         }
 
+        /// <summary>
+        /// PR9 safety review, finding 2: the TBD is written with the system's own materials, while the model would keep its
+        /// own material of the same name. A different same-named material is refused before anything is written; an equal
+        /// one is used; one the model lacks is added; one the system's source does not define is refused.
+        /// </summary>
+        [Theory]
+        [InlineData("equal", null)]
+        [InlineData("differs", "Glazing option 2 “Triple low-e”: the open model's material “Clear6” is not the system's: layer 3 “Clear6” conductivity 1, not 0.5")]
+        [InlineData("undefined", "Glazing option 2 “Triple low-e”: its source does not define the material “LowE6”")]
+        public void A_glazing_systems_material_must_be_the_models_material_of_that_name(string mode, string? problem)
+        {
+            string project = TasModelApplyFixtures.Project(folder);
+            TasGlazingSystem triple = mode == "differs" ? TasModelApplyFixtures.Triple(clear: GlazingFixture.ClearGlass(conductivity: 0.5)) : TasModelApplyFixtures.Triple(lowE: mode != "undefined");
+            TasOptimisationReport report = TasModelApplyFixtures.Run(TasModelApplyFixtures.GlazingDefinition(), project, TasModelApplyFixtures.Inventory(), 2, out TasModelRunner runner, out OptimisationDefinition definition, triple);
+            Assert.Equal([2.0], report.BestPoint);
+
+            TasModelApplyPlan plan = TasModelApplyPlan.Create(report, definition, runner, project, TasModelApplyFixtures.Model(), ModelPath(project), null);
+
+            if (problem == null)
+            {
+                Assert.True(plan.CanApply, string.Join("\n", plan.Lines));
+                return;
+            }
+
+            Assert.False(plan.CanApply);
+            Assert.Contains(problem, plan.Items[0].Problem);
+
+            // Apply as if the plan had been offered: refused before the model or a Tas file changes.
+            bool called = false;
+            TasModelApplyOutcome outcome = Modify.ApplyTasModelBestDesign(plan, applier => applier.TbdWriter = (path, list) => { called = true; return new List<TasModelAppliedValue>(); });
+            Assert.False(outcome.Succeeded);
+            Assert.Null(outcome.AnalyticalModel);
+            Assert.False(called);
+            Assert.Equal("tbd", Text(Path.Combine(project, TasModelApplyFixtures.Tbd)));
+            Assert.False(Directory.Exists(Path.Combine(project, TasModelDesignApplier.WorkFolderName)));
+
+            // The model change itself refuses it too, whatever the plan said.
+            List<TasOptimisationCheck> lines = new List<TasOptimisationCheck>();
+            TasModelApplyItem item = plan.Items[0];
+            AnalyticalModel model = TasModelApplyFixtures.Model();
+            TasModelSamTarget target = new TasModelSamTarget(model.AdjacencyCluster.GetApertureConstructions().Where(x => x.Guid == GlazingFixture.CurrentGuid).Take(1), 4);
+            Assert.Null(Modify.ApplyTasModelDesign(model, new[] { new TasModelApplyItem(item.Change, item.Item, item.Current, item.Best, item.BestRaw, item.Where, false, target, null) }, (x, y) => null, lines, out string? error));
+            Assert.Contains(problem, error);
+        }
+
+        /// <summary>
+        /// PR9 safety review, finding 3: the windows a glazing choice changes are matched to the TBD by name; a construction
+        /// of that name that is not the TBD's (another pane material or layer, another frame) or windows that are not where
+        /// the TBD has them mean the model changed since its last Energy Simulation: refused.
+        /// </summary>
+        [Theory]
+        [InlineData("material", "“GLZ” of the open model is not the Tas model's “Windows: GLZ -pane”: layer 1 “Clear6” conductivity 0.9, not 1; layer 3 “Clear6” conductivity 0.9, not 1")]
+        [InlineData("pane", "“GLZ” of the open model is not the Tas model's “Windows: GLZ -pane”: layer 1 is “LowE6”, not “Clear6”")]
+        [InlineData("frame", "The frame of “GLZ” in the open model is not the Tas model's: layer 1 “Frame” is 0.07 m thick, not 0.05")]
+        [InlineData("added", "The open model's windows of “GLZ” are not where the Tas model has them (Studio 1_0: 3 in the model, 2 in the TBD)")]
+        [InlineData("moved", "The open model's windows of “GLZ” are not where the Tas model has them (Studio 1_0: 1 in the model, 2 in the TBD; Studio 2_0: 3 in the model, 2 in the TBD)")]
+        [InlineData("unread", "The Tas model's glazing “Windows: GLZ -pane” was not read in enough detail")]
+        public void A_glazing_construction_of_the_same_name_that_is_not_the_TBDs_blocks_the_application(string mode, string message)
+        {
+            string project = TasModelApplyFixtures.Project(folder);
+            TasModelInventory inventory = mode == "unread"
+                ? TasModelApplyFixtures.Inventory(glazingInfo: new TasGlazingConstructionInfo(TasModelApplyFixtures.Glazing, new[] { "W1", "W2" }, 0.6, 1.4, 0.78))
+                : TasModelApplyFixtures.Inventory();
+            TasOptimisationReport report = TasModelApplyFixtures.Run(TasModelApplyFixtures.GlazingDefinition(), project, inventory, 2, out TasModelRunner runner, out OptimisationDefinition definition);
+
+            ApertureConstruction current = GlazingFixture.Current();
+            MaterialLibrary materials = GlazingFixture.ModelMaterials();
+            switch (mode)
+            {
+                case "material":
+                    materials = new MaterialLibrary("Model");
+                    materials.Add(GlazingFixture.ClearGlass(conductivity: 0.9));
+                    materials.Add(GlazingFixture.ArgonGas());
+                    materials.Add(GlazingFixture.FrameOpaque());
+                    materials.Add(GlazingFixture.LowEGlass());
+                    break;
+                case "pane":
+                    current = GlazingFixture.System(GlazingFixture.CurrentGuid, GlazingFixture.CurrentName, ApertureType.Window, GlazingFixture.LowE);
+                    materials.Add(GlazingFixture.LowEGlass());
+                    break;
+                case "frame":
+                    current = new ApertureConstruction(current, current.PaneConstructionLayers, new List<ConstructionLayer> { new ConstructionLayer(GlazingFixture.FrameMaterial, 0.07) });
+                    break;
+            }
+
+            int[] rooms = mode == "added" ? new[] { 0, 0, 0, 1, 1 } : mode == "moved" ? new[] { 0, 1, 1, 1 } : TasModelApplyFixtures.GlazingRooms;
+            AnalyticalModel model = TasModelApplyFixtures.Model(glazing: current, materials: materials, glazingRooms: rooms);
+
+            TasModelApplyPlan plan = TasModelApplyPlan.Create(report, definition, runner, project, model, ModelPath(project), null);
+
+            Assert.False(plan.CanApply);
+            Assert.Contains(message, plan.Items[0].Problem);
+            if (mode != "unread")
+            {
+                Assert.Contains("The model has changed since its last Energy Simulation", plan.Items[0].Problem);
+            }
+
+            Assert.StartsWith("The best design cannot be applied", plan.Headline);
+
+            bool called = false;
+            Assert.False(Modify.ApplyTasModelBestDesign(plan, applier => applier.TbdWriter = (path, list) => { called = true; return new List<TasModelAppliedValue>(); }).Succeeded);
+            Assert.False(called);
+            Assert.Equal("tbd", Text(Path.Combine(project, TasModelApplyFixtures.Tbd)));
+        }
+
         [Fact]
         public void A_plant_controller_goes_to_the_TPD_only_and_the_plan_says_so()
         {
@@ -221,6 +331,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.True(outcome.Succeeded, outcome.Headline);
             Assert.Null(outcome.AnalyticalModel);
+            Assert.DoesNotContain(outcome.Lines, x => x.Title == "Undo");
             Assert.Equal([best], values);
             Assert.Equal("tpd written", Text(Path.Combine(project, TasModelApplyFixtures.Tpd)));
             Assert.Equal("tbd", Text(Path.Combine(project, TasModelApplyFixtures.Tbd)));

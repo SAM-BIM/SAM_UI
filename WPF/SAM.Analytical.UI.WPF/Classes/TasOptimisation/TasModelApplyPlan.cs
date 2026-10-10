@@ -233,15 +233,16 @@ namespace SAM.Analytical.UI.WPF
 
             if (result.ChangesModel)
             {
-                notes.Add("The model change is one Undo step and is not saved: save the model to keep it. Energy Simulation is offered afterwards.");
+                notes.Add("The model change is one Undo step and is not saved: save the model to keep it. Undo restores the open model only, not the Tas files: after an Undo, run Energy Simulation (or copy the originals back) before using the Tas files. Energy Simulation is offered afterwards.");
             }
 
             result.Notes = notes;
 
             if (items.Any(x => x.Problem != null))
             {
-                result.Headline = "The best design cannot be applied: the open model is not the model the Tas files were made from.";
-                result.Notes = new[] { "Nothing will be written. Each ✕ says what does not match." }.Concat(notes.Where(x => !x.StartsWith("The TBD and TPD", StringComparison.Ordinal) && !x.StartsWith("The model change", StringComparison.Ordinal))).ToList();
+                // Not always a different model: a glazing system's material may conflict with the model's, so each ✕ says why.
+                result.Headline = "The best design cannot be applied to the open model as it was evaluated.";
+                result.Notes = new[] { "Nothing will be written. Each ✕ says why." }.Concat(notes.Where(x => !x.StartsWith("The TBD and TPD", StringComparison.Ordinal) && !x.StartsWith("The model change", StringComparison.Ordinal))).ToList();
             }
             else if (items.All(x => x.Unchanged))
             {

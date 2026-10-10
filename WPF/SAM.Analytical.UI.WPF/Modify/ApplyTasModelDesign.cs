@@ -110,6 +110,11 @@ namespace SAM.Analytical.UI.WPF
                 lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Original Tas files", tasModelApplyResult.BackupFolder));
             }
 
+            if (analyticalModel != null)
+            {
+                lines.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, "Undo", "Undo restores the open model only, not the Tas files: after an Undo, run Energy Simulation (or copy the original Tas files back) before using the Tas files or their results."));
+            }
+
             string headline = analyticalModel != null
                 ? "The best design is in the open model and its Tas files. Save the model to keep it; run Energy Simulation to see its results."
                 : tasModelApplyResult.FilesReplaced.Count == 0 ? "Nothing needed writing: the model already held the best design." : "The best design is in the Tas files (" + string.Join(", ", tasModelApplyResult.FilesReplaced) + ").";
@@ -241,12 +246,22 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
+            // The pane's materials as evaluated: every one defined by the system's source, and any model material of the
+            // same name the same thermal input (checked again here, before anything is changed, whatever the plan said).
+            string? conflict = Query.TasGlazingMaterialProblem(option, analyticalModel.MaterialLibrary);
+            if (conflict != null)
+            {
+                error = conflict;
+                return null;
+            }
+
             AnalyticalModel result = analyticalModel;
             foreach (ApertureConstruction current in target.ApertureConstructions)
             {
                 ApertureConstruction composite = TasGlazingComposite(system, current);
 
-                // The pane's materials come from the system's source; the frame's are the model's own.
+                // The pane's materials come from the system's source where the model lacks them (the model's own, the
+                // same, otherwise); the frame's are the model's own.
                 MaterialLibrary materialLibrary = result.MaterialLibrary ?? new MaterialLibrary("Default MaterialLibrary");
                 List<IMaterial> materials = new List<IMaterial>();
                 foreach (ConstructionLayer constructionLayer in composite.PaneConstructionLayers ?? new List<ConstructionLayer>())

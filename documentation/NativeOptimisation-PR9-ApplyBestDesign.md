@@ -14,16 +14,19 @@ Energy Simulation → Simulate > Optimisation ("Tas model") → Run → **Apply 
 1. SAM-BIM/SAM_Tas#93, same branch name (`SAM_Tas/SAM.Analytical.Tas.GenOpt/NATIVE_OPTIMISATION_PR9.md`): the Tas file
    writers, their protection, the run's file hashes, the 24 hours of a setpoint profile. **Merge first.**
 2. SAM-BIM/SAM_UI#220 (this PR): the window, the plan shown before anything is written, the SAM model change, Energy Simulation
-   offered. CI builds it against the SAM_Tas branch of the same name; after (1) merges it builds against `sow/2026-Q4`.
+   offered. CI builds it against the SAM_Tas branch of the same name while that branch exists, and against
+   `sow/2026-Q4` once it is deleted (see Next step).
 
 SAM and SAM_Systems are unchanged. PR7b-2, the coordinated Tas units correction and SAM_Deploy PR10 are not part of PR9.
 
 ## Current status
 
-SAM-BIM/SAM_Tas#93 and SAM-BIM/SAM_UI#220 open, **not merged**, mergeable; no reviews or comments yet. Code, tests,
-mutations and licensed acceptance (harness and real application) are complete. PR CI (`build`, `spdx`) was **green** on
-SAM_Tas `dd222a47` and SAM_UI `9b82509d` (2026-10-10); the commit that adds this status changes only the two records, so
-CI runs again on the new heads. **Blocker for merge: owner review** of the decisions below and the finding.
+SAM-BIM/SAM_Tas#93 and SAM-BIM/SAM_UI#220 open, **not merged**. An architecture review on 2026-10-10
+(`PR9_ARCHITECTURE_ADVICE_2026-10-10.md`, a local file in the SAM-BIM workspace, not in Git) raised three source
+findings. All three were **reproduced with failing tests, then fixed** on both branches. Validation was then rerun:
+unit and full suites, mutations, and licensed acceptance (see "Safety review" below). The CI-green heads before it
+(SAM_Tas `dd222a47`/`aad85e39`, SAM_UI `9b82509d`/`2b776e22`) are superseded and are **not** evidence for the final pair.
+**Blockers for merge:** green CI on the final heads, and **owner review** of decisions 1–15 below and of the Sizing finding.
 
 ## What the user sees
 
@@ -49,7 +52,7 @@ or golden-section nullspace; never a cancelled, withheld or failed run), the res
    replaced with rollback). If the Tas files fail, the model is not changed. Then the model is put in the window as **one
    Undo step** (`SetJSAMObject`, `FullModification`), as the Glazing window does; it is **not saved**.
 3. **What was done**: each value before → after as read back, the SAM model change, the backup folder (**Open backup
-   folder**), and **Run Energy Simulation…**, which closes the window and opens the ordinary Energy Simulation dialog for
+   folder**), a ⚠ line saying Undo restores the model only, not the Tas files, and **Run Energy Simulation…**, which closes the window and opens the ordinary Energy Simulation dialog for
    the open model (the ribbon's command). After Apply, the run cannot be applied again, and the window reads the model again
    before another run.
 
@@ -67,8 +70,10 @@ offered.
 
 **Never guessed:** where the Tas project is the model's folder, every building item must be found in the model as the Tas
 model has it, or nothing is applied: no space of that name (or several), a profile that would not write the TBD's profile
-hour by hour ("the model has changed since its last Energy Simulation"), no aperture construction with that TBD pane name.
-The Tas files must still have the hashes of the files the run evaluated. Values, option numbers and references are
+hour by hour ("the model has changed since its last Energy Simulation"), no aperture construction with that TBD pane name,
+or one whose pane, frame or window placement is not the TBD's (decision 15), or a chosen system whose pane materials the
+model cannot take as evaluated (decision 14). The Tas files must still have the hashes of the files the run evaluated,
+checked again under a hold just before they are replaced (decision 13). Values, option numbers and references are
 checked against the definition (SAM_Tas `TasModelDesignChanges`).
 
 ## Owner decisions (proposed and implemented; please confirm or redirect)
@@ -89,14 +94,37 @@ checked against the definition (SAM_Tas `TasModelDesignChanges`).
    own frame. A collision-qualified TBD name ("<name>_<hash> -pane") is refused (it cannot be traced back).
 5. **Controllers go to the TPD only**, stated in the plan; "Create TPD" may not keep them.
 6. **Originals** are backed up under `<project>\SAM_ApplyBestDesign\<time>-<id>\original` and never deleted
-   automatically; the staging copies are deleted after success and kept after a failure.
+   automatically; after success the staged files have become the project files (an empty `staging` folder may stay
+   if Tas still holds it), and after a failure the attempt is kept.
 7. **A changed source** is any change to any top-level Tas file after the run (SHA-256): refused, nothing repaired.
 8. **Items already at the best value write nothing**; when nothing would change, Apply is not offered as runnable.
 9. **Saving**: the model is changed as one Undo step and not saved (the Glazing window's convention); the plan and the
    outcome say so.
 10. **After Apply** the run is no longer offered and the window reads the model again before another run.
 11. **Simulation limit / nullspace** best points are applied (the result rules count them as successful), with a note.
-12. **Glazing read-back within 0.001** of the option's g/U/light (SAM_Tas): the pool may hold a system's values rounded.
+12. **Glazing read-back within one rounding step per quantity** (g, U, light each 0.001, named separately in SAM_Tas): the
+    pool's values come from SAM_Tas' TCD glazing readers, rounded to `Core.Tolerance.MacroDistance`; the TBD read-back is
+    not rounded. Equal values are not the same glazing, so the pane is also read back layer by layer (13–15).
+13. **(Safety review, finding 1) Final check under a hold; OS replacement; no automatic recovery.** The project files to
+    replace are held so no other program can open them, every Tas file is compared with the run's again under the hold,
+    and a change made meanwhile (Tas saving or simulating the project) refuses everything and is kept. Files are replaced
+    with `File.Replace`, one after another — **not one transaction**: if the process or computer stops part-way, a note
+    in the work folder (`REPLACING-PROJECT-FILES.txt`) gives the backup and hashes to restore by hand; nothing restores
+    automatically. **Undo restores the open model only, never the Tas files**: after an Undo, run Energy Simulation (or
+    copy the originals back from the backup) before treating the Tas files or their results as current; the plan and the
+    outcome say so.
+14. **(Safety review, finding 2) A glazing system's material must be the model's material of that name.** The TBD is
+    written with the system's own materials; the model keeps its own material of a name it already has. So: a pane
+    material the system's source does not define, or a model material of the same name that is a different thermal
+    input to Tas (any property SAM_Tas writes, compared as the TBD's floats), **refuses the item before anything is
+    written** (plan ✕, and again in the model change); an equal one is used; one the model lacks is added. Nothing is
+    renamed or overwritten — the engineer renames one of them and runs the optimisation again.
+15. **(Safety review, finding 3) A glazing construction is the TBD's only if its content and placement are.** The name
+    finds the aperture constructions; each one's **pane layers** must be the TBD construction's, its **frame** one of the
+    TBD's frames for those windows (both as SAM_Tas writes them, material properties included), and its windows must be
+    in the **same zones, as many in each**, as the TBD's pane surfaces. Otherwise the plan refuses the whole application
+    ("… the model has changed since its last Energy Simulation"). This compares only what Apply changes and keeps, not
+    the whole model; folder and name equality alone are not claimed as provenance.
 
 ## Finding for the owner (not changed in PR9)
 
@@ -122,11 +150,82 @@ copied only the TBD and TSD). Options: (a) the reader takes the TBD named like t
 - Tests (`WPF/SAM.Analytical.UI.WPF.Tests/`): `TasModelApplyTests.cs`, `TasModelApplyWindowTests.cs`,
   `Helpers/TasModelApplyFixtures.cs`, the opt-in `TasModelApplyAcceptanceHarness.cs` (does nothing unless
   `SAM_APPLY_ACCEPTANCE` is set).
+- Safety review: `Query/TasModelSamTarget.cs` (`TasGlazingMaterialProblem`; the glazing target compares pane, frame and
+  placement with the TBD), `Modify/ApplyTasModelDesign.cs` (the material check again before the model changes),
+  `Classes/TasOptimisation/TasModelApplyPlan.cs` (a refusal headline that does not over-claim; the Undo note);
+  tests: 9 new cases in `TasModelApplyTests.cs`; `Helpers/TasModelApplyFixtures.cs` (the windows' walls bound the
+  studios; the inventory carries the TBD's pane, frame and zone surfaces; a variant pool system).
 - This record.
+
+## Safety review (2026-10-10): findings, reproduction, fixes
+
+Source review: `PR9_ARCHITECTURE_ADVICE_2026-10-10.md` (SAM-BIM workspace, local). Each finding was first reproduced by a
+new test failing on the reviewed heads (SAM_Tas `aad85e39`, SAM_UI `2b776e22`), then fixed.
+
+| # | Finding | Reproduced (failing on the reviewed heads) | Fix |
+|---|---|---|---|
+| 1 | Source changed during staging could be overwritten: hashes were checked only at entry | SAM_Tas: Tas saves the project TBD (or simulates its TSD) while the staging copy is written/read back → Apply **succeeded and overwrote the other program's TBD** with the default `File.Copy`; with a stand-in replacer the post-copy check then "restored" the backup over that save. Another program holding the TBD open and a writer between the check and the replacement were not refused. (4 tests) | Hold + final check under the hold, `File.Replace`, recovery note, restore only files no longer original (decision 13). SAM_Tas `TasModelDesignApplier`. |
+| 2 | Same-named but different glazing material: the TBD got the system's material, the model kept its own | SAM_UI: a pool system whose `Clear6` has conductivity 0.5 against the model's 1 → **the plan offered Apply**; so did a system whose source does not define its `LowE6` (2 tests; the equal-materials case passed before and after) | `Query.TasGlazingMaterialProblem` in the plan and again in the model change (decision 14); SAM_Tas reads the written pane back layer by layer. |
+| 3 | Stale glazing matched by name and usage only | SAM_UI: the model's `GLZ` with another `Clear6` conductivity, another outer pane, another frame thickness, a fifth window, or a window moved to the other studio (same total) → **the plan offered Apply** in every case; an inventory without the detail was not refused (6 tests) | SAM_Tas inventory reads each glazing's pane layers, paired frames and zone surfaces; SAM_UI compares them (decision 15). |
+
+The TBD-side layer values in the SAM_Tas tests are the ones the licensed reader read from the S2 Energy Simulation TBD of
+`SAM_zoningAM.sam` (pane: two 6 mm panes and 12 mm argon; frame from the gbXML import), and they equal the model's materials
+as SAM_Tas describes them — checked before the comparison was trusted.
 
 ## Validation
 
-### Build and tests (no licence)
+### Safety review validation (final code, 2026-10-10)
+
+- Release `MSBuild SAM_Tas.sln -restore` and `MSBuild SAM_UI.sln -restore -m:1`: **0 errors**; no warning in a changed
+  file. Logs: `C:\TasOut\pr9\fix\build-*.log` (local).
+- `SAM.Analytical.Tas.GenOpt.Tests`: **330/330** (323 + 7: four for finding 1, the read-back of the pane's layers, two for
+  the layer description and comparison). `SAM.Analytical.UI.WPF.Tests`: **2793/2793** (2784 + 9: two for finding 2 plus the
+  equal-materials case, six for finding 3; the Undo wording asserted in two existing tests).
+- **Mutations** (`C:\TasOut\pr9\fix\mutate-fix.ps1`, `mutations-fix.log`; each alone, rebuilt, the apply suites run, the file
+  restored byte for byte; afterwards the unmutated build passed 31/31 and 25/25): **14/14 caught**.
+
+  | Mutation | Failed |
+  |---|---|
+  | T8 no final source check under the hold | 2 |
+  | T9 the hold lets other programs write | 2 |
+  | T10 copy-over replacement (the old default) | 5 |
+  | T11 read-back ignores the pane layers | 1 |
+  | T12 a transparent property left out of SAM's description | 3 |
+  | T13 two NaNs differ | 2 |
+  | T14 layer thickness not compared | 1 |
+  | U9 the pane is not compared with the TBD | 3 |
+  | U10 the frame is not compared with the TBD | 1 |
+  | U11 the windows compared by total, not by zone | 3 |
+  | U12 the plan does not check the system's materials | 3 |
+  | U13 the model change does not check the system's materials | 3 in the scripted run; **2 (the expected two) when rerun alone** — the third failure did not reproduce and was not identified |
+  | U14 a material the source does not define accepted | 2 |
+  | U15 an inventory without the glazing detail accepted | 2 |
+
+- **Licensed acceptance rerun** on the final build (this workstation, Tas licensed; the same harness, inputs and cases as
+  below; evidence `C:\TasOut\pr9\fix`, local), because the inventory reader, the glazing checks and the file replacement
+  all changed:
+
+  | Case | Plan | Apply (read back) | After |
+  |---|---|---|---|
+  | S1 (24-hour cooling setpoint, 11 simulations) | offered | TBD Studio 1_0's 12 hours = (float) 25.984924, setback kept; SAM copy profile **25.984925003778077 bit-exact**; backup = original | Energy Simulation 2: 1344.908198852539 kWh vs the best simulation's 1344.90819885254 (−9.1e-13) |
+  | S2 (glazing from the open model, 2 options) | **offered: the genuine model passed the new pane, gbXML-frame and per-zone checks** (20 windows) | TBD both elements on `Windows: SIM_EXT_GLZ b9d885 -pane`, g 0.40016 U 1.24339 light 0.80356, **pane layer by layer the system's**; SAM 20 apertures on `SIM_EXT_GLZ 2`; backup = original | overheating 19 h = the best simulation's 19 h |
+  | D1 (TPD controller, 11 simulations) | offered (Tas files only) | TPD **-4.799000050374341 bit-exact** via `File.Replace`; T3D/TBD/TSD unchanged | — |
+
+  Best points and values are identical to the first acceptance. The Tas processes listed at the end of each case had exited
+  by the next check; none was left. `HKCU\Software\EDSL\TasManager` `Path` was changed by Energy Simulation, as before,
+  and restored (`reg-before.reg` = `reg-restored.reg`).
+- **Real application** rerun (`C:\TasOut\pr9\fix\app-smoke.ps1`, `app-smoke.log`; `SAM Analytical.exe` of this build,
+  GenOpt `B443829C`): Optimisation on the open model's folder, Run → "Optimum found after 11 simulations", best
+  27.96482500881551; the plan, with the Undo note; Apply → TBD changed, backup written, outcome with the ⚠ Undo line;
+  **Run Energy Simulation…** opened the dialog (cancelled); app exit 0, model not saved, registry unchanged, no Tas process
+  left.
+- Observed, not changed (it predates this review): after a licensed Apply the **empty** `staging` folder can stay in the
+  work folder. Tas still holds it when Apply deletes it, and that error is ignored. The staged files themselves are gone:
+  the replacement consumes them.
+- Not exercised licensed: the refusals (findings 2–3 negative cases are unit-tested only), internal glazing between two
+  spaces, the direct (non-gbXML) export route, an interrupted replacement.
+
+### Before the safety review: build and tests (no licence; superseded by the section above)
 
 - Step 0: SAM `288c9f57`, SAM_Tas `a4cd6d32`, SAM_UI `828ed76a`, SAM_Systems `5404926`, all at `origin/sow/2026-Q4`, clean.
   SAM and SAM_Systems `build\` were already current (no change since PR8).
@@ -170,7 +269,7 @@ copied only the TBD and TSD). Options: (a) the reader takes the TBD named like t
   | U7 the window does not put the model in (no Undo step) | 1 |
   | U8 any folder treated as the model's | 1 |
 
-### Licensed acceptance (this workstation, Tas installed and licensed, 2026-10-10)
+### Before the safety review: licensed acceptance (this workstation, Tas installed and licensed, 2026-10-10)
 
 Every input is a copy; evidence (logs, renders, definitions, process logs, registry exports) is local in `C:\TasOut\pr9`
 (not committed). **PR8's missing evidence is closed here: the source model is a SAM model (`SAM_zoningAM.sam`, the
@@ -211,6 +310,12 @@ optimised, applied, checked, and simulated again.
 ## Unresolved issues and risks
 
 - **Default Energy Simulation folders cannot be optimised** (Sizing's extra TBDs): see the finding.
+- Replacing the Tas files is per file, not one transaction; an interrupted replacement is restored by hand (decision 13).
+  Undo restores the model only.
+- The glazing placement check counts one TBD pane surface per window and adjacent zone. It matched the licensed S2
+  model (external windows). Internal glazing between two spaces and the direct (non-gbXML) route have **not** been run
+  licensed. If Tas splits or merges window surfaces there, the plan would refuse a genuine model, not accept a wrong one.
+- A material conflict (decision 14) is refused, not resolved: the engineer renames one of the two materials.
 - A COM call that hangs cannot be interrupted; Apply waits (one document at a time, its own STA thread).
 - The heating design-day condition follows a heating setpoint at the next Energy Simulation (sizing changes), unlike the
   evaluation, which left it. Annual results are unaffected.
@@ -223,17 +328,28 @@ optimised, applied, checked, and simulated again.
 
 ## Outstanding owner decisions
 
-1. Approve or redirect decisions 1–12 above.
+1. Approve or redirect decisions 1–15 above. New with the safety review:
+   - 13: is a per-file `File.Replace` with a manual-recovery note enough, or is automatic recovery of an interrupted
+     replacement wanted before release?
+   - 14: refuse a same-named different material (current), or import it under a unique name and rewrite only the new
+     pane's references?
+   - 15: is the narrow check enough (pane, frame, placement; refuse on any doubt)?
 2. The Sizing-TBD finding: option (a), (b) or (c), and its place in the order of PR7b-2, the Tas units correction and PR10.
 
 ## Next step
 
-1. Confirm PR CI (`build`, `spdx`) green on the current heads of both PRs (the records-only commit re-runs it).
-2. After the owner approves: merge **SAM_Tas#93 first**, then SAM_UI#220 (merge commits, `--match-head-commit`), each
-   only on a green head. Then the `PROJECT_PROGRESS.md` closeouts as direct docs-only `[skip ci]` commits on both
-   `sow/2026-Q4` branches, with the merge SHAs (never on the feature branches).
-3. Then, in the owner's order: the Sizing-TBD fix (finding), PR7b-2 (SAM_Tas licensed acceptance matrix), the Tas units
-   correction, PR10 (SAM_Deploy shipping).
+1. Confirm PR CI (`build`, `spdx`) green on the **final** heads of both PRs; earlier green runs do not count.
+2. After the owner approves: merge **SAM_Tas#93 first** (merge commit, `--match-head-commit <final head>`) and confirm
+   the `sow/2026-Q4` build of SAM_Tas. Then **re-run SAM_UI#220's CI against the merged SAM_Tas**: the UI workflow
+   clones a dependency by the PR's head-branch name first and `sow/2026-Q4` next, so delete the SAM_Tas feature branch
+   after its merge (owner's call) before re-running; merge SAM_UI#220 on that green run (`--match-head-commit`). A UI run
+   made against the feature branch does not validate the final pair. Then the `PROJECT_PROGRESS.md` closeouts as direct
+   docs-only `[skip ci]` commits on both `sow/2026-Q4` branches, with the merge SHAs (never on the feature branches).
+3. Then, in the owner's order: the Sizing-TBD fix (the reviewer recommends an unambiguous primary project with sizing
+   derivatives excluded consistently from inventory and run snapshot — never "first/latest TBD", never deleting
+   sizing files — and acceptance on a genuine default Energy Simulation folder with Sizing on, through read, test, run
+   and apply), PR7b-2 (licensed matrix: heating, multi-plant-room where fixtures exist), the Tas units correction, PR10
+   (SAM_Deploy shipping).
 
 ## Hand-over (another session or computer)
 
@@ -241,10 +357,12 @@ optimised, applied, checked, and simulated again.
   (the current `sow/2026-Q4` tips; no rebase needed as of 2026-10-10). SAM and SAM_Systems unchanged (`288c9f57`,
   `5404926`).
 - Rebuild before testing: SAM_Tas `MSBuild SAM_Tas.sln -restore -p:Configuration=Release`, then
-  `dotnet test SAM_Tas/SAM.Analytical.Tas.GenOpt.Tests -c Release` (323) and
-  `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c Release` in SAM_UI (2784).
-- Licensed evidence is local to the authoring workstation (`C:\TasOut\pr9`: logs, renders, definitions, process logs,
-  registry exports, `app-smoke.ps1`, `mutate.ps1`); it is not needed to merge. To repeat it: set `SAM_APPLY_ACCEPTANCE`
+  `dotnet test SAM_Tas/SAM.Analytical.Tas.GenOpt.Tests -c Release` (330) and
+  `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c Release` in SAM_UI (2793). The GenOpt tests reference the built
+  `SAM_Tas\build\*.dll`, not the project: rebuild GenOpt with MSBuild after any change to it before `dotnet test`.
+- Licensed evidence is local to the authoring workstation (`C:\TasOut\pr9`: the first acceptance; `C:\TasOut\pr9\fix`:
+  the safety-review rerun, mutations, build/test logs); it is not needed to merge. The review itself is
+  `PR9_ARCHITECTURE_ADVICE_2026-10-10.md` in the SAM-BIM workspace folder (not in Git; copy it with the workspace files). To repeat it: set `SAM_APPLY_ACCEPTANCE`
   (output folder; optional `SAM_APPLY_ACCEPTANCE_SAM`, `_DEMO`, `_CASES`) and run the `TasModelApplyAcceptanceHarness`
   test with Tas licensed. Energy Simulation in the harness rewrites `HKCU\Software\EDSL\TasManager` `Path`; export it
   before and re-import it after.

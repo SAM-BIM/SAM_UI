@@ -21,7 +21,11 @@ namespace SAM.Analytical.UI.WPF
         /// value; 24-hour profile: all 24 hours; compared as the floats the TBD stores).</item>
         /// <item>Glazing choice: the aperture constructions with apertures whose TBD pane construction is the choice's
         /// glazing construction, by SAM_Tas' gbXML-route naming (<c>Windows: &lt;name&gt; -pane</c>) or the direct
-        /// route's preferred naming (<c>&lt;name&gt; -pane</c>). A collision-qualified TBD name cannot be traced back.</item>
+        /// route's preferred naming (<c>&lt;name&gt; -pane</c>). A collision-qualified TBD name cannot be traced back. The
+        /// name only finds them: their pane and frame layers and their windows' zones must also be the TBD's
+        /// (<see cref="TasGlazingConstructionInfo.PaneLayers"/>, <see cref="TasGlazingConstructionInfo.Frames"/>,
+        /// <see cref="TasGlazingConstructionInfo.ZoneSurfaces"/>), and the chosen system's pane materials must be ones the
+        /// model can take as they were evaluated (<see cref="TasGlazingMaterialProblem"/>).</item>
         /// </list>
         /// </summary>
         /// <param name="analyticalModel">The open model.</param>
@@ -45,7 +49,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (tasModelDesignChange.IsGlazing)
             {
-                return GlazingTarget(adjacencyCluster, tasModelDesignChange, out problem);
+                return GlazingTarget(analyticalModel, adjacencyCluster, tasModelDesignChange, tasModelInventory, out problem);
             }
 
             problem = "SAM does not hold this item; it is written to the TPD only.";
@@ -184,7 +188,67 @@ namespace SAM.Analytical.UI.WPF
             return new TasModelSamTarget(space, profileType, profile, users != 1);
         }
 
-        private static TasModelSamTarget? GlazingTarget(AdjacencyCluster adjacencyCluster, TasModelDesignChange change, out string? problem)
+        /// <summary>
+        /// Why the open model cannot be given a glazing option's pane as it was evaluated; null when it can. The TBD gets
+        /// the system with its source's materials (SAM_Tas); the model gets the system's pane layers, which name materials:
+        /// the model's own material of each name where it has one, the source's otherwise. So every pane material must be
+        /// defined by the source, and a model material of the same name must be the same thermal input to Tas (SAM_Tas'
+        /// description of it, <c>Query.TasMaterialLayer</c>); a different one is refused, not renamed or overwritten.
+        /// </summary>
+        public static string? TasGlazingMaterialProblem(TasGlazingOption tasGlazingOption, Core.MaterialLibrary? materialLibrary)
+        {
+            if (tasGlazingOption == null || tasGlazingOption.IsCurrent)
+            {
+                return null;
+            }
+
+            string option = "Glazing option " + tasGlazingOption.Number.ToString(CultureInfo.InvariantCulture) + " “" + tasGlazingOption.Text + "”";
+            ApertureConstruction? system = tasGlazingOption.System?.ApertureConstruction;
+            if (system == null)
+            {
+                return option + " has no glazing system.";
+            }
+
+            Core.MaterialLibrary? source = tasGlazingOption.System!.MaterialLibrary;
+            List<ConstructionLayer> layers = (system.PaneConstructionLayers ?? new List<ConstructionLayer>()).FindAll(x => x != null && !string.IsNullOrWhiteSpace(x.Name));
+            List<string> undefined = layers.Select(x => x.Name).Where(x => source?.GetMaterial(x) == null).Distinct(StringComparer.Ordinal).ToList();
+            if (undefined.Count > 0)
+            {
+                return option + ": its source does not define the material" + (undefined.Count == 1 ? " " : "s ") + string.Join(", ", undefined.Select(x => "“" + x + "”")) + ", so the glazing that was evaluated cannot be given to the model.";
+            }
+
+            List<string> differences = new List<string>();
+            List<string> names = new List<string>();
+            for (int i = 0; i < layers.Count; i++)
+            {
+                Core.IMaterial? material = materialLibrary?.GetMaterial(layers[i].Name);
+                if (material == null)
+                {
+                    continue;
+                }
+
+                List<string> layer = Analytical.Tas.GenOpt.Query.TasMaterialLayerDifferences(
+                    new[] { Analytical.Tas.GenOpt.Query.TasMaterialLayer(layers[i], source!.GetMaterial(layers[i].Name)) },
+                    new[] { Analytical.Tas.GenOpt.Query.TasMaterialLayer(layers[i], material) });
+                if (layer.Count > 0)
+                {
+                    differences.AddRange(layer.Select(x => "layer " + (i + 1).ToString(CultureInfo.InvariantCulture) + x.Substring("layer 1".Length)));
+                    if (!names.Contains(layers[i].Name))
+                    {
+                        names.Add(layers[i].Name);
+                    }
+                }
+            }
+
+            if (differences.Count == 0)
+            {
+                return null;
+            }
+
+            return option + ": the open model's material" + (names.Count == 1 ? " " : "s ") + string.Join(", ", names.Select(x => "“" + x + "”")) + (names.Count == 1 ? " is" : " are") + " not the system's: " + string.Join("; ", differences) + ". The model would keep its own and not get the glazing that was evaluated. Give one of them another name, then run the optimisation again.";
+        }
+
+        private static TasModelSamTarget? GlazingTarget(AnalyticalModel analyticalModel, AdjacencyCluster adjacencyCluster, TasModelDesignChange change, TasModelInventory tasModelInventory, out string? problem)
         {
             string glazingConstruction = change.GlazingConstruction;
             List<ApertureConstruction> matches = new List<ApertureConstruction>();
@@ -218,8 +282,95 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
-            problem = null;
-            return new TasModelSamTarget(matches, apertures);
+            problem = TasGlazingSnapshotProblem(analyticalModel, adjacencyCluster, glazingConstruction, matches, tasModelInventory)
+                ?? TasGlazingMaterialProblem(change.GlazingOption, analyticalModel.MaterialLibrary);
+            return problem == null ? new TasModelSamTarget(matches, apertures) : null;
+        }
+
+        /// <summary>
+        /// Why the aperture constructions found by name are not the Tas model's glazing; null when they are. A name is not
+        /// enough: the construction (or a material) may have changed since the Energy Simulation that made the TBD. Each
+        /// one's pane must be the TBD construction's layers, its frame one of the TBD's frames for those windows (as SAM_Tas
+        /// writes them: <c>Query.TasMaterialLayers</c>; a construction without a frame layer writes its pane as the frame),
+        /// and its windows must be in the zones where the TBD has its pane surfaces, as many in each. Nothing else of the
+        /// model is compared.
+        /// </summary>
+        private static string? TasGlazingSnapshotProblem(AnalyticalModel analyticalModel, AdjacencyCluster adjacencyCluster, string glazingConstruction, List<ApertureConstruction> apertureConstructions, TasModelInventory tasModelInventory)
+        {
+            const string changed = " The model has changed since its last Energy Simulation. Run Energy Simulation, then the optimisation again.";
+
+            List<TasGlazingConstructionInfo> infos = tasModelInventory?.GlazingConstructions.Where(x => x.Name == glazingConstruction).ToList() ?? new List<TasGlazingConstructionInfo>();
+            TasGlazingConstructionInfo? info = infos.Count == 1 ? infos[0] : null;
+            if (info?.PaneLayers == null || info.Frames == null || info.ZoneSurfaces == null)
+            {
+                return "The Tas model's glazing “" + glazingConstruction + "” was not read in enough detail to check that the open model's windows are its windows. Open Simulate > Optimisation again so it reads the Tas model, and run the optimisation again.";
+            }
+
+            Core.MaterialLibrary? materialLibrary = analyticalModel.MaterialLibrary;
+            foreach (ApertureConstruction apertureConstruction in apertureConstructions)
+            {
+                List<string> pane = Analytical.Tas.GenOpt.Query.TasMaterialLayerDifferences(info.PaneLayers, Analytical.Tas.GenOpt.Query.TasMaterialLayers(apertureConstruction.PaneConstructionLayers, materialLibrary));
+                if (pane.Count > 0)
+                {
+                    return "“" + apertureConstruction.Name + "” of the open model is not the Tas model's “" + glazingConstruction + "”: " + string.Join("; ", pane) + "." + changed;
+                }
+
+                double frameThickness = apertureConstruction.GetFrameThickness();
+                if (double.IsNaN(frameThickness) || frameThickness <= 0)
+                {
+                    continue;
+                }
+
+                List<ConstructionLayer> frameLayers = apertureConstruction.FrameConstructionLayers is { Count: > 0 } layers ? layers : apertureConstruction.PaneConstructionLayers;
+                List<TasMaterialLayer> frame = Analytical.Tas.GenOpt.Query.TasMaterialLayers(frameLayers, materialLibrary);
+                if (info.Frames.Any(x => Analytical.Tas.GenOpt.Query.TasMaterialLayerDifferences(x, frame).Count == 0))
+                {
+                    continue;
+                }
+
+                return info.Frames.Count == 0
+                    ? "The Tas model has no frame for “" + glazingConstruction + "”, but “" + apertureConstruction.Name + "” of the open model has one." + changed
+                    : "The frame of “" + apertureConstruction.Name + "” in the open model is not the Tas model's: " + string.Join("; ", Analytical.Tas.GenOpt.Query.TasMaterialLayerDifferences(info.Frames[0], frame)) + "." + changed;
+            }
+
+            // Where the windows are: one TBD pane surface per window and zone it bounds.
+            Dictionary<string, int> zones = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (ApertureConstruction apertureConstruction in apertureConstructions)
+            {
+                foreach (Panel panel in adjacencyCluster.GetPanels(apertureConstruction) ?? new List<Panel>())
+                {
+                    int count = panel?.GetApertures(apertureConstruction)?.Count ?? 0;
+                    if (count == 0)
+                    {
+                        continue;
+                    }
+
+                    foreach (Space space in adjacencyCluster.GetSpaces(panel) ?? new List<Space>())
+                    {
+                        string name = space?.Name ?? string.Empty;
+                        zones.TryGetValue(name, out int sum);
+                        zones[name] = sum + count;
+                    }
+                }
+            }
+
+            List<string> placement = new List<string>();
+            foreach (string zone in zones.Keys.Union(info.ZoneSurfaces.Keys).OrderBy(x => x, StringComparer.Ordinal))
+            {
+                zones.TryGetValue(zone, out int model);
+                info.ZoneSurfaces.TryGetValue(zone, out int tbd);
+                if (model != tbd)
+                {
+                    placement.Add(string.Format(CultureInfo.InvariantCulture, "{0}: {1} in the model, {2} in the TBD", zone, model, tbd));
+                }
+            }
+
+            if (placement.Count > 0)
+            {
+                return "The open model's windows of " + string.Join(", ", apertureConstructions.Select(x => "“" + x.Name + "”")) + " are not where the Tas model has them (" + string.Join("; ", placement) + ")." + changed;
+            }
+
+            return null;
         }
     }
 }
