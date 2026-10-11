@@ -31,6 +31,29 @@ it). Every earlier head, CI-green or not (SAM_Tas `dd222a47`/`aad85e39`/`194a154
 is superseded and is **not** evidence for the final pair. **Blockers for merge:** green CI on the final heads, and
 **owner review** of decisions 1–15 below and of the Sizing finding.
 
+### Part O test fix integrated — 2026-10-11
+
+- Separate [SAM_UI#221](https://github.com/SAM-BIM/SAM_UI/pull/221) merged first, with owner approval,
+  as `057609d244db3e8e51713d6d32fb41d8baa1e149`; build/SPDX passed at reviewed head `e4566b76`.
+  Its remote and local feature branches were deleted. Q4 post-merge `PROJECT_PROGRESS.md` closeout
+  pushed as docs-only `[skip ci]` commit `2ee47f03`.
+- Current Q4 incorporated into this PR with conflict-free merge `fbf1dd79e9d1b73bfa245c6ddbef22ccb0bda920`.
+  This brings in the merged icon migration and the test fix; neither appears as new work in PR9's
+  diff against Q4. No `PROJECT_PROGRESS.md` edit was made on this feature branch.
+- The reported progress-window flake is resolved: repeated UI Automation reads reproduced partial
+  rows during the window's 500 ms dispatcher refresh. The test now waits for all expected text in
+  one snapshot and requires completed preparation, running simulation and elapsed text after Show.
+  Details: `documentation/PartO-Progress-Test-Synchronisation.md`.
+- Fix-branch validation: Release suite **2768/2768 PASS**, 1000 snapshot checks PASS, 10/10 independent
+  regression runs PASS; permanently missing content still fails the timeout mutation. These are
+  PR221 results, not a fresh 2793-test PR9 or licensed acceptance run.
+- Integration validation: `git diff --check` PASS; stable patch ID of PR9's production code and Apply
+  tests is identical before/after the Q4 merge (`13ca0b7ae664f632a69f5d974d1eb6679129063b`). Only this
+  PR record was edited for the checkpoint; PR9 product behavior and SAM_Tas head `dc823fe0` unchanged.
+- Next: check CI on the updated PR220 head, then retain the existing owner-decision review and
+  **SAM_Tas#93 first**, followed by PR220 validation against the merged dependency. PR220 remains open;
+  the approval to merge PR221 does not approve PR9. Refresh full-suite evidence before PR9 merge.
+
 ## What the user sees
 
 After a "Tas model" run whose result rules (SAM_Tas `NativeGenOptOutcome`) give a best point (success, simulation limit
@@ -189,7 +212,8 @@ as SAM_Tas describes them — checked before the comparison was trusted.
 - `SAM.Analytical.Tas.GenOpt.Tests` **335/335** (330 + 5 replacement-protocol tests). `SAM.Analytical.UI.WPF.Tests`
   **2793/2793**. In the first full run one test unrelated to PR9 failed once:
   `PartOWorkflowSimplificationTests.The_progress_window_keeps_its_content_after_standing_aside_for_a_dialog`. It
-  passed 3/3 alone and in a full rerun, with no SAM_UI code changed since `60828d31`. It is recorded as intermittent.
+  passed 3/3 alone and in a full rerun, with no SAM_UI code changed since `60828d31`. This historical
+  intermittent failure was subsequently reproduced and fixed in merged PR221 (2026-10-11 checkpoint above).
 - **Mutations 6/6 caught** (R1–R6, SAM_Tas record; `C:\TasOut\pr9\fix\mutate-race.ps1`, `mutations-race.log`).
 - **Licensed rerun on this build** (`C:\TasOut\pr9\fix\race`, local): S1 (TBD), S2 (TBD glazing, the new pane/frame/
   placement checks passed on the genuine model) and D1 (TPD) all PASS. Best points are identical to before (S1
@@ -342,7 +366,8 @@ optimised, applied, checked, and simulated again.
   conflict, never a loss). A save to a file after Apply replaced it, while Apply goes on, is the other program's.
   `File.Replace` is not verified on network shares (refused → nothing changed). The conflict paths are proven with real
   NTFS replacements in tests, not by provoking Tas itself mid-Apply.
-- One intermittent, unrelated UI test (Part O progress window) failed once in a full run this session.
+- The unrelated Part O progress-window failure from the 2026-10-10 full run is resolved by merged PR221,
+  now integrated into this branch; see the 2026-10-11 checkpoint above.
 - The glazing placement check counts one TBD pane surface per window and adjacent zone. It matched the licensed S2
   model (external windows). Internal glazing between two spaces and the direct (non-gbXML) route have **not** been run
   licensed. If Tas splits or merges window surfaces there, the plan would refuse a genuine model, not accept a wrong one.
@@ -387,8 +412,9 @@ optimised, applied, checked, and simulated again.
 ## Hand-over (another session or computer)
 
 - Branch `feature/optimisation-apply-best-design` in SAM_Tas and SAM_UI, both pushed, cut from `a4cd6d32` / `828ed76a`
-  (the current `sow/2026-Q4` tips; no rebase needed as of 2026-10-10). SAM and SAM_Systems unchanged (`288c9f57`,
-  `5404926`).
+  (the Q4 tips at creation on 2026-10-10). SAM_UI now includes Q4 through `2ee47f03`, including merged
+  PR221; SAM_Tas PR93 remains at `dc823fe0`. Historical SAM/SAM_Systems acceptance inputs were `288c9f57`
+  / `5404926`; do not assume those are today's local dependency binaries.
 - Rebuild before testing: SAM_Tas `MSBuild SAM_Tas.sln -restore -p:Configuration=Release`, then
   `dotnet test SAM_Tas/SAM.Analytical.Tas.GenOpt.Tests -c Release` (335) and
   `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c Release` in SAM_UI (2793). The GenOpt tests reference the built
