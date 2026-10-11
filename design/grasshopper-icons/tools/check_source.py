@@ -8,6 +8,8 @@
    The only other allowed change is the repository SPDX policy header (2 lines + blank) added at the top of a file.
 3. The set of ComponentGuid values, names, nicknames, categories and exposures is unchanged vs base.
 """
+import json
+import pathlib
 import hashlib
 import os
 import re
@@ -40,51 +42,54 @@ def main(base):
         print(f"vendored {f}: {'OK' if got == h else 'MODIFIED'}")
         ok &= got == h
     files = [f for f in git("diff", "--name-only", base, "--", "*.cs").split("\n") if f and not f.startswith("design/")]
+    ui_manifest = pathlib.Path(REPO) / "design/ui-icons/manifest.json"
+    ui_rows = json.loads(ui_manifest.read_text()) if ui_manifest.exists() else []
+    ui_sources = {r.get("source") for r in ui_rows if r.get("source")}
     swaps, bad, headers = 0, [], 0
     for f in files:
         if f.endswith("Resources.Designer.cs") or f.startswith("design/"):
             continue
-        diff = git("diff", "-U0", base, "--", f)
-        if "// <sam-gh-icons>" in diff:  # generated holder block: only additions inside the markers
-            block = re.findall(r"^[-+](?![-+]).*$", diff, re.M)
-            inside, outside = False, []
-            for line in block:
-                if "// <sam-gh-icons>" in line:
-                    inside = True
-                if not inside and line.strip() not in ("+", "-"):
-                    outside.append(line)
-                if "// </sam-gh-icons>" in line:
-                    inside = False
-            if outside:
-                bad.append((f, outside[:4]))
+        if f in ui_sources:
+            import difflib
+            from collections import Counter
+            old = git("show", base + ":" + f).lstrip("\ufeff")
+            now = open(os.path.join(REPO, f), encoding="utf-8-sig").read()
+            strip_header = lambda s: s.removeprefix("\n".join(SPDX_HEADER) + "\n\n")
+            allowed = Counter(("Resources." + r["old_resource"], "Resources." + r["resource"]) for r in ui_rows if r.get("source") == f)
+            a, b = strip_header(old).splitlines(), strip_header(now).splitlines()
+            for op, i, j, k, l in difflib.SequenceMatcher(a=a, b=b).get_opcodes():
+                if op == "equal": continue
+                if j-i != l-k:
+                    bad.append((f, "UI line additions/removals")); continue
+                for x, y in zip(a[i:j], b[k:l]):
+                    if x == y: continue
+                    before = re.findall(r"Resources\.\w+", x)
+                    after = re.findall(r"Resources\.\w+", y)
+                    pair = (before[0], after[0]) if len(before)==len(after)==1 else None
+                    if pair and allowed[pair] and x.replace(pair[0], "ICON") == y.replace(pair[1], "ICON"):
+                        allowed[pair] -= 1; swaps += 1
+                    else: bad.append((f, "UI change exceeds manifest", x, y))
             continue
-        minus = [x.lstrip("﻿") for x in re.findall(r"^-(?!--)(.*)$", diff, re.M)]
-        plus = [x.lstrip("﻿") for x in re.findall(r"^\+(?!\+\+)(.*)$", diff, re.M)]
-        top = open(os.path.join(REPO, f), encoding="utf-8-sig").read().replace("\r\n", "\n").split("\n")[:3]
-        if ([t.strip() for t in top] == [*SPDX_HEADER, ""] and all(any(p.strip() == h for p in plus) for h in SPDX_HEADER)
-                and all(h not in "\n".join(minus) for h in SPDX_HEADER)):
-            # repository SPDX policy header added at the top of the file (the only allowed non-icon addition)
-            for line in (*SPDX_HEADER, ""):
-                plus.remove(next(p for p in plus if p.strip() == line))
-            headers += 1
-            for m in list(minus):  # a line displaced by the header insertion (e.g. the BOM moving) is unchanged
-                if m in plus:
-                    minus.remove(m)
-                    plus.remove(m)
-        if len(minus) != len(plus):
-            bad.append((f, "added/removed lines"))
-            continue
+        import difflib
+        old = git("show", base + ":" + f).lstrip("\ufeff")
         now = open(os.path.join(REPO, f), encoding="utf-8-sig").read()
+        header = "\n".join(SPDX_HEADER) + "\n\n"
+        if now.startswith(header) and not old.startswith(header): headers += 1
+        a, b = old.removeprefix(header).splitlines(), now.removeprefix(header).splitlines()
         getters = [m.end() for m in re.finditer(r"Bitmap\s+Icon\b", now)]
-
-        def in_icon_getter(line):  # the line sits inside an `Icon` getter (single- or multi-line form)
+        def in_icon_getter(line):
             i = now.find(line.strip())
-            return i >= 0 and any(0 <= i - g <= 300 for g in getters)
-        for a, b in zip(minus, plus):
-            if ("Icon" not in a and not in_icon_getter(b)) or TOKEN.sub("X", a) != TOKEN.sub("X", b) or "SAM_GH_" not in b or KEEP_RE.search(a):
-                bad.append((f, a.strip(), b.strip()))
-            else:
-                swaps += 1
+            return i >= 0 and any(0 <= i-g <= 300 for g in getters)
+        for op, i, j, k, l in difflib.SequenceMatcher(a=a, b=b).get_opcodes():
+            if op == "equal": continue
+            if not "".join(a[i:j]).strip() and not "".join(b[k:l]).strip(): continue
+            if j-i != l-k:
+                bad.append((f, "added/removed nonblank lines")); continue
+            for x, y in zip(a[i:j], b[k:l]):
+                if x == y: continue
+                if (not re.search(r"Bitmap\s+Icon\b", x) and not in_icon_getter(y)) or TOKEN.sub("X", x) != TOKEN.sub("X", y) or "SAM_GH_" not in y or KEEP_RE.search(x):
+                    bad.append((f, x.strip(), y.strip()))
+                else: swaps += 1
     print(f"component .cs files changed: {len(files)}; icon-token swaps: {swaps}; SPDX headers added: {headers}; "
           f"non-icon changes: {len(bad)}")
     for b in bad[:20]:

@@ -1,0 +1,2914 @@
+[
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_AddMissingObjects",
+    "resource": "SAM_UI_ObjectAddTrue",
+    "object": "object",
+    "op": "add",
+    "plural": true,
+    "container": null,
+    "icon_id": "object_add_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_AddMissingObjects.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_AirHandlingUnitDiagram",
+    "resource": "SAM_UI_AhuDisplay",
+    "object": "ahu",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "ahu_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_AirHandlingUnitDiagram.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_AnalyticalModelProperties",
+    "resource": "SAM_UI_ModelInspect",
+    "object": "model",
+    "op": "inspect",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_inspect",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_AnalyticalModelProperties.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_ApertureConstruction",
+    "resource": "SAM_UI_ApertureConstructionModify",
+    "object": "apertureConstruction",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "apertureConstruction_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_ApertureConstruction.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Clean",
+    "resource": "SAM_UI_ModelModify",
+    "object": "model",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Clean.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_ModelRemove",
+    "object": "model",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Close.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_ConstructionLibrary",
+    "resource": "SAM_UI_ConstructionModifyLibrary",
+    "object": "construction",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "construction_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_ConstructionLibrary.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_EditLibrary",
+    "resource": "SAM_UI_ObjectModifyLibrary",
+    "object": "object",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "object_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_EditLibrary.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_EnergySimulation",
+    "resource": "SAM_UI_ModelRun",
+    "object": "model",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_EnergySimulation.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Export",
+    "resource": "SAM_UI_ModelExport",
+    "object": "model",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Export.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Import",
+    "resource": "SAM_UI_ObjectImport",
+    "object": "object",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "object_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Import.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_InternalCondition",
+    "resource": "SAM_UI_InternalConditionModifyLibrary",
+    "object": "internalCondition",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "internalCondition_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_InternalCondition.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Location",
+    "resource": "SAM_UI_LocationSet",
+    "object": "location",
+    "op": "set",
+    "plural": false,
+    "container": null,
+    "icon_id": "location_set",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Location.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_MaterialLibrary",
+    "resource": "SAM_UI_MaterialModifyLibrary",
+    "object": "material",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "material_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_MaterialLibrary.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_ModelCheck",
+    "resource": "SAM_UI_ModelValidate",
+    "object": "model",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_validate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_ModelCheck.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_MollierDiagram",
+    "resource": "SAM_UI_MollierChartDisplay",
+    "object": "mollierChart",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "mollierChart_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_MollierDiagram.PNG"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_New",
+    "resource": "SAM_UI_ModelCreate",
+    "object": "model",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_New.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_ModelImport",
+    "object": "model",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Open.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_SpaceExport",
+    "object": "space",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "space_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_PrintRDS.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_ProfileLibrary",
+    "resource": "SAM_UI_ProfileModifyLibrary",
+    "object": "profile",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "profile_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_ProfileLibrary.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Save",
+    "resource": "SAM_UI_ModelExport",
+    "object": "model",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Save.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_SaveAs",
+    "resource": "SAM_UI_FileExport",
+    "object": "file",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "file_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_SaveAs.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_SolarCalculator",
+    "resource": "SAM_UI_SolarRun",
+    "object": "solar",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "solar_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_SolarCalculator.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_SpaceModifyTrue",
+    "object": "space",
+    "op": "modify",
+    "plural": true,
+    "container": null,
+    "icon_id": "space_modify_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Space.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_SpaceDiagram",
+    "resource": "SAM_UI_SpaceDisplay",
+    "object": "space",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "space_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_SpaceDiagram.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_T3D",
+    "resource": "SAM_UI_ModelDisplay",
+    "object": "model",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_T3D.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_TBD",
+    "resource": "SAM_UI_ResultDisplay",
+    "object": "result",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "result_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_TBD.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_TPD",
+    "resource": "SAM_UI_MollierChartDisplay",
+    "object": "mollierChart",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "mollierChart_display",
+    "size": [
+      37,
+      38
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_TPD.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_TSD",
+    "resource": "SAM_UI_SystemDisplay",
+    "object": "system",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "system_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_TSD.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_WeatherData",
+    "resource": "SAM_UI_WeatherDataModify",
+    "object": "weatherData",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "weatherData_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_WeatherData.png"
+  },
+  {
+    "project_dir": "Application/SAM Analytical",
+    "source": "",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_InfoGet",
+    "object": "info",
+    "op": "get",
+    "plural": false,
+    "container": null,
+    "icon_id": "info_get",
+    "size": [
+      32,
+      32
+    ],
+    "output": "Application/SAM Analytical/Resources/SAM_Wiki.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_AddMissingObjects",
+    "resource": "SAM_UI_ObjectAddTrue",
+    "object": "object",
+    "op": "add",
+    "plural": true,
+    "container": null,
+    "icon_id": "object_add_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_AddMissingObjects.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_AnalyticalModelProperties",
+    "resource": "SAM_UI_ModelInspect",
+    "object": "model",
+    "op": "inspect",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_inspect",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_AnalyticalModelProperties.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_ApertureConstruction",
+    "resource": "SAM_UI_ApertureConstructionModify",
+    "object": "apertureConstruction",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "apertureConstruction_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_ApertureConstruction.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Clean",
+    "resource": "SAM_UI_ModelModify",
+    "object": "model",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Clean.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_ModelRemove",
+    "object": "model",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Close.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_ConstructionLibrary",
+    "resource": "SAM_UI_ConstructionModifyLibrary",
+    "object": "construction",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "construction_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_ConstructionLibrary.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_EditLibrary",
+    "resource": "SAM_UI_ObjectModifyLibrary",
+    "object": "object",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "object_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_EditLibrary.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_EnergySimulation",
+    "resource": "SAM_UI_ModelRun",
+    "object": "model",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_EnergySimulation.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Export",
+    "resource": "SAM_UI_ModelExport",
+    "object": "model",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Export.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Import",
+    "resource": "SAM_UI_ObjectImport",
+    "object": "object",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "object_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Import.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_InternalCondition",
+    "resource": "SAM_UI_InternalConditionModifyLibrary",
+    "object": "internalCondition",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "internalCondition_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_InternalCondition.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Location",
+    "resource": "SAM_UI_LocationSet",
+    "object": "location",
+    "op": "set",
+    "plural": false,
+    "container": null,
+    "icon_id": "location_set",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Location.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_MaterialLibrary",
+    "resource": "SAM_UI_MaterialModifyLibrary",
+    "object": "material",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "material_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_MaterialLibrary.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_ModelCheck",
+    "resource": "SAM_UI_ModelValidate",
+    "object": "model",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_validate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_ModelCheck.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_New",
+    "resource": "SAM_UI_ModelCreate",
+    "object": "model",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_New.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_ModelImport",
+    "object": "model",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Open.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_SpaceExport",
+    "object": "space",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "space_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_PrintRDS.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_ProfileLibrary",
+    "resource": "SAM_UI_ProfileModifyLibrary",
+    "object": "profile",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "profile_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_ProfileLibrary.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Save",
+    "resource": "SAM_UI_ModelExport",
+    "object": "model",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Save.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_SaveAs",
+    "resource": "SAM_UI_FileExport",
+    "object": "file",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "file_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_SaveAs.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_SolarCalculator",
+    "resource": "SAM_UI_SolarRun",
+    "object": "solar",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "solar_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_SolarCalculator.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_SpaceModifyTrue",
+    "object": "space",
+    "op": "modify",
+    "plural": true,
+    "container": null,
+    "icon_id": "space_modify_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Space.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_T3D",
+    "resource": "SAM_UI_ModelDisplay",
+    "object": "model",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_T3D.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_TBD",
+    "resource": "SAM_UI_ResultDisplay",
+    "object": "result",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "result_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_TBD.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_TPD",
+    "resource": "SAM_UI_MollierChartDisplay",
+    "object": "mollierChart",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "mollierChart_display",
+    "size": [
+      37,
+      38
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_TPD.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_TSD",
+    "resource": "SAM_UI_SystemDisplay",
+    "object": "system",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "system_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_TSD.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_WeatherData",
+    "resource": "SAM_UI_WeatherDataModify",
+    "object": "weatherData",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "weatherData_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_WeatherData.png"
+  },
+  {
+    "project_dir": "SAM_UI/SAM.Analytical.UI",
+    "source": "",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_InfoGet",
+    "object": "info",
+    "op": "get",
+    "plural": false,
+    "container": null,
+    "icon_id": "info_get",
+    "size": [
+      32,
+      32
+    ],
+    "output": "SAM_UI/SAM.Analytical.UI/Resources/SAM_Wiki.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_AddMissingObjects",
+    "resource": "SAM_UI_ObjectAddTrue",
+    "object": "object",
+    "op": "add",
+    "plural": true,
+    "container": null,
+    "icon_id": "object_add_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_AddMissingObjects.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_AirHandlingUnitDiagram",
+    "resource": "SAM_UI_AhuDisplay",
+    "object": "ahu",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "ahu_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_AirHandlingUnitDiagram.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_AnalyticalModelProperties",
+    "resource": "SAM_UI_ModelInspect",
+    "object": "model",
+    "op": "inspect",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_inspect",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_AnalyticalModelProperties.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_ApertureConstruction",
+    "resource": "SAM_UI_ApertureConstructionModify",
+    "object": "apertureConstruction",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "apertureConstruction_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_ApertureConstruction.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Clean",
+    "resource": "SAM_UI_ModelModify",
+    "object": "model",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Clean.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_ModelRemove",
+    "object": "model",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Close.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_ConstructionLibrary",
+    "resource": "SAM_UI_ConstructionModifyLibrary",
+    "object": "construction",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "construction_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_ConstructionLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_CreateCases",
+    "resource": "SAM_UI_CaseCreate",
+    "object": "case",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "case_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_CreateCases.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_EditLibrary",
+    "resource": "SAM_UI_ObjectModifyLibrary",
+    "object": "object",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "object_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_EditLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_EnergySimulation",
+    "resource": "SAM_UI_ModelRun",
+    "object": "model",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_EnergySimulation.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Export",
+    "resource": "SAM_UI_ModelExport",
+    "object": "model",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Export.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Import",
+    "resource": "SAM_UI_ObjectImport",
+    "object": "object",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "object_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Import.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_InternalCondition",
+    "resource": "SAM_UI_InternalConditionModifyLibrary",
+    "object": "internalCondition",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "internalCondition_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_InternalCondition.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Location",
+    "resource": "SAM_UI_LocationSet",
+    "object": "location",
+    "op": "set",
+    "plural": false,
+    "container": null,
+    "icon_id": "location_set",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Location.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_MaterialLibrary",
+    "resource": "SAM_UI_MaterialModifyLibrary",
+    "object": "material",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "material_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_MaterialLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_ModelCheck",
+    "resource": "SAM_UI_ModelValidate",
+    "object": "model",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_validate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_ModelCheck.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_MollierDiagram",
+    "resource": "SAM_UI_MollierChartDisplay",
+    "object": "mollierChart",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "mollierChart_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_MollierDiagram.PNG"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_New",
+    "resource": "SAM_UI_ModelCreate",
+    "object": "model",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_New.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_ModelImport",
+    "object": "model",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Open.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Optimisation",
+    "resource": "SAM_UI_AlgorithmRun",
+    "object": "algorithm",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "algorithm_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Optimisation.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_PartL",
+    "resource": "SAM_UI_ModelValidate",
+    "object": "model",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_validate",
+    "size": [
+      23,
+      30
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_PartL.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_PartL_UKBR",
+    "resource": "SAM_UI_ModelUpdate",
+    "object": "model",
+    "op": "update",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_update",
+    "size": [
+      23,
+      30
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_PartL_UKBR.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_SpaceExport",
+    "object": "space",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "space_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_PrintRDS.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_ProfileLibrary",
+    "resource": "SAM_UI_ProfileModifyLibrary",
+    "object": "profile",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "profile_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_ProfileLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Save",
+    "resource": "SAM_UI_ModelExport",
+    "object": "model",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Save.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_SaveAs",
+    "resource": "SAM_UI_FileExport",
+    "object": "file",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "file_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_SaveAs.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Section",
+    "resource": "SAM_UI_SectionBoxCreate",
+    "object": "sectionBox",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "sectionBox_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Section.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_SolarCalculator",
+    "resource": "SAM_UI_SolarRun",
+    "object": "solar",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "solar_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_SolarCalculator.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_SpaceModifyTrue",
+    "object": "space",
+    "op": "modify",
+    "plural": true,
+    "container": null,
+    "icon_id": "space_modify_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Space.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_SpaceDiagram",
+    "resource": "SAM_UI_SpaceDisplay",
+    "object": "space",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "space_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_SpaceDiagram.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_T3D",
+    "resource": "SAM_UI_ModelDisplay",
+    "object": "model",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_T3D.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_TBD",
+    "resource": "SAM_UI_ResultDisplay",
+    "object": "result",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "result_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_TBD.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_TPD",
+    "resource": "SAM_UI_MollierChartDisplay",
+    "object": "mollierChart",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "mollierChart_display",
+    "size": [
+      37,
+      38
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_TPD.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_TSD",
+    "resource": "SAM_UI_SystemDisplay",
+    "object": "system",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "system_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_TSD.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_WeatherData",
+    "resource": "SAM_UI_WeatherDataModify",
+    "object": "weatherData",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "weatherData_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_WeatherData.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_InfoGet",
+    "object": "info",
+    "op": "get",
+    "plural": false,
+    "container": null,
+    "icon_id": "info_get",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/SAM_Wiki.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_ModelRemove",
+    "object": "model",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/SAM_Close.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_ModelImport",
+    "object": "model",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/SAM_Open.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_ModelImport",
+    "object": "model",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelImport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_New",
+    "resource": "SAM_UI_ModelCreate",
+    "object": "model",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelCreate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Save",
+    "resource": "SAM_UI_ModelExport",
+    "object": "model",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelExport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_SaveAs",
+    "resource": "SAM_UI_FileExport",
+    "object": "file",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "file_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_FileExport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_ModelRemove",
+    "object": "model",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelRemove.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_ModelImport",
+    "object": "model",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelImport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Save",
+    "resource": "SAM_UI_ModelExport",
+    "object": "model",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelExport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Section",
+    "resource": "SAM_UI_SectionBoxCreateTrue",
+    "object": "sectionBox",
+    "op": "create",
+    "plural": true,
+    "container": null,
+    "icon_id": "sectionBox_create_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SectionBoxCreateTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Section",
+    "resource": "SAM_UI_SectionBoxCreate",
+    "object": "sectionBox",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "sectionBox_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SectionBoxCreate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Section",
+    "resource": "SAM_UI_ViewCreate",
+    "object": "view",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "view_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ViewCreate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Section",
+    "resource": "SAM_UI_ViewSet",
+    "object": "view",
+    "op": "set",
+    "plural": false,
+    "container": null,
+    "icon_id": "view_set",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ViewSet.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Section",
+    "resource": "SAM_UI_ViewRemove",
+    "object": "view",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "view_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ViewRemove.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Location",
+    "resource": "SAM_UI_LocationSet",
+    "object": "location",
+    "op": "set",
+    "plural": false,
+    "container": null,
+    "icon_id": "location_set",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_LocationSet.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_AnalyticalModelProperties",
+    "resource": "SAM_UI_ModelInspect",
+    "object": "model",
+    "op": "inspect",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_inspect",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelInspect.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Import",
+    "resource": "SAM_UI_ObjectImport",
+    "object": "object",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "object_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ObjectImport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_ModelCheck",
+    "resource": "SAM_UI_ModelValidate",
+    "object": "model",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_validate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelValidate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_MaterialLibrary",
+    "resource": "SAM_UI_MaterialModifyLibrary",
+    "object": "material",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "material_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_MaterialModifyLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_InternalCondition",
+    "resource": "SAM_UI_InternalConditionModifyLibrary",
+    "object": "internalCondition",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "internalCondition_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_InternalConditionModifyLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_ProfileLibrary",
+    "resource": "SAM_UI_ProfileModifyLibrary",
+    "object": "profile",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "profile_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ProfileModifyLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_SpaceModifyTrue",
+    "object": "space",
+    "op": "modify",
+    "plural": true,
+    "container": null,
+    "icon_id": "space_modify_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SpaceModifyTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_ConstructionLibrary",
+    "resource": "SAM_UI_ConstructionModifyLibrary",
+    "object": "construction",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "construction_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ConstructionModifyLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_ApertureConstruction",
+    "resource": "SAM_UI_ApertureConstructionModify",
+    "object": "apertureConstruction",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "apertureConstruction_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ApertureConstructionModify.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_WeatherData",
+    "resource": "SAM_UI_WeatherDataModify",
+    "object": "weatherData",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "weatherData_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_WeatherDataModify.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Import",
+    "resource": "SAM_UI_WeatherDataImport",
+    "object": "weatherData",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "weatherData_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_WeatherDataImport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_SolarCalculator",
+    "resource": "SAM_UI_SolarRun",
+    "object": "solar",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "solar_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SolarRun.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_EnergySimulation",
+    "resource": "SAM_UI_ModelRun",
+    "object": "model",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelRun.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Optimisation",
+    "resource": "SAM_UI_AlgorithmRun",
+    "object": "algorithm",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "algorithm_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_AlgorithmRun.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_EditLibrary",
+    "resource": "SAM_UI_ObjectModifyLibrary",
+    "object": "object",
+    "op": "modify",
+    "plural": false,
+    "container": "library",
+    "icon_id": "object_modify_library",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ObjectModifyLibrary.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_ConstructionLibrary",
+    "resource": "SAM_UI_ConstructionLayerSetTrue",
+    "object": "constructionLayer",
+    "op": "set",
+    "plural": true,
+    "container": null,
+    "icon_id": "constructionLayer_set_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ConstructionLayerSetTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_EditLibrary",
+    "resource": "SAM_UI_SystemSetTrue",
+    "object": "system",
+    "op": "set",
+    "plural": true,
+    "container": null,
+    "icon_id": "system_set_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SystemSetTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_T3D",
+    "resource": "SAM_UI_ModelDisplay",
+    "object": "model",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_TBD",
+    "resource": "SAM_UI_ResultDisplay",
+    "object": "result",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "result_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ResultDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_TSD",
+    "resource": "SAM_UI_SystemDisplay",
+    "object": "system",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "system_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SystemDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_TPD",
+    "resource": "SAM_UI_MollierChartDisplay",
+    "object": "mollierChart",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "mollierChart_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_MollierChartDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_T3D",
+    "resource": "SAM_UI_ConstructionCalculate",
+    "object": "construction",
+    "op": "calculate",
+    "plural": false,
+    "container": null,
+    "icon_id": "construction_calculate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ConstructionCalculate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_T3D",
+    "resource": "SAM_UI_ApertureConstructionCalculate",
+    "object": "apertureConstruction",
+    "op": "calculate",
+    "plural": false,
+    "container": null,
+    "icon_id": "apertureConstruction_calculate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ApertureConstructionCalculate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_CreateCases",
+    "resource": "SAM_UI_CaseCreate",
+    "object": "case",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "case_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_CaseCreate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_CreateCases",
+    "resource": "SAM_UI_CaseRun",
+    "object": "case",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "case_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_CaseRun.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_CreateCases",
+    "resource": "SAM_UI_CaseRun",
+    "object": "case",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "case_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_CaseRun.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_CreateCases",
+    "resource": "SAM_UI_AlgorithmRun",
+    "object": "algorithm",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "algorithm_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_AlgorithmRun.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PartL",
+    "resource": "SAM_UI_ModelValidate",
+    "object": "model",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_validate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelValidate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PartL",
+    "resource": "SAM_UI_ModelValidate",
+    "object": "model",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_validate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelValidate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PartL_UKBR",
+    "resource": "SAM_UI_ModelUpdate",
+    "object": "model",
+    "op": "update",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_update",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelUpdate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_EditLibrary",
+    "resource": "SAM_UI_InternalConditionGet",
+    "object": "internalCondition",
+    "op": "get",
+    "plural": false,
+    "container": null,
+    "icon_id": "internalCondition_get",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_InternalConditionGet.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_EditLibrary",
+    "resource": "SAM_UI_NameModify",
+    "object": "name",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "name_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_NameModify.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Clean",
+    "resource": "SAM_UI_ModelModify",
+    "object": "model",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelModify.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Clean",
+    "resource": "SAM_UI_AirflowRemove",
+    "object": "airflow",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "airflow_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_AirflowRemove.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_AddMissingObjects",
+    "resource": "SAM_UI_ObjectAddTrue",
+    "object": "object",
+    "op": "add",
+    "plural": true,
+    "container": null,
+    "icon_id": "object_add_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ObjectAddTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_SpaceExport",
+    "object": "space",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "space_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SpaceExport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_SpaceExport",
+    "object": "space",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "space_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SpaceExport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_HeatExport",
+    "object": "heat",
+    "op": "export",
+    "plural": false,
+    "container": null,
+    "icon_id": "heat_export",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_HeatExport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_SpaceExportTrue",
+    "object": "space",
+    "op": "export",
+    "plural": true,
+    "container": null,
+    "icon_id": "space_export_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SpaceExportTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_MollierDiagram",
+    "resource": "SAM_UI_MollierChartDisplay",
+    "object": "mollierChart",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "mollierChart_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_MollierChartDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_GeometryDisplay",
+    "object": "geometry",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "geometry_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_GeometryDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_InternalConditionUpdateTrue",
+    "object": "internalCondition",
+    "op": "update",
+    "plural": true,
+    "container": null,
+    "icon_id": "internalCondition_update_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_InternalConditionUpdateTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_InternalConditionUpdateTrue",
+    "object": "internalCondition",
+    "op": "update",
+    "plural": true,
+    "container": null,
+    "icon_id": "internalCondition_update_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_InternalConditionUpdateTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_FanAdd",
+    "object": "fan",
+    "op": "add",
+    "plural": false,
+    "container": null,
+    "icon_id": "fan_add",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_FanAdd.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_EnergySimulation",
+    "resource": "SAM_UI_ThermometerRun",
+    "object": "thermometer",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "thermometer_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ThermometerRun.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_EnergySimulation",
+    "resource": "SAM_UI_CaseCreate",
+    "object": "case",
+    "op": "create",
+    "plural": false,
+    "container": null,
+    "icon_id": "case_create",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_CaseCreate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_ModelModify",
+    "object": "model",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "model_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ModelModify.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Clean",
+    "resource": "SAM_UI_ResultRemove",
+    "object": "result",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "result_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ResultRemove.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_ThermometerValidate",
+    "object": "thermometer",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "thermometer_validate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ThermometerValidate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_AlgorithmRun",
+    "object": "algorithm",
+    "op": "run",
+    "plural": false,
+    "container": null,
+    "icon_id": "algorithm_run",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_AlgorithmRun.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Space",
+    "resource": "SAM_UI_InternalConditionModifyTrue",
+    "object": "internalCondition",
+    "op": "modify",
+    "plural": true,
+    "container": null,
+    "icon_id": "internalCondition_modify_True",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_InternalConditionModifyTrue.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_TextMapModify",
+    "object": "textMap",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "textMap_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_TextMapModify.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_ObjectFilter",
+    "object": "object",
+    "op": "filter",
+    "plural": false,
+    "container": null,
+    "icon_id": "object_filter",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ObjectFilter.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_ObjectFilter",
+    "object": "object",
+    "op": "filter",
+    "plural": false,
+    "container": null,
+    "icon_id": "object_filter",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ObjectFilter.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_ObjectDisplay",
+    "object": "object",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "object_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ObjectDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_PrintRDS",
+    "resource": "SAM_UI_ViewSet",
+    "object": "view",
+    "op": "set",
+    "plural": false,
+    "container": null,
+    "icon_id": "view_set",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ViewSet.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_AirHandlingUnitDiagram",
+    "resource": "SAM_UI_AhuDisplay",
+    "object": "ahu",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "ahu_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_AhuDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_SpaceDiagram",
+    "resource": "SAM_UI_SpaceDisplay",
+    "object": "space",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "space_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SpaceDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_ResultRemove",
+    "object": "result",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "result_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ResultRemove.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_InfoGet",
+    "object": "info",
+    "op": "get",
+    "plural": false,
+    "container": null,
+    "icon_id": "info_get",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_InfoGet.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_SettingsInspect",
+    "object": "settings",
+    "op": "inspect",
+    "plural": false,
+    "container": null,
+    "icon_id": "settings_inspect",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_SettingsInspect.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_ListModify",
+    "object": "list",
+    "op": "modify",
+    "plural": false,
+    "container": null,
+    "icon_id": "list_modify",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ListModify.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_ListUpdate",
+    "object": "list",
+    "op": "update",
+    "plural": false,
+    "container": null,
+    "icon_id": "list_update",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ListUpdate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_Info",
+    "object": "info",
+    "op": null,
+    "plural": false,
+    "container": null,
+    "icon_id": "info",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_Info.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Analytical.UI.WPF",
+    "source": "WPF/SAM.Analytical.UI.WPF/Windows/AnalyticalWindow.xaml.cs",
+    "old_resource": "SAM_Wiki",
+    "resource": "SAM_UI_ObjectValidate",
+    "object": "object",
+    "op": "validate",
+    "plural": false,
+    "container": null,
+    "icon_id": "object_validate",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Analytical.UI.WPF/Resources/Icons/SAM_UI_ObjectValidate.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "WPF/SAM.Geometry.UI.WPF/Windows/GeometryWindow.xaml.cs",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_GeometryImport",
+    "object": "geometry",
+    "op": "import",
+    "plural": false,
+    "container": null,
+    "icon_id": "geometry_import",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/Icons/SAM_UI_GeometryImport.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "WPF/SAM.Geometry.UI.WPF/Windows/GeometryWindow.xaml.cs",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_GeometryRemove",
+    "object": "geometry",
+    "op": "remove",
+    "plural": false,
+    "container": null,
+    "icon_id": "geometry_remove",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/Icons/SAM_UI_GeometryRemove.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "WPF/SAM.Geometry.UI.WPF/Windows/GeometryWindow.xaml.cs",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_JsonDisplay",
+    "object": "json",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "json_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/Icons/SAM_UI_JsonDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "WPF/SAM.Geometry.UI.WPF/Windows/GeometryWindow.xaml.cs",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_Geometry2DDisplay",
+    "object": "geometry2D",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "geometry2D_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/Icons/SAM_UI_Geometry2DDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "WPF/SAM.Geometry.UI.WPF/Windows/GeometryWindow.xaml.cs",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_GeometryDisplay",
+    "object": "geometry",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "geometry_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/Icons/SAM_UI_GeometryDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "WPF/SAM.Geometry.UI.WPF/Windows/GeometryWindow.xaml.cs",
+    "old_resource": "SAM_Close",
+    "resource": "SAM_UI_GeometryDisplay",
+    "object": "geometry",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "geometry_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/Icons/SAM_UI_GeometryDisplay.png"
+  },
+  {
+    "project_dir": "WPF/SAM.Geometry.UI.WPF",
+    "source": "WPF/SAM.Geometry.UI.WPF/Windows/GeometryWindow.xaml.cs",
+    "old_resource": "SAM_Open",
+    "resource": "SAM_UI_Geometry2DDisplay",
+    "object": "geometry2D",
+    "op": "display",
+    "plural": false,
+    "container": null,
+    "icon_id": "geometry2D_display",
+    "size": [
+      32,
+      32
+    ],
+    "output": "WPF/SAM.Geometry.UI.WPF/Resources/Icons/SAM_UI_Geometry2DDisplay.png"
+  }
+]

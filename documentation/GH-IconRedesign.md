@@ -1,7 +1,7 @@
 # SAM Grasshopper icon redesign — SAM_UI PR record
 
 Branch `feature/sam-gh-icon-redesign-q4`, based on `sow/2026-Q4` @ `9bef0158`. PR: SAM-BIM/SAM_UI#203. Q4 migration of SAM-BIM/SAM_UI#138 (`feature/sam-gh-icon-redesign` @ `51de3fc7`, based on `sow/2026-Q3` @ `05800789`, kept open for provenance): the same commits replayed onto `sow/2026-Q4`; Q3 history was not imported.
-Propagates the SAM icon design system from SAM-BIM/SAM#166 (head `cf4d924a`, open, not merged) to this repository.
+Propagates the SAM icon design system from SAM-BIM/SAM#166 (head `cf4d924a`, closed historical reference) to this repository.
 
 ## Current status
 All **32** Grasshopper objects in this repo (31 components + 1 params) use redesigned icons: **32 / 32**.
