@@ -35,8 +35,13 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// the best simulation.</item>
     /// <item>Systems Demo case (D1, <c>SAM_APPLY_ACCEPTANCE_DEMO</c>): no model is open, a plant controller by golden section;
     /// the TPD alone is changed.</item>
+    /// <item>Setpoint cases on the model as its author set it (PR7b-2; the harness changes nothing): H1, a space's heating
+    /// setpoint, minimising annual heating demand (<c>SAM_APPLY_ACCEPTANCE_HEATING</c> = "space,minimum,maximum", default
+    /// "Bathroom_2,14,18"); C1, a space's cooling setpoint, minimising annual cooling demand
+    /// (<c>SAM_APPLY_ACCEPTANCE_COOLING</c>, default "Cell 1,22,28"). Golden section; the space must have that setpoint on.</item>
     /// </list>
-    /// <c>SAM_APPLY_ACCEPTANCE_CASES</c> selects cases (default S1,S2,D1).
+    /// <c>SAM_APPLY_ACCEPTANCE_CASES</c> selects cases (default S1,S2,D1). <c>SAM_APPLY_ACCEPTANCE_DIRECT=on</c> runs Energy
+    /// Simulation on the direct T3D route (the dialog's DirectT3D option) instead of the gbXML route.
     /// </summary>
     [Collection(WpfCollection.Name)]
     public class TasModelApplyAcceptanceHarness : IDisposable
@@ -90,9 +95,40 @@ namespace SAM.Analytical.UI.WPF.Tests
             {
                 await DemoCase("D1", demo, output);
             }
+
+            if (selected.Contains("H1"))
+            {
+                await SamCase("H1", sam, output, false, SetpointCase.Read("SAM_APPLY_ACCEPTANCE_HEATING", "Bathroom_2,14,18", true));
+            }
+
+            if (selected.Contains("C1"))
+            {
+                await SamCase("C1", sam, output, false, SetpointCase.Read("SAM_APPLY_ACCEPTANCE_COOLING", "Cell 1,22,28", false));
+            }
         }
 
-        private async Task SamCase(string id, string source, string output, bool glazing)
+        /// <summary>H1/C1: an existing heating or cooling setpoint of a space, optimised within a range.</summary>
+        private sealed class SetpointCase
+        {
+            public string Space { get; private set; } = string.Empty;
+
+            public bool Heating { get; private set; }
+
+            public string Minimum { get; private set; } = string.Empty;
+
+            public string Maximum { get; private set; } = string.Empty;
+
+            public string Quantity => Heating ? "heating" : "cooling";
+
+            public static SetpointCase Read(string variable, string defaultValue, bool heating)
+            {
+                string[] values = (Environment.GetEnvironmentVariable(variable) ?? defaultValue).Split(',').Select(x => x.Trim()).ToArray();
+                return new SetpointCase() { Space = values[0], Minimum = values[1], Maximum = values[2], Heating = heating };
+            }
+        }
+
+        /// <param name="setpoint">H1/C1: the existing setpoint to optimise; null for S1 and S2.</param>
+        private async Task SamCase(string id, string source, string output, bool glazing, SetpointCase? setpoint = null)
         {
             log = Path.Combine(output, id + ".log");
             File.WriteAllText(log, string.Empty);
@@ -143,7 +179,20 @@ namespace SAM.Analytical.UI.WPF.Tests
                     Log("windows given " + sky.Name + " " + sky.Guid + " (" + setGlazingResult.ApertureCount + " apertures); kept in the model, assigned to nothing: " + current.Name + " " + current.Guid);
                 }
 
-                if (!glazing)
+                if (setpoint != null)
+                {
+                    //The model is not changed: its author has the setpoint on in the space.
+                    Space? space = model.AdjacencyCluster.GetSpaces().SingleOrDefault(x => x.Name == setpoint.Space);
+                    Profile? profile = space?.InternalCondition?.GetProfile(setpoint.Heating ? ProfileType.Heating : ProfileType.Cooling, model.ProfileLibrary);
+                    double[] values = profile?.GetValues() ?? new double[0];
+                    Log("space " + setpoint.Space + " (internal condition " + space?.InternalCondition?.Name + ") " + setpoint.Quantity + " profile '" + profile?.Name + "': " + string.Join(" ", values.Select(Raw)));
+                    if (values.Length == 0 || values.All(x => setpoint.Heating ? x <= -50 : x >= 150))
+                    {
+                        Log("NOT RUNNABLE: the space has no " + setpoint.Quantity + " on in the source model");
+                        return;
+                    }
+                }
+                else if (!glazing)
                 {
                     //The source has cooling off everywhere: two rooms get one shared 24-hour cooling profile (23 °C 08-20,
                     //"no cooling" otherwise), as an engineer would before optimising its setpoint.
@@ -166,6 +215,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 string projectName = model.Name;
 
                 // Energy Simulation 1: the ordinary core, the dialog's options with Full Year 1-365.
+                Log("energy simulation route: " + (string.Equals(Environment.GetEnvironmentVariable("SAM_APPLY_ACCEPTANCE_DIRECT"), "on", StringComparison.OrdinalIgnoreCase) ? "direct T3D (DirectT3D on)" : "gbXML (DirectT3D off, the dialog's default)"));
                 Stopwatch stopwatch = Stopwatch.StartNew();
                 AnalyticalModel? simulated = EnergySimulation(ui, projectName, work, out string? path_TSD);
                 Log("energy simulation 1 in " + stopwatch.Elapsed.TotalSeconds.ToString("0", CultureInfo.InvariantCulture) + " s: " + (simulated == null ? "FAILED" : "TSD " + path_TSD));
@@ -179,7 +229,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 TasModelInventory inventory_1 = Analytical.Tas.GenOpt.Query.TasModelInventory(work);
                 LogInventory("after energy simulation 1", inventory_1);
 
-                if (!glazing)
+                if (!glazing && setpoint == null)
                 {
                     //For the real-application smoke: the simulated model saved beside a copy of its Tas files.
                     string app = Path.Combine(output, "app-ws");
@@ -215,6 +265,15 @@ namespace SAM.Analytical.UI.WPF.Tests
                     window.AddMeasure(Item(window.CanMeasureItems, "Overheating hours"));
                     window.AddMeasure(Item(window.CanMeasureItems, "Annual cooling demand"));
                 }
+                else if (setpoint != null)
+                {
+                    TasOptimisationParameterRow row = window.AddTarget(Item(window.CanChangeItems, setpoint.Space + " " + setpoint.Quantity + " setpoint"))!;
+                    row.Minimum = setpoint.Minimum;
+                    row.Maximum = setpoint.Maximum;
+                    Text(window, "textBox_Tolerance", "10");
+                    window.AddMeasure(Item(window.CanMeasureItems, "Annual " + setpoint.Quantity + " demand"));
+                    window.AddMeasure(Item(window.CanMeasureItems, "Overheating hours"));
+                }
                 else
                 {
                     TasOptimisationParameterRow row = window.AddTarget(Item(window.CanChangeItems, "Studio 1_0 cooling setpoint"))!;
@@ -249,7 +308,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 SizingCopies(work, "after energy simulation 2");
                 TasModelInventory inventory_2 = Analytical.Tas.GenOpt.Query.TasModelInventory(work);
                 LogInventory("after energy simulation 2", inventory_2);
-                CompareWithBest(window, inventory_1, inventory_2, glazing);
+                CompareWithBest(window, inventory_1, inventory_2, glazing, setpoint);
 
                 if (glazing)
                 {
@@ -359,7 +418,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Sizing = simulateOptions.Sizing && !string.Equals(Environment.GetEnvironmentVariable("SAM_APPLY_ACCEPTANCE_SIZING"), "off", StringComparison.OrdinalIgnoreCase),
                 UseWidths = simulateOptions.UseWidths,
                 UpdateConstructionLayersByPanelType = simulateOptions.UpdateConstructionLayersByPanelType,
-                DirectT3D = simulateOptions.DirectT3D,
+                DirectT3D = simulateOptions.DirectT3D || string.Equals(Environment.GetEnvironmentVariable("SAM_APPLY_ACCEPTANCE_DIRECT"), "on", StringComparison.OrdinalIgnoreCase),
             };
 
             AnalyticalModel analyticalModel = new AnalyticalModel(ui.JSAMObject) { Name = projectName };
@@ -484,15 +543,18 @@ namespace SAM.Analytical.UI.WPF.Tests
             TasModelDesignChange change = applied.Change;
             if (change.IsSetpoint)
             {
-                TasSetpointProfile? profile = inventory.InternalConditions.Single(x => x.Name == change.InternalCondition).Cooling;
+                string quantity = change.IsHeating ? "heating" : "cooling";
+                TasInternalConditionInfo condition = inventory.InternalConditions.Single(x => x.Name == change.InternalCondition);
+                TasSetpointProfile? profile = change.IsHeating ? condition.Heating : condition.Cooling;
                 List<float> hours = profile?.Hours?.ToList() ?? new List<float>();
-                Log("TBD " + change.InternalCondition + " cooling hours now: " + string.Join(" ", hours.Select(Raw)) + "; (float)best = " + Raw((float)best) + " in " + hours.Count(x => x == (float)best) + " hours -> " + (hours.Count(x => x == (float)best) > 0 ? "PASS" : "FAIL"));
+                bool written = hours.Count(x => x == (float)best) > 0 || (profile?.Type == TasSetpointProfileType.Value && profile.Setpoint.HasValue && (float)profile.Setpoint.Value == (float)best);
+                Log("TBD " + change.InternalCondition + " " + quantity + " " + profile?.Type + " profile now: setpoint " + (profile?.Setpoint.HasValue == true ? Raw(profile.Setpoint!.Value) : "-") + ", hours " + string.Join(" ", hours.Select(Raw)) + "; (float)best = " + Raw((float)best) + " in " + hours.Count(x => x == (float)best) + " hours -> " + (written ? "PASS" : "FAIL"));
                 AnalyticalModel model = window.UIAnalyticalModel!.JSAMObject;
                 Space space = model.AdjacencyCluster.GetSpaces().Single(x => x.Name == change.InternalCondition);
-                Profile cooling = space.InternalCondition.GetProfile(ProfileType.Cooling, model.ProfileLibrary);
-                double[] values = Query.TasHours(cooling);
+                Profile samProfile = space.InternalCondition.GetProfile(change.IsHeating ? ProfileType.Heating : ProfileType.Cooling, model.ProfileLibrary);
+                double[] values = Query.TasHours(samProfile);
                 int exact = values.Count(x => BitConverter.DoubleToInt64Bits(x) == BitConverter.DoubleToInt64Bits(best));
-                Log("SAM model space " + space.Name + " cooling profile '" + cooling.Name + "': " + string.Join(" ", values.Select(Raw)) + "; best " + Raw(best) + " bit-exact in " + exact + " hours -> " + (exact > 0 ? "PASS" : "FAIL"));
+                Log("SAM model space " + space.Name + " " + quantity + " profile '" + samProfile.Name + "': " + string.Join(" ", values.Select(Raw)) + "; best " + Raw(best) + " bit-exact in " + exact + " hours -> " + (exact > 0 ? "PASS" : "FAIL"));
             }
             else if (change.IsGlazing)
             {
@@ -514,23 +576,30 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>Energy Simulation of the applied model against the best simulation of the run.</summary>
-        private void CompareWithBest(TasOptimisationWindow window, TasModelInventory inventory_1, TasModelInventory inventory_2, bool glazing)
+        /// <param name="setpoint">H1/C1: the setpoint that was optimised (objective: that demand); null for S1 (Studio 1_0 cooling) and S2.</param>
+        private void CompareWithBest(TasOptimisationWindow window, TasModelInventory inventory_1, TasModelInventory inventory_2, bool glazing, SetpointCase? setpoint = null)
         {
             TasOptimisationReport report = window.Report!;
             double objective = report.BestObjectives[glazing ? 1 : 0];
-            double? cooling = inventory_2.CoolingDemand;
-            Log("annual cooling demand: energy simulation 1 " + (inventory_1.CoolingDemand.HasValue ? Raw(inventory_1.CoolingDemand.Value) : "-") + ", best simulation of the run " + Raw(objective) + ", energy simulation 2 " + (cooling.HasValue ? Raw(cooling.Value) : "-") + (cooling.HasValue ? "; difference " + Raw(cooling.Value - objective) + (cooling.Value == objective ? " (bit-identical)" : string.Empty) : string.Empty));
+            bool heating = setpoint?.Heating == true;
+            string quantity = heating ? "heating" : "cooling";
+            double? demand_1 = heating ? inventory_1.HeatingDemand : inventory_1.CoolingDemand;
+            double? demand_2 = heating ? inventory_2.HeatingDemand : inventory_2.CoolingDemand;
+            Log("annual " + quantity + " demand: energy simulation 1 " + (demand_1.HasValue ? Raw(demand_1.Value) : "-") + ", best simulation of the run " + Raw(objective) + ", energy simulation 2 " + (demand_2.HasValue ? Raw(demand_2.Value) : "-") + (demand_2.HasValue ? "; difference " + Raw(demand_2.Value - objective) + " relative " + Raw(objective == 0 ? 0 : Math.Abs((demand_2.Value - objective) / objective)) + (demand_2.Value == objective ? " (bit-identical)" : string.Empty) : string.Empty));
 
             if (!glazing)
             {
-                TasSetpointProfile? before = inventory_1.InternalConditions.Single(x => x.Name == "Studio 1_0").Cooling;
-                TasSetpointProfile? after = inventory_2.InternalConditions.Single(x => x.Name == "Studio 1_0").Cooling;
+                string space = setpoint?.Space ?? "Studio 1_0";
+                TasInternalConditionInfo info_1 = inventory_1.InternalConditions.Single(x => x.Name == space);
+                TasInternalConditionInfo info_2 = inventory_2.InternalConditions.Single(x => x.Name == space);
+                TasSetpointProfile? before = heating ? info_1.Heating : info_1.Cooling;
+                TasSetpointProfile? after = heating ? info_2.Heating : info_2.Cooling;
                 float best = (float)report.BestPoint[0];
-                float setpoint = (float)(before?.Setpoint ?? double.NaN);
-                List<float> expected = (before?.Hours ?? new List<float>()).Select(x => x == setpoint ? best : x).ToList();
+                float value = (float)(before?.Setpoint ?? double.NaN);
+                List<float> expected = (before?.Hours ?? new List<float>()).Select(x => x == value ? best : x).ToList();
                 bool same = after?.Hours != null && after.Hours.SequenceEqual(expected);
-                Log("energy simulation 2 TBD Studio 1_0 cooling hours: " + string.Join(" ", (after?.Hours ?? new List<float>()).Select(Raw)) + " -> " + (same ? "PASS (the best value in the hours at the setpoint, the setback kept)" : "FAIL"));
-                foreach (TasInternalConditionInfo info in inventory_1.InternalConditions.Where(x => x.Name != "Studio 1_0"))
+                Log("energy simulation 2 TBD " + space + " " + quantity + " hours: " + string.Join(" ", (after?.Hours ?? new List<float>()).Select(Raw)) + (after?.Type == TasSetpointProfileType.Value ? " (value profile " + Raw(after.Setpoint ?? double.NaN) + ")" : string.Empty) + " -> " + (same || (after?.Type == TasSetpointProfileType.Value && after.Setpoint.HasValue && (float)after.Setpoint.Value == best) ? "PASS (the best value in the hours at the setpoint, the setback kept)" : "FAIL"));
+                foreach (TasInternalConditionInfo info in inventory_1.InternalConditions.Where(x => x.Name != space))
                 {
                     TasInternalConditionInfo? other = inventory_2.InternalConditions.FirstOrDefault(x => x.Name == info.Name);
                     bool unchanged = other != null && Same(info.Heating, other.Heating) && Same(info.Cooling, other.Cooling);
@@ -578,10 +647,15 @@ namespace SAM.Analytical.UI.WPF.Tests
 
         private void LogInventory(string title, TasModelInventory inventory)
         {
-            Log(title + ": files " + inventory.TbdFileName + " " + inventory.TsdFileName + " " + inventory.TpdFileName + "; cooling demand " + (inventory.CoolingDemand.HasValue ? Raw(inventory.CoolingDemand.Value) : "-") + " kWh");
+            Log(title + ": files " + inventory.TbdFileName + " " + inventory.TsdFileName + " " + inventory.TpdFileName + "; cooling demand " + (inventory.CoolingDemand.HasValue ? Raw(inventory.CoolingDemand.Value) : "-") + " kWh; heating demand " + (inventory.HeatingDemand.HasValue ? Raw(inventory.HeatingDemand.Value) : "-") + " kWh");
             foreach (TasInternalConditionInfo info in inventory.InternalConditions.Where(x => x.Name.StartsWith("Studio", StringComparison.Ordinal)))
             {
                 Log("  " + info.Name + ": cooling " + info.Cooling?.Type + " " + (info.Cooling?.Setpoint.HasValue == true ? Raw(info.Cooling.Setpoint!.Value) : "-") + " hours " + string.Join(" ", info.Cooling?.Hours?.Select(Raw) ?? new string[0]));
+            }
+
+            foreach (TasInternalConditionInfo info in inventory.InternalConditions.Where(x => x.Heating?.Setpoint > -50))
+            {
+                Log("  " + info.Name + ": heating " + info.Heating?.Type + " " + Raw(info.Heating!.Setpoint!.Value) + " hours " + string.Join(" ", info.Heating.Hours?.Select(Raw) ?? new string[0]));
             }
 
             foreach (TasGlazingConstructionInfo info in inventory.GlazingConstructions)
