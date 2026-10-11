@@ -72,8 +72,9 @@ test project's ignored `TestResults/` directory; these files do not travel with 
 ## Status and next step
 
 Implementation and local validation complete; PR #221 targets `SAM-BIM/SAM_UI:sow/2026-Q4`.
-No automatic CI runs appeared on the initial PR head; request the existing Windows build workflow
-on the final evidence head. The SPDX workflow's manual mode explicitly skips PR file checks, so
+Initial automatic CI scheduling was delayed; the existing Windows build workflow was also requested.
+Automatic PR build/SPDX checks subsequently appeared. Review checks on the current PR head.
+The SPDX workflow's manual mode explicitly skips PR file checks, so
 do not claim a manual SPDX run as validation. The changed C# file retains both required headers.
 Review final-head CI and obtain owner merge approval. Merge this fix
 before PR9, then incorporate the merged Q4 change into PR9 and revalidate its final head. After this
