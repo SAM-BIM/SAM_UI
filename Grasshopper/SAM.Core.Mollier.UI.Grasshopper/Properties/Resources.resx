@@ -127,4 +127,43 @@
   <data name="SAM_Small" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\SAM_Small.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="SAM_GH_GeometryConvert" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_GeometryConvert.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_MollierChart" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_MollierChart.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_MollierChartCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_MollierChartCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_MollierPointCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_MollierPointCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_MollierProcessCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_MollierProcessCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_ProcessAdiabaticCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_ProcessAdiabaticCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_ProcessCoolingCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_ProcessCoolingCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_ProcessFanCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_ProcessFanCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_ProcessHeatRecoveryCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_ProcessHeatRecoveryCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_ProcessHeatingCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_ProcessHeatingCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_ProcessHumidificationCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_ProcessHumidificationCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_ProcessMixingCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_ProcessMixingCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SAM_GH_ProcessRoomCreate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Icons\SAM_GH_ProcessRoomCreate.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
 </root>

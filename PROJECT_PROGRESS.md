@@ -1,5 +1,23 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Part O progress test closeout — 2026-10-11
+
+- [SAM_UI#221](https://github.com/SAM-BIM/SAM_UI/pull/221) merged with owner approval as `057609d244db3e8e51713d6d32fb41d8baa1e149`; reviewed head `e4566b763f434826e5acd43f9de254c95a1104f5` had build/SPDX PASS. Source branch removed after merge.
+- Reproduced the reported UI Automation partial snapshot twice with repeated reads during the progress window's 500 ms dispatcher refresh. Replaced fixed sleeps with a bounded wait for all expected text in one snapshot; strengthened preparation/simulation status assertions and retained elapsed text. Production code unchanged.
+- Files: `WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowSimplificationTests.cs`, `documentation/PartO-Progress-Test-Synchronisation.md`; this post-merge closeout changes only `PROJECT_PROGRESS.md`.
+- Validation: full Release suite 2768/2768 PASS; 1000 repeated snapshot checks PASS; 10/10 independent regression runs PASS; missing-content mutation correctly FAILS after timeout; mutation reverted and final source rebuilt. `git diff --check` PASS. No known blocker for this test fix.
+- Exact next step: incorporate current Q4 into open SAM_UI#220, update its record/description to log this resolved flake, and validate its new head. PR9 remains unmerged; retain owner review and SAM_Tas#93-before-SAM_UI#220 dependency validation requirements. This closeout does not approve PR9.
+
+## Icon migration closeout — 2026-10-11
+
+- [SAM_UI#203](https://github.com/SAM-BIM/SAM_UI/pull/203) merged as `0b4ba4c038bf259764af6e3bd2dfed8adcead826`; owner authorized merging after green/safe validation. Feature branch preserved.
+- Completed frozen SAM#179 glyph/palette/badge migration; component GUIDs, APIs, namespaces, metadata and behavior preserved. Icon resources, manifests/generation kit, token assignments and PR validation record changed; no unrelated production refactor.
+- Fresh local `Release` build PASS; source guard 117 token swaps / 0 non-icon C# changes (standard SPDX headers and additive resource properties excepted); 214 resource references / 0 errors. Final-head GitHub checks passed before merge. Available regression test results are recorded in `documentation/Icon-Migration-Validation-2026-10-11.md`; hosted Rhino smoke is not claimed as a fresh pass.
+- Revit-family additional builds: 2025/2027 passed where applicable. OCCT native build and native integration cases were not required for resource-only changes; skips remain documented.
+- Remaining: no known blocker for this merged icon PR. SAM_Building and separate local test/environment failures elsewhere remain tracked in the organisation audit; unrelated PR9 is not merged by this task. All network operations target SAM-BIM; historical external integration/attribution text is unchanged.
+- Exact next step: owner visual review of merged icons in the installed host, then continue other work from current Q4. No installer/submodule repin is included in this closeout.
+
+
 ## Branch
 
 `sow/2026-Q4` - bootstrapped 2026-10-06 from `master` `ab080134`. Frozen Q3 record: `sow/2026-Q3` @ `f6fab16c` (not modified).
