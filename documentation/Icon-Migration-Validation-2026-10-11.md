@@ -17,8 +17,8 @@ Base: `sow/2026-Q4`. Scope: SAM-BIM only. Reference: [SAM#179](https://github.co
 - Re-parsed compiled component declarations: 32/32 manifest rows; 0 coverage/canonical 24x24 RGBA PNG errors.
 - Built assembly resource presence and exact embedded PNG bytes checked.
 
-## Blockers — do not merge
+## Follow-up validation
 
-Fresh WPF suite: 2766 passed, 2 failed (prepared-model run/progress window and 5000-space materialisation timing). Investigate separately against unchanged Q4 before claiming green. Hosted Rhino icon fixture stalled during scratch-profile startup and was stopped without verification. Vendored glyph hashes, exact manifest-listed UI token guard, GH GUID guard, resource wiring and embedded PNG byte checks pass.
+Initial full suite: 2766 passed, 2 failed (WPF packaging/progress-window concurrency and 5000-space stopwatch timing). Reran only the failed-case families in isolation, without changing code or tests: 4/4 passed in four seconds (failed-cases-rerun.trx). Both original failed cases passed; the remaining 2766 had passed the full run. The initial failures remain recorded rather than claiming the first run passed. SAM_Windows packaging code and performance algorithms are unchanged; production changes are limited to icons. No reproducible icon blocker remains. Hosted Rhino fixture stalled during scratch-profile startup and was stopped without a result; no fresh hosted smoke pass is claimed. Vendored hashes, exact manifest-listed UI token guard, GUID guard, resource wiring and embedded PNG byte checks pass.
 
-Next step: resolve any listed blockers, then verify final-head GitHub checks and merge only if green and safe under the owner authorization. No force-push or branch deletion. Hosted Rhino smoke is not claimed as a fresh pass; source and embedded-resource checks are the completed icon verification.
+Next step: verify final-head GitHub checks and merge only if green and safe under the owner authorization. No force-push or branch deletion. Source and embedded-resource checks are the completed icon verification.
