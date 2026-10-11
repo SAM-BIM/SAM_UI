@@ -4,13 +4,13 @@
 # Native Optimisation PR7b-2: licensed acceptance (SAM_UI part)
 
 Branch `feature/optimisation-pr7b2-acceptance` → base `sow/2026-Q4` (cut from `18d59010`, the Sizing closeout). Record
-date: 2026-10-11. **Record of record:** SAM_Tas `SAM_Tas/SAM.Analytical.Tas.GenOpt/NATIVE_OPTIMISATION_PR7B2.md` (the
+date: 2026-10-11. This is SAM-BIM/SAM_UI#223. **Record of record:** SAM-BIM/SAM_Tas#95, `SAM_Tas/SAM.Analytical.Tas.GenOpt/NATIVE_OPTIMISATION_PR7B2.md` (the
 coverage matrix, the evidence, defect D1 and its options, the missing inputs). Independent of the SAM_Tas PR (no API
 change in either); either can merge first.
 
 ## Current status
 
-Test-only change, validated; open, not merged. **No product code changed.** Owner decision pending on D1 (SAM_Tas record).
+Test-only change, validated; SAM-BIM/SAM_UI#223 open, not merged. **No product code changed.** Owner decision pending on D1 (SAM_Tas record).
 
 ## What changed
 
