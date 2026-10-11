@@ -19,7 +19,8 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// missing / unreadable / ready; an unreadable file is never overwritten; the previous file is kept as .bak and no temporary or lock file is
     /// left; a second writer waits for the lock and a timeout fails explicitly and writes nothing; concurrent transactions are serialised and
     /// none is lost; the edit runs under the lock; a failed write (injected through the test seam) leaves the file as it was; a throwing change
-    /// handler does not stop the others. Each test uses its own temporary folder.
+    /// handler does not stop the others; a swap refused for a moment by another program holding the file or its .bak is retried a bounded
+    /// number of times and anything else is reported at once. Each test uses its own temporary folder.
     /// </summary>
     public sealed class UserLibraryFileTests : IDisposable
     {
@@ -321,6 +322,282 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(new[] { companion.Path }, targets);
             Assert.Equal(new[] { "Gone" }, Names(companion.Read()));
             Assert.NotEqual(file.LockPath, companion.LockPath);
+        }
+
+        // ---- A swap refused for a moment ----------------------------------------------------------------------------------
+        //
+        // Windows refuses File.Replace while anything has the existing .bak open (even sharing read, write and delete), and while anything has
+        // the file open without delete sharing. An antivirus or DLP scan of the file the previous save just rotated to .bak does exactly that, a
+        // few tens of milliseconds at a time - the cause of the old intermittent "Unable to remove the file to be replaced". These hold the file
+        // the same way, through the attempt seam, so the refusals are real and deterministic.
+
+        // Opens path the way a scanner might.
+        private static FileStream Hold(string path, FileShare share) => new FileStream(path, FileMode.Open, FileAccess.Read, share);
+
+        [Fact]
+        public void A_bak_held_open_for_a_moment_is_retried_and_the_write_lands_with_the_previous_file_as_bak()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A", "B"))));
+            string previous = Hash(file.Path);
+
+            List<int> attempts = new List<int>();
+            FileStream held = null;
+            file.BeforeReplace = attempt =>
+            {
+                attempts.Add(attempt);
+                if (attempt == 1)
+                {
+                    held = Hold(file.BackupPath, FileShare.ReadWrite | FileShare.Delete);
+                }
+                else
+                {
+                    held?.Dispose();
+                }
+            };
+
+            string error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B", "C")));
+            held?.Dispose();
+
+            Assert.Null(error);
+            Assert.Equal(new[] { 1, 2 }, attempts);
+            Assert.Equal(new[] { "A", "B", "C" }, Names(file.Read()));
+            Assert.Equal(previous, Hash(file.BackupPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+            Assert.False(File.Exists(file.LockPath));
+        }
+
+        [Fact]
+        public void A_file_held_open_without_delete_sharing_is_retried_until_it_is_let_go()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+
+            List<int> attempts = new List<int>();
+            FileStream held = null;
+            file.BeforeReplace = attempt =>
+            {
+                attempts.Add(attempt);
+                if (attempt == 1)
+                {
+                    held = Hold(file.Path, FileShare.Read);
+                }
+                else if (attempt == 3)
+                {
+                    held.Dispose();
+                }
+            };
+
+            string error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B")));
+            held?.Dispose();
+
+            Assert.Null(error);
+            Assert.Equal(new[] { 1, 2, 3 }, attempts);
+            Assert.Equal(new[] { "A", "B" }, Names(file.Read()));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+        }
+
+        [Fact]
+        public void A_bak_that_stays_held_fails_after_a_bounded_number_of_attempts_with_the_reason_and_leaves_the_file_as_it_was()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A", "B"))));
+            string hash = Hash(file.Path);
+            string hash_Backup = Hash(file.BackupPath);
+
+            List<int> attempts = new List<int>();
+            file.BeforeReplace = attempt => attempts.Add(attempt);
+            string error;
+            System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            using (Hold(file.BackupPath, FileShare.ReadWrite | FileShare.Delete))
+            {
+                error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B", "C")));
+            }
+
+            stopwatch.Stop();
+
+            Assert.Equal(Enumerable.Range(1, UserLibraryFile.ReplaceAttempts), attempts);
+            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), "The retries took " + stopwatch.Elapsed);
+            Assert.StartsWith("Test Library.json could not be written: ", error);
+            Assert.Contains("still refused after 5 attempts; another program may be holding Test Library.json or Test Library.json.bak open", error);
+            Assert.Equal(hash, Hash(file.Path));
+            Assert.Equal(hash_Backup, Hash(file.BackupPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+            Assert.False(File.Exists(file.LockPath));
+
+            file.BeforeReplace = null;
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A", "B", "C"))));
+            Assert.Equal(new[] { "A", "B", "C" }, Names(file.Read()));
+        }
+
+        [Fact]
+        public void A_failure_that_is_not_a_momentary_hold_is_reported_at_once_without_retrying()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string hash = Hash(file.Path);
+
+            List<int> attempts = new List<int>();
+            file.BeforeReplace = attempt =>
+            {
+                attempts.Add(attempt);
+                throw new IOException("disk full");
+            };
+
+            string error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B")));
+
+            Assert.Equal(new[] { 1 }, attempts);
+            Assert.Equal("Test Library.json could not be written: disk full", error);
+            Assert.Equal(hash, Hash(file.Path));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+        }
+
+        // What File.Replace leaves after ERROR_UNABLE_TO_MOVE_REPLACEMENT_2: the previous file is already .bak, the new one is still the
+        // temporary file and there is no target.
+        private static void PartialSwap(UserLibraryFile file)
+        {
+            File.Move(file.Path, file.BackupPath, true);
+            throw new IOException("Unable to move the replacement file to the file to be replaced (simulated).", unchecked((int)0x80070499));
+        }
+
+        [Fact]
+        public void After_a_partial_swap_the_next_attempt_moves_the_new_file_in_and_the_previous_one_is_the_bak()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string previous = Hash(file.Path);
+
+            List<int> attempts = new List<int>();
+            file.BeforeReplace = attempt =>
+            {
+                attempts.Add(attempt);
+                if (attempt == 1)
+                {
+                    PartialSwap(file);
+                }
+            };
+
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A", "B"))));
+
+            Assert.Equal(new[] { 1, 2 }, attempts);
+            Assert.Equal(new[] { "A", "B" }, Names(file.Read()));
+            Assert.Equal(previous, Hash(file.BackupPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+        }
+
+        [Fact]
+        public void A_partial_swap_that_is_never_completed_puts_the_previous_file_back_before_failing()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string previous = Hash(file.Path);
+
+            file.BeforeReplace = attempt =>
+            {
+                if (attempt == 1)
+                {
+                    PartialSwap(file);
+                }
+
+                throw new IOException("still held", unchecked((int)0x80070020));
+            };
+
+            string error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B")));
+
+            Assert.Contains("still refused after 5 attempts", error);
+            Assert.Equal(previous, Hash(file.Path));
+            Assert.Equal(new[] { "A" }, Names(file.Read()));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+            Assert.False(File.Exists(file.LockPath));
+        }
+
+        [Fact]
+        public void A_partial_swap_followed_by_another_failure_puts_the_previous_file_back()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string previous = Hash(file.Path);
+
+            file.BeforeReplace = attempt =>
+            {
+                if (attempt == 1)
+                {
+                    PartialSwap(file);
+                }
+
+                throw new IOException("disk full");
+            };
+
+            string error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B")));
+
+            Assert.Equal("Test Library.json could not be written: disk full", error);
+            Assert.Equal(previous, Hash(file.Path));
+        }
+
+        [Fact]
+        public void When_the_previous_file_cannot_be_put_back_the_error_says_where_it_is()
+        {
+            UserLibraryFile file = Engine();
+            Assert.Null(file.Transact(content => UserLibraryEdit.Write(Library("A"))));
+            string previous = Hash(file.Path);
+
+            string error;
+            FileStream held = null;
+            try
+            {
+                // The .bak is opened exclusively after the partial swap, so it cannot be copied back.
+                file.BeforeReplace = attempt =>
+                {
+                    if (attempt == 1)
+                    {
+                        File.Move(file.Path, file.BackupPath, true);
+                        held = new FileStream(file.BackupPath, FileMode.Open, FileAccess.Read, FileShare.None);
+                    }
+
+                    throw new IOException("disk full");
+                };
+
+                error = file.Transact(content => UserLibraryEdit.Write(Library("A", "B")));
+            }
+            finally
+            {
+                held?.Dispose();
+            }
+
+            Assert.StartsWith("Test Library.json could not be written: disk full The previous Test Library.json could not be put back (", error);
+            Assert.EndsWith("); it is kept as Test Library.json.bak.", error);
+            Assert.False(File.Exists(file.Path));
+            Assert.Equal(previous, Hash(file.BackupPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
+        }
+
+        [Theory]
+        [InlineData(unchecked((int)0x80070020), true)]  // sharing violation
+        [InlineData(unchecked((int)0x80070021), true)]  // lock violation
+        [InlineData(unchecked((int)0x80070497), true)]  // unable to remove the file to be replaced
+        [InlineData(unchecked((int)0x80070498), true)]  // unable to move the replacement
+        [InlineData(unchecked((int)0x80070499), true)]  // unable to move the replacement (2)
+        [InlineData(unchecked((int)0x80070005), false)] // access denied
+        [InlineData(unchecked((int)0x80070003), false)] // path not found
+        [InlineData(unchecked((int)0x80070070), false)] // disk full
+        [InlineData(unchecked((int)0x80131620), false)] // a plain IOException
+        public void Only_a_momentary_hold_counts_as_a_transient_swap_failure(int hResult, bool transient)
+        {
+            Assert.Equal(transient, UserLibraryFile.IsTransientReplaceFailure(new IOException("x", hResult)));
+        }
+
+        [Fact]
+        public void A_companion_file_shares_the_attempt_seam()
+        {
+            UserLibraryFile file = Engine();
+            List<int> attempts = new List<int>();
+            file.BeforeReplace = attempt => attempts.Add(attempt);
+
+            file.Companion(UserLibraryArchive.PathFor(file.Path), "Removed", "test library").Write(Library("Gone"));
+
+            Assert.Equal(new[] { 1 }, attempts);
         }
 
         [Theory]

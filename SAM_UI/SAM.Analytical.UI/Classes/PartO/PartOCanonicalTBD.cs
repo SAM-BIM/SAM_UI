@@ -314,7 +314,7 @@ namespace SAM.Analytical.UI
             //Everything the workflow settings carry that changes the prepared TBD. The PROJECT NAME is
             //deliberately absent: it is the one thing every round must change, and it decides which files a
             //round writes rather than what is in them.
-            Append(stringBuilder, "case",
+            List<string> descriptions_Case =
             [
                 string.Format("solar={0}", partOSimulationContext.SolarCalculationMethod),
                 string.Format("weather={0}", partOSimulationContext.WeatherData?.Name ?? "-"),
@@ -324,7 +324,17 @@ namespace SAM.Analytical.UI
                 string.Format("unmetHours={0}", partOSimulationContext.UnmetHours),
                 string.Format("useWidths={0}", partOSimulationContext.UseWidths),
                 string.Format("updateConstructionLayers={0}", partOSimulationContext.UpdateConstructionLayersByPanelType),
-            ]);
+            ];
+
+            //Direct T3D converts the same model to a different TBD (zone volumes differ with widths, surface sides are set by
+            //the converter), so a conversion made by one route is never the baseline of a case on the other. Stated only where
+            //it is used: a gbXML case's fingerprint is exactly what it always was.
+            if (partOSimulationContext.UsesDirectT3D)
+            {
+                descriptions_Case.Add("t3d=Direct");
+            }
+
+            Append(stringBuilder, "case", descriptions_Case);
 
             return stringBuilder.ToString();
         }

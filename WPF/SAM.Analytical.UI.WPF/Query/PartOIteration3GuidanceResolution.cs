@@ -74,7 +74,7 @@ namespace SAM.Analytical.UI.WPF
 
             if (partODwellingStrategySet is null || !partODwellingStrategySet.IsValid)
             {
-                refusals.Add("The prepared design has no valid saved Part O dwelling strategy selections, so its cooling control rooms cannot be resolved.");
+                refusals.Add(PartOIteration3NoDwellingStrategiesRefusal);
                 return refusals;
             }
 

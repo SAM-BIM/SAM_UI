@@ -50,6 +50,7 @@ namespace SAM.Analytical.UI.WPF
                     Sizing = partOSimulationContext.Sizing,
                     UseWidths = partOSimulationContext.UseWidths,
                     UpdateConstructionLayersByPanelType = partOSimulationContext.UpdateConstructionLayersByPanelType,
+                    DirectT3D = partOSimulationContext.DirectT3D,
                     Length_TSD = simulationResultProvenance.Length_TSD,
                     Timestamp_TSD = simulationResultProvenance.Timestamp_TSD,
                     Fingerprint_PreparedModel = SimulationResultProvenance.Fingerprint(analyticalModel_Prepared),

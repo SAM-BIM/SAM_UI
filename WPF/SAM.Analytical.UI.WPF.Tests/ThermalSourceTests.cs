@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -298,6 +299,110 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.False(entry.HasContent);
             Assert.StartsWith("panes.tcd contains 3 panes", entry.StatusText);
             Assert.Empty(catalog.ReadySources);
+        }
+
+        [Fact]
+        public async Task A_progress_report_that_arrives_while_or_after_the_outcome_is_published_never_replaces_it()
+        {
+            // Progress is posted to the context that asked, so a report can land at any moment, even in the middle of the outcome (that is how
+            // "Reading panes.tcd…" once replaced the note above, in a run under load). Here every post is held and delivered at each notification
+            // the entry raises: an observer must never see a half-published outcome (the pool there but the state still Loading), the progress
+            // shows while reading, and once the entry is Ready its line stays the outcome - also when a report arrives after it.
+            const string note = "panes.tcd contains 3 panes and no constructions or glazing systems.";
+            GlazingSource panes = new GlazingSource(GlazingSourceKind.Loaded, "panes.tcd", new ConstructionManager()) { Note = note };
+            TaskCompletionSource<bool> gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            IProgress<string> reported = null;
+            ThermalSourceCatalog catalog = new ThermalSourceCatalog(new InMemoryThermalSourceStore(), async (path, progress) =>
+            {
+                reported = progress;
+                progress.Report("Reading panes.tcd…");
+                await gate.Task;
+                return panes;
+            });
+
+            QueueingSynchronizationContext context = new QueueingSynchronizationContext();
+            List<(ThermalSourceState State, bool HasSource, string StatusText)> seen = new List<(ThermalSourceState State, bool HasSource, string StatusText)>();
+            ThermalSourceEntry observed = null;
+            catalog.PropertyChanged += (sender, e) =>
+            {
+                if (observed == null && catalog.Entries.Count == 1)
+                {
+                    observed = catalog.Entries[0];
+                    observed.PropertyChanged += (sender_Entry, e_Entry) =>
+                    {
+                        seen.Add((observed.State, observed.Source != null, observed.StatusText));
+                        context.Drain();
+                    };
+                }
+            };
+
+            Task add;
+            SynchronizationContext previous = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(context);
+            try
+            {
+                add = catalog.AddAsync(FakeSourceReader.Path("panes.tcd"));
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previous);
+            }
+
+            // Reading: the progress shows.
+            context.Drain();
+            Assert.False(add.IsCompleted);
+            Assert.Equal("Reading panes.tcd…", observed.StatusText);
+
+            // Read: the continuations of the read run through the held context, and the outcome is published.
+            gate.SetResult(true);
+            context.Drain();
+            Assert.True(add.IsCompleted);
+            await add;
+
+            // A report that arrives after the outcome is dropped.
+            reported.Report("Reading panes.tcd…");
+            context.Drain();
+
+            ThermalSourceEntry entry = Assert.Single(catalog.Entries);
+            Assert.Same(observed, entry);
+            Assert.DoesNotContain(seen, x => x.State == ThermalSourceState.Loading && x.HasSource);
+            Assert.All(seen.SkipWhile(x => x.State != ThermalSourceState.Ready), x => Assert.Equal(note, x.StatusText));
+            Assert.Equal(ThermalSourceState.Ready, entry.State);
+            Assert.False(entry.HasContent);
+            Assert.Equal(note, entry.StatusText);
+        }
+
+        // Holds what is posted to it until the test delivers it.
+        private sealed class QueueingSynchronizationContext : SynchronizationContext
+        {
+            private readonly Queue<(SendOrPostCallback Callback, object State)> posted = new Queue<(SendOrPostCallback Callback, object State)>();
+
+            public override void Post(SendOrPostCallback d, object state)
+            {
+                lock (posted)
+                {
+                    posted.Enqueue((d, state));
+                }
+            }
+
+            public void Drain()
+            {
+                while (true)
+                {
+                    (SendOrPostCallback Callback, object State) item;
+                    lock (posted)
+                    {
+                        if (posted.Count == 0)
+                        {
+                            return;
+                        }
+
+                        item = posted.Dequeue();
+                    }
+
+                    item.Callback(item.State);
+                }
+            }
         }
 
         [Fact]

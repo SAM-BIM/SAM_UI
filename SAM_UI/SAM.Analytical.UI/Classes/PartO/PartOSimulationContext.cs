@@ -88,6 +88,19 @@ namespace SAM.Analytical.UI
         public bool UpdateConstructionLayersByPanelType { get; set; } = true;
 
         /// <summary>
+        /// Build the TAS3D model directly from the SAM geometry instead of through gbXML. False (the gbXML route) unless the
+        /// ordinary Energy Simulation command asks; only meaningful with the TAS solar calculation method, and ignored
+        /// where a canonical TBD is supplied.
+        /// </summary>
+        public bool DirectT3D { get; set; } = false;
+
+        /// <summary>
+        /// Whether this case actually converts through Direct T3D: asked for, and with the TAS solar calculation - the only one
+        /// that converts the geometry into a T3D. This, not <see cref="DirectT3D"/> alone, is what identifies the case.
+        /// </summary>
+        public bool UsesDirectT3D => DirectT3D && SolarCalculationMethod == SolarCalculationMethod.TAS;
+
+        /// <summary>
         /// This case again, writing somewhere else - the <b>only</b> way an Approved Document O Iteration 3
         /// Candidate B is allowed to be built.
         ///
@@ -129,6 +142,7 @@ namespace SAM.Analytical.UI
                 Sizing = Sizing,
                 UseWidths = UseWidths,
                 UpdateConstructionLayersByPanelType = UpdateConstructionLayersByPanelType,
+                DirectT3D = DirectT3D,
                 Path_DesignModel = Path_DesignModel,
             };
         }

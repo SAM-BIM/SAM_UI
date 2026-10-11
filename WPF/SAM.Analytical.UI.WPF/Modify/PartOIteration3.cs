@@ -214,17 +214,19 @@ namespace SAM.Analytical.UI.WPF
                     return null;
                 }
 
-                DialogResult replacement = MessageBox.Show(
-                    refusal_Output + "\n\nReplace the existing evidence intentionally?",
-                    "Part O — Iteration 3", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
-                if (replacement != DialogResult.Yes)
+                //The same question Prepare & Run asks, in the same words. Here replacing keeps the folder - it holds every
+                //method's record - and overwrites only what this method's new run writes, which the window says.
+                PartOOutputOccupancy partOOutputOccupancy = paths!.OutputPaths.Occupancy(partORun.Guid_OutputRun, Query.PartOSimulationCaseKey(partORun.SimulationContext));
+                if (!ConfirmReplacePartOResults(string.Format("Iteration 3 — {0}", label), partOOutputOccupancy, false, owner))
                 {
                     return null;
                 }
                 replaceExisting = true;
             }
 
-            if (partOIteration3PairingStatus.IsReviewable)
+            //Asked once: where the Replace window above was just confirmed, this method's result in that folder IS what was
+            //agreed to be replaced, so a second "run it again?" over the same result would only repeat the question.
+            if (partOIteration3PairingStatus.IsReviewable && !replaceExisting)
             {
                 DialogResult dialogResult = MessageBox.Show(
                     string.Format(

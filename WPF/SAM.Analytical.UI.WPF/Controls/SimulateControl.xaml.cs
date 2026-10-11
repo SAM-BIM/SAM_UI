@@ -53,6 +53,8 @@ namespace SAM.Analytical.UI.WPF
                 comboBox_SolarCalculationMethod.Items.Add(Core.Query.Description(solarCalculationMethod));
             }
 
+            comboBox_SolarCalculationMethod.SelectionChanged += (s, e) => EnableDirectT3D();
+
             EnableTextMap();
             EnableFullYearSimulation();
             EnableSimulate();
@@ -311,6 +313,22 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>
+        /// Direct T3D is chosen only by an explicit check; an unchecked or indeterminate box is the gbXML route.
+        /// </summary>
+        public bool DirectT3D
+        {
+            get
+            {
+                return checkBox_DirectT3D.IsChecked == true;
+            }
+
+            set
+            {
+                checkBox_DirectT3D.IsChecked = value;
+            }
+        }
+
         public string SelectedZoneCategory
         {
             get
@@ -402,7 +420,8 @@ namespace SAM.Analytical.UI.WPF
                 CreateTPD = CreateTPD,
                 Sizing = Sizing,
                 CreatePartL = CreatePartL,
-                UpdateConstructionLayersByPanelType = UpdateConstructionLayersByPanelType
+                UpdateConstructionLayersByPanelType = UpdateConstructionLayersByPanelType,
+                DirectT3D = DirectT3D
             };
 
             return result;
@@ -436,6 +455,9 @@ namespace SAM.Analytical.UI.WPF
             Sizing = simulateOptions.Sizing;
 
             UpdateConstructionLayersByPanelType = simulateOptions.UpdateConstructionLayersByPanelType;
+
+            DirectT3D = simulateOptions.DirectT3D;
+            EnableDirectT3D();
 
             return true;
         }
@@ -484,6 +506,17 @@ namespace SAM.Analytical.UI.WPF
             EnableFullYearSimulation();
             checkBox_UnmetHours.IsEnabled = enable;
             checkBox_CreateTPD.IsEnabled = enable;
+            EnableDirectT3D();
+        }
+
+        /// <summary>
+        /// Direct T3D replaces the gbXML import into a TAS3D model, so it only has meaning where the TAS solar calculation
+        /// method simulates. It is the one conversion choice a person keeps on the Part O route too.
+        /// </summary>
+        private void EnableDirectT3D()
+        {
+            //Read from the selected item, not the ComboBox text: this also runs from SelectionChanged, where Text is not yet updated.
+            checkBox_DirectT3D.IsEnabled = Simulate && Core.Query.Enum<SolarCalculationMethod>(comboBox_SolarCalculationMethod.SelectedItem as string) == SolarCalculationMethod.TAS;
         }
 
         private void checkBox_Simulate_Click(object sender, System.Windows.RoutedEventArgs e)
@@ -548,6 +581,9 @@ namespace SAM.Analytical.UI.WPF
             checkBox_UnmetHours.IsEnabled = false;
             checkBox_UseWidths.IsEnabled = false;
             checkBox_UpdateConstructionLayersByPanelType.IsEnabled = false;
+
+            //Direct T3D is deliberately NOT locked: which conversion produced a run is part of its case (the case key, the
+            //scenario fingerprint, the canonical TBD's fingerprint and the saved sidecar all carry it).
 
             checkBox_RoomDataSheets.IsEnabled = false;
             checkBox_CreateSAP.IsEnabled = false;

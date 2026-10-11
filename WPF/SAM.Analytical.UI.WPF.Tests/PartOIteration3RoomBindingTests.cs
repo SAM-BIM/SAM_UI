@@ -23,7 +23,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             catch (IOException) { }
         }
 
-        private (PartORun Run, VentilationUnitCatalogue Catalogue, List<Zone> Zones, List<AirHandlingUnit> Units, List<Space> Stats) Prepared(int dwellingCount = 3, bool alternateStatRooms = false)
+        internal (PartORun Run, VentilationUnitCatalogue Catalogue, List<Zone> Zones, List<AirHandlingUnit> Units, List<Space> Stats) Prepared(int dwellingCount = 3, bool alternateStatRooms = false)
         {
             VentilationUnitCatalogue catalogue = VentilationUnitCatalogue.Read();
             Assert.Equal(VentilationUnitCatalogueState.Selectable, catalogue.State);

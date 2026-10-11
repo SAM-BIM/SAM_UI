@@ -434,17 +434,16 @@ namespace SAM.Analytical.UI
 
             int count = 0;
 
+            //Asked ONCE per room of the scope (supply and extract), and remembered by identity for the per-zone check below, so
+            //the question count stays linear in the rooms - see PartOWorkflowInspectionScalingTests.
+            HashSet<Guid> guids_Carrying = [];
+
             foreach (Space space in spaces_Scope)
             {
-                //The same answer Query.PartFRequiredFlowRate_Lps gives, read from the model through the
-                //inspection's own snapshot rather than by re-resolving the room against the whole model
-                //twice over. No rate is held here, and none is compared against anything.
-                double? supply = partFIndex.PartFRequiredFlowRate_Lps(space, FlowClassification.Supply);
-                double? extract = partFIndex.PartFRequiredFlowRate_Lps(space, FlowClassification.Extract);
-
-                if ((supply.HasValue && supply.Value > 0) || (extract.HasValue && extract.Value > 0))
+                if (CarriesRequirement(partFIndex, space))
                 {
                     count++;
+                    guids_Carrying.Add(space.Guid);
                 }
             }
 
@@ -453,11 +452,75 @@ namespace SAM.Analytical.UI
                 return new PartOWorkflowStageState(PartOWorkflowStage.PartFRequirements, PartOWorkflowStageStatus.Blocked, string.Format("No space in scope carries a continuous Approved Document F requirement, so the {0} route has no mechanical ventilation to realize. Run AddVent PartF over these dwellings first.", Core.Query.Description(partOVentilationMode)));
             }
 
+            //A dwelling zone none of whose spaces carries a requirement. The preparation builds one system per dwelling zone
+            //and refuses the WHOLE iteration - "No space carries a design ventilation terminal" - when one of them has no
+            //design terminal to serve, so a shared corridor or landlord area that nobody marked as not a dwelling (a model
+            //where no zone states Is Dwelling counts every zone as one) would otherwise pass here as Ready and fail after
+            //the engineer has pressed Run. Said here, with the zones named and the remedy.
+            List<string> names_NoRequirement = [];
+
+            foreach (Zone zone in partOWorkflowRequest.Zones_Dwelling ?? [])
+            {
+                if (zone is null)
+                {
+                    continue;
+                }
+
+                bool carries = false;
+
+                //By identity: a zone's related space instances can predate a later write, and only the Guid is read from them.
+                foreach (Space space in partFIndex.AdjacencyCluster.GetRelatedObjects<Space>(zone) ?? [])
+                {
+                    if (space is not null && guids_Carrying.Contains(space.Guid))
+                    {
+                        carries = true;
+
+                        break;
+                    }
+                }
+
+                if (!carries)
+                {
+                    names_NoRequirement.Add(string.IsNullOrWhiteSpace(zone.Name) ? zone.Guid.ToString() : string.Format("'{0}'", zone.Name));
+                }
+            }
+
+            if (names_NoRequirement.Count != 0)
+            {
+                return new PartOWorkflowStageState(
+                    PartOWorkflowStage.PartFRequirements,
+                    PartOWorkflowStageStatus.Blocked,
+                    string.Format(
+                        "{0} {1} in scope as {2}, but none of {3} spaces carries a continuous Approved Document F requirement, so no mechanical ventilation can be built for {4} and the preparation would refuse. If {5} not a dwelling (a shared corridor, a landlord area, a commercial unit), set Is Dwelling to false on {6} (and to true on each dwelling: once any zone states Is Dwelling, only zones set to true are dwellings); otherwise run AddVent PartF over {7}.",
+                        string.Join(", ", names_NoRequirement),
+                        names_NoRequirement.Count == 1 ? "is" : "are",
+                        names_NoRequirement.Count == 1 ? "a dwelling" : "dwellings",
+                        names_NoRequirement.Count == 1 ? "its" : "their",
+                        names_NoRequirement.Count == 1 ? "it" : "them",
+                        names_NoRequirement.Count == 1 ? "it is" : "they are",
+                        names_NoRequirement.Count == 1 ? "it" : "each of them",
+                        names_NoRequirement.Count == 1 ? "it" : "them"));
+            }
+
             return new PartOWorkflowStageState(
                 PartOWorkflowStage.PartFRequirements,
                 PartOWorkflowStageStatus.Ready,
                 string.Format("{0} of {1} in scope {2} a continuous Approved Document F supply or extract requirement.", count, Query.PartOCount(spaces_Scope.Count, "space", "spaces"), count == 1 ? "carries" : "carry"),
                 string.Format("{0}/{1} defined", count, Query.PartOCount(spaces_Scope.Count, "space", "spaces")));
+        }
+
+        /// <summary>
+        /// Whether a space carries a continuous Approved Document F supply or extract requirement - the same answer
+        /// <c>Query.PartFRequiredFlowRate_Lps</c> gives, read from the model through the inspection's own snapshot rather than
+        /// by re-resolving the room against the whole model twice over. No rate is held here, and none is compared against
+        /// anything.
+        /// </summary>
+        private static bool CarriesRequirement(PartFIndex partFIndex, Space space)
+        {
+            double? supply = partFIndex.PartFRequiredFlowRate_Lps(space, FlowClassification.Supply);
+            double? extract = partFIndex.PartFRequiredFlowRate_Lps(space, FlowClassification.Extract);
+
+            return (supply.HasValue && supply.Value > 0) || (extract.HasValue && extract.Value > 0);
         }
 
         /// <summary>

@@ -75,6 +75,8 @@ namespace SAM.Analytical.UI.WPF
     /// <summary>One source in the panel: a file the user added (now or earlier), what state it is in and what it holds.</summary>
     public sealed class ThermalSourceEntry : INotifyPropertyChanged
     {
+        // Guards what the panel shows: a step of the read (start, progress, outcome) is published whole, so the state and the line never disagree.
+        private readonly object sync = new object();
         private ThermalSourceState state = ThermalSourceState.Pending;
         private string message;
         private GlazingSource source;
@@ -98,46 +100,147 @@ namespace SAM.Analytical.UI.WPF
 
         public ThermalSourceState State
         {
-            get => state;
-            internal set
+            get
             {
-                state = value;
-                Raise();
+                lock (sync)
+                {
+                    return state;
+                }
             }
         }
 
         /// <summary>The progress while loading, the reason when it failed or has nothing to offer, else null.</summary>
         public string Message
         {
-            get => message;
-            internal set
+            get
             {
-                message = value;
-                Raise();
+                lock (sync)
+                {
+                    return message;
+                }
             }
         }
 
         /// <summary>The pool, once <see cref="ThermalSourceState.Ready"/>; null before.</summary>
-        public GlazingSource Source => source;
+        public GlazingSource Source
+        {
+            get
+            {
+                lock (sync)
+                {
+                    return source;
+                }
+            }
+        }
 
         /// <summary>How many opaque constructions / window systems / door systems the pool holds (counted once when it was read).</summary>
-        public int ConstructionCount => constructions;
+        public int ConstructionCount
+        {
+            get
+            {
+                lock (sync)
+                {
+                    return constructions;
+                }
+            }
+        }
 
-        public int WindowCount => windows;
+        public int WindowCount
+        {
+            get
+            {
+                lock (sync)
+                {
+                    return windows;
+                }
+            }
+        }
 
-        public int DoorCount => doors;
+        public int DoorCount
+        {
+            get
+            {
+                lock (sync)
+                {
+                    return doors;
+                }
+            }
+        }
 
         /// <summary>True when the source has something to offer: constructions or glazing systems.</summary>
-        public bool HasContent => source != null && constructions + windows + doors != 0;
-
-        // The pool arrives (the counts read the construction manager, which copies what it hands out, so they are taken once).
-        internal void SetSource(GlazingSource value)
+        public bool HasContent
         {
-            source = value;
-            constructions = value?.GetConstructions().Count ?? 0;
+            get
+            {
+                lock (sync)
+                {
+                    return HasContentUnlocked;
+                }
+            }
+        }
+
+        private bool HasContentUnlocked => source != null && constructions + windows + doors != 0;
+
+        // The read starts.
+        internal void Begin()
+        {
+            lock (sync)
+            {
+                state = ThermalSourceState.Loading;
+                message = "Loading…";
+            }
+
+            Raise();
+        }
+
+        // Progress of the read. Reports are posted to the context that asked and may arrive late - even while the outcome is being published on
+        // another thread - so the check and the write share the outcome's lock: a report after the outcome is dropped, never shown over it.
+        internal void Report(string text)
+        {
+            lock (sync)
+            {
+                if (state != ThermalSourceState.Loading)
+                {
+                    return;
+                }
+
+                message = text;
+            }
+
+            Raise();
+        }
+
+        // The read failed: the reason is the line.
+        internal void Fail(string reason)
+        {
+            lock (sync)
+            {
+                message = reason ?? "Could not be read.";
+                state = ThermalSourceState.Failed;
+            }
+
+            Raise();
+        }
+
+        // The pool arrives (the counts read the construction manager, which copies what it hands out, so they are taken once). One with nothing
+        // to offer (a pane library, a wrong file) says why in the reader's note. Published in one step with the state.
+        internal void Complete(GlazingSource value)
+        {
+            int constructionCount = value?.GetConstructions().Count ?? 0;
             List<ApertureConstruction> apertureConstructions = value?.ConstructionManager?.ApertureConstructions ?? new List<ApertureConstruction>();
-            windows = apertureConstructions.Count(x => x.ApertureType == ApertureType.Window);
-            doors = apertureConstructions.Count(x => x.ApertureType == ApertureType.Door);
+            int windowCount = apertureConstructions.Count(x => x.ApertureType == ApertureType.Window);
+            int doorCount = apertureConstructions.Count(x => x.ApertureType == ApertureType.Door);
+
+            lock (sync)
+            {
+                source = value;
+                constructions = constructionCount;
+                windows = windowCount;
+                doors = doorCount;
+                message = HasContentUnlocked ? null : value?.Note;
+                state = ThermalSourceState.Ready;
+            }
+
             Raise();
         }
 
@@ -146,28 +249,36 @@ namespace SAM.Analytical.UI.WPF
         {
             get
             {
-                switch (state)
+                lock (sync)
                 {
-                    case ThermalSourceState.Pending:
-                        return "Remembered · read when needed";
-
-                    case ThermalSourceState.Loading:
-                        return message ?? "Loading…";
-
-                    case ThermalSourceState.Failed:
-                        return message ?? "Could not be read.";
+                    return StatusTextUnlocked();
                 }
-
-                if (!HasContent)
-                {
-                    return message ?? "Nothing to offer.";
-                }
-
-                return string.Format(CultureInfo.CurrentCulture, "{0:N0} {1} · {2:N0} {3} · {4:N0} {5}", constructions, constructions == 1 ? "construction" : "constructions", windows, windows == 1 ? "window system" : "window systems", doors, doors == 1 ? "door system" : "door systems");
             }
         }
 
         public string ToolTip => Path;
+
+        private string StatusTextUnlocked()
+        {
+            switch (state)
+            {
+                case ThermalSourceState.Pending:
+                    return "Remembered · read when needed";
+
+                case ThermalSourceState.Loading:
+                    return message ?? "Loading…";
+
+                case ThermalSourceState.Failed:
+                    return message ?? "Could not be read.";
+            }
+
+            if (!HasContentUnlocked)
+            {
+                return message ?? "Nothing to offer.";
+            }
+
+            return string.Format(CultureInfo.CurrentCulture, "{0:N0} {1} · {2:N0} {3} · {4:N0} {5}", constructions, constructions == 1 ? "construction" : "constructions", windows, windows == 1 ? "window system" : "window systems", doors, doors == 1 ? "door system" : "door systems");
+        }
 
         private void Raise()
         {
@@ -342,8 +453,7 @@ namespace SAM.Analytical.UI.WPF
                     return running;
                 }
 
-                entry.State = ThermalSourceState.Loading;
-                entry.Message = "Loading…";
+                entry.Begin();
                 loads[entry.Path] = completion.Task;
             }
 
@@ -371,14 +481,8 @@ namespace SAM.Analytical.UI.WPF
             string failure = null;
             try
             {
-                // Progress is posted to the context that asked, so a late report must not overwrite the outcome.
-                source = await reader(entry.Path, new Progress<string>(x =>
-                {
-                    if (entry.State == ThermalSourceState.Loading)
-                    {
-                        entry.Message = x;
-                    }
-                }));
+                // Progress is posted to the context that asked, so a late report must not overwrite the outcome (the entry drops it).
+                source = await reader(entry.Path, new Progress<string>(entry.Report));
             }
             catch (Exception exception)
             {
@@ -396,15 +500,11 @@ namespace SAM.Analytical.UI.WPF
 
             if (source == null || failure != null)
             {
-                entry.Message = failure ?? "Could not be read.";
-                entry.State = ThermalSourceState.Failed;
+                entry.Fail(failure);
             }
             else
             {
-                // Read. One with nothing to offer (a pane library, a wrong file) says why in the reader's note.
-                entry.SetSource(source);
-                entry.Message = entry.HasContent ? null : source.Note;
-                entry.State = ThermalSourceState.Ready;
+                entry.Complete(source);
             }
 
             Raise();

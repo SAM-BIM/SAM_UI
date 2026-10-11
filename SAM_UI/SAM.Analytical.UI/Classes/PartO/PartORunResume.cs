@@ -61,6 +61,12 @@ namespace SAM.Analytical.UI
 
         public bool UpdateConstructionLayersByPanelType { get; set; }
 
+        /// <summary>
+        /// Whether the run was converted through Direct T3D. A sidecar written before the option existed does not hold it and reads
+        /// as false - the gbXML route it was made on; only a stored boolean true is Direct.
+        /// </summary>
+        public bool DirectT3D { get; set; }
+
         public long Length_TSD { get; set; }
 
         public long Timestamp_TSD { get; set; }
@@ -114,6 +120,7 @@ namespace SAM.Analytical.UI
                 ["Sizing"] = Sizing,
                 ["UseWidths"] = UseWidths,
                 ["UpdateConstructionLayersByPanelType"] = UpdateConstructionLayersByPanelType,
+                ["DirectT3D"] = DirectT3D,
                 ["Length_TSD"] = Length_TSD,
                 ["Timestamp_TSD"] = Timestamp_TSD,
                 ["Fingerprint_PreparedModel"] = Fingerprint_PreparedModel,
@@ -153,6 +160,7 @@ namespace SAM.Analytical.UI
                     Sizing = (bool)jsonObject["Sizing"],
                     UseWidths = (bool)jsonObject["UseWidths"],
                     UpdateConstructionLayersByPanelType = (bool)jsonObject["UpdateConstructionLayersByPanelType"],
+                    DirectT3D = jsonObject["DirectT3D"] is JsonValue jsonValue_DirectT3D && jsonValue_DirectT3D.TryGetValue(out bool directT3D) && directT3D,
                     Length_TSD = (long)jsonObject["Length_TSD"],
                     Timestamp_TSD = (long)jsonObject["Timestamp_TSD"],
                     Fingerprint_PreparedModel = (string)jsonObject["Fingerprint_PreparedModel"],

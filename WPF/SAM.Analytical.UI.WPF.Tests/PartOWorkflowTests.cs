@@ -255,6 +255,56 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
+        /// A dwelling zone none of whose spaces carries a requirement - a shared corridor nobody marked as not a dwelling, which
+        /// a model where no zone states Is Dwelling counts as one - makes the preparation refuse the WHOLE mechanical iteration
+        /// ("No space carries a design ventilation terminal"). The Hub says so before Run, names the zone and the remedy.
+        /// </summary>
+        [Fact]
+        public void ADwellingZoneWithNoPartFRequirement_BlocksTheMechanicalRoute_NamingTheZone()
+        {
+            AnalyticalModel analyticalModel = ModelWithCorridor(isDwelling: true);
+
+            PartOWorkflowInspection partOWorkflowInspection = Inspect(analyticalModel, Request(Scenario_1a(), analyticalModel));
+
+            Assert.False(partOWorkflowInspection.CanRun);
+
+            PartOWorkflowStageState partOWorkflowStageState = Stage(partOWorkflowInspection, PartOWorkflowStage.PartFRequirements);
+
+            Assert.Equal(PartOWorkflowStageStatus.Blocked, partOWorkflowStageState.Status);
+            Assert.Contains("'Corridor'", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+            Assert.DoesNotContain("'Flat 1'", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+            Assert.Contains("Is Dwelling", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+            Assert.Contains("AddVent PartF", partOWorkflowStageState.Detail, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// The remedy the message names works: the same zone marked as not a dwelling is not eligible, and the run is offered.
+        /// </summary>
+        [Fact]
+        public void TheSameZoneMarkedNotADwelling_LeavesTheMechanicalRouteReady()
+        {
+            AnalyticalModel analyticalModel = ModelWithCorridor(isDwelling: false);
+
+            PartOWorkflowInspection partOWorkflowInspection = Inspect(analyticalModel, Request(Scenario_1a(), analyticalModel, analyticalModel.AdjacencyCluster.GetZones().FindAll(x => x.Name != "Corridor")));
+
+            Assert.True(partOWorkflowInspection.CanRun);
+            Assert.Equal(PartOWorkflowStageStatus.Ready, Stage(partOWorkflowInspection, PartOWorkflowStage.PartFRequirements).Status);
+        }
+
+        /// <summary>
+        /// Natural ventilation (Iteration 1b) applies no mechanical rate, so a corridor in scope is not a blocker there.
+        /// </summary>
+        [Fact]
+        public void ADwellingZoneWithNoPartFRequirement_DoesNotBlockTheNaturalVentilationRoute()
+        {
+            AnalyticalModel analyticalModel = ModelWithCorridor(isDwelling: true);
+
+            PartOWorkflowInspection partOWorkflowInspection = Inspect(analyticalModel, Request(Scenario_1b(), analyticalModel));
+
+            Assert.Equal(PartOWorkflowStageStatus.NotApplicable, Stage(partOWorkflowInspection, PartOWorkflowStage.PartFRequirements).Status);
+        }
+
+        /// <summary>
         /// A model whose text map cannot be read on this machine is <b>not</b> refused. That is an
         /// environment fact, not a defect in the building, and the assessment reads the same resource and
         /// will report what it finds.
@@ -1200,6 +1250,32 @@ namespace SAM.Analytical.UI.WPF.Tests
         private static PartOWorkflowRequest Request(PartOWorkflowScenario partOWorkflowScenario, AnalyticalModel analyticalModel = null)
         {
             return new PartOWorkflowRequest(partOWorkflowScenario.Option, PartOWorkflowScope.AllDwellings, analyticalModel?.GetZones() ?? [], partOWorkflowScenario.SelectVentilationUnit);
+        }
+
+        private static PartOWorkflowRequest Request(PartOWorkflowScenario partOWorkflowScenario, AnalyticalModel analyticalModel, List<Zone> zones)
+        {
+            return new PartOWorkflowRequest(partOWorkflowScenario.Option, PartOWorkflowScope.AllDwellings, zones, partOWorkflowScenario.SelectVentilationUnit);
+        }
+
+        /// <summary>
+        /// The two flats of <see cref="Model"/> plus a shared corridor zone whose one space carries no Part F data.
+        /// </summary>
+        private static AnalyticalModel ModelWithCorridor(bool isDwelling)
+        {
+            AnalyticalModel analyticalModel = Model();
+
+            AdjacencyCluster adjacencyCluster = analyticalModel.AdjacencyCluster;
+
+            Zone zone = new(new Guid("aaaaaaaa-0000-0000-0000-0000000000c0"), "Corridor");
+            zone.SetValue(ZoneParameter.IsDwelling, isDwelling);
+
+            adjacencyCluster.AddObject(zone);
+
+            Space space = new(new Guid("bbbbbbbb-0000-0000-00c0-0000000000c0"), "Corridor 0.1", null);
+            adjacencyCluster.AddObject(space);
+            adjacencyCluster.AddRelation(zone, space);
+
+            return new AnalyticalModel(analyticalModel, adjacencyCluster);
         }
 
         private static PartOWorkflowScenario Scenario_1a()

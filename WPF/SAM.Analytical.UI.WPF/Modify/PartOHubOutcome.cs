@@ -129,11 +129,16 @@ namespace SAM.Analytical.UI.WPF
         /// After Prepare &amp; Run assessed its results: "✕ Iteration 1a completed — TM59 FAIL", worded from the
         /// summary the result window was given.
         /// </summary>
-        internal static PartOWorkflowOutcome CompletedOutcome(string? name, TimeSpan elapsed_Simulation, PartOTM59ResultSummary? partOTM59ResultSummary, int count_Notes)
+        internal static PartOWorkflowOutcome CompletedOutcome(string? name, TimeSpan elapsed_Simulation, PartOTM59ResultSummary? partOTM59ResultSummary, int count_Notes, string? notes_Text = null)
         {
             name = Name(name);
 
-            string notes = count_Notes != 0 ? string.Format(" · {0} shown", UI.Query.PartOCount(count_Notes, "note was", "notes were")) : string.Empty;
+            //The notes no longer interrupt the run with a box: they are kept here, under Show details and on the tooltip.
+            string notes = count_Notes != 0 ? string.Format(" · {0} - see Show details", UI.Query.PartOCount(count_Notes, "note", "notes")) : string.Empty;
+
+            string? Full(string? reason) => string.IsNullOrWhiteSpace(notes_Text)
+                ? reason
+                : string.Join("\n\n", new[] { reason, "Notes from the simulation:\n" + notes_Text }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
             if (partOTM59ResultSummary is null)
             {
@@ -141,7 +146,8 @@ namespace SAM.Analytical.UI.WPF
                     PartOWorkflowOutcomeKind.Information,
                     "○",
                     string.Format("{0} completed — results ready to review", name),
-                    string.Format("TAS simulation {0}{1}", PartOProgressState.Format(elapsed_Simulation), notes))
+                    string.Format("TAS simulation {0}{1}", PartOProgressState.Format(elapsed_Simulation), notes),
+                    Full(null))
                 {
                     RunState = PartORunState.WorkflowCompleted,
                 };
@@ -152,7 +158,7 @@ namespace SAM.Analytical.UI.WPF
                 partOTM59ResultSummary.Glyph,
                 string.Format("{0} completed — TM59 {1}", name, partOTM59ResultSummary.VerdictText),
                 string.Format("TAS simulation {0}{1}{2}", PartOProgressState.Format(elapsed_Simulation), Counts(partOTM59ResultSummary), notes),
-                partOTM59ResultSummary.Reason)
+                Full(partOTM59ResultSummary.Reason))
             {
                 RunState = PartORunState.WorkflowCompleted,
             };
@@ -202,6 +208,20 @@ namespace SAM.Analytical.UI.WPF
                 "○",
                 string.Format("{0} review cancelled — no simulation was run", Name(iteration)),
                 "Cancelled before TAS · the model is unchanged");
+        }
+
+        /// <summary>
+        /// Mixed Design saved cooling control rooms on the open model. It claims nothing about the run, which the model
+        /// change may have dropped - it states the next step, which is the same either way: prepare Iteration 2 again so
+        /// the reference case carries the rooms.
+        /// </summary>
+        internal static PartOWorkflowOutcome MixedDesignSavedOutcome()
+        {
+            return new PartOWorkflowOutcome(
+                PartOWorkflowOutcomeKind.Information,
+                "○",
+                "Cooling control rooms saved on the model",
+                "Next: choose Iteration 2 and Prepare & Run, so the reference case carries them · Iteration 3 then runs against it");
         }
 
         /// <summary>

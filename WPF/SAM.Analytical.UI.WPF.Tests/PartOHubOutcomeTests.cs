@@ -155,7 +155,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             PartOWorkflowOutcome partOWorkflowOutcome = Modify.CompletedOutcome(PartOWorkflowScenario.Text_Iteration1a, TimeSpan.FromSeconds(53), Summary(PartOTM59Verdict.Fail), 2);
 
-            Assert.Equal("✕ Iteration 1a completed — TM59 FAIL · TAS simulation 53s · 2 spaces assessed · 1 pass · 1 fail · 0 not assessed · 2 notes were shown", partOWorkflowOutcome.Text);
+            Assert.Equal("✕ Iteration 1a completed — TM59 FAIL · TAS simulation 53s · 2 spaces assessed · 1 pass · 1 fail · 0 not assessed · 2 notes - see Show details", partOWorkflowOutcome.Text);
         }
 
         [Fact]

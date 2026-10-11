@@ -280,8 +280,13 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
+            // Direct T3D builds the T3D from the SAM geometry and never reads a gbXML, so none is written - an export that
+            // is not read must not be able to refuse the run. Only with the TAS solar calculation (the one that converts the
+            // geometry into a T3D) and never with a canonical TBD, which SAM_Tas refuses together with Direct.
+            bool directT3D = partOSimulationContext.DirectT3D && solarCalculationMethod == SolarCalculationMethod.TAS && partOCanonicalTBD is null;
+
             string path_Xml = null;
-            if (solarCalculationMethod == SolarCalculationMethod.TAS && partOCanonicalTBD is null)
+            if (solarCalculationMethod == SolarCalculationMethod.TAS && partOCanonicalTBD is null && !directT3D)
             {
                 path_Xml = System.IO.Path.Combine(outputDirectory, projectName + ".xml");
                 if (!gbXML.Convert.ToFile(analyticalModel, path_Xml))
@@ -472,6 +477,7 @@ namespace SAM.Analytical.UI.WPF
                     Path_TBD_Canonical = partOCanonicalTBD?.Path_TBD,
 
                     Path_gbXML = path_Xml,
+                    T3DRoute = directT3D ? T3DRoute.Direct : T3DRoute.GbXML,
                     WeatherData = solarCalculationMethod == SolarCalculationMethod.TAS ? weatherData : null,
                     DesignDays_Heating = heatingDesignDays,
                     DesignDays_Cooling = coolingDesignDays,
