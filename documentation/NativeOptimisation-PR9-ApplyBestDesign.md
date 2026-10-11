@@ -28,8 +28,31 @@ unit and full suites, mutations, and licensed acceptance (see "Safety review" be
 (`PR9_FOLLOWUP_REVIEW_2026-10-10.md`, local) found that finding 1's fix still let an **atomic save** by another program be
 lost; that was reproduced through the SAM_Tas applier and fixed in SAM_Tas (row 1b below; this PR's code is unchanged by
 it). Every earlier head, CI-green or not (SAM_Tas `dd222a47`/`aad85e39`/`194a1545`, SAM_UI `9b82509d`/`2b776e22`/`60828d31`),
-is superseded and is **not** evidence for the final pair. **Blockers for merge:** green CI on the final heads, and
-**owner review** of decisions 1–15 below and of the Sizing finding.
+is superseded and is **not** evidence for the final pair.
+
+### Owner decisions confirmed and evidence refreshed — 2026-10-11
+
+- **Owner decisions** (recorded verbatim in substance; see "Owner decisions" below):
+  - 1–12: approved as implemented (scoped setpoints, preserved frames, TPD-only controllers, backups, stale-result
+    rejection, one unsaved SAM Undo step, explicit result eligibility).
+  - 13: manual recovery accepted for V1. Conflicting saves must be preserved and reported; a crash during replacement
+    is recovered from the backups; **Undo restores SAM only, not the Tas files**.
+  - 14: refusal kept for V1; materials are never silently overwritten or renamed. Import under unique names may come later.
+  - 15: strict pane, frame and placement checks kept. Licensed coverage accepted for **external glazing through the
+    tested (gbXML) export route**; internal glazing and the direct export route need further acceptance before support
+    is claimed.
+  - Sizing finding: **option (a), as a separate small PR** — identify the primary project TBD unambiguously, exclude
+    sizing derivatives consistently from inventory and run snapshots, preserve those files, refuse ambiguous folders.
+- **Final-head CI green**: SAM_UI `e6ed6761` build + SPDX (2026-10-11, built against SAM_Tas `dc823fe0`); SAM_Tas
+  `dc823fe0` build + SPDX.
+- **Fresh local evidence on the integrated heads** (SAM_UI `e6ed6761` incl. Q4 icon migration and PR221; SAM_Tas
+  `dc823fe0`; SAM `c080dd08` / SAM_Systems `c0dc428` `build\` from today's Q4): Release `MSBuild SAM_Tas.sln -restore`
+  and `MSBuild SAM_UI.sln -restore -m:1` **0 errors**; `SAM.Analytical.Tas.GenOpt.Tests` **335/335**;
+  `SAM.Analytical.UI.WPF.Tests` **2793/2793** (first run, no failures, no retry); no Tas process left. Logs/TRX:
+  `C:\TasOut\pr9\refresh-2026-10-11` (local). Licensed acceptance was not rerun: PR9 product code is unchanged since
+  the licensed rerun (identical patch ID, above).
+- **Remaining blocker:** explicit owner approval to merge (decisions approved ≠ merge approved). Then the merge order in
+  "Next step".
 
 ### Part O test fix integrated — 2026-10-11
 
@@ -102,7 +125,7 @@ model cannot take as evaluated (decision 14). The Tas files must still have the 
 checked again under a hold just before they are replaced (decision 13). Values, option numbers and references are
 checked against the definition (SAM_Tas `TasModelDesignChanges`).
 
-## Owner decisions (proposed and implemented; please confirm or redirect)
+## Owner decisions (implemented; approved by the owner 2026-10-11, see the status above for 13–15)
 
 1. **SAM model and Tas files together, or Tas files only.** Both when the Tas project is the open model's folder; any
    building item not found there as the Tas model has it blocks the whole application (Energy Simulation would rebuild
@@ -164,7 +187,9 @@ TBD**, and SAM_Tas' `Query.TasModelInventory` refuses a folder with more than on
 Energy Simulation with Sizing off. This is PR7b/PR8 behaviour, not PR9's, and it was not in the earlier evidence (PR7a/PR8
 copied only the TBD and TSD). Options: (a) the reader takes the TBD named like the TSD/T3D and ignores `_HDDCDD`/
 `_Uncapped` (small SAM_Tas change, also the run's snapshot); (b) Energy Simulation writes the sizing copies elsewhere;
-(c) document "Sizing off before optimising". Recommended: (a), as its own small PR.
+(c) document "Sizing off before optimising". **Owner decision 2026-10-11: (a), as a separate small PR** (primary
+project TBD identified unambiguously; sizing derivatives excluded consistently from inventory and run snapshot, the
+files preserved; ambiguous folders refused).
 
 ## Files changed
 
@@ -384,26 +409,20 @@ optimised, applied, checked, and simulated again.
 
 ## Outstanding owner decisions
 
-1. Approve or redirect decisions 1–15 above. New with the safety review (the follow-up reviewer's recommendations in
-   brackets — recommendations, not approvals):
-   - 13: is a reported conflict plus manual recovery (note, backup, displaced files) enough for V1, or is automatic
-     recovery wanted before release? [manual acceptable for V1; never overwrite later legitimate changes — implemented]
-   - 14: refuse a same-named different material (current), or import it under a unique name and rewrite only the new
-     pane's references? [refuse for V1; unique-name import later]
-   - 15: is the narrow check enough (pane, frame, placement; refuse on any doubt)? [keep; complete direct-route and
-     internal-glazing licensed coverage before claiming them]
-2. The Sizing-TBD finding: option (a), (b) or (c), and its place in the order of PR7b-2, the Tas units correction and PR10.
+- Decisions 1–15 and the Sizing option: **resolved 2026-10-11** (status above).
+- Open: explicit approval to merge PR9; the Sizing PR's place in the order of PR7b-2, the Tas units correction and PR10.
 
 ## Next step
 
-1. Confirm PR CI (`build`, `spdx`) green on the **final** heads of both PRs; earlier green runs do not count.
-2. After the owner approves: merge **SAM_Tas#93 first** (merge commit, `--match-head-commit <final head>`) and confirm
+1. Confirm PR CI (`build`, `spdx`) green on the **final** heads of both PRs (the 2026-10-11 records-only commits);
+   earlier green runs do not count.
+2. On explicit owner approval to merge: merge **SAM_Tas#93 first** (merge commit, `--match-head-commit <final head>`) and confirm
    the `sow/2026-Q4` build of SAM_Tas. Then **re-run SAM_UI#220's CI against the merged SAM_Tas**: the UI workflow
    clones a dependency by the PR's head-branch name first and `sow/2026-Q4` next, so delete the SAM_Tas feature branch
    after its merge (owner's call) before re-running; merge SAM_UI#220 on that green run (`--match-head-commit`). A UI run
    made against the feature branch does not validate the final pair. Then the `PROJECT_PROGRESS.md` closeouts as direct
    docs-only `[skip ci]` commits on both `sow/2026-Q4` branches, with the merge SHAs (never on the feature branches).
-3. Then, in the owner's order: the Sizing-TBD fix (the reviewer recommends an unambiguous primary project with sizing
+3. Then, in the owner's order: the Sizing-TBD fix (owner-chosen option (a), separate small SAM_Tas PR; the reviewer recommends an unambiguous primary project with sizing
    derivatives excluded consistently from inventory and run snapshot — never "first/latest TBD", never deleting
    sizing files — and acceptance on a genuine default Energy Simulation folder with Sizing on, through read, test, run
    and apply), PR7b-2 (licensed matrix: heating, multi-plant-room where fixtures exist), the Tas units correction, PR10
