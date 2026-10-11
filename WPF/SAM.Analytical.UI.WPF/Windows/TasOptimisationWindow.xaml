@@ -576,6 +576,35 @@
                                     <Button x:Name="button_ExportTrace" Height="24" Padding="10,0" Margin="8,0,0,0" IsEnabled="False" Click="button_ExportTrace_Click"
                                             ToolTip="Saves every simulation of the trace as a CSV file: full precision, invariant numbers, names and units in the header.">Export trace (CSV)…</Button>
                                 </StackPanel>
+                                <Button x:Name="button_ApplyBest" HorizontalAlignment="Left" Height="26" Padding="12,0" Margin="0,10,0,0" Visibility="Collapsed" Click="button_ApplyBest_Click"
+                                        ToolTip="Shows what the best design changes, in the model and in the Tas files, before anything is written.">Apply best design…</Button>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- APPLY BEST DESIGN ("Tas model" runs): what changes and where, before anything is written; then what was done. -->
+                        <Border x:Name="border_Apply" Visibility="Collapsed" Margin="0,12,0,0" Padding="10,8" CornerRadius="4" BorderThickness="1"
+                                Background="{StaticResource PartO.Brush.Surface}" BorderBrush="{StaticResource PartO.Brush.Border}">
+                            <StackPanel>
+                                <TextBlock Text="Apply best design" Style="{StaticResource PartO.SectionHeading}"/>
+                                <TextBlock x:Name="textBlock_ApplyHeadline" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{StaticResource PartO.Brush.Text}"/>
+                                <ItemsControl x:Name="itemsControl_Apply" Focusable="False" Margin="0,6,0,0" ItemTemplate="{StaticResource TasOptimisation.CheckTemplate}"/>
+                                <ItemsControl x:Name="itemsControl_ApplyNotes" Focusable="False" Margin="0,4,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,2,0,2" Style="{StaticResource PartO.Caption}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ProgressBar x:Name="progressBar_Apply" Height="4" Margin="0,6,0,0" IsIndeterminate="True" Visibility="Collapsed"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button x:Name="button_ApplyConfirm" Height="26" Padding="12,0" Margin="0,0,8,0" Click="button_ApplyConfirm_Click" Style="{StaticResource PartO.PrimaryButton}"
+                                            ToolTip="Writes the values above. The Tas files are written as copies, read back, then replace the originals, which are kept.">Apply</Button>
+                                    <Button x:Name="button_ApplyCancel" Height="26" Padding="12,0" Margin="0,0,8,0" Click="button_ApplyCancel_Click">Cancel</Button>
+                                    <Button x:Name="button_EnergySimulation" Height="26" Padding="12,0" Margin="0,0,8,0" Visibility="Collapsed" Click="button_EnergySimulation_Click"
+                                            ToolTip="Closes this window and opens Energy Simulation for the open model, which now holds the best design.">Run Energy Simulation…</Button>
+                                    <Button x:Name="button_OpenBackup" Height="26" Padding="12,0" Visibility="Collapsed" Click="button_OpenBackup_Click"
+                                            ToolTip="Opens the folder that holds the original Tas files.">Open backup folder</Button>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
