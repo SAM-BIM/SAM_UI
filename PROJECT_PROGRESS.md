@@ -6,7 +6,8 @@
 - Reproduced the reported UI Automation partial snapshot twice with repeated reads during the progress window's 500 ms dispatcher refresh. Replaced fixed sleeps with a bounded wait for all expected text in one snapshot; strengthened preparation/simulation status assertions and retained elapsed text. Production code unchanged.
 - Files: `WPF/SAM.Analytical.UI.WPF.Tests/PartOWorkflowSimplificationTests.cs`, `documentation/PartO-Progress-Test-Synchronisation.md`; this post-merge closeout changes only `PROJECT_PROGRESS.md`.
 - Validation: full Release suite 2768/2768 PASS; 1000 repeated snapshot checks PASS; 10/10 independent regression runs PASS; missing-content mutation correctly FAILS after timeout; mutation reverted and final source rebuilt. `git diff --check` PASS. No known blocker for this test fix.
-- Exact next step: incorporate current Q4 into open SAM_UI#220, update its record/description to log this resolved flake, and validate its new head. PR9 remains unmerged; retain owner review and SAM_Tas#93-before-SAM_UI#220 dependency validation requirements. This closeout does not approve PR9.
+- PR220 incorporates current Q4 via conflict-free merge `fbf1dd79`; record/description updated at pushed head `e6ed6761625728b365af84cac43bb220e6eb9ec6`. PR9 production/Apply-test stable patch ID preserved; `git diff --check` PASS. No fresh PR9 full-suite or licensed acceptance result is claimed for this documentation/integration checkpoint.
+- Exact next step: validate PR220's updated-head CI and refresh full-suite evidence, then retain owner review and SAM_Tas#93-before-SAM_UI#220 dependency validation requirements. PR9 remains unmerged; this closeout does not approve it. Original SAM_UI checkout restored to clean Q4 after the PR update.
 
 ## Icon migration closeout — 2026-10-11
 
