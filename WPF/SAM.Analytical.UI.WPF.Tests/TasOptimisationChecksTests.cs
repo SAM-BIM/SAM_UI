@@ -78,6 +78,51 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [Fact]
+        public void Energy_Simulations_sizing_copies_are_named_as_not_used_and_left_out_of_the_files()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
+            foreach (string name in new[] { "Model.tsd", "Model_Uncapped.tbd", "Model_HDDCDD.tbd" })
+            {
+                File.WriteAllText(Path.Combine(workspace.Directory, name), "x");
+            }
+
+            Assert.Equal(["Model.tbd", "Model.tsd"], Query.TasOptimisationTasFiles(workspace.Directory));
+
+            foreach (TasOptimisationInput input in new[] { workspace.Input(), ModelInput(workspace) })
+            {
+                TasOptimisationCheck check = Check(input.TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Tas project");
+
+                Assert.Equal(TasOptimisationCheckStatus.Ready, check.Status);
+                Assert.StartsWith("Model.tbd, Model.tsd. Each simulation runs on a copy under ", check.Detail);
+                Assert.EndsWith("the originals are not changed. Energy Simulation's sizing copies (Model_HDDCDD.tbd, Model_Uncapped.tbd) are not used and are left as they are.", check.Detail);
+            }
+        }
+
+        [Fact]
+        public void A_sizing_copy_without_the_models_TBD_blocks_the_model_engine_only()
+        {
+            using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace(tasFile: false);
+            File.WriteAllText(Path.Combine(workspace.Directory, "Model_HDDCDD.tbd"), "x");
+            File.WriteAllText(Path.Combine(workspace.Directory, "Model.tsd"), "x");
+
+            TasOptimisationCheck model = Check(ModelInput(workspace).TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Tas project");
+            Assert.Equal(TasOptimisationCheckStatus.Blocked, model.Status);
+            Assert.StartsWith("Model_HDDCDD.tbd is named like Energy Simulation's sizing copies, but the model's TBD they would be copies of is not in the folder", model.Detail);
+
+            //A script names its own files: the folder line lists the file as it is, as before.
+            TasOptimisationCheck script = Check(workspace.Input().TasOptimisationChecks(TasOptimisationWorkspace.StubExecutable), "Tas project");
+            Assert.Equal(TasOptimisationCheckStatus.Ready, script.Status);
+            Assert.StartsWith("Model.tsd, Model_HDDCDD.tbd. ", script.Detail);
+        }
+
+        private static TasOptimisationInput ModelInput(TasOptimisationWorkspace workspace)
+        {
+            TasOptimisationInput result = TasOptimisationInput.CreateTasModel();
+            result.Directory = workspace.Directory;
+            return result;
+        }
+
+        [Fact]
         public void A_folder_that_exists_but_cannot_be_listed_is_blocked_rather_than_thrown()
         {
             using TasOptimisationWorkspace workspace = new TasOptimisationWorkspace();
