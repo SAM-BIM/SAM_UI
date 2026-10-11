@@ -289,7 +289,10 @@ namespace SAM.Analytical.UI.WPF
             return tasOptimisationChecks != null && tasOptimisationChecks.All(x => x.Status != TasOptimisationCheckStatus.Blocked);
         }
 
-        /// <summary>The Tas files TasGenExecute would receive from <paramref name="directory"/>: its top-level files of SAM_Tas' Tas types.</summary>
+        /// <summary>
+        /// The Tas files TasGenExecute would receive from <paramref name="directory"/>: its top-level files of SAM_Tas' Tas
+        /// types, Energy Simulation's sizing copies of the TBD left out (SAM_Tas <c>Query.TasProjectFiles</c>).
+        /// </summary>
         public static List<string> TasOptimisationTasFiles(string directory)
         {
             return TasOptimisationTasFiles(directory, out _);
@@ -301,20 +304,30 @@ namespace SAM.Analytical.UI.WPF
         /// </summary>
         public static List<string> TasOptimisationTasFiles(string directory, out string? error)
         {
+            return TasOptimisationProjectFiles(directory, out error)?.Files.ToList() ?? new List<string>();
+        }
+
+        /// <summary>
+        /// SAM_Tas' split of <paramref name="directory"/>'s top-level Tas files into the project's files and Energy
+        /// Simulation's sizing copies (the same split the run snapshot, the run's hashes and Apply use); null when the
+        /// folder is missing or cannot be listed (<paramref name="error"/> says why for a folder that exists).
+        /// </summary>
+        public static TasProjectFiles? TasOptimisationProjectFiles(string directory, out string? error)
+        {
             error = null;
             if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
             {
-                return new List<string>();
+                return null;
             }
 
             try
             {
-                return Directory.GetFiles(directory, "*", SearchOption.TopDirectoryOnly).Where(NativeGenOptWorkspace.IsTasFile).Select(Path.GetFileName).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList()!;
+                return global::SAM.Analytical.Tas.GenOpt.Query.TasProjectFiles(directory);
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
                 error = exception.Message;
-                return new List<string>();
+                return null;
             }
         }
 
@@ -351,18 +364,27 @@ namespace SAM.Analytical.UI.WPF
                 return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder does not exist: '" + directory + "'.");
             }
 
-            List<string> names = TasOptimisationTasFiles(directory, out string? error);
-            if (error != null)
+            TasProjectFiles? tasProjectFiles = TasOptimisationProjectFiles(directory, out string? error);
+            if (error != null || tasProjectFiles == null)
             {
-                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder cannot be read: " + error);
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder cannot be read: " + (error ?? "it no longer exists."));
             }
 
+            List<string> names = tasProjectFiles.Files.ToList();
             if (names.Count == 0)
             {
                 return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, "The folder holds no Tas file (" + string.Join(", ", NativeGenOptWorkspace.TasFileExtensions) + ") at its top level, so the simulations would have no model to run.");
             }
 
-            return new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, string.Join(", ", names) + ". Each simulation runs on a copy under " + tasOptimisationInput.TasOptimisationRunsDirectory() + "; the originals are not changed.");
+            if (tasOptimisationInput.IsTasModel && tasProjectFiles.UnmatchedSizingNames.Count != 0)
+            {
+                return new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, title, string.Join(", ", tasProjectFiles.UnmatchedSizingNames) + (tasProjectFiles.UnmatchedSizingNames.Count == 1 ? " is" : " are") + " named like Energy Simulation's sizing copies, but the model's TBD they would be copies of is not in the folder, so the model to optimise cannot be identified. Run Energy Simulation again, or choose the folder that holds the model's TBD.");
+            }
+
+            string sizingCopies = tasProjectFiles.SizingCopies.Count == 0
+                ? string.Empty
+                : " Energy Simulation's sizing copies (" + string.Join(", ", tasProjectFiles.SizingCopies) + ") are not used and are left as they are.";
+            return new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, string.Join(", ", names) + ". Each simulation runs on a copy under " + tasOptimisationInput.TasOptimisationRunsDirectory() + "; the originals are not changed." + sizingCopies);
         }
 
         private static TasOptimisationCheck TasOptimisationCheck_Script(string scriptPath, out string? scriptText)

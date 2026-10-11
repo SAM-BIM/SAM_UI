@@ -175,6 +175,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 }
 
                 ui.SetJSAMObject(simulated, new Core.UI.FullModification());
+                Dictionary<string, string> sizingCopies_1 = SizingCopies(work, "after energy simulation 1");
                 TasModelInventory inventory_1 = Analytical.Tas.GenOpt.Query.TasModelInventory(work);
                 LogInventory("after energy simulation 1", inventory_1);
 
@@ -231,7 +232,10 @@ namespace SAM.Analytical.UI.WPF.Tests
                     return;
                 }
 
+                RunSnapshot(Path.Combine(output, id + "-r"));
                 await Apply(window, output, id, work);
+                Dictionary<string, string> sizingCopies_Applied = SizingCopies(work, "after apply");
+                Log("sizing copies after apply: " + (sizingCopies_Applied.Count == sizingCopies_1.Count && sizingCopies_1.All(x => sizingCopies_Applied.TryGetValue(x.Key, out string? hash) && hash == x.Value) ? "PASS (" + sizingCopies_1.Count + " unchanged)" : "CHANGED"));
 
                 // Energy Simulation 2: the ordinary core again, on the model as it now is.
                 stopwatch.Restart();
@@ -242,6 +246,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                     return;
                 }
 
+                SizingCopies(work, "after energy simulation 2");
                 TasModelInventory inventory_2 = Analytical.Tas.GenOpt.Query.TasModelInventory(work);
                 LogInventory("after energy simulation 2", inventory_2);
                 CompareWithBest(window, inventory_1, inventory_2, glazing);
@@ -340,8 +345,9 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <summary>
-        /// The ordinary Energy Simulation core (no Part O run), with the dialog's options, Full Year 1-365 and Sizing off: the
-        /// dialog's default Sizing leaves two more TBDs (_HDDCDD, _Uncapped) that the "tas-model" reader refuses (PR9 finding).
+        /// The ordinary Energy Simulation core (no Part O run), with the dialog's options and Full Year 1-365. Sizing is the
+        /// dialog's (on by default), which leaves the sizing copies <c>_Uncapped</c>/<c>_HDDCDD</c> beside the TBD; the
+        /// optimisation leaves them out and untouched. <c>SAM_APPLY_ACCEPTANCE_SIZING=off</c> runs without Sizing (PR9's runs).
         /// </summary>
         private static AnalyticalModel? EnergySimulation(UIAnalyticalModel ui, string projectName, string outputDirectory, out string? path_TSD)
         {
@@ -350,7 +356,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             PartOSimulationContext partOSimulationContext = new PartOSimulationContext(outputDirectory, projectName, weatherData, simulateOptions.SolarCalculationMethod, 1, 365)
             {
                 UnmetHours = simulateOptions.UnmetHours,
-                Sizing = false,
+                Sizing = simulateOptions.Sizing && !string.Equals(Environment.GetEnvironmentVariable("SAM_APPLY_ACCEPTANCE_SIZING"), "off", StringComparison.OrdinalIgnoreCase),
                 UseWidths = simulateOptions.UseWidths,
                 UpdateConstructionLayersByPanelType = simulateOptions.UpdateConstructionLayersByPanelType,
                 DirectT3D = simulateOptions.DirectT3D,
@@ -537,6 +543,26 @@ namespace SAM.Analytical.UI.WPF.Tests
             else
             {
                 Log("energy simulation 2 TBD glazing: " + string.Join(" | ", inventory_2.GlazingConstructions.Select(x => x.Name + " on " + string.Join("/", x.Elements) + " g " + Raw(x.G) + " U " + Raw(x.U) + " light " + Raw(x.Light))));
+            }
+        }
+
+        /// <summary>Energy Simulation's sizing copies in the folder now, with their hashes (SAM_Tas' split).</summary>
+        private Dictionary<string, string> SizingCopies(string work, string when)
+        {
+            TasProjectFiles tasProjectFiles = Analytical.Tas.GenOpt.Query.TasProjectFiles(work);
+            Dictionary<string, string> result = tasProjectFiles.SizingCopies.ToDictionary(x => x, x => Analytical.Tas.GenOpt.Query.FileHash(Path.Combine(work, x)), StringComparer.OrdinalIgnoreCase);
+            Log("project files " + when + ": " + string.Join(", ", tasProjectFiles.Files) + "; sizing copies: " + (result.Count == 0 ? "none" : string.Join(", ", result.Select(x => x.Key + " " + x.Value.Substring(0, 8)))) + (tasProjectFiles.UnmatchedSizingNames.Count == 0 ? string.Empty : "; UNMATCHED " + string.Join(", ", tasProjectFiles.UnmatchedSizingNames)));
+            return result;
+        }
+
+        /// <summary>The project snapshot of each run under <paramref name="runs"/>: sizing copies must not be there.</summary>
+        private void RunSnapshot(string runs)
+        {
+            foreach (string project in Directory.Exists(runs) ? Directory.GetDirectories(runs).Select(x => Path.Combine(x, NativeGenOptWorkspace.ProjectFolderName)).Where(Directory.Exists) : Enumerable.Empty<string>())
+            {
+                List<string> files = Directory.GetFiles(project).Select(Path.GetFileName).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList()!;
+                bool copies = files.Any(x => Analytical.Tas.GenOpt.Query.SizingCopySuffixes.Any(s => Path.GetFileNameWithoutExtension(x).EndsWith(s, StringComparison.OrdinalIgnoreCase)));
+                Log("run snapshot " + project + ": " + string.Join(", ", files) + " -> " + (copies ? "FAIL (a sizing copy was snapshotted)" : "PASS (no sizing copy)"));
             }
         }
 
