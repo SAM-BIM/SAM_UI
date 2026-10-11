@@ -318,13 +318,43 @@ namespace SAM.Analytical.UI.WPF.Tests
                 return null;
             }
 
-            List<string> texts = [];
-            foreach (System.Windows.Automation.AutomationElement automationElement_Text in automationElement.FindAll(System.Windows.Automation.TreeScope.Descendants, new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.ControlTypeProperty, System.Windows.Automation.ControlType.Text)))
+            try
             {
-                texts.Add(automationElement_Text.Current.Name);
-            }
+                List<string> texts = [];
+                foreach (System.Windows.Automation.AutomationElement automationElement_Text in automationElement.FindAll(System.Windows.Automation.TreeScope.Descendants, new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.ControlTypeProperty, System.Windows.Automation.ControlType.Text)))
+                {
+                    texts.Add(automationElement_Text.Current.Name);
+                }
 
-            return string.Join(" | ", texts);
+                return string.Join(" | ", texts);
+            }
+            catch (System.Windows.Automation.ElementNotAvailableException)
+            {
+                //A timer refresh can replace a stage row between finding it and reading its name.
+                return null;
+            }
+        }
+
+        private static void WaitForProgressText(params string[] expected)
+        {
+            //Render replaces ItemsSource on the window's own dispatcher every 500 ms. A fixed sleep
+            //neither waits for a stage update nor makes the subsequent UI Automation traversal atomic.
+            //Require all the text in one snapshot; never combine fragments from different refreshes.
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            string text = null;
+            do
+            {
+                text = ProgressText();
+                if (text is not null && expected.All(x => text.Contains(x, StringComparison.Ordinal)))
+                {
+                    return;
+                }
+
+                System.Threading.Thread.Sleep(50);
+            }
+            while (stopwatch.Elapsed < TimeSpan.FromSeconds(10));
+
+            Assert.Fail($"Progress window did not show [{string.Join(" | ", expected)}] within 10 seconds. Last UI Automation snapshot: {text ?? "<unavailable>"}");
         }
 
         /// <summary>
@@ -340,20 +370,12 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.True(partOProgressHost.IsShown, "no progress window could be shown on this desktop");
 
             partOProgressHost.Start(0);
-            System.Threading.Thread.Sleep(1500);
-
-            string before = ProgressText();
-            Assert.Contains("Prepare and review the iteration", before);
+            WaitForProgressText("Running now: Prepare and review the iteration", "TAS simulation (full year)", "Elapsed ");
 
             partOProgressHost.Hide();
-            System.Threading.Thread.Sleep(500);
             partOProgressHost.Show();
             partOProgressHost.Start(1);
-            System.Threading.Thread.Sleep(1500);
-
-            string after = ProgressText();
-            Assert.Contains("TAS simulation (full year)", after);
-            Assert.Contains("Elapsed ", after);
+            WaitForProgressText("Completed: Prepare and review the iteration", "Running now: TAS simulation (full year)", "Elapsed ");
         }
 
         [WpfFact]
