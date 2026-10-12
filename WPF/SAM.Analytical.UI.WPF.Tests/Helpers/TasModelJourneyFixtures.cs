@@ -54,7 +54,25 @@ namespace SAM.Analytical.UI.WPF.Tests
                 PlantEnergy = tpd == null ? (double?)null : 27387.79,
                 PlantCost = tpd == null ? (double?)null : 7363.17,
                 PlantCO2 = tpd == null ? (double?)null : 3932.89,
+                // As the Systems Demo's TBD (PR7b-2 D1): sized on the design days by every simulation, so its zone
+                // setpoints and glazing are offered.
+                ZoneSizing = new[] { new TasZoneSizing("B1_Office 1", TasZoneSizing.DesignSizingOnly, 1593.755126953125, TasZoneSizing.DesignSizingOnly, 963.8809204101562) },
             };
+        }
+
+        /// <summary>
+        /// <see cref="Demo"/> as Energy Simulation with Sizing on leaves a TBD (PR7b-2 D1): zone capacities fixed
+        /// (tbdNoSizing), so its zone setpoints and glazing are not offered; its controller is.
+        /// </summary>
+        public static TasModelInventory DemoWithFixedCapacities(string tbd = "Model.tbd", string? tsd = "Model.tsd", string? tpd = "Model.tpd")
+        {
+            TasModelInventory result = Demo(tbd, tsd, tpd);
+            result.ZoneSizing = new[]
+            {
+                new TasZoneSizing("B1_Office 1", TasZoneSizing.NoSizing, 1586.5380859375, TasZoneSizing.NoSizing, 2947.120849609375),
+                new TasZoneSizing("B1_Office 2", TasZoneSizing.NoSizing, 1525.4364013671875, TasZoneSizing.NoSizing, 2671.56298828125),
+            };
+            return result;
         }
 
         /// <summary>

@@ -135,6 +135,13 @@ namespace SAM.Analytical.UI.WPF
             TasModelSession? session = tasModelSession != null && tasModelSession.Folder != null && string.Equals(SafeFullPath(tasModelSession.Folder), SafeFullPath(directory), StringComparison.OrdinalIgnoreCase) ? tasModelSession : null;
             result.Add(TasOptimisationCheck_Model(tasOptimisationCheck_Directory.Status == TasOptimisationCheckStatus.Blocked, session));
 
+            // PR7b-2 D1: why the model's zone setpoints and glazing are not in "Can change" (plant controllers still are).
+            string? sizingRefusal = TasModelSizingRefusal(session);
+            if (sizingRefusal != null)
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Warning, SizingTitle, sizingRefusal));
+            }
+
             string path_TasGenExecute = string.IsNullOrWhiteSpace(tasGenExecutePath) ? Analytical.Tas.GenOpt.Query.TasGenOptExecutePath() : tasGenExecutePath!;
             result.Add(System.IO.File.Exists(path_TasGenExecute)
                 ? new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, "Tas optimisation engine", "Installed.")
@@ -143,6 +150,15 @@ namespace SAM.Analytical.UI.WPF
             if (!tasOptimisationInput.TryGetDefinition(out OptimisationDefinition? optimisationDefinition, out List<string> problems) || optimisationDefinition == null)
             {
                 result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", string.Join(Environment.NewLine, problems)));
+                return result;
+            }
+
+            // A definition with a zone setpoint or glazing (loaded, pasted or kept from before) on such a model: the reason,
+            // not the catalogue check's "not in this model" (SAM_Tas' runner refuses it as OPT617 too).
+            List<string> tbdVariables = optimisationDefinition.Variables.Where(x => TasModelKind.IsBuildingTarget(x?.Target?.Kind)).Select(x => "“" + x.Name + "”").ToList();
+            if (sizingRefusal != null && tbdVariables.Count != 0)
+            {
+                result.Add(new TasOptimisationCheck(TasOptimisationCheckStatus.Blocked, "Setup", string.Join(", ", tbdVariables) + (tbdVariables.Count == 1 ? " changes" : " change") + " the TBD. " + sizingRefusal));
                 return result;
             }
 
@@ -211,6 +227,20 @@ namespace SAM.Analytical.UI.WPF
             }
 
             return new TasOptimisationCheck(TasOptimisationCheckStatus.Ready, title, TasModelText(tasModelSession));
+        }
+
+        /// <summary>The title of the check line that says why zone setpoints and glazing are not offered (PR7b-2 D1).</summary>
+        public const string SizingTitle = "Zone setpoints and glazing";
+
+        /// <summary>
+        /// SAM_Tas' reason the read model's zone setpoints and glazing cannot be optimised (capacities fixed by Energy
+        /// Simulation's Sizing, or a sizing not measured or not read); null when they can, when the model has no TBD or has
+        /// not been read.
+        /// </summary>
+        public static string? TasModelSizingRefusal(TasModelSession? tasModelSession)
+        {
+            TasModelInventory? inventory = tasModelSession?.State == TasModelReadState.Ready ? tasModelSession.Inventory : null;
+            return inventory != null && inventory.HasBuilding ? Analytical.Tas.GenOpt.Query.TasModelSizingRefusal(inventory) : null;
         }
 
         /// <summary>"Model.tbd, Model.tsd, Model.tpd: 7 internal conditions, 2 glazing constructions, 1 plant room with 6 controllers. Glazing pool: 25 systems."</summary>

@@ -162,6 +162,15 @@ namespace SAM.Analytical.UI.WPF
             }
 
             TasModelInventory inventory = tasModelRunner.Inventory;
+
+            // PR7b-2 D1: a zone setpoint or glazing only on a model whose zones are sized in every simulation; SAM_Tas
+            // refuses it again when it writes (the inventory, then the TBD itself). Said here, before anything is offered.
+            string? sizingRefusal = changes.Any(x => x.IsBuilding && !TasModelDesignApplier.IsUnchanged(x, inventory)) ? Analytical.Tas.GenOpt.Query.TasModelSizingRefusal(inventory) : null;
+            if (sizingRefusal != null)
+            {
+                return Refused(sizingRefusal + " Nothing will be written.");
+            }
+
             string folder = Path.GetFullPath(projectFolder!.Trim());
             bool linked = analyticalModel != null && !string.IsNullOrWhiteSpace(modelPath) && SameFolder(Path.GetDirectoryName(modelPath!), folder);
             string? tasOnlyReason = linked ? null : analyticalModel == null ? "No SAM model is open" : string.IsNullOrWhiteSpace(modelPath) ? "The open model has not been saved, so it has no folder" : "The Tas project folder is not the open model's folder";
