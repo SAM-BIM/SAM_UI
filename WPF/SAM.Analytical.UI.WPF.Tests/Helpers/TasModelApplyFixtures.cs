@@ -138,6 +138,13 @@ namespace SAM.Analytical.UI.WPF.Tests
             {
                 CoolingDemand = 2523.75187299657,
                 HeatingDemand = 0,
+                // Sized in every simulation (as after Energy Simulation with Sizing off), so the targets are offered and
+                // applied (PR7b-2 D1).
+                ZoneSizing = new[]
+                {
+                    new TasZoneSizing(Studio1, TasZoneSizing.Sizing, 0, TasZoneSizing.Sizing, 0),
+                    new TasZoneSizing(Studio2, TasZoneSizing.Sizing, 0, TasZoneSizing.Sizing, 0),
+                },
             };
         }
 
