@@ -119,7 +119,8 @@ namespace SAM.Analytical.UI.WPF
 
         /// <summary>
         /// The readiness list of the "tas-model" engine: the Tas project, the Tas model (read in the background; Tas and its
-        /// licence are needed), the Tas optimisation engine, then the setup: the form read as a definition, judged by its
+        /// licence are needed), the sizing warning (only when the model's zone capacities are fixed; PR7b-2 D1), the Tas
+        /// optimisation engine, then the setup: the form read as a definition, judged by its
         /// own diagnostics against the "tas-model" capabilities and the model's catalogue (a name not in the model is
         /// OPT609), then by SAM_Tas' runner, which resolves the glazing options and generates the script without starting
         /// anything. Warnings never block. There is no script line: SAM_Tas writes the script.
