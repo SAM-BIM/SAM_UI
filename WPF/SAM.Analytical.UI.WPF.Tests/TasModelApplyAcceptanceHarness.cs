@@ -39,6 +39,10 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// setpoint, minimising annual heating demand (<c>SAM_APPLY_ACCEPTANCE_HEATING</c> = "space,minimum,maximum", default
     /// "Bathroom_2,14,18"); C1, a space's cooling setpoint, minimising annual cooling demand
     /// (<c>SAM_APPLY_ACCEPTANCE_COOLING</c>, default "Cell 1,22,28"). Golden section; the space must have that setpoint on.</item>
+    /// <item>G1 (PR7b-2): the glazing choice on the model's own windows, heating and cooling on as set by its author, the
+    /// filter widened in the window; try every option minimising <c>SAM_APPLY_ACCEPTANCE_GLAZING_OBJECTIVE</c> (default
+    /// "Annual heating demand"), recording the other two of heating, cooling and overheating, each compared with Energy
+    /// Simulation 2 (with <c>SAM_APPLY_ACCEPTANCE_SIZING</c> on and off: does a sized model keep the result?).</item>
     /// </list>
     /// <c>SAM_APPLY_ACCEPTANCE_CASES</c> selects cases (default S1,S2,D1). <c>SAM_APPLY_ACCEPTANCE_DIRECT=on</c> runs Energy
     /// Simulation on the direct T3D route (the dialog's DirectT3D option) instead of the gbXML route.
@@ -46,6 +50,20 @@ namespace SAM.Analytical.UI.WPF.Tests
     [Collection(WpfCollection.Name)]
     public class TasModelApplyAcceptanceHarness : IDisposable
     {
+        /// <summary>
+        /// G1's measures in the window's order: the objective (<c>SAM_APPLY_ACCEPTANCE_GLAZING_OBJECTIVE</c>, default annual
+        /// heating demand) first, then the others recorded.
+        /// </summary>
+        private static string[] GlazingMeasures
+        {
+            get
+            {
+                string[] measures = { "Annual heating demand", "Annual cooling demand", "Overheating hours" };
+                string objective = Environment.GetEnvironmentVariable("SAM_APPLY_ACCEPTANCE_GLAZING_OBJECTIVE") ?? measures[0];
+                return new[] { objective }.Concat(measures.Where(x => x != objective)).ToArray();
+            }
+        }
+
         private string log = string.Empty;
 
         public TasModelApplyAcceptanceHarness()
@@ -105,6 +123,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             {
                 await SamCase("C1", sam, output, false, SetpointCase.Read("SAM_APPLY_ACCEPTANCE_COOLING", "Cell 1,22,28", false));
             }
+
+            if (selected.Contains("G1"))
+            {
+                await SamCase("G1", sam, output, true, asAuthored: true);
+            }
         }
 
         /// <summary>H1/C1: an existing heating or cooling setpoint of a space, optimised within a range.</summary>
@@ -128,7 +151,9 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         /// <param name="setpoint">H1/C1: the existing setpoint to optimise; null for S1 and S2.</param>
-        private async Task SamCase(string id, string source, string output, bool glazing, SetpointCase? setpoint = null)
+        /// <param name="asAuthored">G1: the glazing choice on the model's own windows (no system swapped in first), heating and
+        /// cooling on as its author set them; every measure is compared with Energy Simulation 2.</param>
+        private async Task SamCase(string id, string source, string output, bool glazing, SetpointCase? setpoint = null, bool asAuthored = false)
         {
             log = Path.Combine(output, id + ".log");
             File.WriteAllText(log, string.Empty);
@@ -151,7 +176,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
                 GlazingSource user = GlazingSource.FromUserLibrary(new UserGlazingLibrary());
                 Log("My glazing systems: " + (user.ConstructionManager?.ApertureConstructions?.Count ?? 0) + " systems" + (string.IsNullOrWhiteSpace(user.Note) ? string.Empty : " (" + user.Note + ")"));
-                if (glazing)
+                if (glazing && !asAuthored)
                 {
                     //The open model as a glazing source: the windows get the default library's SIM_EXT_GLZ_SKY (higher g) the
                     //way the Glazing window assigns a system, and the model keeps its SIM_EXT_GLZ, now assigned to nothing.
@@ -258,7 +283,20 @@ namespace SAM.Analytical.UI.WPF.Tests
                 window.Show();
                 await ReadModel(window);
 
-                if (glazing)
+                if (asAuthored)
+                {
+                    //The filter widened in the window (Ug and light allowances) for more than the current system; the
+                    //objective first, the other measures recorded (GlazingMeasures).
+                    Text(window, "textBox_GlazingUgAllowance", "5");
+                    Text(window, "textBox_GlazingLightAllowance", "1");
+                    Refresh(window);
+                    window.AddTarget(window.CanChangeItems.First(x => x.IsChoice));
+                    foreach (string measure in GlazingMeasures)
+                    {
+                        window.AddMeasure(Item(window.CanMeasureItems, measure));
+                    }
+                }
+                else if (glazing)
                 {
                     //The default filter, untouched; the objective is overheating (the model has no cooling).
                     window.AddTarget(window.CanChangeItems.First(x => x.IsChoice));
@@ -308,9 +346,51 @@ namespace SAM.Analytical.UI.WPF.Tests
                 SizingCopies(work, "after energy simulation 2");
                 TasModelInventory inventory_2 = Analytical.Tas.GenOpt.Query.TasModelInventory(work);
                 LogInventory("after energy simulation 2", inventory_2);
-                CompareWithBest(window, inventory_1, inventory_2, glazing, setpoint);
+                if (asAuthored)
+                {
+                    //Heating and cooling of the best simulation against Energy Simulation 2's TSD, then "Test one simulation"
+                    //of a fresh window on Energy Simulation 2's files (option 1 = as applied): the generated script against it.
+                    string[] measures = GlazingMeasures;
+                    IReadOnlyList<double> best = window.Report!.BestObjectives;
+                    Log("energy simulation 2 TBD glazing: " + string.Join(" | ", inventory_2.GlazingConstructions.Select(x => x.Name + " on " + string.Join("/", x.Elements) + " g " + Raw(x.G) + " U " + Raw(x.U) + " light " + Raw(x.Light))));
+                    foreach ((string measure, double? demand_1, double? demand_2) in new[] { ("Annual heating demand", inventory_1.HeatingDemand, inventory_2.HeatingDemand), ("Annual cooling demand", inventory_1.CoolingDemand, inventory_2.CoolingDemand) })
+                    {
+                        double value = best[Array.IndexOf(measures, measure)];
+                        Log(measure + ": energy simulation 1 " + (demand_1.HasValue ? Raw(demand_1.Value) : "-") + ", best simulation of the run " + Raw(value) + ", energy simulation 2 " + (demand_2.HasValue ? Raw(demand_2.Value) + "; relative " + Raw(value == 0 ? demand_2.Value : Math.Abs((demand_2.Value - value) / value)) : "-"));
+                    }
 
-                if (glazing)
+                    window.Close();
+                    TasOptimisationWindow.ResetSession();
+                    window = new TasOptimisationWindow(work, ui.JSAMObject, null, () => new[] { GlazingSource.FromModel(ui.JSAMObject), GlazingSource.FromDefaultLibrary() }) { UIAnalyticalModel = ui };
+                    Text(window, "textBox_RunsDirectory", Path.Combine(output, id + "-r2"));
+                    window.Show();
+                    await ReadModel(window);
+                    Text(window, "textBox_GlazingUgAllowance", "5");
+                    Text(window, "textBox_GlazingLightAllowance", "1");
+                    Refresh(window);
+                    window.AddTarget(window.CanChangeItems.First(x => x.IsChoice));
+                    foreach (string measure in measures)
+                    {
+                        window.AddMeasure(Item(window.CanMeasureItems, measure));
+                    }
+
+                    Refresh(window);
+                    await window.TestAsync();
+                    IReadOnlyList<double> measured = window.TestReport?.Outputs ?? new List<double>();
+                    Log("energy simulation 2's model, Test one simulation (option 1 = as applied): " + window.TestReport?.ToText().Replace(Environment.NewLine, " | "));
+                    for (int i = 0; i < measures.Length; i++)
+                    {
+                        double value = i < measured.Count ? measured[i] : double.NaN;
+                        double? tsd = measures[i] == "Annual heating demand" ? inventory_2.HeatingDemand : measures[i] == "Annual cooling demand" ? inventory_2.CoolingDemand : null;
+                        Log(measures[i] + ": best simulation of the run " + Raw(best[i]) + ", test on energy simulation 2's files " + Raw(value) + (tsd.HasValue ? " (energy simulation 2's TSD " + Raw(tsd.Value) + ")" : string.Empty) + " -> " + (value == best[i] ? "PASS (equal)" : "DIFFERENT, relative " + Raw(best[i] == 0 ? value : Math.Abs((value - best[i]) / best[i]))));
+                    }
+                }
+                else
+                {
+                    CompareWithBest(window, inventory_1, inventory_2, glazing, setpoint);
+                }
+
+                if (glazing && !asAuthored)
                 {
                     //The objective (overheating) has no reader outside the generated script: measure Energy Simulation 2's
                     //model with "Test one simulation" of a fresh window (option 1 = the model as it now is).
