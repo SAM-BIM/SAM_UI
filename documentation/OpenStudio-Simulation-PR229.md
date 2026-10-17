@@ -4,7 +4,7 @@ Status: implemented on `claude/openstudio-mcp-server-1jmjlo`; owner review and g
 Issue: SAM-BIM/SAM_UI#229 (parent SAM-BIM/SAM_UI#227, tracker SAM-BIM/SAM#206).
 Base: `sow/2026-Q4` at `ebe5e09b30b95e43e5d047b3aef2d8c5f01110e9`.
 PR: the live PR for this branch in `SAM-BIM/SAM_UI` (its number is not committed here).
-Tested content SHA: `b7e34cd0dd8de31e1e63eeb88e9340d18fc2038d`. This record is the only change after it.
+Tested content SHA: `b7e34cd0dd8de31e1e63eeb88e9340d18fc2038d` for the code and tests. Then `8c1c2a7130b435c6fb8bf47a074c91d09177c1b7` fixed only a `build.yml` comment line that the first push had split: pwsh rejected the script before any build ran. This record is the only change after that.
 Final PR head and hosted check results: recorded in the live PR description.
 
 ## What it does
