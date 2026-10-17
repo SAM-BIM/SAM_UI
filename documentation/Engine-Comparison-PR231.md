@@ -143,26 +143,48 @@ No result in this record comes from a real engine.
 
 Report: PASS/FAIL per step (including 12a), `engine-comparison-run.json`, `comparison-summary.json`, the two producer logs if anything fails, and any native-DLL, OpenStudio CLI or Tas COM error.
 
-## Presentation polish - 2026-10-17
+## Presentation polish and review follow-up - 2026-10-17
 
-Status: implemented on this PR; presentation-only. Not merged.
-Tested content SHA: `cdcadac37cf277fe990520ee1a4f0d1352a17d52`. The companion SAM_Validation presentation is on `claude/tas-openstudio-comparison` at `7fd54b3` (CSV/JSON unchanged).
+Status: implemented on this PR; presentation, labelling and layout only. Not merged.
+Tested content SHA: `647637f3039c2fc001aa820913142232cf5fa8d4` (local). The companion SAM_Validation presentation is on `claude/tas-openstudio-comparison` at `4a7da6b` (code `a39e4a9`; CSV/JSON unchanged).
+
+### Presentation
 
 - Model/Spaces grids show engineering quantities, absolute differences and normalized percentages to two decimals; hour-of-year values and hour differences stay integers. Numeric cells are right-aligned. Full precision remains available through cell tooltips and in the exported reports.
-- Informational rows keep their band but use neutral styling and the label `Informational — excluded from numerical status`. The banner shows the gate's total Fail count with the contributing/informational split (saved example: 10 Fail, 4 contributing, 6 informational). Unit mismatch is labelled separately.
+- Informational rows keep their band but use neutral styling and the label `Informational — excluded from numerical status`. Unit mismatch has its own `Unit mismatch` label and note. The banner shows the gate's total Fail count with the contributing/informational split (saved example: 10 Fail, 4 contributing, 6 informational) and a separate unit-mismatch count.
 - Notes wrap and expose the full text through a tooltip. The Spaces GUID is compact in the grid; the grid context menu copies the complete GUID. Markdown shows the space name beside its GUID.
 - The footer defines the unsigned normalized difference, notes that it is not percentage change against TAS, and states that peak hours use circular hours with no percentage. Markdown now carries the same definition and the 5.00%/15.00% thresholds.
 - Provenance/Diagnostics text wraps; action buttons wrap below the explanatory text.
 - Markdown now includes engine warnings/notes, the `designDaySource=None` explanation and the input-manifest limitation. Reconciliation values use two decimals and include a normalized difference column.
 - CSV and summary JSON keep their existing columns, full precision and byte-identical content. No tolerance, gate, engine, conversion or comparison arithmetic changed.
 
-Validation: focused `EngineComparisonTests` + `OpenStudioSimulationTests` 30/30 PASS; full `SAM.Analytical.UI.WPF.Tests` 2832/2832 PASS; `SAM_UI.sln` Release build 0 errors. A stale ribbon-order expectation from #238's new commands was updated in `TasOptimisationWindowTests` (test-only; it now expects Run Simulation, Solar Simulation, Energy Simulation, OpenStudio Simulation, Compare Tas / OpenStudio and Optimisation). The saved `box-both` example remains 6 Match / 0 Warn / 10 Fail / 2 N/A with Overall/Numerical Fail, Coverage Warn, Provenance/Reconciliation Pass, and the 4/6 informational split. Screenshots are machine-local under `C:\TasOut\pr238-ui\ui-polish\screenshots` (`compare-model-1180-v3.png`, `compare-spaces-1180-final3.png`, `compare-model-820-scroll.png`, `compare-provenance-820.png`, `compare-diagnostics-820.png`).
+### Review findings fixed
 
-Remaining gaps: at narrow widths the dense numeric columns compress and require horizontal scrolling/widening; notes and action buttons remain accessible. The numerical TAS/OpenStudio discrepancy (heating, cooling, peaks, 871/872 hour, cooling peak) remains a separate engineering investigation, not resolved here.
+1. **Banner counts informational rows separately from incompatible rows.** `EngineComparison.ContributingFailCount`/`InformationalFailCount` now take SAM_Validation's authoritative split (`ComparisonResult`/`Query.IsInformationalForNumericalGate`) instead of re-deriving it from displayed row strings, and `UnitMismatchCount` is a separate count. The saved `box-both` banner reads: *Gate Fail: 6 match, 0 warn, 10 fail (4 contributing to numerical status, 6 informational and excluded); 2 missing on one engine, 0 unit mismatch, 0 not reported.* The 10 Fail bands are retained as 4 contributing + 6 informational; the six are labelled *Informational*, never as incompatible/not-equivalent.
+2. **Model/Spaces sizing at 1180 and 820 px.** The grids no longer sit inside an outer `ScrollViewer` with a star-width Note column: at 820 px WPF compressed every column instead of scrolling. Each DataGrid now owns horizontal scrolling and every column has a fixed, readable width, including `Unit` (wide enough for `hourOfYear`) and `Note` (275 px Model, 160 px Spaces). Headers wrap; notes wrap with full-text tooltips; Metric/Status truncate with their full value on a tooltip; the footer action buttons remain visible. Regression `EngineComparisonWindowTests.Grids_KeepReadableColumns_AndScrollHorizontallyWhenNarrow` asserts every column keeps its width and that each grid scrolls horizontally at 820 px and fits at 1180 px.
+3. **Fractional peak-hour thresholds in Markdown.** SAM_Validation `WriteMarkdown` cast `HourWarnAbsolute`/`HourFailAbsolute` to `int`, so a profile with 1.5 h / 24.5 h was reported as 1 h / 24 h. It now uses `Format.Number`, the same full-precision value as the CSV; integer formatting remains for hour-of-year indices and hour differences. The SAM_Validation regression asserts the Markdown value equals the raw profile and `toleranceProfileDetail` in the summary JSON, and the CSV per-row profile columns, for a 1.5/24.5 profile. Default-profile goldens are unchanged.
+
+### Validation
+
+- Focused `EngineComparisonTests` + `OpenStudioSimulationTests` + `EngineComparisonWindowTests` 32/32 PASS.
+- Full `SAM.Analytical.UI.WPF.Tests` 2835/2835 PASS.
+- `SAM_UI.sln` Release build 0 errors (463 solution warnings; no warning from the changed comparison files) with `SAM_COMMIT` set.
+- `SAM.Analytical.Benchmark.Compare.Tests` 100/100 PASS and `SAM.Analytical.Benchmark.Compare.ApiTests` 2/2 PASS in SAM_Validation at `4a7da6b`; `SAM_Validation.sln` Release build 0 errors.
+- Saved `box-both` run: still 6 Match / 0 Warn / 10 Fail / 2 N/A, Overall/Numerical Fail, Coverage Warn, Provenance/Reconciliation Pass, 4 contributing + 6 informational. Regenerated `comparison.csv` SHA-256 `8092B384DD9D9BA9289E1C10B77DB7C93BCD95E911B4A0F32CEE93373C0ECD3D` and `comparison-summary.json` SHA-256 `36B9D353B35CDFEB1FBAC70B78317BF36C4F393159F114FCF39716D825FF4A98` are byte-identical to the saved run.
+- Reproduce:
+  `dotnet test WPF\SAM.Analytical.UI.WPF.Tests -c Release --filter "FullyQualifiedName~EngineComparisonTests|FullyQualifiedName~OpenStudioSimulationTests|FullyQualifiedName~EngineComparisonWindowTests"`
+  `dotnet test WPF\SAM.Analytical.UI.WPF.Tests -c Release`
+  `dotnet build SAM_UI.sln -c Release`
+  `dotnet test SAM.Analytical.Benchmark.Compare.Tests -c Release` (in SAM_Validation)
+- Screenshots from the final build are committed under `documentation/evidence/pr231-presentation/`: `compare-model-1180.png`, `compare-model-820.png`, `compare-model-820-scrolled.png`, `compare-spaces-1180.png`, `compare-spaces-820.png`, `compare-spaces-820-scrolled.png`. They were rendered by the opt-in `EngineComparisonScreenshotHarness` (`SAM_ENGINE_COMPARISON_RUN` = the saved run folder, `SAM_ENGINE_COMPARISON_SCREENSHOTS` = an output folder) from `C:\TasOut\pr238-ui\box-both\000000_SAM_AnalyticalModel_TasOpenStudio_20261017-191647_1eb45853` (machine-local prerequisite, not committed).
+- A stale ribbon-order expectation from #238's new commands was updated in `TasOptimisationWindowTests` (test-only; it expects Run Simulation, Solar Simulation, Energy Simulation, OpenStudio Simulation, Compare Tas / OpenStudio and Optimisation).
+
+### Remaining gaps
+
+The numerical TAS/OpenStudio discrepancy (heating, cooling, peaks, 871/872 hour, cooling peak) remains a separate engineering investigation, not resolved here. Real Tas/OpenStudio acceptance remains the owner's Windows procedure above. Per-engine input manifests and producer deployment remain as stated earlier.
 
 ## Next step
-1. Hosted CI green on this PR and on SAM_Validation#14.
-2. Owner runs the procedure above.
-3. Fix what it finds.
-4. Owner review. Merge order: SAM_Validation#14, #237, then this PR.
-5. `PROJECT_PROGRESS.md` closeouts after each merge.
+1. Hosted CI green at the final heads of this PR and SAM_Validation#15.
+2. Owner review; the presentation findings above are ready for independent verification.
+3. Merge order: SAM_Validation#15, #237, then this PR. Do not merge automatically.
+4. `PROJECT_PROGRESS.md` closeouts after each merge.
