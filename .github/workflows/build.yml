@@ -218,7 +218,9 @@ jobs:
           # SAM_OpenStudio\build, where SAM.Analytical.UI.WPF picks them up.
           $platformBySolution = @{
             'SAM_OpenStudio' = 'x64'
-          } (robust: first .sln in each folder)
+          }
+
+          # Convert build order -> solution paths (robust: first .sln in each folder)
           $solutions = foreach ($r in $buildOrder) {
             $expected = Join-Path $r "$r.sln"
             if (Test-Path $expected) {
