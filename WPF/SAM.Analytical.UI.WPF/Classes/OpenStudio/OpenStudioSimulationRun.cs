@@ -197,7 +197,9 @@ namespace SAM.Analytical.UI.WPF
             JsonArray result = new JsonArray();
             foreach (string value in values)
             {
-                result.Add(value);
+                //JsonValue.Create, not Add(value): the generic Add<string> makes a value that ToJson's options (no TypeInfoResolver)
+                //cannot write, so any run with a diagnostic threw while writing its manifest.
+                result.Add(JsonValue.Create(value));
             }
 
             return result;

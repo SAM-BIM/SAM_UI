@@ -261,9 +261,10 @@ namespace SAM.Analytical.UI.WPF
                 File.WriteAllText(path, openStudioSimulationRun.ToJson());
                 openStudioSimulationRun.ManifestPath = path;
             }
-            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            catch (Exception exception)
             {
-                openStudioSimulationRun.Diagnostics.Add("Warning: the run manifest could not be written: " + exception.Message);
+                //Written from a finally on a worker thread: whatever goes wrong here must not take the run, or the application, down.
+                openStudioSimulationRun.Diagnostics.Add("Warning: the run manifest could not be written: " + exception.GetType().Name + ": " + exception.Message);
             }
         }
 

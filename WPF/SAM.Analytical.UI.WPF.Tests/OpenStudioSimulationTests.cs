@@ -165,6 +165,23 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [Fact]
+        public void Manifest_WithDiagnosticsAndAnError_IsWritten()
+        {
+            //A real run nearly always has diagnostics; the manifest must still serialise (it once threw on the first diagnostic).
+            OpenStudioSimulationRun run = new OpenStudioSimulationRun() { Id = "0123abcd", Directory = directory, Exception = new InvalidOperationException("boom") };
+            run.Diagnostics.Add("Warning SAM-OS-RUN-001: a warning");
+            run.Diagnostics.Add("Error SAM-OS-RUN-001: an error");
+            run.ResultDiagnostics.Add("No simulation result found for space 'Cell 1'");
+
+            JsonObject jsonObject = JsonNode.Parse(run.ToJson()).AsObject();
+
+            Assert.Equal(2, jsonObject["diagnostics"].AsArray().Count);
+            Assert.Equal("Error SAM-OS-RUN-001: an error", (string)jsonObject["diagnostics"][1]);
+            Assert.Single(jsonObject["resultDiagnostics"].AsArray());
+            Assert.Equal("InvalidOperationException: boom", (string)jsonObject["error"]);
+        }
+
+        [Fact]
         public void Run_WithoutAModelOrAFolder_FailsWithoutThrowing()
         {
             OpenStudioSimulationRun run = Modify.RunOpenStudioSimulation(null, directory);
