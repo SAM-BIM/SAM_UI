@@ -4,7 +4,7 @@ Status: implemented on `claude/openstudio-mcp-server-1jmjlo`; owner review and g
 Issue: SAM-BIM/SAM_UI#229 (parent SAM-BIM/SAM_UI#227, tracker SAM-BIM/SAM#206).
 Base: `sow/2026-Q4` at `ebe5e09b30b95e43e5d047b3aef2d8c5f01110e9`.
 PR: the live PR for this branch in `SAM-BIM/SAM_UI` (its number is not committed here).
-Tested content SHA: `0e75a1a2aab98020bdfdb7dd0597978a944efe1d`. Earlier heads failed hosted CI: `2b140f3` (a `build.yml` comment line split, pwsh parse error) and `f8f10d6` (CS0117, see Validation). This record is the only change after the tested SHA.
+Tested content SHA: `3393331` (local Linux harness; hosted CI in the PR description). Earlier heads: `2b140f3` failed CI (a `build.yml` comment line split, pwsh parse error); `f8f10d6` failed CI (CS0117, SAM_UI's own `AnalyticalModelParameter` shadows SAM's); `722f40b` was green on hosted CI but carried the manifest bug fixed in `3393331` (see Validation). This record is the only change after the tested SHA.
 Final PR head and hosted check results: recorded in the live PR description.
 
 ## What it does
@@ -69,6 +69,7 @@ Local results are from a Linux cloud container (no Windows, Tas or OpenStudio CL
 
 | Check | Where | Result |
 |---|---|---|
+| `openstudio-run.json` threw `InvalidOperationException` when a run had any diagnostic: `JsonArray.Add(string)` binds to the generic `Add<T>`, which `ToJson`'s options cannot write. The exception was raised from a `finally` on the worker thread, so a real run with a warning would have failed or crashed SAM_UI. Found by the comparison work (SAM_UI#231). Fixed with `JsonValue.Create`, and the manifest write can no longer throw. Regression test `Manifest_WithDiagnosticsAndAnError_IsWritten`: fails before the fix, passes after (harness 10/10) | Local | FIXED in `3393331` |
 | Hosted CI on `f8f10d6` failed: `SimulateOpenStudio.cs(55,89) CS0117 'AnalyticalModelParameter' does not contain a definition for 'WeatherData'`. SAM_UI's own `SAM.Analytical.UI.AnalyticalModelParameter` shadows SAM's enum. Reproduced locally by adding that enum as a stub; fixed by qualifying it as `Analytical.AnalyticalModelParameter`, as `Modify/Simulate.cs` does. The new files were swept for other names shadowed by SAM_UI types: none found | Local | FIXED |
 | New production files compiled against the real SAM/SAM_OpenStudio builds (net8.0-windows, nullable enabled, `EnableWindowsTargeting`). Machine-local harness; only `UIAnalyticalModel`, `ProgressWindowHost` and two existing private `Query` helpers stubbed | Local | PASS (0 errors, 0 warnings) |
 | `OpenStudioSimulationTests` (9) with the non-WPF production files, net8.0 harness | Local | PASS 9/9. The real-run test returned early (no `openstudio.exe`), so it is **NOT RUN** |
