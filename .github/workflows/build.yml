@@ -108,6 +108,10 @@ jobs:
             # CS0234. Same slot as BuildAlls_v4.csproj uses locally. Needs only SAM and SAM_Mollier,
             # both already above.
             'SAM_Validation'
+            # Simulate > OpenStudio Simulation (SAM_UI#229) references SAM_OpenStudio\build (its libraries need only SAM and
+            # SAM_SQLite; its benchmark needs SAM_Validation, above). Same order as SAM_Deploy's BuildAll.
+            'SAM_SQLite'
+            'SAM_OpenStudio'
             'SAM_Tas'
             'SAM_Excel'
             'SAM_GEM'
@@ -199,6 +203,8 @@ jobs:
             # CS0234. Same slot as BuildAlls_v4.csproj uses locally. Needs only SAM and SAM_Mollier,
             # both already above.
             'SAM_Validation'
+            'SAM_SQLite'
+            'SAM_OpenStudio'
             'SAM_Tas'
             'SAM_Excel'
             'SAM_GEM'
@@ -207,7 +213,12 @@ jobs:
             $repo
           )
 
-          # Convert build order -> solution paths (robust: first .sln in each folder)
+          # Platform overrides, only where a solution needs one: the OpenStudio package's targets refuse AnyCPU, so
+          # SAM_OpenStudio is built x64 (as in its own CI and SAM_Deploy); that build puts the native OpenStudio files in
+          # SAM_OpenStudio\build, where SAM.Analytical.UI.WPF picks them up.
+          $platformBySolution = @{
+            'SAM_OpenStudio' = 'x64'
+          } (robust: first .sln in each folder)
           $solutions = foreach ($r in $buildOrder) {
             $expected = Join-Path $r "$r.sln"
             if (Test-Path $expected) {
@@ -220,15 +231,23 @@ jobs:
             $sln.FullName
           }
 
+          function Platform-Args([string]$sln) {
+            $name = Split-Path (Split-Path $sln -Parent) -Leaf
+            if ($platformBySolution.ContainsKey($name)) { return @("/p:Platform=$($platformBySolution[$name])") }
+            return @()
+          }
+
           foreach ($sln in $solutions) {
-            Write-Host "==> Restore: $sln"
-            & msbuild $sln /t:Restore @common
+            $platformArgs = @(Platform-Args $sln)
+            Write-Host "==> Restore: $sln $platformArgs"
+            & msbuild $sln /t:Restore @common @platformArgs
             if ($LASTEXITCODE -ne 0) { throw "MSBuild restore failed: $sln" }
           }
 
           foreach ($sln in $solutions) {
-            Write-Host "==> Rebuild: $sln"
-            & msbuild $sln /t:Rebuild @common
+            $platformArgs = @(Platform-Args $sln)
+            Write-Host "==> Rebuild: $sln $platformArgs"
+            & msbuild $sln /t:Rebuild @common @platformArgs
             if ($LASTEXITCODE -ne 0) { throw "MSBuild rebuild failed: $sln" }
           }
 
