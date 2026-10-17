@@ -103,6 +103,13 @@
     <Reference Include="SAM.Core.OpenStudio">
       <HintPath>..\..\..\SAM_OpenStudio\build\SAM.Core.OpenStudio.dll</HintPath>
     </Reference>
+    <!-- Compare Tas / OpenStudio (SAM_UI#231): the tests read SAM_Validation's comparison result directly to prove the view shows it as is. -->
+    <Reference Include="SAM.Analytical.Benchmark">
+      <HintPath>..\..\..\SAM_Validation\build\SAM.Analytical.Benchmark.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Analytical.Benchmark.Compare">
+      <HintPath>..\..\..\SAM_Validation\build\SAM.Analytical.Benchmark.Compare.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

@@ -504,6 +504,9 @@
                          Energy Simulation, which stays the Tas workflow and is not changed by it; the result is saved as its own model in
                          its own run folder, never into the open model. -->
                     <RibbonButton x:Name="RibbonButton_OpenStudioSimulation" Label="OpenStudio Simulation" ToolTipService.ShowOnDisabled="True" />
+                    <!-- Tas/OpenStudio comparison (SAM_UI#231): both engines on one frozen snapshot, or existing B1a documents, compared by
+                         SAM_Validation. Always available - comparing existing runs needs no open model. -->
+                    <RibbonButton x:Name="RibbonButton_CompareTasOpenStudio" Label="Compare Tas / OpenStudio" ToolTipService.ShowOnDisabled="True" />
                     <!-- Energy Simulation is the single run; Optimisation runs a Tas project again and again (the native SAM
                          optimiser over TasGenExecute). It works on a Tas project folder, not on the open model, so it
                          is always available. Not the Part O Optimise (2B) command on the Results tab. -->

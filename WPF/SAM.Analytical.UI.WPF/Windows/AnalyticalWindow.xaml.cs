@@ -712,6 +712,11 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_OpenStudioSimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_ModelRun);
             RibbonButton_OpenStudioSimulation.Click += RibbonButton_OpenStudioSimulation_Click;
             RibbonButton_OpenStudioSimulation.ToolTipTitle = "OpenStudio Simulation";
+            RibbonButton_CompareTasOpenStudio.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_ModelValidate);
+            RibbonButton_CompareTasOpenStudio.Click += RibbonButton_CompareTasOpenStudio_Click;
+            RibbonButton_CompareTasOpenStudio.ToolTipTitle = "Compare Tas / OpenStudio";
+            RibbonButton_CompareTasOpenStudio.ToolTipDescription = "Run Tas and OpenStudio/EnergyPlus on one frozen copy of the open model and compare them, or compare existing B1a documents. Model and per-space results, differences and bands come from SAM_Validation. The open model and the Tas workflow are not changed.";
+
             RibbonButton_OpenStudioSimulation.ToolTipDescription = "Run an annual OpenStudio/EnergyPlus simulation of a frozen copy of the open model (SAM_OpenStudio). The results are saved as a separate model in a new run folder; the open model and the Tas workflow are not changed. Needs OpenStudio 3.10 (openstudio.exe) installed.";
 
             RibbonButton_Optimisation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_AlgorithmRun);
@@ -2305,6 +2310,30 @@ namespace SAM.Analytical.UI.WPF.Windows
                 openStudioSimulationRunning = false;
                 RibbonButton_OpenStudioSimulation.IsEnabled = uIAnalyticalModel != null;
             }
+        }
+
+        private void RibbonButton_CompareTasOpenStudio_Click(object sender, RoutedEventArgs e)
+        {
+            //A missing SAM_Validation or SAM_OpenStudio assembly fails when ShowEngineComparison is compiled; say what is missing.
+            try
+            {
+                ShowEngineComparison();
+            }
+            catch (Exception exception) when (Query.IsOpenStudioLoadFailure(exception))
+            {
+                MessageBox.Show(this, "Compare Tas / OpenStudio could not load its components (SAM.Analytical.Benchmark.Compare.dll and SAM.Analytical.Benchmark.dll from SAM_Validation\\build, and the SAM_OpenStudio assemblies).\n\n" + Query.OpenStudioLoadFailure(exception), "Compare Tas / OpenStudio", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private void ShowEngineComparison()
+        {
+            EngineComparisonWindow engineComparisonWindow = new EngineComparisonWindow(uIAnalyticalModel)
+            {
+                Owner = this,
+            };
+
+            engineComparisonWindow.Show();
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]

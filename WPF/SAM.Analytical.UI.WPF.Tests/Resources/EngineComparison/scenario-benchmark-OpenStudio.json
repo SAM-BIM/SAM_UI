@@ -1,0 +1,251 @@
+{
+  "schemaVersion": "1.0.0",
+  "provenance": {
+    "sourceModelName": "SingleBox",
+    "sourceModelGuid": "0123456789abcdef0123456789abcdef",
+    "sourceFileHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "canonicalModelHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "canonicalizationVersion": "1.0.0",
+    "samCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "runnerCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "engine": {
+      "kind": "OpenStudio",
+      "name": "EnergyPlus",
+      "version": "24.1.0",
+      "sdkVersion": "3.10.0"
+    },
+    "route": "Native-OpenStudio",
+    "weather": {
+      "identity": "London-Gatwick.epw",
+      "hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "designDaySource": "DDY",
+    "runTimestampUtc": "2026-07-21T12:00:00Z",
+    "durationSeconds": 12.5,
+    "state": "Success",
+    "resultSources": [
+      "AnalyticalModelSimulationResult",
+      "SpaceSimulationResult"
+    ],
+    "warnings": [],
+    "notes": []
+  },
+  "model": {
+    "consumptionHeating": {
+      "value": 1000,
+      "unit": "kWh",
+      "available": true
+    },
+    "consumptionCooling": {
+      "value": null,
+      "unit": "kWh",
+      "available": false
+    },
+    "peakHeatingLoad": {
+      "value": 30,
+      "unit": "kW",
+      "available": true
+    },
+    "peakHeatingHour": {
+      "value": 205,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "peakCoolingLoad": {
+      "value": 8.8,
+      "unit": "kW",
+      "available": true
+    },
+    "peakCoolingHour": {
+      "value": 0,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "floorArea": {
+      "value": 240,
+      "unit": "m2",
+      "available": true
+    },
+    "volume": {
+      "value": 720,
+      "unit": "m3",
+      "available": true
+    }
+  },
+  "spaces": [
+    {
+      "guid": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "name": "Office A",
+      "area": {
+        "value": 200,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 600,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 2000,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 205,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    },
+    {
+      "guid": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "name": "Office B (OS)",
+      "area": {
+        "value": 44,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 132,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 2600,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 240,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    },
+    {
+      "guid": "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
+      "name": "Atrium",
+      "area": {
+        "value": 18,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 54,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 2000,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 205,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    }
+  ]
+}
