@@ -143,6 +143,23 @@ No result in this record comes from a real engine.
 
 Report: PASS/FAIL per step (including 12a), `engine-comparison-run.json`, `comparison-summary.json`, the two producer logs if anything fails, and any native-DLL, OpenStudio CLI or Tas COM error.
 
+## Presentation polish - 2026-10-17
+
+Status: implemented on this PR; presentation-only. Not merged.
+Tested content SHA: `cdcadac37cf277fe990520ee1a4f0d1352a17d52`. The companion SAM_Validation presentation is on `claude/tas-openstudio-comparison` at `7fd54b3` (CSV/JSON unchanged).
+
+- Model/Spaces grids show engineering quantities, absolute differences and normalized percentages to two decimals; hour-of-year values and hour differences stay integers. Numeric cells are right-aligned. Full precision remains available through cell tooltips and in the exported reports.
+- Informational rows keep their band but use neutral styling and the label `Informational — excluded from numerical status`. The banner shows the gate's total Fail count with the contributing/informational split (saved example: 10 Fail, 4 contributing, 6 informational). Unit mismatch is labelled separately.
+- Notes wrap and expose the full text through a tooltip. The Spaces GUID is compact in the grid; the grid context menu copies the complete GUID. Markdown shows the space name beside its GUID.
+- The footer defines the unsigned normalized difference, notes that it is not percentage change against TAS, and states that peak hours use circular hours with no percentage. Markdown now carries the same definition and the 5.00%/15.00% thresholds.
+- Provenance/Diagnostics text wraps; action buttons wrap below the explanatory text.
+- Markdown now includes engine warnings/notes, the `designDaySource=None` explanation and the input-manifest limitation. Reconciliation values use two decimals and include a normalized difference column.
+- CSV and summary JSON keep their existing columns, full precision and byte-identical content. No tolerance, gate, engine, conversion or comparison arithmetic changed.
+
+Validation: focused `EngineComparisonTests` + `OpenStudioSimulationTests` 30/30 PASS; `SAM_UI.sln` Release build 0 errors; the saved `box-both` example remains 6 Match / 0 Warn / 10 Fail / 2 N/A with Overall/Numerical Fail, Coverage Warn, Provenance/Reconciliation Pass, and the 4/6 informational split. Screenshots are machine-local under `C:\TasOut\pr238-ui\ui-polish\screenshots` (`compare-model-1180-v3.png`, `compare-spaces-1180-final3.png`, `compare-model-820-scroll.png`, `compare-provenance-820.png`, `compare-diagnostics-820.png`).
+
+Remaining gaps: at narrow widths the dense numeric columns compress and require horizontal scrolling/widening; notes and action buttons remain accessible. The numerical TAS/OpenStudio discrepancy (heating, cooling, peaks, 871/872 hour, cooling peak) remains a separate engineering investigation, not resolved here.
+
 ## Next step
 1. Hosted CI green on this PR and on SAM_Validation#14.
 2. Owner runs the procedure above.
