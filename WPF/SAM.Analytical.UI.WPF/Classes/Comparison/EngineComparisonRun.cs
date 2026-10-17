@@ -18,10 +18,20 @@ namespace SAM.Analytical.UI.WPF
     /// <summary>How a Tas/OpenStudio comparison run ended.</summary>
     public enum EngineComparisonRunStatus
     {
-        /// <summary>Both producers wrote their B1a document and SAM_Validation compared them; the reports are written.</summary>
+        /// <summary>
+        /// Both producers completed and SAM_Validation compared their B1a documents; the reports are written. Says nothing about whether
+        /// the engines agree: that is SAM_Validation's gate.
+        /// </summary>
         Compared,
 
-        /// <summary>A producer failed, or its document could not be compared; the diagnostics and logs say which.</summary>
+        /// <summary>
+        /// One producer completed and the other did not (failed, not found or not run): the completed engine's B1a document is kept and
+        /// shown on its own, and nothing is compared. The missing engine's results are never substituted.
+        /// </summary>
+        PartiallyCompleted,
+
+        /// <summary>No producer completed, the inputs could not be prepared or changed during the run, or the documents could not be
+        /// compared; the diagnostics and logs say which.</summary>
         Failed,
 
         /// <summary>The user cancelled; the running producer's process tree was killed.</summary>
@@ -48,11 +58,17 @@ namespace SAM.Analytical.UI.WPF
         public string? BenchmarkPath { get; set; }
 
         public string? Error { get; set; }
+
+        /// <summary>
+        /// True when the producer ran, exited with 0 and wrote its B1a document. Only such a document is shown or compared: a document
+        /// left by a failed producer is kept in the run folder for diagnosis but never treated as a result.
+        /// </summary>
+        public bool Succeeded => ExitCode == 0 && BenchmarkPath != null && Error == null;
     }
 
     /// <summary>
-    /// The record of one Simulate &gt; Compare Tas/OpenStudio run (SAM_UI#231): one frozen snapshot and one weather file, both engines'
-    /// producers run on them in turn, and SAM_Validation's comparison of the two B1a documents. Written to the run folder as
+    /// The record of one Run Simulation &gt; Both run (SAM_UI#231): one frozen, read-only snapshot and weather file, both engines'
+    /// producers run on them in turn, and SAM_Validation's comparison of the two B1a documents when both completed. Written to the run folder as
     /// <see cref="ManifestFileName"/>. It holds no result value: the results are the B1a documents and SAM_Validation's reports.
     /// </summary>
     public sealed class EngineComparisonRun
@@ -119,6 +135,7 @@ namespace SAM.Analytical.UI.WPF
                     ["log"] = producerRun.LogPath,
                     ["benchmark"] = producerRun.BenchmarkPath,
                     ["error"] = producerRun.Error,
+                    ["succeeded"] = producerRun.Succeeded,
                 });
             }
 

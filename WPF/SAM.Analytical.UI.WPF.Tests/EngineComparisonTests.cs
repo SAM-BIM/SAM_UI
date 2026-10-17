@@ -33,6 +33,12 @@ namespace SAM.Analytical.UI.WPF.Tests
         {
             try
             {
+                //The run's snapshot and weather file are read-only, which Directory.Delete refuses on Windows.
+                foreach (string path in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+                {
+                    File.SetAttributes(path, FileAttributes.Normal);
+                }
+
                 Directory.Delete(directory, true);
             }
             catch (IOException)
@@ -194,7 +200,7 @@ namespace SAM.Analytical.UI.WPF.Tests
         }
 
         [Fact]
-        public void Run_WithAFailedProducer_IsFailed_AndComparesNothing()
+        public void Run_WithTasFailed_IsPartiallyCompleted_KeepsOpenStudio_AndComparesNothing()
         {
             EngineComparisonRun run = Modify.RunEngineComparison(Model(), directory, Epw(), ProducerPath("benchmark-tas.exe"), ProducerPath("benchmark-openstudio.exe"), null, null, CancellationToken.None, (producerRun, workDirectory, cancellationToken) =>
             {
@@ -207,11 +213,134 @@ namespace SAM.Analytical.UI.WPF.Tests
                 return 5;
             });
 
-            Assert.Equal(EngineComparisonRunStatus.Failed, run.Status);
+            Assert.Equal(EngineComparisonRunStatus.PartiallyCompleted, run.Status);
             Assert.Empty(run.ReportPaths);
             Assert.Null(run.Gate);
             Assert.Contains("exited with code 5", run.ProducerRuns[0].Error);
-            Assert.Contains(run.Diagnostics, x => x.Contains("Tas wrote no B1a document"));
+            Assert.False(run.ProducerRuns[0].Succeeded);
+            Assert.True(run.ProducerRuns[1].Succeeded);
+            Assert.True(File.Exists(run.ProducerRuns[1].BenchmarkPath));
+            Assert.Contains(run.Diagnostics, x => x.Contains("not compared - Tas did not complete"));
+
+            JsonNode manifest = JsonNode.Parse(File.ReadAllText(run.ManifestPath));
+            Assert.Equal("PartiallyCompleted", (string)manifest["status"]);
+            Assert.False((bool)manifest["producers"][0]["succeeded"]);
+            Assert.True((bool)manifest["producers"][1]["succeeded"]);
+        }
+
+        [Fact]
+        public void Run_WithAProducerNotFound_IsPartiallyCompleted_AndTheOtherEngineStillRuns()
+        {
+            List<ComparisonEngine> calls = new List<ComparisonEngine>();
+            EngineComparisonRun run = Modify.RunEngineComparison(Model(), directory, Epw(), ProducerPath("benchmark-tas.exe"), Path.Combine(directory, "missing", "benchmark-openstudio.exe"), null, null, CancellationToken.None, (producerRun, workDirectory, cancellationToken) =>
+            {
+                calls.Add(producerRun.Engine);
+                File.Copy(Tas, Argument(producerRun, "--out"));
+                return 0;
+            });
+
+            Assert.Equal(new[] { ComparisonEngine.Tas }, calls);
+            Assert.Equal(EngineComparisonRunStatus.PartiallyCompleted, run.Status);
+            Assert.Contains("not found", run.ProducerRuns[1].Error);
+            Assert.Contains(run.Diagnostics, x => x.Contains("not compared - OpenStudio did not complete"));
+            Assert.Empty(run.ReportPaths);
+        }
+
+        [Fact]
+        public void Run_DocumentOfAFailedProducer_IsKeptButNeverUsed()
+        {
+            //Both write a document, but Tas exits with 5: its document is not a result, so nothing is compared.
+            EngineComparisonRun run = Modify.RunEngineComparison(Model(), directory, Epw(), ProducerPath("benchmark-tas.exe"), ProducerPath("benchmark-openstudio.exe"), null, null, CancellationToken.None, (producerRun, workDirectory, cancellationToken) =>
+            {
+                File.Copy(producerRun.Engine == ComparisonEngine.Tas ? Tas : OpenStudio, Argument(producerRun, "--out"));
+                return producerRun.Engine == ComparisonEngine.Tas ? 5 : 0;
+            });
+
+            Assert.Equal(EngineComparisonRunStatus.PartiallyCompleted, run.Status);
+            Assert.NotNull(run.ProducerRuns[0].BenchmarkPath);
+            Assert.False(run.ProducerRuns[0].Succeeded);
+            Assert.Empty(run.ReportPaths);
+            Assert.Null(run.Gate);
+        }
+
+        [Fact]
+        public void Run_WithBothFailed_IsFailed()
+        {
+            EngineComparisonRun run = Modify.RunEngineComparison(Model(), directory, Epw(), ProducerPath("benchmark-tas.exe"), ProducerPath("benchmark-openstudio.exe"), null, null, CancellationToken.None, (producerRun, workDirectory, cancellationToken) => 5);
+
+            Assert.Equal(EngineComparisonRunStatus.Failed, run.Status);
+            Assert.Equal(2, run.ProducerRuns.Count);
+            Assert.Contains(run.Diagnostics, x => x.Contains("neither Tas nor OpenStudio completed"));
+            Assert.Empty(run.ReportPaths);
+        }
+
+        [Fact]
+        public void Run_SnapshotAndWeatherAreReadOnly_AndAChangedSnapshotStopsTheRun()
+        {
+            List<ComparisonEngine> calls = new List<ComparisonEngine>();
+            EngineComparisonRun run = Modify.RunEngineComparison(Model(), directory, Epw(), ProducerPath("benchmark-tas.exe"), ProducerPath("benchmark-openstudio.exe"), null, null, CancellationToken.None, (producerRun, workDirectory, cancellationToken) =>
+            {
+                calls.Add(producerRun.Engine);
+
+                string snapshot = Argument(producerRun, "--model");
+                Assert.True(File.GetAttributes(snapshot).HasFlag(FileAttributes.ReadOnly));
+                Assert.True(File.GetAttributes(Argument(producerRun, "--weather")).HasFlag(FileAttributes.ReadOnly));
+
+                //Something changes the frozen snapshot while Tas runs.
+                File.SetAttributes(snapshot, FileAttributes.Normal);
+                File.AppendAllText(snapshot, " ");
+
+                File.Copy(Tas, Argument(producerRun, "--out"));
+                return 0;
+            });
+
+            //OpenStudio is not run on the changed snapshot, and the Tas document is not shown or compared.
+            Assert.Equal(new[] { ComparisonEngine.Tas }, calls);
+            Assert.Equal(EngineComparisonRunStatus.Failed, run.Status);
+            Assert.Contains("snapshot changed after it was frozen", run.ProducerRuns[1].Error);
+            Assert.Contains(run.Diagnostics, x => x.Contains("no comparison - the snapshot changed"));
+            Assert.Empty(run.ReportPaths);
+        }
+
+        [Fact]
+        public void EngineResult_ShowsOneEngineOnly_UnderSamValidationsKeys_NotComparedAndNothingFilledIn()
+        {
+            EngineResult engineResult = Query.LoadEngineResult(ComparisonEngine.OpenStudio, OpenStudio, ComparisonEngine.Tas);
+            Benchmark.BenchmarkDocument document = Benchmark.BenchmarkSerializer.Read(OpenStudio);
+            EngineComparison engineComparison = Query.LoadEngineComparison(Tas, OpenStudio);
+
+            //The same metric keys, in the same order, as SAM_Validation's comparison rows.
+            Assert.Equal(engineComparison.ModelRows.Select(x => x.Metric), engineResult.ModelRows.Select(x => x.Metric));
+            Assert.Equal(document.Spaces.Count * Benchmark.Compare.Query.SpaceMetricValues(null).Count, engineResult.SpaceRows.Count);
+
+            IReadOnlyList<KeyValuePair<string, Benchmark.MetricValue>> values = Benchmark.Compare.Query.ModelMetricValues(document.Model);
+            for (int i = 0; i < values.Count; i++)
+            {
+                EngineComparisonRow row = engineResult.ModelRows[i];
+                Assert.Equal(EngineComparisonRowStatus.NotCompared, row.Status);
+                Assert.Null(row.MetricComparison);
+                Assert.Equal(string.Empty, row.Tas);
+                Assert.Equal(string.Empty, row.AbsoluteDifference);
+                Assert.Equal(string.Empty, row.PercentDifference);
+                Assert.Equal(string.Empty, row.Band);
+                Assert.Contains("Tas did not complete", row.Note);
+
+                Benchmark.MetricValue value = values[i].Value;
+                if (value != null && value.Available)
+                {
+                    Assert.Equal(Format.Number(value.Value), row.OpenStudio);
+                }
+                else
+                {
+                    //Never a zero or another engine's value.
+                    Assert.Equal(string.Empty, row.OpenStudio);
+                    Assert.Contains("Not reported by OpenStudio", row.Note);
+                }
+            }
+
+            Assert.All(engineResult.SpaceRows, x => Assert.Equal(EngineComparisonRowStatus.NotCompared, x.Status));
+            Assert.Contains("not evaluated", Query.EngineResultProvenance(engineResult));
+            Assert.Contains("Not compared: only OpenStudio completed", Query.EngineResultDiagnostics(engineResult));
         }
 
         [Fact]

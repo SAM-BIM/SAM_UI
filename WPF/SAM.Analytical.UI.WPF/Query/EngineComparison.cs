@@ -95,8 +95,135 @@ namespace SAM.Analytical.UI.WPF
                     return "Missing on Tas";
                 case EngineComparisonRowStatus.MissingOnOpenStudio:
                     return "Missing on OpenStudio";
+                case EngineComparisonRowStatus.NotCompared:
+                    return "Not compared";
                 default:
                     return "Not reported by either engine";
+            }
+        }
+
+        public static string ComparisonEngineText(ComparisonEngine comparisonEngine)
+        {
+            return comparisonEngine == ComparisonEngine.Tas ? "Tas" : "OpenStudio";
+        }
+
+        /// <summary>
+        /// Reads one engine's B1a document (SAM_Validation's reader, which validates it) to show it on its own: Run Simulation &gt; Both
+        /// when the other engine did not complete. Nothing is compared. Throws what SAM_Validation throws for an unreadable or invalid
+        /// document.
+        /// </summary>
+        public static EngineResult LoadEngineResult(ComparisonEngine comparisonEngine, string path, ComparisonEngine? notCompleted = null)
+        {
+            BenchmarkDocument benchmarkDocument = BenchmarkSerializer.Read(path);
+
+            string note = notCompleted == null
+                ? "Not compared."
+                : "Not compared - " + ComparisonEngineText(notCompleted.Value) + " did not complete.";
+
+            return new EngineResult(comparisonEngine, path, benchmarkDocument, note);
+        }
+
+        /// <summary>One engine's model metrics, under SAM_Validation's keys and in its order (ModelMetricValues).</summary>
+        public static IReadOnlyList<EngineComparisonRow> EngineResultModelRows(ComparisonEngine comparisonEngine, BenchmarkDocument benchmarkDocument, string note)
+        {
+            return Benchmark.Compare.Query.ModelMetricValues(benchmarkDocument.Model)
+                .Select(x => new EngineComparisonRow(comparisonEngine, Benchmark.Compare.Query.ModelScope, x.Key, x.Value, null, note)).ToList();
+        }
+
+        /// <summary>One engine's per-space metrics, under SAM_Validation's keys and in its order (SpaceMetricValues), in document order.</summary>
+        public static IReadOnlyList<EngineComparisonRow> EngineResultSpaceRows(ComparisonEngine comparisonEngine, BenchmarkDocument benchmarkDocument, string note)
+        {
+            List<EngineComparisonRow> result = new List<EngineComparisonRow>();
+            foreach (BenchmarkSpaceResult benchmarkSpaceResult in benchmarkDocument.Spaces ?? new List<BenchmarkSpaceResult>())
+            {
+                string scope = benchmarkSpaceResult.Guid ?? benchmarkSpaceResult.Name ?? "(unnamed)";
+                result.AddRange(Benchmark.Compare.Query.SpaceMetricValues(benchmarkSpaceResult)
+                    .Select(x => new EngineComparisonRow(comparisonEngine, scope, x.Key, x.Value, benchmarkSpaceResult.Name, note)));
+            }
+
+            return result;
+        }
+
+        /// <summary>The input provenance of one engine's result shown on its own.</summary>
+        public static string EngineResultProvenance(EngineResult engineResult)
+        {
+            List<string> lines = new List<string>
+            {
+                "Provenance gate: not evaluated - only " + ComparisonEngineText(engineResult.Engine) + " completed, so there is nothing to check it against.",
+                string.Empty,
+            };
+
+            lines.AddRange(ProvenanceLines(ComparisonEngineText(engineResult.Engine), engineResult.Path, engineResult.Document.Provenance));
+            lines.Add(string.Empty);
+            lines.Add("Input manifests (per-space inputs each engine received): not available - not implemented yet (SAM_OpenStudio#30, SAM_UI#230).");
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        /// <summary>The diagnostics of one engine's result shown on its own, and the run's producers and diagnostics.</summary>
+        public static string EngineResultDiagnostics(EngineResult engineResult, EngineComparisonRun? engineComparisonRun = null)
+        {
+            List<string> lines = new List<string>
+            {
+                "Not compared: only " + ComparisonEngineText(engineResult.Engine) + " completed. No gate, difference or band is given, and no result is substituted for the other engine.",
+                string.Empty,
+            };
+
+            lines.AddRange(RunDiagnosticLines(ComparisonEngineText(engineResult.Engine), engineResult.Document.Provenance));
+            lines.AddRange(EngineComparisonRunLines(engineComparisonRun));
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        /// <summary>
+        /// A Run Simulation &gt; Both run's status, producers (exit code, duration, log, error) and diagnostics, as text; empty for no run.
+        /// </summary>
+        public static IEnumerable<string> EngineComparisonRunLines(EngineComparisonRun? engineComparisonRun)
+        {
+            if (engineComparisonRun == null)
+            {
+                yield break;
+            }
+
+            yield return string.Empty;
+            yield return "Run: " + EngineComparisonRunStatusText(engineComparisonRun.Status) + (engineComparisonRun.Directory == null ? string.Empty : " - " + engineComparisonRun.Directory);
+            foreach (EngineComparisonProducerRun producerRun in engineComparisonRun.ProducerRuns)
+            {
+                yield return string.Format(CultureInfo.InvariantCulture, "{0} producer: {1}, {2}, exit code {3}, {4:0.#} s, log {5}", producerRun.Engine, producerRun.Succeeded ? "completed" : "did not complete", producerRun.ExecutablePath ?? "(not found)", producerRun.ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "-", producerRun.DurationSeconds, producerRun.LogPath ?? "-");
+                if (!string.IsNullOrWhiteSpace(producerRun.Error))
+                {
+                    yield return "  " + producerRun.Error;
+                }
+            }
+
+            foreach (string diagnostic in engineComparisonRun.Diagnostics)
+            {
+                yield return diagnostic;
+            }
+
+            if (engineComparisonRun.Exception != null)
+            {
+                yield return "Error: " + engineComparisonRun.Exception.GetType().Name + ": " + engineComparisonRun.Exception.Message;
+            }
+
+            if (engineComparisonRun.ManifestPath != null)
+            {
+                yield return "Run record: " + engineComparisonRun.ManifestPath;
+            }
+        }
+
+        public static string EngineComparisonRunStatusText(EngineComparisonRunStatus engineComparisonRunStatus)
+        {
+            switch (engineComparisonRunStatus)
+            {
+                case EngineComparisonRunStatus.Compared:
+                    return "Compared";
+                case EngineComparisonRunStatus.PartiallyCompleted:
+                    return "Partially completed";
+                case EngineComparisonRunStatus.Cancelled:
+                    return "Cancelled";
+                default:
+                    return "Failed";
             }
         }
 
@@ -202,18 +329,7 @@ namespace SAM.Analytical.UI.WPF
             lines.Add(string.Empty);
             lines.AddRange(RunDiagnosticLines("OpenStudio", engineComparison.OpenStudio.Provenance));
 
-            if (engineComparisonRun != null)
-            {
-                foreach (EngineComparisonProducerRun producerRun in engineComparisonRun.ProducerRuns)
-                {
-                    lines.Add(string.Empty);
-                    lines.Add(string.Format(CultureInfo.InvariantCulture, "{0} producer: {1}, exit code {2}, {3:0.#} s, log {4}", producerRun.Engine, producerRun.ExecutablePath ?? "(not found)", producerRun.ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "-", producerRun.DurationSeconds, producerRun.LogPath ?? "-"));
-                    if (!string.IsNullOrWhiteSpace(producerRun.Error))
-                    {
-                        lines.Add("  " + producerRun.Error);
-                    }
-                }
-            }
+            lines.AddRange(EngineComparisonRunLines(engineComparisonRun));
 
             return string.Join(Environment.NewLine, lines);
         }

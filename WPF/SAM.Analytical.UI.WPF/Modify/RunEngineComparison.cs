@@ -15,13 +15,22 @@ namespace SAM.Analytical.UI.WPF
     public static partial class Modify
     {
         /// <summary>
-        /// Simulate &gt; Compare Tas/OpenStudio (SAM_UI#231): runs both engines, one after the other, on ONE frozen snapshot of
-        /// <paramref name="analyticalModel"/> and ONE weather file, then compares their B1a documents with SAM_Validation.
+        /// Run Simulation &gt; Both (SAM_UI#231): runs both engines, one after the other, on ONE frozen snapshot of
+        /// <paramref name="analyticalModel"/> and ONE weather file, then compares their B1a documents with SAM_Validation when both completed.
         /// <para>
         /// The engines run through their validated B1a producers, each in its own process: benchmark-tas (SAM_Tas, the native Tas route
         /// with that producer's fixed workflow settings - not the Energy Simulation dialog's) and benchmark-openstudio (SAM_OpenStudio, the
         /// same ToOpenStudio pipeline as Simulate &gt; OpenStudio Simulation). SAM_UI neither maps results to B1a nor compares anything
         /// itself: the documents are the producers', and the comparison and reports are SAM_Validation's (Query.Compare, WriteReports).
+        /// </para>
+        /// <para>
+        /// The snapshot and weather file are made read-only once written, and their SHA-256 is checked again before each producer and
+        /// before comparing: a changed input stops the run rather than compare results made from different inputs.
+        /// </para>
+        /// <para>
+        /// A producer that fails does not stop the other one. Both completed: <see cref="EngineComparisonRunStatus.Compared"/>. One completed:
+        /// <see cref="EngineComparisonRunStatus.PartiallyCompleted"/> - its document is kept and nothing is compared or substituted for the
+        /// other engine. None: <see cref="EngineComparisonRunStatus.Failed"/>.
         /// </para>
         /// <para>
         /// The model given is never changed. Never throws for a failed run: the outcome, each producer's exit code and log, and any error
@@ -75,6 +84,7 @@ namespace SAM.Analytical.UI.WPF
                 }
 
                 result.SnapshotSha256 = Query.Sha256(result.SnapshotPath);
+                ProtectInput(result.SnapshotPath);
 
                 //One weather file for both engines, so both documents carry the same weather hash.
                 progress?.Report("Preparing the weather file");
@@ -90,6 +100,7 @@ namespace SAM.Analytical.UI.WPF
                 result.WeatherPath = Path.Combine(result.Directory, OpenStudioSimulationRun.WeatherFileName);
                 File.Copy(epwPath_Source, result.WeatherPath, true);
                 result.WeatherSha256 = Query.Sha256(result.WeatherPath);
+                ProtectInput(result.WeatherPath);
 
                 foreach ((ComparisonEngine engine, string producerPath) in new[] { (ComparisonEngine.Tas, tasProducerPath), (ComparisonEngine.OpenStudio, openStudioProducerPath) })
                 {
@@ -113,6 +124,13 @@ namespace SAM.Analytical.UI.WPF
                     if (string.IsNullOrWhiteSpace(producerPath) || !File.Exists(producerPath))
                     {
                         producerRun.Error = "The producer executable was not found: " + (producerPath ?? "(none)");
+                        continue;
+                    }
+
+                    string? inputChange = InputChange(result);
+                    if (inputChange != null)
+                    {
+                        producerRun.Error = "Not run: " + inputChange;
                         continue;
                     }
 
@@ -141,20 +159,38 @@ namespace SAM.Analytical.UI.WPF
 
                 EngineComparisonProducerRun tas = result.ProducerRuns[0];
                 EngineComparisonProducerRun openStudio = result.ProducerRuns[1];
-                if (tas.BenchmarkPath == null || openStudio.BenchmarkPath == null)
+
+                string? inputChange_Final = InputChange(result);
+                if (inputChange_Final != null)
                 {
-                    result.Diagnostics.Add("Error: no comparison - " + (tas.BenchmarkPath == null ? "Tas" : "OpenStudio") + (tas.BenchmarkPath == null && openStudio.BenchmarkPath == null ? " and OpenStudio" : string.Empty) + " wrote no B1a document");
+                    //Which producer saw which input can no longer be told: keep the documents for diagnosis, show and compare none.
+                    result.Diagnostics.Add("Error: no comparison - " + inputChange_Final + "; the documents are kept in the run folder but not used");
+                    return result;
+                }
+
+                if (!tas.Succeeded || !openStudio.Succeeded)
+                {
+                    EngineComparisonProducerRun? completed = tas.Succeeded ? tas : openStudio.Succeeded ? openStudio : null;
+                    if (completed == null)
+                    {
+                        result.Diagnostics.Add("Error: no comparison - neither Tas nor OpenStudio completed");
+                        return result;
+                    }
+
+                    EngineComparisonProducerRun notCompleted = completed == tas ? openStudio : tas;
+                    result.Status = EngineComparisonRunStatus.PartiallyCompleted;
+                    result.Diagnostics.Add(string.Format("Partially completed: not compared - {0} did not complete. The {1} results ({2}) are kept and shown on their own; no {0} result is substituted.",
+                        Query.ComparisonEngineText(notCompleted.Engine), Query.ComparisonEngineText(completed.Engine), Path.GetFileName(completed.BenchmarkPath)));
                     return result;
                 }
 
                 progress?.Report("Comparing (SAM_Validation)");
-                EngineComparison engineComparison = Query.LoadEngineComparison(tas.BenchmarkPath, openStudio.BenchmarkPath);
+                EngineComparison engineComparison = Query.LoadEngineComparison(tas.BenchmarkPath!, openStudio.BenchmarkPath!);
                 result.ReportPaths.AddRange(Benchmark.Compare.Modify.WriteReports(engineComparison.ComparisonResult, result.Directory));
                 result.Gate = Benchmark.Compare.Format.Gate(engineComparison.ComparisonResult.Gate);
 
-                //Compared is about the workflow, not the engines' agreement: a failed producer still fails the run even when an older
-                //document happened to be compared.
-                result.Status = tas.ExitCode == 0 && openStudio.ExitCode == 0 ? EngineComparisonRunStatus.Compared : EngineComparisonRunStatus.Failed;
+                //Compared is about the workflow, not the engines' agreement: that is SAM_Validation's gate.
+                result.Status = EngineComparisonRunStatus.Compared;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -191,6 +227,28 @@ namespace SAM.Analytical.UI.WPF
             {
                 return false;
             }
+        }
+
+        /// <summary>Makes a run input read-only, so neither engine nor the user changes it unnoticed; its hash is checked as well.</summary>
+        private static void ProtectInput(string path)
+        {
+            File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);
+        }
+
+        /// <summary>Null when the snapshot and weather file still have the SHA-256 they were frozen with; else what changed.</summary>
+        private static string? InputChange(EngineComparisonRun engineComparisonRun)
+        {
+            List<string> changes = new List<string>();
+            foreach ((string name, string? path, string? sha256) in new[] { ("snapshot", engineComparisonRun.SnapshotPath, engineComparisonRun.SnapshotSha256), ("weather file", engineComparisonRun.WeatherPath, engineComparisonRun.WeatherSha256) })
+            {
+                string? sha256_Now = path != null && File.Exists(path) ? Query.Sha256(path) : null;
+                if (sha256_Now == null || !string.Equals(sha256_Now, sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    changes.Add(string.Format("the {0} changed after it was frozen (SHA-256 {1} -> {2})", name, sha256 ?? "-", sha256_Now ?? "missing"));
+                }
+            }
+
+            return changes.Count == 0 ? null : string.Join("; ", changes);
         }
 
         // Its own method, never inlined: SAM_OpenStudio's embedded-weather export is reached here, so a missing SAM_OpenStudio assembly

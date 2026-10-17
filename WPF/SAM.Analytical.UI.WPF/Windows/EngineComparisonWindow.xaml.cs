@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
-using SAM.Core.Windows.WPF;
-using SAM.Weather;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -15,10 +12,12 @@ using System.Windows.Media;
 namespace SAM.Analytical.UI.WPF
 {
     /// <summary>
-    /// Simulate &gt; Compare Tas/OpenStudio (SAM_UI#231, Phase 1): choose a Tas and an OpenStudio B1a document - or a comparison run
-    /// folder - or run both engines on a frozen copy of the open model, and see SAM_Validation's comparison of the two: model and
+    /// The Tas/OpenStudio comparison view (SAM_UI#231, Phase 1), opened by Run Simulation &gt; Both when its run finishes
+    /// (<see cref="ShowRun"/>) and by Simulate &gt; Compare Tas/OpenStudio: choose a Tas and an OpenStudio B1a document - or a comparison
+    /// run folder - or run both engines on a frozen copy of the open model, and see SAM_Validation's comparison of the two: model and
     /// per-space metrics with units, differences and bands, which metrics are missing, not equivalent or not reported, the provenance,
-    /// the diagnostics and the unmatched spaces; open or export the Markdown/CSV/JSON reports.
+    /// the diagnostics and the unmatched spaces; open or export the Markdown/CSV/JSON reports. When only one engine of a run completed,
+    /// that engine's results are shown on their own, marked partially completed and not compared.
     /// <para>
     /// The window is read-only: it never changes the open model or a run folder (it writes only to a new run folder, an export folder or
     /// a temporary report folder). It computes nothing - see <see cref="EngineComparisonRow"/>.
@@ -33,6 +32,10 @@ namespace SAM.Analytical.UI.WPF
         private EngineComparison? engineComparison;
 
         private EngineComparisonRun? engineComparisonRun;
+
+        private EngineResult? engineResult;
+
+        private IReadOnlyList<EngineComparisonRow>? spaceRows;
 
         private bool running;
 
@@ -56,7 +59,7 @@ namespace SAM.Analytical.UI.WPF
             Button_Run.IsEnabled = uIAnalyticalModel != null;
             Button_Run.ToolTip = uIAnalyticalModel == null
                 ? "Open a model to run both engines on it."
-                : "Freeze the open model, run benchmark-tas and benchmark-openstudio on the snapshot one after the other with one weather file, and compare. Needs a licensed Tas and OpenStudio 3.10. The open model is not changed.";
+                : "The same as Run Simulation > Both: freeze the open model, run benchmark-tas and benchmark-openstudio on the read-only snapshot one after the other with one weather file, and compare when both complete. Needs a licensed Tas and OpenStudio 3.10. The open model is not changed.";
 
             Closing += (s, e) =>
             {
@@ -89,6 +92,7 @@ namespace SAM.Analytical.UI.WPF
                 return false;
             }
 
+            ClearResults();
             engineComparison = engineComparison_Loaded;
             this.engineComparisonRun = engineComparisonRun;
 
@@ -96,12 +100,7 @@ namespace SAM.Analytical.UI.WPF
             TextBox_OpenStudio.Text = openStudioPath;
 
             DataGrid_Model.ItemsSource = engineComparison.ModelRows;
-
-            List<string> spaces = new List<string> { AllSpaces };
-            spaces.AddRange(engineComparison.SpaceRows.Select(x => x.SpaceName ?? x.Scope).Distinct());
-            ComboBox_Space.ItemsSource = spaces;
-            ComboBox_Space.SelectedIndex = 0;
-            RefreshSpaces();
+            SetSpaces(engineComparison.SpaceRows);
 
             TextBox_Provenance.Text = Query.EngineComparisonProvenance(engineComparison);
 
@@ -155,9 +154,24 @@ namespace SAM.Analytical.UI.WPF
             TextBlock_Banner.Text = text;
         }
 
+        private void SetSpaces(IReadOnlyList<EngineComparisonRow>? rows)
+        {
+            spaceRows = rows;
+
+            List<string> spaces = new List<string> { AllSpaces };
+            if (rows != null)
+            {
+                spaces.AddRange(rows.Select(x => x.SpaceName ?? x.Scope).Distinct());
+            }
+
+            ComboBox_Space.ItemsSource = spaces;
+            ComboBox_Space.SelectedIndex = 0;
+            RefreshSpaces();
+        }
+
         private void RefreshSpaces()
         {
-            if (engineComparison == null)
+            if (spaceRows == null)
             {
                 DataGrid_Spaces.ItemsSource = null;
                 return;
@@ -165,8 +179,8 @@ namespace SAM.Analytical.UI.WPF
 
             string? space = ComboBox_Space.SelectedItem as string;
             DataGrid_Spaces.ItemsSource = space == null || space == AllSpaces
-                ? engineComparison.SpaceRows
-                : engineComparison.SpaceRows.Where(x => (x.SpaceName ?? x.Scope) == space).ToList();
+                ? spaceRows
+                : spaceRows.Where(x => (x.SpaceName ?? x.Scope) == space).ToList();
         }
 
         private void Browse(System.Windows.Controls.TextBox textBox, string title)
@@ -215,98 +229,18 @@ namespace SAM.Analytical.UI.WPF
 
         private async Task RunAsync()
         {
-            if (running)
+            if (running || uIAnalyticalModel == null)
             {
                 return;
-            }
-
-            AnalyticalModel? analyticalModel = uIAnalyticalModel?.JSAMObject;
-            if (analyticalModel == null)
-            {
-                MessageBox.Show(this, "Open a model first: Run Tas + OpenStudio simulates the open model.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            string? tasProducerPath = LocateProducer(ComparisonEngine.Tas);
-            if (tasProducerPath == null)
-            {
-                return;
-            }
-
-            string? openStudioProducerPath = LocateProducer(ComparisonEngine.OpenStudio);
-            if (openStudioProducerPath == null)
-            {
-                return;
-            }
-
-            string? path = uIAnalyticalModel!.Path;
-            string directory;
-            using (System.Windows.Forms.FolderBrowserDialog folderBrowserDialog = new()
-            {
-                Description = "Select the folder for the Tas/OpenStudio comparison run (a new run folder is created in it)",
-                UseDescriptionForTitle = true,
-                SelectedPath = (string.IsNullOrWhiteSpace(path) ? null : Path.GetDirectoryName(path)) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            })
-            {
-                if (folderBrowserDialog.ShowDialog() != System.Windows.Forms.DialogResult.OK || string.IsNullOrWhiteSpace(folderBrowserDialog.SelectedPath))
-                {
-                    return;
-                }
-
-                directory = folderBrowserDialog.SelectedPath;
-            }
-
-            //One weather file for both engines: the model's WeatherData exported once, or an EPW chosen here.
-            string? epwPath = null;
-            bool embeddedWeather = analyticalModel.TryGetValue(Analytical.AnalyticalModelParameter.WeatherData, out WeatherData? weatherData) && weatherData != null;
-            if (embeddedWeather)
-            {
-                MessageBoxResult messageBoxResult = MessageBox.Show(this, "Use the model's weather data for both engines?\n\nYes: the model's weather data (exported once to EPW).\nNo: choose an EPW file.", Title, MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-                if (messageBoxResult == MessageBoxResult.Cancel)
-                {
-                    return;
-                }
-
-                embeddedWeather = messageBoxResult == MessageBoxResult.Yes;
-            }
-
-            if (!embeddedWeather)
-            {
-                Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog()
-                {
-                    Title = "Select the EPW weather file for both engines",
-                    Filter = "epw files (*.epw)|*.epw|All files (*.*)|*.*",
-                };
-
-                if (openFileDialog.ShowDialog(this) != true)
-                {
-                    return;
-                }
-
-                epwPath = openFileDialog.FileName;
             }
 
             running = true;
             Button_Run.IsEnabled = false;
 
-            EngineComparisonRun run;
+            EngineComparisonRun? run;
             try
             {
-                using CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-                ProgressWindowHost progressWindowHost = new ProgressWindowHost("Compare Tas / OpenStudio", 6, true, "Cancel stops the running engine (its process tree is killed). The open model is not changed.");
-                try
-                {
-                    progressWindowHost.CancelRequested += (s, e) => cancellationTokenSource.Cancel();
-
-                    Progress progress = new Progress(progressWindowHost);
-                    CancellationToken cancellationToken = cancellationTokenSource.Token;
-
-                    run = await Task.Run(() => analyticalModel.RunEngineComparison(directory, epwPath, tasProducerPath, openStudioProducerPath, path, progress, cancellationToken));
-                }
-                finally
-                {
-                    progressWindowHost.Dispose();
-                }
+                run = await uIAnalyticalModel.SimulateBothEnginesAsync(this);
             }
             finally
             {
@@ -314,65 +248,103 @@ namespace SAM.Analytical.UI.WPF
                 Button_Run.IsEnabled = uIAnalyticalModel != null;
             }
 
-            List<string> lines = new List<string> { "Comparison run: " + run.Status, "Run folder: " + (run.Directory ?? "-") };
-            if (run.Gate != null)
+            if (run != null)
             {
-                lines.Add("SAM_Validation gate: " + run.Gate);
-            }
-
-            lines.AddRange(run.ProducerRuns.Where(x => x.Error != null).Select(x => x.Engine + ": " + x.Error));
-            lines.AddRange(run.Diagnostics);
-            if (run.Exception != null)
-            {
-                lines.Add("Error: " + run.Exception.GetType().Name + ": " + run.Exception.Message);
-            }
-
-            MessageBox.Show(this, string.Join(Environment.NewLine, lines), Title, MessageBoxButton.OK, run.Status == EngineComparisonRunStatus.Compared ? MessageBoxImage.Information : MessageBoxImage.Warning);
-
-            EngineComparisonProducerRun? tas = run.ProducerRuns.FirstOrDefault(x => x.Engine == ComparisonEngine.Tas);
-            EngineComparisonProducerRun? openStudio = run.ProducerRuns.FirstOrDefault(x => x.Engine == ComparisonEngine.OpenStudio);
-            if (tas?.BenchmarkPath != null && openStudio?.BenchmarkPath != null)
-            {
-                Compare(tas.BenchmarkPath, openStudio.BenchmarkPath, run);
-            }
-            else if (run.Directory != null)
-            {
-                TextBox_Diagnostics.Text = string.Join(Environment.NewLine, lines) + Environment.NewLine + Environment.NewLine + "Run record: " + Path.Combine(run.Directory, EngineComparisonRun.ManifestFileName);
+                ShowRun(run);
             }
         }
 
-        /// <summary>The producer to run, asking the user to locate it (once; remembered) when it is not found.</summary>
-        private string? LocateProducer(ComparisonEngine comparisonEngine)
+        /// <summary>
+        /// Shows a Run Simulation &gt; Both run: SAM_Validation's comparison when both engines completed; the completed engine's own
+        /// results, marked not compared, when only one did; else the run's status and diagnostics. Nothing is filled in for an engine that
+        /// did not complete.
+        /// </summary>
+        public void ShowRun(EngineComparisonRun engineComparisonRun)
         {
-            string? path = Query.BenchmarkProducerPath(comparisonEngine);
-            if (path != null)
+            if (engineComparisonRun == null)
             {
-                return path;
+                return;
             }
 
-            string fileName = Query.BenchmarkProducerFileName(comparisonEngine);
-            string hint = comparisonEngine == ComparisonEngine.Tas
-                ? "It is built by SAM_Tas into SAM_Tas\\build (needs Visual Studio / .NET Framework MSBuild for the Tas COM references)."
-                : "It is built by SAM_OpenStudio (benchmark\\SAM.Analytical.OpenStudio.Benchmark\\bin\\x64\\Release\\...).";
+            EngineComparisonProducerRun? tas = engineComparisonRun.ProducerRuns.Find(x => x.Engine == ComparisonEngine.Tas);
+            EngineComparisonProducerRun? openStudio = engineComparisonRun.ProducerRuns.Find(x => x.Engine == ComparisonEngine.OpenStudio);
 
-            if (MessageBox.Show(this, string.Format("{0} was not found (environment variable {1}, the application folder, or a location chosen before).\n\n{2}\n\nLocate it now?", fileName, Query.BenchmarkProducerVariable(comparisonEngine), hint), Title, MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+            if (engineComparisonRun.Status == EngineComparisonRunStatus.Compared && tas?.BenchmarkPath != null && openStudio?.BenchmarkPath != null)
             {
-                return null;
+                Compare(tas.BenchmarkPath, openStudio.BenchmarkPath, engineComparisonRun);
+                return;
             }
 
-            Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog()
+            if (engineComparisonRun.Status == EngineComparisonRunStatus.PartiallyCompleted)
             {
-                Title = "Locate " + fileName,
-                Filter = fileName + "|" + fileName + "|Executables (*.exe)|*.exe",
-            };
-
-            if (openFileDialog.ShowDialog(this) != true)
-            {
-                return null;
+                EngineComparisonProducerRun? completed = tas != null && tas.Succeeded ? tas : openStudio != null && openStudio.Succeeded ? openStudio : null;
+                if (completed != null && ShowEngineResult(completed, engineComparisonRun))
+                {
+                    return;
+                }
             }
 
-            Modify.SaveBenchmarkProducerPath(comparisonEngine, openFileDialog.FileName);
-            return openFileDialog.FileName;
+            ClearResults();
+            this.engineComparisonRun = engineComparisonRun;
+            TextBox_Diagnostics.Text = string.Join(Environment.NewLine, Query.EngineComparisonRunLines(engineComparisonRun)).TrimStart();
+            TextBlock_Banner.Text = Query.EngineComparisonRunStatusText(engineComparisonRun.Status).ToUpperInvariant() + " - nothing to show or compare. See Diagnostics for each engine's exit code, error and log.";
+            Border_Banner.Background = new SolidColorBrush(Color.FromRgb(0xF6, 0xD2, 0xD2));
+            Button_OpenFolder.IsEnabled = engineComparisonRun.Directory != null && Directory.Exists(engineComparisonRun.Directory);
+        }
+
+        /// <summary>One engine's results on their own, with a partial-completion banner; nothing is compared.</summary>
+        private bool ShowEngineResult(EngineComparisonProducerRun completed, EngineComparisonRun engineComparisonRun)
+        {
+            ComparisonEngine notCompleted = completed.Engine == ComparisonEngine.Tas ? ComparisonEngine.OpenStudio : ComparisonEngine.Tas;
+
+            EngineResult engineResult_Loaded;
+            try
+            {
+                engineResult_Loaded = Query.LoadEngineResult(completed.Engine, completed.BenchmarkPath!, notCompleted);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(this, "The " + Query.ComparisonEngineText(completed.Engine) + " results could not be read:\n\n" + exception.GetType().Name + ": " + exception.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            ClearResults();
+            engineResult = engineResult_Loaded;
+            this.engineComparisonRun = engineComparisonRun;
+
+            TextBox_Tas.Text = completed.Engine == ComparisonEngine.Tas ? completed.BenchmarkPath : "(did not complete)";
+            TextBox_OpenStudio.Text = completed.Engine == ComparisonEngine.OpenStudio ? completed.BenchmarkPath : "(did not complete)";
+
+            DataGrid_Model.ItemsSource = engineResult.ModelRows;
+            SetSpaces(engineResult.SpaceRows);
+
+            TextBox_Provenance.Text = Query.EngineResultProvenance(engineResult);
+            TextBox_Diagnostics.Text = Query.EngineResultDiagnostics(engineResult, engineComparisonRun);
+
+            EngineComparisonProducerRun? failed = engineComparisonRun.ProducerRuns.Find(x => x.Engine == notCompleted);
+            TextBlock_Banner.Text = string.Format("PARTIALLY COMPLETED - not compared: {0} did not complete{1}. Showing the {2} results only; no {0} result is substituted and nothing is banded. See Diagnostics.",
+                Query.ComparisonEngineText(notCompleted), string.IsNullOrWhiteSpace(failed?.Error) ? string.Empty : " (" + failed!.Error + ")", Query.ComparisonEngineText(completed.Engine));
+            Border_Banner.Background = new SolidColorBrush(Color.FromRgb(0xFC, 0xEB, 0xC7));
+
+            Button_OpenFolder.IsEnabled = true;
+            return true;
+        }
+
+        /// <summary>Empties the view before another run or comparison is shown in it.</summary>
+        private void ClearResults()
+        {
+            engineComparison = null;
+            engineResult = null;
+            engineComparisonRun = null;
+
+            DataGrid_Model.ItemsSource = null;
+            SetSpaces(null);
+            TextBox_Provenance.Text = string.Empty;
+            TextBox_Diagnostics.Text = string.Empty;
+
+            Button_OpenReport.IsEnabled = false;
+            Button_Export.IsEnabled = false;
+            Button_OpenFolder.IsEnabled = false;
         }
 
         private void OpenReport()
@@ -420,31 +392,19 @@ namespace SAM.Analytical.UI.WPF
 
         private void OpenFolder()
         {
-            if (engineComparison != null)
+            string? directory = engineComparison != null ? Path.GetDirectoryName(engineComparison.TasPath)
+                : engineResult != null ? Path.GetDirectoryName(engineResult.Path)
+                : engineComparisonRun?.Directory;
+
+            if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
             {
-                ShellOpen(Path.GetDirectoryName(engineComparison.TasPath)!);
+                ShellOpen(directory!);
             }
         }
 
         private static void ShellOpen(string path)
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-        }
-
-        /// <summary>Step lines into the progress window; it marshals onto its own thread, so any thread may report.</summary>
-        private sealed class Progress : IProgress<string>
-        {
-            private readonly ProgressWindowHost progressWindowHost;
-
-            public Progress(ProgressWindowHost progressWindowHost)
-            {
-                this.progressWindowHost = progressWindowHost;
-            }
-
-            public void Report(string value)
-            {
-                progressWindowHost.Update(value);
-            }
         }
     }
 }
