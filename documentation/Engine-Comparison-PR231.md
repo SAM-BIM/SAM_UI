@@ -1,37 +1,61 @@
-# Simulate > Compare Tas / OpenStudio - end-to-end comparison workflow (SAM_UI#231)
+# Unified Run Simulation (Tas / OpenStudio / Both) and Tas vs OpenStudio comparison (SAM_UI#231)
 
 Status: implemented on `claude/tas-openstudio-comparison`; draft PR, owner manual test and review required. Not merged.
 Issue: SAM-BIM/SAM_UI#231 (gate G2; parent #227, tracker SAM-BIM/SAM#206).
 Base: `sow/2026-Q4` at `ebe5e09b30b95e43e5d047b3aef2d8c5f01110e9`.
 
-**Stacked on draft PR #237** (SAM_UI#229, `claude/openstudio-mcp-server-1jmjlo` at `95135ce`). This PR's own change is the single commit after `95135ce`. Merge #237 first; this diff then shrinks to that commit.
+**Stacked on draft PR #237** (SAM_UI#229, `claude/openstudio-mcp-server-1jmjlo` at `95135ce`). This PR's own changes are the commits after `95135ce`. Merge #237 first; this diff then shrinks to them.
 
 **Depends on SAM-BIM/SAM_Validation#14** (SAM#211, the comparator library), which uses the same branch name. SAM_UI CI selects that branch by name until it is merged.
 
-Tested content SHA: `3db8d7bfa99b59c2be2e87429e1ed36aba3c22a1` (local). This record is the only change after it.
+Tested content SHA: `035224c` (local; comparison workflow `3db8d7b` + unified Run Simulation). SAM_Validation tested at `70f1411`. This record is the only change after it.
 
 ## What it does
-**Simulate > Compare Tas / OpenStudio** opens a read-only window. It is always available, because comparing existing runs needs no open model.
+### Simulate > Run Simulation (the unified command; open model required)
+A dialog offers three choices. It only chooses; each choice runs an existing workflow.
 
-- **Run Tas + OpenStudio…** (open model required):
-  1. Freezes the model once to `snapshot.json`, and prepares one `weather.epw`: the user's EPW, or the model's WeatherData exported once.
+| Choice | What runs | Results and diagnostics |
+|---|---|---|
+| **Tas only** | The existing Energy Simulation path (`Simulate(partORun)`), unchanged: the same code as the Energy Simulation button | As before, written back into the open model |
+| **OpenStudio/EnergyPlus only** | #229's OpenStudio Simulation (`SimulateOpenStudioAsync`) on a frozen copy | #229's summary and run folder (`openstudio-run.json`, `<model>_OpenStudio.json`) |
+| **Both** | The comparison run below, then the comparison window opens with it | Compared, Partially completed, Failed or Cancelled (see below) |
+
+- **Migration:** Energy Simulation, OpenStudio Simulation and Compare Tas / OpenStudio stay on the ribbon, unchanged. Their tooltips name the matching Run Simulation choice. No command was removed or changed in behaviour. The last choice is offered again; a choice whose run is in progress is disabled.
+- **Sequential.** Both runs Tas then OpenStudio, in this milestone. Parallel execution is Phase 2 (SAM_UI#234–#236), not part of this PR.
+
+### The Both run (also *Run Tas + OpenStudio…* in the comparison window)
+  1. Freezes the model once to `snapshot.json`, and prepares one `weather.epw`: the user's EPW, or the model's WeatherData exported once. Both files are made **read-only**, and their SHA-256 is checked again before each producer and before comparing.
   2. Runs the **validated B1a producers** one after the other, each in its own process, on that snapshot and EPW:
      - `benchmark-tas --model --weather --tbd --out` (SAM_Tas);
      - `benchmark-openstudio --model --weather --out --work` (SAM_OpenStudio).
   3. Writes stdout/stderr to `benchmark-*.log`. Cancel kills the running producer's process tree.
-  4. Compares the two documents with SAM_Validation and writes `comparison.md/.csv/comparison-summary.json`, plus the run record `engine-comparison-run.json`.
+  4. A producer **completed** when it exited 0 and wrote its B1a document. A failed (or not found) producer does not stop the other one.
+  5. Outcome (status in `engine-comparison-run.json`, with `succeeded` per producer):
+     - **Compared:** both completed. SAM_Validation compares them and writes `comparison.md/.csv/comparison-summary.json`.
+     - **Partially completed:** one completed. Nothing is compared; the completed engine's document is kept and shown on its own. No result is substituted for the other engine.
+     - **Failed:** neither completed, the inputs could not be prepared, or the snapshot/weather changed during the run. In the last case the documents are kept for diagnosis but neither shown nor compared.
+     - **Cancelled.**
 
-  The run folder is `<folder>\<model>_TasOpenStudio_<yyyyMMdd-HHmmss>_<id>\`, with `tas\` and `openstudio\` working folders.
+  The run folder is `<folder>\<model>_TasOpenStudio_<yyyyMMdd-HHmmss>_<id>\`, with `tas\` and `openstudio\` working folders. A document left by a failed producer stays in the folder but is never treated as a result.
+
+### Comparison window
+Opened by Run Simulation > Both when the run finishes, whatever its status, and by **Simulate > Compare Tas / OpenStudio** (always available, because comparing existing runs needs no open model).
+- **Partially completed:** an amber banner, *PARTIALLY COMPLETED - not compared: <engine> did not complete (<error>)*. The Model/Spaces tabs show only the completed engine's column under SAM_Validation's metric keys (`Query.ModelMetricValues`/`SpaceMetricValues`, SAM_Validation#14). The status is *Not compared*, with no difference or band; an unreported metric is blank with *Not reported by <engine>*. Provenance says the gate is not evaluated. Diagnostics give both producers' exit codes, errors and logs.
+- **Failed / Cancelled:** a red banner and the run's diagnostics; nothing else.
 - **Load run folder…** / **Browse** + **Compare** load existing `benchmark-TAS.json` / `benchmark-OpenStudio.json`. A #229 OpenStudio run folder has no B1a document, and the window says so.
-- **Banner:** the gate and counts. **NOT THE SAME INPUTS** appears when SAM_Validation's provenance gate finds mismatches.
+- **Compared banner:** the gate and counts. **NOT THE SAME INPUTS** appears when SAM_Validation's provenance gate finds mismatches.
 - **Model / Spaces tabs:** unit, Tas, OpenStudio, absolute difference, difference %, band, status and note.
-  - Status is one of *Compared*, *Not equivalent* (SAM_Validation's informational metrics, or a unit mismatch), *Missing on Tas/OpenStudio*, or *Not reported by either engine*.
-  - Missing values are blank, never 0. Band colours apply to *Compared* rows only.
+  - Status is one of *Compared*, *Not equivalent* (SAM_Validation's informational metrics, or a unit mismatch), *Missing on Tas/OpenStudio*, *Not reported by either engine*, or *Not compared* (partial run).
+  - Missing values are blank, never 0. Band colours apply to *Compared* rows only, so a non-equivalent or one-sided metric is never shown as passing.
 - **Provenance tab:** the provenance gate and mismatches; per engine: route, engine, version, model, canonical hash, source hash, weather, design days and run information. The per-space input manifests are stated as **not available** (SAM_OpenStudio#30, SAM_UI#230).
 - **Diagnostics tab:** gate statuses and counts; unmatched, duplicate and ambiguous spaces; model-total reconciliation; B1a warnings and notes; producer exit codes and logs.
 - **Open report / Export reports… / Open run folder.** Reports are written by SAM_Validation's `WriteReports`.
 
 ## Decisions
+- **Run Simulation chooses; it does not re-implement.** Tas only calls the same private `SimulateTas()` as the Energy Simulation button, so the Tas workflow cannot drift between the two entry points.
+- **Both uses the producers, so its Tas run is not the Energy Simulation dialog's** (see below). The dialog text says so. Tas only is the dialog-driven run.
+- **Immutable inputs:** a read-only attribute plus a SHA-256 re-check, not a copy per engine. Both engines read the same bytes, and a change is detected rather than silently compared.
+- **Partial results use SAM_Validation's metric list, not a second one.** SAM_Validation#14 added `ModelMetricValues`/`SpaceMetricValues`, and its comparator now builds its rows from them (goldens unchanged).
 - **No comparator in SAM_UI.** All values, differences, bands, notes, gates, alignment and reports come from `SAM.Analytical.Benchmark.Compare` (SAM#211). `EngineComparisonRow` renders them with SAM_Validation's own `Format`; the only addition is the status label, taken from SAM_Validation's availability, unit and informational flags.
 - **B1a from the producers, not from SAM_UI.** The validated producers write the B1a documents, and SAM_UI runs them as processes. This avoids a second results-to-B1a mapping, and Tas COM stays out of the UI process.
   - Consequence: Tas runs with the `benchmark-tas` producer's fixed workflow settings (sizing, unmet hours, full year), **not** the Energy Simulation dialog's. The Energy Simulation command itself is unchanged.
@@ -45,23 +69,27 @@ Tested content SHA: `3db8d7bfa99b59c2be2e87429e1ed36aba3c22a1` (local). This rec
 - **Deployment:** SAM_Deploy's BuildAll (master) does not build SAM_Validation, and the producer executables are not deployed. A source build is needed for testing; a SAM_Deploy change is needed before release.
 - **Engineering acceptance:** bands are tolerance bands, not verdicts. Benchmark cases and the classification of differences are #232/#233.
 
-## Files changed (this PR's commit)
-- `WPF/SAM.Analytical.UI.WPF/Classes/Comparison/EngineComparison.cs` (row, status, loaded comparison) and `EngineComparisonRun.cs` (run record and manifest).
-- `WPF/SAM.Analytical.UI.WPF/Query/EngineComparison.cs` (load, rows, provenance, diagnostics, run folder) and `Query/BenchmarkProducer.cs` (producer location and arguments).
-- `WPF/SAM.Analytical.UI.WPF/Modify/RunEngineComparison.cs` (orchestration, process runner, saved producer path).
-- `WPF/SAM.Analytical.UI.WPF/Windows/EngineComparisonWindow.xaml(.cs)`; `Windows/AnalyticalWindow.xaml(.cs)` (ribbon button).
+## Files changed (this PR's commits)
+- `WPF/SAM.Analytical.UI.WPF/Classes/Comparison/EngineComparison.cs` (row, status, loaded comparison, single-engine `EngineResult`) and `EngineComparisonRun.cs` (run record, `PartiallyCompleted`, `Succeeded`, manifest).
+- `WPF/SAM.Analytical.UI.WPF/Query/EngineComparison.cs` (load, rows, single-engine rows, provenance, diagnostics, run lines, run folder) and `Query/BenchmarkProducer.cs` (producer location and arguments).
+- `WPF/SAM.Analytical.UI.WPF/Modify/RunEngineComparison.cs` (orchestration, read-only inputs, hash checks, partial completion, process runner, saved producer path) and `Modify/SimulateBothEngines.cs` (the Both UI flow: producers, folder, weather, progress).
+- `WPF/SAM.Analytical.UI.WPF/Windows/RunSimulationWindow.xaml(.cs)` (the choice dialog), `Windows/EngineComparisonWindow.xaml(.cs)` (`ShowRun`, partial and failed views), `Windows/AnalyticalWindow.xaml(.cs)` (Run Simulation and Compare buttons; `SimulateTas`, `RunOpenStudioSimulationAsync` and `RunBothEnginesAsync` shared by the buttons).
 - `WPF/SAM.Analytical.UI.WPF/SAM.Analytical.UI.WPF.csproj` and the tests csproj: references to `SAM_Validation\build\SAM.Analytical.Benchmark(.Compare).dll`.
 - `WPF/SAM.Analytical.UI.WPF.Tests/EngineComparisonTests.cs` and `Resources/EngineComparison/*` (fabricated SAM_Validation documents, README).
 
 ## Validation
-Local runs were in a Linux container (no Windows, Tas or OpenStudio), compiling against SAM `618db819`, SAM_SQLite `ec2eb86d`, SAM_OpenStudio `d4216f35` and SAM_Validation `b0f3a16`, using machine-local harness projects (not committed). Only `UIAnalyticalModel`, `ProgressWindowHost` and two private `Query` helpers were stubbed.
+Local runs were in a Linux container (no Windows, Tas or OpenStudio), compiling against SAM `618db819`, SAM_SQLite `ec2eb86d`, SAM_OpenStudio `d4216f35` and SAM_Validation `70f1411`, using machine-local harness projects (not committed). Only `UIAnalyticalModel`, `ProgressWindowHost` and two private `Query` helpers were stubbed.
 
 | Check | Where | Result |
 |---|---|---|
-| New files plus #237's, including the XAML window, compiled as net8.0-windows (nullable) | Local | PASS, 0 errors / 0 warnings |
-| `EngineComparisonTests` (11) and `OpenStudioSimulationTests` (10), fabricated documents and fake producers | Local | PASS 21/21 |
+| New files plus #237's, including the comparison and Run Simulation XAML windows, compiled as net8.0-windows (nullable) | Local | PASS, 0 errors / 0 warnings |
+| `AnalyticalWindow.xaml(.cs)` (ribbon wiring) | Local | **NOT RUN** (not in the harness: too many dependencies). Compiled only by hosted CI |
+| `EngineComparisonTests` (16) and `OpenStudioSimulationTests` (10), fabricated documents and fake producers | Local | PASS 26/26 |
 | Every view cell equals SAM_Validation's `comparison.csv` (scenario and weather-mismatch) | Local | PASS |
-| Orchestration: one snapshot and one EPW to both producers, compare, reports, manifest, model unchanged; failed-producer, cancel and no-weather paths | Local (fake producers) | PASS |
+| Orchestration: one snapshot and one EPW to both producers, compare, reports, manifest, model unchanged; cancel and no-weather paths | Local (fake producers) | PASS |
+| Partial completion: Tas fails, or a producer is not found → *PartiallyCompleted*, the other engine kept, nothing compared; a failed producer's document never used; both fail → *Failed* | Local (fake producers) | PASS |
+| Immutability: snapshot and weather read-only for the producers; a changed snapshot stops the next producer and the comparison | Local (fake producers) | PASS |
+| Single-engine rows: SAM_Validation's keys and order, *Not compared*, no difference or band, unreported values blank | Local | PASS |
 | Hosted Windows build (SAM_UI.sln, SAM_Validation from the same-named branch) | GitHub CI | See the PR description |
 | **Real Tas + EnergyPlus comparison** | Owner's Windows laptop | **NOT RUN** (procedure below) |
 
@@ -80,9 +108,14 @@ No result in this record comes from a real engine.
 2. **Build in CI order** with `msbuild <sln> /t:Restore;Rebuild /p:Configuration=Release`. SAM_OpenStudio additionally gets `/p:Platform=x64`. Order: SAM, SAM_Mollier, SAM_Systems, SAM_Windows, SAM_gbXML, SAM_SolarCalculator, **SAM_Validation**, **SAM_SQLite**, **SAM_OpenStudio (x64)**, SAM_Tas, SAM_Excel, SAM_GEM, SAM_LadybugTools, SAM_Solver, SAM_UI.
 3. **Producers.** Confirm that `SAM_Tas\build\benchmark-tas.exe` and `SAM_OpenStudio\benchmark\SAM.Analytical.OpenStudio.Benchmark\bin\x64\Release\net8.0\benchmark-openstudio.exe` exist. Then either set `SAM_BENCHMARK_TAS` and `SAM_BENCHMARK_OPENSTUDIO` to them, or locate them when SAM_UI asks (asked once, then remembered).
 4. **Model.** Start SAM Analytical and open a Tas-legal model, for example HungaryHouse (13 spaces). Note: SAM_OpenStudio's two-cell fixture is OpenStudio-oriented and SingleBox is illegal in Tas. **Save** it and note its SHA-256: `certutil -hashfile <file> SHA256`.
-5. **Tas unchanged.** Run Simulate > **Energy Simulation** as usual. The dialog and results should be as on `sow/2026-Q4`.
-6. **OpenStudio alone (#229).** Run Simulate > **OpenStudio Simulation**. Expect: finished; `openstudio-run.json` with `status` Succeeded, `fatalCount` 0, `diagnostics` filled; and `<model>_OpenStudio.json` holding only `SAM.Analytical.OpenStudio` results.
-7. **Comparison run.** Simulate > **Compare Tas / OpenStudio** > **Run Tas + OpenStudio…**: pick a folder, then the model's weather (Yes) or an EPW. The progress window steps: Freezing, Weather, Running Tas, Running OpenStudio/EnergyPlus, Comparing. Cancel must work at any step.
+5. **Tas unchanged.**
+   - Run Simulate > **Energy Simulation** as usual. The dialog and results should be as on `sow/2026-Q4`.
+   - Then run Simulate > **Run Simulation** > **Tas only**: the same dialog and the same results.
+6. **OpenStudio alone (#229).** Run Simulate > **Run Simulation** > **OpenStudio/EnergyPlus only**, and once via the **OpenStudio Simulation** button. Expect: finished; `openstudio-run.json` with `status` Succeeded, `fatalCount` 0, `diagnostics` filled; and `<model>_OpenStudio.json` holding only `SAM.Analytical.OpenStudio` results.
+7. **Both.** Simulate > **Run Simulation** > **Both**: pick a folder, then the model's weather (Yes) or an EPW.
+   - The progress window steps: Freezing, Weather, Running Tas, Running OpenStudio/EnergyPlus, Comparing. Cancel must work at any step.
+   - When it finishes, the comparison window opens by itself with the run.
+   - In the run folder, `snapshot.json` and `weather.epw` are read-only (file Properties).
 8. **Run folder.** Expect:
    - `snapshot.json`, `weather.epw`;
    - `benchmark-TAS.json`, `benchmark-OpenStudio.json`;
@@ -99,10 +132,16 @@ No result in this record comes from a real engine.
 10. **Same as SAM_Validation.** `SAM_Validation\build\benchmark-compare.exe --tas …\benchmark-TAS.json --openstudio …\benchmark-OpenStudio.json --out x` gives a `comparison.csv` identical to the one in the run folder.
 11. **Original model preserved.** No new undo step or modification; Save and re-hash gives the same hash as step 4.
 12. **Existing runs.** Close the window, reopen it, use **Load run folder…** on the step-7 folder: same content. On the step-6 folder, the window explains that there is no B1a document.
+12a. **Partial completion.** Make Tas fail without touching the build: close SAM, set `SAM_BENCHMARK_TAS=C:\Windows\System32\where.exe` (an existing executable that rejects the producer arguments and writes no B1a document), restart SAM, and run **Both** again. Expect:
+   - OpenStudio still runs;
+   - the run's `status` is PartiallyCompleted, Tas has `succeeded: false` with its error, and there is no `comparison.*`;
+   - the window shows the amber *PARTIALLY COMPLETED - not compared: Tas did not complete* banner, an empty Tas column, *Not compared* rows with no band, and the OpenStudio values.
+
+   Clear the variable and restart SAM afterwards.
 13. **Mismatch.** Compare the step-7 `benchmark-TAS.json` with a `benchmark-OpenStudio.json` made with a different EPW. The banner shows NOT THE SAME INPUTS, and Provenance lists `weatherHash`.
 14. **Tests.** `dotnet test WPF\SAM.Analytical.UI.WPF.Tests -c Release --filter "FullyQualifiedName~EngineComparisonTests|FullyQualifiedName~OpenStudioSimulationTests"`, then the full suite.
 
-Report: PASS/FAIL per step, `engine-comparison-run.json`, `comparison-summary.json`, the two producer logs if anything fails, and any native-DLL, OpenStudio CLI or Tas COM error.
+Report: PASS/FAIL per step (including 12a), `engine-comparison-run.json`, `comparison-summary.json`, the two producer logs if anything fails, and any native-DLL, OpenStudio CLI or Tas COM error.
 
 ## Next step
 1. Hosted CI green on this PR and on SAM_Validation#14.
