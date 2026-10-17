@@ -93,7 +93,7 @@ Local runs were in a Linux container (no Windows, Tas or OpenStudio), compiling 
 | Hosted Windows build (SAM_UI.sln, SAM_Validation from the same-named branch) | GitHub CI | See the PR description |
 | **Real Tas + EnergyPlus comparison** | Owner's Windows laptop | **NOT RUN** (procedure below) |
 
-No result in this record comes from a real engine.
+The validation table above records the original Linux harness. Later Windows runs and their acceptance limits are reconciled below.
 
 ## Windows laptop test procedure (owner)
 **Prerequisites:**
@@ -183,8 +183,16 @@ Tested content SHA: `647637f3039c2fc001aa820913142232cf5fa8d4` (local). The comp
 
 The numerical TAS/OpenStudio discrepancy (heating, cooling, peaks, 871/872 hour, cooling peak) remains a separate engineering investigation, not resolved here. Real Tas/OpenStudio acceptance remains the owner's Windows procedure above. Per-engine input manifests and producer deployment remain as stated earlier.
 
-## Next step
-1. Hosted CI green at the final heads of this PR and SAM_Validation#15.
-2. Owner review; the presentation findings above are ready for independent verification.
-3. Merge order: SAM_Validation#15, #237, then this PR. Do not merge automatically.
-4. `PROJECT_PROGRESS.md` closeouts after each merge.
+## Gated merge reconciliation - 2026-10-17
+
+Status: HOLD. Original owner-authorized candidate: `c9c215227dd4fc33415ea416983eecab35173a54`; this docs-only correction requires a new owner-approved pin. Presentation content remains tested at `647637f3039c2fc001aa820913142232cf5fa8d4`. No product file changed, no test or simulation was rerun for this correction.
+
+The live #238 description records owner integration acceptance at UI `0e1980a9d5e302da22fc32db488a5ccefd81d037` (contains #237 `95135ce`) and SAM_Validation#14 `329ef6b`. The machine-local report `C:\TasOut\pr238-ui\PR238-BOTH-REPORT.md`, the saved successful `box-both` manifest/logs, the standalone box manifest and the `both-3` partial manifest were inspected during the gated merge session. They support successful orchestration/provenance/reports and safe partial completion, not completion of all G1 requirements. See this branch's `documentation/OpenStudio-Simulation-PR229.md`, Gated acceptance reconciliation, for exact paths, stored metric values and remaining gates.
+
+A read-only comparison of the saved standalone box result and Both OpenStudio B1a found all four model energy/peak values exactly equal, with matching weather SHA-256 and model GUID. This is evidence for the box scenario; the prescribed explicit-EPW fixture remains unevidenced. Cancellation/native-process cleanup, concurrent-edit isolation and the Tas before/after Q4 baseline comparison have no real-run evidence or explicit owner deferral in the inspected record. #238's integration acceptance is not a blanket G1 waiver. A 2835/2835 suite does not prove the opt-in real-run test executed; it can return early with NOT RUN.
+
+SAM_Validation#15 merged first as `912ae94ef68af20b437fc92ec7e8891fd1cb640f` from approved head `4a7da6b1821d303d183fe87d275b5d0aaf05460e`. Its fully merged same-named task branch was lease-guard deleted so downstream CI can select `sow/2026-Q4`. #237 remains unmerged; its corrected documentation candidate is `b7483443f53dd53a4d16f159d6bc327c901a7770`. This branch carries the identical #237 record correction without claiming that new #237 commit is already an ancestor.
+
+Saved CSV and summary JSON SHA-256 were independently rechecked and match the earlier record: `8092B384DD9D9BA9289E1C10B77DB7C93BCD95E911B4A0F32CEE93373C0ECD3D` and `36B9D353B35CDFEB1FBAC70B78317BF36C4F393159F114FCF39716D825FF4A98`. Numerical disagreement, HungaryHouse Tas crash, unavailable input manifests and producer deployment remain unresolved follow-ups. Machine-local run evidence must be copied/provisioned on another machine.
+
+Exact next step: obtain missing G1 evidence or explicit owner decisions for each deferral and the fixture substitution, review the documentation corrections and approve both new candidate pins. Merge #237 only after its final gates and refreshed CI pass; preserve its ancestry with a merge commit. Then refresh #238 against merged UI Q4 and dependencies, verify `SAM_Validation @ sow/2026-Q4` in logs, recheck every gate, remove draft only when eligible, and merge only its newly approved exact head. Record successful merges in base-branch `PROJECT_PROGRESS.md` closeouts. No UI merge or draft removal is authorized by this record.

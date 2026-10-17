@@ -1,6 +1,6 @@
 # Simulate > OpenStudio Simulation - minimal OpenStudio/EnergyPlus run from SAM_UI (SAM_UI#229)
 
-Status: implemented on `claude/openstudio-mcp-server-1jmjlo`; owner review and gate G1 manual validation required. Not merged.
+Status: implemented on `claude/openstudio-mcp-server-1jmjlo`; HOLD for incomplete G1 acceptance. Not merged.
 Issue: SAM-BIM/SAM_UI#229 (parent SAM-BIM/SAM_UI#227, tracker SAM-BIM/SAM#206).
 Base: `sow/2026-Q4` at `ebe5e09b30b95e43e5d047b3aef2d8c5f01110e9`.
 PR: the live PR for this branch in `SAM-BIM/SAM_UI` (its number is not committed here).
@@ -108,9 +108,29 @@ On Windows, the real run test is `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c
 - The CI build-artifact upload grows by about 150 MB of OpenStudio natives.
 - The SWIG bindings run in process. See Decisions.
 
-## Next step
+## Gated acceptance reconciliation - 2026-10-17
 
-1. Check the hosted CI build on the PR.
-2. On the owner's Windows machine with OpenStudio 3.10 and a Tas licence, run the G1 manual steps from the PR description.
-3. Owner review.
-4. Merge, then the `PROJECT_PROGRESS.md` closeout on `sow/2026-Q4`.
+Status: HOLD for G1 acceptance. This documentation-only correction does not authorize a merge or waive a required check. The owner-authorized merge candidate was `95135ceb0ac6efb877f3c17735659084bdbc2aa3`; any record correction creates a new candidate requiring a new owner-approved pin. Product content remains `3393331`.
+
+The original NOT RUN entries above describe the Linux investigation. Later Windows evidence on #238 (build `0e1980a9d5e302da22fc32db488a5ccefd81d037`, incorporating #237 `95135ce`) supports a real standalone run and Both integration; it does not establish every G1 requirement. #238's live description records owner acceptance for integration, with numerical equivalence left open. No explicit owner deferral of the remaining G1 checks was found in the inspected records, PR comments or current merge instruction.
+
+Machine-local evidence (must be copied/provisioned on another machine):
+
+- Report: `C:\TasOut\pr238-ui\PR238-BOTH-REPORT.md`.
+- Standalone: `C:\TasOut\pr238-ui\input-box\box-aperture_OpenStudio_20261017-191359_3beea496`. `openstudio-run.json`: Succeeded, exit 0, 10 warnings, 0 severe, 0 fatal, 13 results, embedded weather, OpenStudio 3.10. The result model, snapshot, EPW, OSM/OSW and SQL are present.
+- Successful Both: `C:\TasOut\pr238-ui\box-both\000000_SAM_AnalyticalModel_TasOpenStudio_20261017-191647_1eb45853`. Both producer exits 0; Compared; provenance Pass. Overall/Numerical Fail, Coverage Warn; reports retain 6 Match / 0 Warn / 10 Fail / 2 N/A. This proves orchestration, not engine equivalence.
+- Partial: `C:\TasOut\pr238-ui\both-3\000000_SAM_AnalyticalModel_TasOpenStudio_20261017-185627_e65f7d4c`. Tas exit 5, OpenStudio exit 0; PartiallyCompleted, no comparison reports; failed Tas document is not substituted. The report records the UI banner.
+
+Read-only audit during this merge session (no new simulation): compared the standalone `box-aperture_OpenStudio.json` AnalyticalModelSimulationResult parameters with `box-both`'s `benchmark-OpenStudio.json` model fields. All four stored values are exactly equal: heating 2810.0182949034006 kWh; cooling 3832.503031616723 kWh; peak heating 3.343728936987215 kW; peak cooling 5.206164980706354 kW. Model GUID is `1988f7b93ec047d0b87bf9cb345d9eab`; both weather files hash to `E1353BD2600A401F76262D52A8E16176A15DC45A4967E58D9107C374704ABF7C`. Equality is evidenced for this box scenario, not for the prescribed two-cell explicit-EPW G1 procedure. Snapshot file hashes differ; no claim of byte-identical snapshots is made.
+
+| G1 requirement | Current evidence / decision |
+|---|---|
+| Standalone OpenStudio real run | Evidenced on box, as above; original full fixture/UI step checklist not supplied |
+| Standalone vs benchmark equality | Four model metrics exactly equal for the saved box; prescribed explicit-EPW fixture not run/evidenced |
+| Cancel and process cleanup | NOT EVIDENCED for a real run; fake-producer tests are not native-process acceptance; no explicit owner deferral |
+| Concurrent-edit isolation | NOT EVIDENCED for a real UI run; frozen-copy tests do not demonstrate concurrent UI editing; no explicit owner deferral |
+| Tas baseline comparison | NOT EVIDENCED: no same-model before/after Energy Simulation comparison against Q4; successful benchmark-tas is a different workflow; no explicit owner deferral |
+| Full WPF suite | Existing #238 record reports 2835/2835; not rerun in this merge session |
+| Opt-in RealRun actually executed | NOT established by 2835/2835: `OpenStudioSimulationTests.RealRun_...` returns early with NOT RUN when CLI or model is missing |
+
+Exact next step: owner supplies missing G1 evidence or explicitly accepts each deferral (including whether the box equality substitutes for the prescribed fixture), reviews this correction and approves its new exact head. Refresh final-head CI against merged SAM_Validation Q4, check dependency logs, and recheck all merge gates. #238 remains dependent on #237. Do not merge either UI PR under the original pins after changing its record. Numerical disagreement, HungaryHouse Tas crash, unavailable per-engine input manifests and producer deployment remain separate unresolved follow-ups.
