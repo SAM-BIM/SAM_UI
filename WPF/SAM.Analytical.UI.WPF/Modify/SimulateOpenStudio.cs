@@ -52,7 +52,7 @@ namespace SAM.Analytical.UI.WPF
 
             //SAM_OpenStudio's precedence: an EPW chosen here, else the model's embedded WeatherData.
             string? epwPath = null;
-            bool embeddedWeather = analyticalModel.TryGetValue(AnalyticalModelParameter.WeatherData, out WeatherData? weatherData) && weatherData != null;
+            bool embeddedWeather = analyticalModel.TryGetValue(Analytical.AnalyticalModelParameter.WeatherData, out WeatherData? weatherData) && weatherData != null;
             if (embeddedWeather)
             {
                 MessageBoxResult messageBoxResult = ShowOpenStudioMessage(owner, "Use the model's weather data for the OpenStudio run?\n\nYes: the model's weather data.\nNo: choose an EPW file.", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
