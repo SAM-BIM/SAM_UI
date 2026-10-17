@@ -167,7 +167,51 @@
     <Reference Include="SAM.Weather.Tas">
       <HintPath>..\..\..\SAM_Tas\build\SAM.Weather.Tas.dll</HintPath>
     </Reference>
+    <!-- Simulate > OpenStudio Simulation (SAM_UI#229): SAM_OpenStudio's own convert/run/results pipeline, from its x64 build
+         (SAM_Deploy and CI build SAM_OpenStudio with Platform=x64 before SAM_UI). OpenStudio.dll is the bindings' managed,
+         platform-neutral (IL-only) assembly, so this AnyCPU project references it directly instead of through the OpenStudio
+         package, whose targets refuse an AnyCPU build. System.Data.SQLite.dll and SAM.Core.SQLite.dll come along as
+         dependencies of SAM.Analytical.OpenStudio.dll; the native files are copied by SAMOpenStudioNativeFiles below. -->
+    <Reference Include="OpenStudio">
+      <HintPath>..\..\..\SAM_OpenStudio\build\OpenStudio.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Analytical.OpenStudio">
+      <HintPath>..\..\..\SAM_OpenStudio\build\SAM.Analytical.OpenStudio.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.OpenStudio">
+      <HintPath>..\..\..\SAM_OpenStudio\build\SAM.Core.OpenStudio.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Geometry.OpenStudio">
+      <HintPath>..\..\..\SAM_OpenStudio\build\SAM.Geometry.OpenStudio.dll</HintPath>
+    </Reference>
+    <!-- Simulate > Compare Tas / OpenStudio (SAM_UI#231): SAM_Validation's B1a schema and its comparator library (SAM#211). Every
+         comparison, band, gate and report comes from these; SAM_UI only lays them out. Built before SAM_UI by CI. -->
+    <Reference Include="SAM.Analytical.Benchmark">
+      <HintPath>..\..\..\SAM_Validation\build\SAM.Analytical.Benchmark.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Analytical.Benchmark.Compare">
+      <HintPath>..\..\..\SAM_Validation\build\SAM.Analytical.Benchmark.Compare.dll</HintPath>
+    </Reference>
   </ItemGroup>
+  <!-- The x64 native side of OpenStudio and of System.Data.SQLite, which no reference resolves: without them the first OpenStudio
+       call throws DllNotFoundException at run time. As None items with CopyToOutputDirectory they also reach every project that
+       references this one (the applications, the tests). The SQLite interop keeps the NuGet runtimes\win-x64\native layout that
+       System.Data.SQLite's loader probes (see SAM.Analytical.OpenStudio.csproj, SAMCopySQLiteAssets). -->
+  <PropertyGroup>
+    <SAMOpenStudioBuildDir>$(MSBuildThisFileDirectory)..\..\..\SAM_OpenStudio\build\</SAMOpenStudioBuildDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <SAMOpenStudioNativeFile Include="$(SAMOpenStudioBuildDir)openstudiolib.dll" />
+    <SAMOpenStudioNativeFile Include="$(SAMOpenStudioBuildDir)openstudio_csharp.dll" />
+    <SAMOpenStudioNativeFile Include="$(SAMOpenStudioBuildDir)openstudio_model_csharp.dll" />
+    <SAMOpenStudioNativeFile Include="$(SAMOpenStudioBuildDir)openstudio_translators_csharp.dll" />
+    <SAMOpenStudioNativeFile Include="$(SAMOpenStudioBuildDir)runtimes\win-x64\native\SQLite.Interop.dll" Link="runtimes\win-x64\native\SQLite.Interop.dll" />
+    <None Include="@(SAMOpenStudioNativeFile)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+  <!-- Fail the build rather than produce an application whose OpenStudio command cannot load. -->
+  <Target Name="SAMCheckOpenStudioNativeFiles" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('%(SAMOpenStudioNativeFile.FullPath)')" Text="%(SAMOpenStudioNativeFile.FullPath) is missing: build SAM_OpenStudio with Platform=x64 before SAM_UI (Simulate &gt; OpenStudio Simulation needs it at run time)." />
+  </Target>
   <ItemGroup>
     <PackageReference Include="HelixToolkit.Wpf">
       <Version>2.27.0</Version>

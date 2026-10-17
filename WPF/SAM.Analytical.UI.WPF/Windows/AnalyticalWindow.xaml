@@ -498,8 +498,19 @@
                     <RibbonButton x:Name="RibbonButton_PartOMixedDesign" Label="Mixed Design" ToolTipService.ShowOnDisabled="True" />
                 </RibbonGroup>
                 <RibbonGroup x:Name="RibbonGroup_Simulate_Simulate" Header="Simulate">
+                    <!-- Run Simulation (SAM_UI#231): one command for Tas only, OpenStudio/EnergyPlus only, or Both on one frozen snapshot with
+                         SAM_Validation's comparison. It only chooses; each choice runs the existing workflow. Energy Simulation, OpenStudio
+                         Simulation and Compare Tas / OpenStudio stay beside it, unchanged, as the established entry points. -->
+                    <RibbonButton x:Name="RibbonButton_RunSimulation" Label="Run Simulation" ToolTipService.ShowOnDisabled="True" />
                     <RibbonButton x:Name="RibbonButton_SolarSimulation" Label="Solar Simulation" />
                     <RibbonButton x:Name="RibbonButton_EnergySimulation" Label="Energy Simulation" />
+                    <!-- An annual OpenStudio/EnergyPlus run of a frozen copy of the open model through SAM_OpenStudio (SAM_UI#229). Beside
+                         Energy Simulation, which stays the Tas workflow and is not changed by it; the result is saved as its own model in
+                         its own run folder, never into the open model. -->
+                    <RibbonButton x:Name="RibbonButton_OpenStudioSimulation" Label="OpenStudio Simulation" ToolTipService.ShowOnDisabled="True" />
+                    <!-- Tas/OpenStudio comparison (SAM_UI#231): both engines on one frozen snapshot, or existing B1a documents, compared by
+                         SAM_Validation. Always available - comparing existing runs needs no open model. -->
+                    <RibbonButton x:Name="RibbonButton_CompareTasOpenStudio" Label="Compare Tas / OpenStudio" ToolTipService.ShowOnDisabled="True" />
                     <!-- Energy Simulation is the single run; Optimisation runs a Tas project again and again (the native SAM
                          optimiser over TasGenExecute). It works on a Tas project folder, not on the open model, so it
                          is always available. Not the Part O Optimise (2B) command on the Results tab. -->
