@@ -3,7 +3,10 @@
 
 using SAM.Analytical.Benchmark;
 using SAM.Analytical.Benchmark.Compare;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 
 namespace SAM.Analytical.UI.WPF
 {
@@ -52,14 +55,37 @@ namespace SAM.Analytical.UI.WPF
             SpaceName = spaceName;
 
             Scope = metricComparison.Scope;
+            ScopeFull = metricComparison.Scope;
+            ScopeDisplay = string.Equals(metricComparison.Scope, Benchmark.Compare.Query.ModelScope, StringComparison.Ordinal)
+                ? "Model"
+                : Guid.TryParseExact(metricComparison.Scope, "N", out _)
+                    ? PresentationFormat.CompactGuid(metricComparison.Scope)
+                    : metricComparison.Scope;
+
             Metric = metricComparison.Key;
             Unit = Format.Unit(metricComparison.Unit);
-            Tas = Format.Number(metricComparison.TasValue);
-            OpenStudio = Format.Number(metricComparison.OpenStudioValue);
-            AbsoluteDifference = Format.Number(metricComparison.AbsoluteDifference);
-            PercentDifference = Format.Percent(metricComparison.RelativeDifference);
+
+            //Presentation only: two decimals; the raw values and differences stay on the *Full properties and in the reports.
+            Tas = PresentationFormat.Number(metricComparison.TasValue, metricComparison.Unit, CultureInfo.CurrentCulture, string.Empty);
+            OpenStudio = PresentationFormat.Number(metricComparison.OpenStudioValue, metricComparison.Unit, CultureInfo.CurrentCulture, string.Empty);
+            AbsoluteDifference = PresentationFormat.Number(
+                metricComparison.AbsoluteDifference,
+                metricComparison.Circular ? MetricUnit.HourOfYear : metricComparison.Unit,
+                CultureInfo.CurrentCulture,
+                string.Empty);
+            PercentDifference = metricComparison.Circular
+                ? string.Empty
+                : PresentationFormat.Percent(metricComparison.RelativeDifference, CultureInfo.CurrentCulture, string.Empty);
+
+            TasFull = Format.Number(metricComparison.TasValue);
+            OpenStudioFull = Format.Number(metricComparison.OpenStudioValue);
+            AbsoluteDifferenceFull = Format.Number(metricComparison.AbsoluteDifference);
+            PercentDifferenceFull = metricComparison.Circular ? string.Empty : Format.Percent(metricComparison.RelativeDifference);
+
             Band = Format.Band(metricComparison.Band);
-            Note = Format.MetricNote(metricComparison);
+            Note = PresentationFormat.Note(metricComparison);
+            IsInformational = metricComparison.Band != ComparisonBand.NotApplicable && Benchmark.Compare.Query.IsInformationalForNumericalGate(metricComparison);
+            IsUnitMismatch = metricComparison.NotApplicableReason == NotApplicableReason.UnitMismatch;
 
             Status = Query.ComparisonRowStatus(metricComparison);
         }
@@ -70,17 +96,32 @@ namespace SAM.Analytical.UI.WPF
             SpaceName = spaceName;
 
             Scope = scope;
+            ScopeFull = scope;
+            ScopeDisplay = string.Equals(scope, Benchmark.Compare.Query.ModelScope, StringComparison.Ordinal)
+                ? "Model"
+                : Guid.TryParseExact(scope, "N", out _)
+                    ? PresentationFormat.CompactGuid(scope)
+                    : scope;
+
             Metric = key;
             Unit = metricValue == null ? string.Empty : Format.Unit(metricValue.Unit);
 
             //An unreported metric stays empty: SAM_Validation's own rule (MetricValue.Available), never a zero.
-            string value = metricValue != null && metricValue.Available ? Format.Number(metricValue.Value) : string.Empty;
+            bool available = metricValue != null && metricValue.Available;
+            string value = available ? PresentationFormat.Number(metricValue!.Value, metricValue.Unit, CultureInfo.CurrentCulture, string.Empty) : string.Empty;
+            string full = available ? Format.Number(metricValue!.Value) : string.Empty;
             Tas = comparisonEngine == ComparisonEngine.Tas ? value : string.Empty;
             OpenStudio = comparisonEngine == ComparisonEngine.OpenStudio ? value : string.Empty;
+            TasFull = comparisonEngine == ComparisonEngine.Tas ? full : string.Empty;
+            OpenStudioFull = comparisonEngine == ComparisonEngine.OpenStudio ? full : string.Empty;
             AbsoluteDifference = string.Empty;
             PercentDifference = string.Empty;
+            AbsoluteDifferenceFull = string.Empty;
+            PercentDifferenceFull = string.Empty;
             Band = string.Empty;
-            Note = metricValue != null && metricValue.Available ? note : "Not reported by " + Query.ComparisonEngineText(comparisonEngine) + ". " + note;
+            Note = available ? note : "Not reported by " + Query.ComparisonEngineText(comparisonEngine) + ". " + note;
+            IsInformational = false;
+            IsUnitMismatch = false;
 
             Status = EngineComparisonRowStatus.NotCompared;
         }
@@ -91,6 +132,12 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>"model" for a model metric, else the space's SAM GUID (or its name when it has none).</summary>
         public string Scope { get; }
 
+        /// <summary>A compact grid label for <see cref="Scope"/>: "Model", a short GUID, or the space name.</summary>
+        public string ScopeDisplay { get; }
+
+        /// <summary>The complete scope identifier, for inspection and copying.</summary>
+        public string ScopeFull { get; }
+
         /// <summary>The space's name as the engines report it ("Tas name / OpenStudio name" when they differ); null for a model metric.</summary>
         public string? SpaceName { get; }
 
@@ -98,23 +145,58 @@ namespace SAM.Analytical.UI.WPF
 
         public string Unit { get; }
 
+        /// <summary>Two-decimal display value; empty when the engine did not report it.</summary>
         public string Tas { get; }
 
         public string OpenStudio { get; }
 
         public string AbsoluteDifference { get; }
 
-        /// <summary>The relative difference in percent, as comparison.csv's relativePercent column.</summary>
+        /// <summary>The normalized difference in percent, two decimals; empty for a circular hour or a missing value.</summary>
         public string PercentDifference { get; }
+
+        /// <summary>Full-precision Tas value for the cell tooltip; empty when unavailable.</summary>
+        public string TasFull { get; }
+
+        /// <summary>Full-precision OpenStudio value for the cell tooltip; empty when unavailable.</summary>
+        public string OpenStudioFull { get; }
+
+        /// <summary>Full-precision absolute difference for the cell tooltip; empty when unavailable.</summary>
+        public string AbsoluteDifferenceFull { get; }
+
+        /// <summary>Full-precision normalized percentage for the cell tooltip; empty for a circular hour.</summary>
+        public string PercentDifferenceFull { get; }
 
         /// <summary>SAM_Validation's band: Match, Warn, Fail or N/A. A tolerance band, not an engineering verdict. Empty when not compared.</summary>
         public string Band { get; }
 
         public EngineComparisonRowStatus Status { get; }
 
-        public string StatusText => Query.ComparisonRowStatusText(Status);
+        /// <summary>True when the row carries a band that is excluded from the numerical status.</summary>
+        public bool IsInformational { get; }
 
-        /// <summary>SAM_Validation's note for the metric (why it is N/A or informational), as in comparison.csv; for a single-engine row, why it is not compared.</summary>
+        /// <summary>True when the two engines declared incompatible units (not an informational metric).</summary>
+        public bool IsUnitMismatch { get; }
+
+        public string StatusText
+        {
+            get
+            {
+                if (Status == EngineComparisonRowStatus.NotEquivalent)
+                {
+                    if (IsUnitMismatch)
+                    {
+                        return "Unit mismatch";
+                    }
+
+                    return IsInformational ? "Informational" : "Not equivalent";
+                }
+
+                return Query.ComparisonRowStatusText(Status);
+            }
+        }
+
+        /// <summary>SAM_Validation's presentation note for the metric; for a single-engine row, why it is not compared.</summary>
         public string Note { get; }
     }
 
@@ -149,6 +231,14 @@ namespace SAM.Analytical.UI.WPF
         public IReadOnlyList<EngineComparisonRow> ModelRows { get; }
 
         public IReadOnlyList<EngineComparisonRow> SpaceRows { get; }
+
+        public IReadOnlyList<EngineComparisonRow> AllRows => ModelRows.Concat(SpaceRows).ToList();
+
+        /// <summary>Fail bands that contribute to the numerical status.</summary>
+        public int ContributingFailCount => AllRows.Count(x => x.Band == "Fail" && !x.IsInformational);
+
+        /// <summary>Fail bands shown but excluded from the numerical status; they are always included in the gate's fail count.</summary>
+        public int InformationalFailCount => AllRows.Count(x => x.Band == "Fail" && x.IsInformational);
     }
 
     /// <summary>

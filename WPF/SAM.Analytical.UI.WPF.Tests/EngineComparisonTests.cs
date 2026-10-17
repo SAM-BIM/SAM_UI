@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (c) 2020-2026 Michal Dengusiak & Jakub Ziolkowski and contributors
 
+using SAM.Analytical.Benchmark;
 using SAM.Analytical.Benchmark.Compare;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -78,12 +80,23 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Assert.Equal(expected[0], row.Scope);
                 Assert.Equal(expected[1], row.Metric);
                 Assert.Equal(expected[2], row.Unit);
-                Assert.Equal(expected[4], row.Tas);
-                Assert.Equal(expected[5], row.OpenStudio);
-                Assert.Equal(expected[6], row.AbsoluteDifference);
-                Assert.Equal(expected[8], row.PercentDifference);
                 Assert.Equal(expected[10], row.Band);
-                Assert.Equal(expected[11], row.Note);
+
+                //The CSV stays the raw, full-precision contract; the grid is the two-decimal presentation.
+                Assert.Equal(expected[4], row.TasFull);
+                Assert.Equal(expected[5], row.OpenStudioFull);
+                Assert.Equal(expected[6], row.AbsoluteDifferenceFull);
+                Assert.Equal(expected[8], row.PercentDifferenceFull);
+                Assert.Equal(PresentationFormat.Note(row.MetricComparison), row.Note);
+
+                Assert.Equal(PresentationFormat.Number(row.MetricComparison.TasValue, row.MetricComparison.Unit, System.Globalization.CultureInfo.CurrentCulture, string.Empty), row.Tas);
+                Assert.Equal(PresentationFormat.Number(row.MetricComparison.OpenStudioValue, row.MetricComparison.Unit, System.Globalization.CultureInfo.CurrentCulture, string.Empty), row.OpenStudio);
+                Assert.Equal(
+                    PresentationFormat.Number(row.MetricComparison.AbsoluteDifference, row.MetricComparison.Circular ? MetricUnit.HourOfYear : row.MetricComparison.Unit, System.Globalization.CultureInfo.CurrentCulture, string.Empty),
+                    row.AbsoluteDifference);
+                Assert.Equal(
+                    row.MetricComparison.Circular ? string.Empty : PresentationFormat.Percent(row.MetricComparison.RelativeDifference, System.Globalization.CultureInfo.CurrentCulture, string.Empty),
+                    row.PercentDifference);
             }
         }
 
@@ -328,7 +341,7 @@ namespace SAM.Analytical.UI.WPF.Tests
                 Benchmark.MetricValue value = values[i].Value;
                 if (value != null && value.Available)
                 {
-                    Assert.Equal(Format.Number(value.Value), row.OpenStudio);
+                    Assert.Equal(PresentationFormat.Number(value.Value, value.Unit, CultureInfo.CurrentCulture, string.Empty), row.OpenStudio);
                 }
                 else
                 {
@@ -415,6 +428,127 @@ namespace SAM.Analytical.UI.WPF.Tests
             (tas, openStudio) = Query.EngineComparisonDocuments(directory);
             Assert.NotNull(tas);
             Assert.Null(openStudio);
+        }
+
+        [Fact]
+        public void Presentation_TwoDecimals_HoursStayInteger_AndMissingStaysEmpty()
+        {
+            MetricComparison heating = Metric(
+                "model", "consumptionHeating", MetricUnit.KilowattHour,
+                742.7750866578222, true, 2810.0182949034006, true,
+                circular: false, absoluteDifference: 2067.2432082455784, relativeDifference: 0.7356689499121726,
+                band: ComparisonBand.Fail, reason: NotApplicableReason.None);
+
+            EngineComparisonRow heatingRow = new EngineComparisonRow(heating, null);
+            Assert.Equal("742.78", heatingRow.Tas);
+            Assert.Equal("742.7750866578222", heatingRow.TasFull);
+            Assert.Equal("2810.02", heatingRow.OpenStudio);
+            Assert.Equal("2067.24", heatingRow.AbsoluteDifference);
+            Assert.Equal("73.57", heatingRow.PercentDifference);
+            Assert.Equal("Compared", heatingRow.StatusText);
+            Assert.False(heatingRow.IsInformational);
+
+            MetricComparison hour = Metric(
+                "model", "peakHeatingHour", MetricUnit.HourOfYear,
+                871, true, 919, true,
+                circular: true, absoluteDifference: 48, relativeDifference: null,
+                band: ComparisonBand.Fail, reason: NotApplicableReason.None);
+
+            EngineComparisonRow hourRow = new EngineComparisonRow(hour, null);
+            Assert.Equal("871", hourRow.Tas);
+            Assert.Equal("919", hourRow.OpenStudio);
+            Assert.Equal("48", hourRow.AbsoluteDifference);
+            Assert.Equal(string.Empty, hourRow.PercentDifference);
+            Assert.Equal(48.ToString(CultureInfo.InvariantCulture), hourRow.AbsoluteDifferenceFull);
+            Assert.True(hourRow.IsInformational);
+            Assert.Equal("Informational", hourRow.StatusText);
+            Assert.Contains(PresentationFormat.InformationalNote, hourRow.Note);
+
+            MetricComparison missing = Metric(
+                "model", "heating.designLoad", MetricUnit.Watt,
+                1927.0106201171875, true, null, false,
+                circular: false, absoluteDifference: null, relativeDifference: null,
+                band: ComparisonBand.NotApplicable, reason: NotApplicableReason.Unavailable);
+
+            EngineComparisonRow missingRow = new EngineComparisonRow(missing, "Office");
+            Assert.Equal("1927.01", missingRow.Tas);
+            Assert.Equal(string.Empty, missingRow.OpenStudio);
+            Assert.Equal(string.Empty, missingRow.AbsoluteDifference);
+            Assert.Equal(string.Empty, missingRow.PercentDifference);
+            Assert.Equal("Missing on OpenStudio", missingRow.StatusText);
+            Assert.Equal(string.Empty, missingRow.OpenStudioFull);
+        }
+
+        [Fact]
+        public void ScopeDisplay_IsCompactWhileFullGuidStaysAvailable()
+        {
+            string guid = "cb68bed195af496bb255a13ffa5c58e9";
+            EngineComparisonRow row = new EngineComparisonRow(
+                Metric("model", "area", MetricUnit.SquareMetre, 50, true, 50, true, false, 0, 0, ComparisonBand.Match, NotApplicableReason.None),
+                "Office");
+
+            //The comparison scope is the model for this metric; the space GUID is carried by the space row factory.
+            Assert.Equal("Model", row.ScopeDisplay);
+            Assert.Equal("model", row.ScopeFull);
+
+            MetricComparison spaceMetric = Metric(
+                guid, "area", MetricUnit.SquareMetre, 50, true, 50, true,
+                circular: false, absoluteDifference: 0, relativeDifference: 0,
+                band: ComparisonBand.Match, reason: NotApplicableReason.None);
+
+            EngineComparisonRow spaceRow = new EngineComparisonRow(spaceMetric, "Office");
+            Assert.Equal(guid, spaceRow.ScopeFull);
+            Assert.Equal(guid.Substring(0, 8) + "…", spaceRow.ScopeDisplay);
+        }
+
+        [Fact]
+        public void UnitMismatch_HasItsOwnStatusAndNote()
+        {
+            MetricComparison mismatch = new MetricComparison(
+                "model", "consumptionHeating", MetricUnit.Kilowatt,
+                1, true, 2, true, false, null, null, null,
+                ComparisonBand.NotApplicable, NotApplicableReason.UnitMismatch,
+                MetricUnit.Kilowatt, MetricUnit.Watt);
+
+            EngineComparisonRow row = new EngineComparisonRow(mismatch, null);
+            Assert.True(row.IsUnitMismatch);
+            Assert.False(row.IsInformational);
+            Assert.Equal("Unit mismatch", row.StatusText);
+            Assert.Contains("Unit mismatch (TAS kW vs OpenStudio W)", row.Note);
+            Assert.DoesNotContain(PresentationFormat.InformationalNote, row.Note);
+        }
+
+        [Fact]
+        public void InformationalFailCountsAreSeparateFromContributingFailCounts()
+        {
+            EngineComparison comparison = Query.LoadEngineComparison(Tas, OpenStudio);
+            Assert.True(comparison.InformationalFailCount > 0);
+            Assert.True(comparison.ContributingFailCount > 0);
+            Assert.Equal(comparison.ComparisonResult.FailCount, comparison.ContributingFailCount + comparison.InformationalFailCount);
+            Assert.All(comparison.AllRows.Where(x => x.IsInformational), x => Assert.Equal("Informational", x.StatusText));
+        }
+
+        private static MetricComparison Metric(
+            string scope,
+            string key,
+            MetricUnit unit,
+            double? tas,
+            bool tasAvailable,
+            double? openStudio,
+            bool openStudioAvailable,
+            bool circular,
+            double? absoluteDifference,
+            double? relativeDifference,
+            ComparisonBand band,
+            NotApplicableReason reason)
+        {
+            return new MetricComparison(
+                scope, key, unit,
+                tas, tasAvailable,
+                openStudio, openStudioAvailable,
+                circular, absoluteDifference, relativeDifference, null,
+                band, reason,
+                unit, unit);
         }
 
         private static AnalyticalModel Model()

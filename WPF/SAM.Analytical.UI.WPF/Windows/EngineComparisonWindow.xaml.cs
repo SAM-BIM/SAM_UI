@@ -131,13 +131,14 @@ namespace SAM.Analytical.UI.WPF
 
             Benchmark.Compare.ComparisonResult comparisonResult = engineComparison.ComparisonResult;
 
-            int notEquivalent = engineComparison.ModelRows.Concat(engineComparison.SpaceRows).Count(x => x.Status == EngineComparisonRowStatus.NotEquivalent);
-            int missing = engineComparison.ModelRows.Concat(engineComparison.SpaceRows).Count(x => x.Status == EngineComparisonRowStatus.MissingOnTas || x.Status == EngineComparisonRowStatus.MissingOnOpenStudio);
-            int unavailable = engineComparison.ModelRows.Concat(engineComparison.SpaceRows).Count(x => x.Status == EngineComparisonRowStatus.Unavailable);
+            int notEquivalent = engineComparison.AllRows.Count(x => x.Status == EngineComparisonRowStatus.NotEquivalent);
+            int missing = engineComparison.AllRows.Count(x => x.Status == EngineComparisonRowStatus.MissingOnTas || x.Status == EngineComparisonRowStatus.MissingOnOpenStudio);
+            int unavailable = engineComparison.AllRows.Count(x => x.Status == EngineComparisonRowStatus.Unavailable);
 
             string text = string.Format(
-                "Gate {0}: {1} match, {2} warn, {3} fail; {4} missing on one engine, {5} not equivalent, {6} not reported. Spaces: {7} matched, {8} only in Tas, {9} only in OpenStudio.",
-                Benchmark.Compare.Format.Gate(comparisonResult.Gate), comparisonResult.MatchCount, comparisonResult.WarnCount, comparisonResult.FailCount, missing, notEquivalent, unavailable,
+                "Gate {0}: {1} match, {2} warn, {3} fail ({4} contributing to numerical status, {5} informational); {6} missing on one engine, {7} not equivalent, {8} not reported. Spaces: {9} matched, {10} only in Tas, {11} only in OpenStudio.",
+                Benchmark.Compare.Format.Gate(comparisonResult.Gate), comparisonResult.MatchCount, comparisonResult.WarnCount, comparisonResult.FailCount,
+                engineComparison.ContributingFailCount, engineComparison.InformationalFailCount, missing, notEquivalent, unavailable,
                 comparisonResult.SpaceDiagnostics.MatchedByGuid + comparisonResult.SpaceDiagnostics.MatchedByName, comparisonResult.SpaceDiagnostics.OnlyInTas.Count, comparisonResult.SpaceDiagnostics.OnlyInOpenStudio.Count);
 
             if (!comparisonResult.ProvenanceCompatibility.IsCompatible)
@@ -181,6 +182,17 @@ namespace SAM.Analytical.UI.WPF
             DataGrid_Spaces.ItemsSource = space == null || space == AllSpaces
                 ? spaceRows
                 : spaceRows.Where(x => (x.SpaceName ?? x.Scope) == space).ToList();
+        }
+
+        /// <summary>The GUID column shows a compact value; the grid context menu copies the selected row's complete identifier.</summary>
+        private void CopyGuid_Click(object sender, RoutedEventArgs e)
+        {
+            EngineComparisonRow? row = (sender as FrameworkElement)?.DataContext as EngineComparisonRow
+                ?? DataGrid_Spaces.SelectedItem as EngineComparisonRow;
+            if (row != null && !string.IsNullOrWhiteSpace(row.ScopeFull))
+            {
+                Clipboard.SetText(row.ScopeFull);
+            }
         }
 
         private void Browse(System.Windows.Controls.TextBox textBox, string title)
