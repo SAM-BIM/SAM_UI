@@ -81,6 +81,15 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="ToolTip" Value="{Binding Note}"/>
         </Style>
+        <!-- Text columns keep their full value available when a fixed, readable column width clips it. -->
+        <Style x:Key="Style_MetricCell" TargetType="TextBlock">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="ToolTip" Value="{Binding Metric}"/>
+        </Style>
+        <Style x:Key="Style_StatusCell" TargetType="TextBlock">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="ToolTip" Value="{Binding StatusText}"/>
+        </Style>
     </Window.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -120,27 +129,29 @@
             <TextBlock x:Name="TextBlock_Banner" TextWrapping="Wrap" Text="Choose a Tas and an OpenStudio B1a document, load a comparison run folder, or run both engines on the open model."/>
         </Border>
 
-        <TabControl Grid.Row="2">
+        <TabControl x:Name="TabControl_Main" Grid.Row="2">
             <TabItem Header="Model">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" CanContentScroll="False">
-                <DataGrid x:Name="DataGrid_Model" AutoGenerateColumns="False" IsReadOnly="True" RowStyle="{StaticResource Style_Row}" HeadersVisibility="Column" CanUserAddRows="False" MinWidth="1050" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <!-- The grid owns its scrolling. Fixed, readable pixel widths (including Note) keep every column legible at a
+                     narrow window; the grid then scrolls horizontally instead of compressing the columns. A star column would
+                     let WPF shrink all columns to fit the viewport, which made the 820 px layout unreadable. -->
+                <DataGrid x:Name="DataGrid_Model" AutoGenerateColumns="False" IsReadOnly="True" RowStyle="{StaticResource Style_Row}" HeadersVisibility="Column" CanUserAddRows="False" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Metric" Binding="{Binding Metric}" Width="160"/>
-                        <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="55"/>
+                        <DataGridTextColumn Header="Metric" Binding="{Binding Metric}" Width="160" ElementStyle="{StaticResource Style_MetricCell}"/>
+                        <!-- Wide enough for the longest unit token (hourOfYear). -->
+                        <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="85"/>
                         <DataGridTextColumn Header="Tas" Binding="{Binding Tas}" Width="80" ElementStyle="{StaticResource Style_TasCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
                         <DataGridTextColumn Header="OpenStudio" Binding="{Binding OpenStudio}" Width="90" ElementStyle="{StaticResource Style_OpenStudioCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
-                        <DataGridTextColumn Header="Abs. difference" Binding="{Binding AbsoluteDifference}" Width="105" ElementStyle="{StaticResource Style_AbsDifferenceCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
-                        <DataGridTextColumn Binding="{Binding PercentDifference}" Width="160" ElementStyle="{StaticResource Style_PercentCell}">
+                        <DataGridTextColumn Header="Abs. difference" Binding="{Binding AbsoluteDifference}" Width="100" ElementStyle="{StaticResource Style_AbsDifferenceCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
+                        <DataGridTextColumn Binding="{Binding PercentDifference}" Width="135" ElementStyle="{StaticResource Style_PercentCell}">
                             <DataGridTextColumn.Header>
-                                <TextBlock Text="Normalized difference (%)" TextWrapping="Wrap" TextAlignment="Center" Width="145"/>
+                                <TextBlock Text="Normalized difference (%)" TextWrapping="Wrap" TextAlignment="Center" Width="120"/>
                             </DataGridTextColumn.Header>
                         </DataGridTextColumn>
                         <DataGridTextColumn Header="Band" Binding="{Binding Band}" Width="55" CellStyle="{StaticResource Style_BandCell}"/>
-                        <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="95"/>
-                        <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="*" MinWidth="260" ElementStyle="{StaticResource Style_NoteCell}"/>
+                        <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="140" ElementStyle="{StaticResource Style_StatusCell}"/>
+                        <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="275" ElementStyle="{StaticResource Style_NoteCell}"/>
                     </DataGrid.Columns>
                 </DataGrid>
-                </ScrollViewer>
             </TabItem>
             <TabItem Header="Spaces">
                 <Grid>
@@ -152,15 +163,15 @@
                         <TextBlock Text="Space:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <ComboBox x:Name="ComboBox_Space" MinWidth="320"/>
                     </StackPanel>
-                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" CanContentScroll="False">
-                    <DataGrid x:Name="DataGrid_Spaces" AutoGenerateColumns="False" IsReadOnly="True" RowStyle="{StaticResource Style_Row}" HeadersVisibility="Column" CanUserAddRows="False" MinWidth="1150" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <!-- Same sizing rule as the Model grid: fixed readable widths, Note included, and the grid scrolls horizontally. -->
+                    <DataGrid x:Name="DataGrid_Spaces" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True" RowStyle="{StaticResource Style_Row}" HeadersVisibility="Column" CanUserAddRows="False" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Copy full GUID" Click="CopyGuid_Click"/>
                             </ContextMenu>
                         </DataGrid.ContextMenu>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Space" Binding="{Binding SpaceName}" Width="105">
+                            <DataGridTextColumn Header="Space" Binding="{Binding SpaceName}" Width="100">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="TextWrapping" Value="Wrap"/>
@@ -182,18 +193,21 @@
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Metric" Binding="{Binding Metric}" Width="135"/>
-                            <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="75"/>
+                            <DataGridTextColumn Header="Metric" Binding="{Binding Metric}" Width="125" ElementStyle="{StaticResource Style_MetricCell}"/>
+                            <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="85"/>
                             <DataGridTextColumn Header="Tas" Binding="{Binding Tas}" Width="60" ElementStyle="{StaticResource Style_TasCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
-                            <DataGridTextColumn Header="OpenStudio" Binding="{Binding OpenStudio}" Width="70" ElementStyle="{StaticResource Style_OpenStudioCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
-                            <DataGridTextColumn Header="Abs. difference" Binding="{Binding AbsoluteDifference}" Width="95" ElementStyle="{StaticResource Style_AbsDifferenceCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
-                            <DataGridTextColumn Header="Normalized difference (%)" Binding="{Binding PercentDifference}" Width="185" ElementStyle="{StaticResource Style_PercentCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
+                            <DataGridTextColumn Header="OpenStudio" Binding="{Binding OpenStudio}" Width="75" ElementStyle="{StaticResource Style_OpenStudioCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
+                            <DataGridTextColumn Header="Abs. difference" Binding="{Binding AbsoluteDifference}" Width="90" ElementStyle="{StaticResource Style_AbsDifferenceCell}" HeaderStyle="{StaticResource Style_NumericHeader}"/>
+                            <DataGridTextColumn Binding="{Binding PercentDifference}" Width="140" ElementStyle="{StaticResource Style_PercentCell}">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Text="Normalized difference (%)" TextWrapping="Wrap" TextAlignment="Right" Width="128"/>
+                                </DataGridTextColumn.Header>
+                            </DataGridTextColumn>
                             <DataGridTextColumn Header="Band" Binding="{Binding Band}" Width="45" CellStyle="{StaticResource Style_BandCell}"/>
-                            <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="140"/>
-                            <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="*" MinWidth="170" ElementStyle="{StaticResource Style_NoteCell}"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="140" ElementStyle="{StaticResource Style_StatusCell}"/>
+                            <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="160" ElementStyle="{StaticResource Style_NoteCell}"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                    </ScrollViewer>
                 </Grid>
             </TabItem>
             <TabItem Header="Provenance">
@@ -213,7 +227,7 @@
                 <TextBlock TextWrapping="Wrap" Foreground="#6A6A6A"
                            Text="Normalized difference (%) = 100 × |OpenStudio − TAS| / max(|TAS|, |OpenStudio|, applicable near-zero floor). It is unsigned and is not percentage change against TAS; peak hours use circular hours and no percentage. Bands are provisional tolerance bands, not engineering verdicts."/>
                 <TextBlock TextWrapping="Wrap" Foreground="#6A6A6A" Margin="0,3,0,0"
-                           Text="Values, differences, bands and notes are SAM_Validation's (benchmark-compare). Missing and not-equivalent metrics are never shown as zero. Informational rows keep their band but are excluded from the numerical status."/>
+                           Text="Values, differences, bands and notes are SAM_Validation's (benchmark-compare). Missing values are never shown as zero. Unit mismatches and informational rows are labelled; informational rows keep their band but are excluded from the numerical status."/>
             </StackPanel>
             <WrapPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
                 <Button x:Name="Button_OpenReport" Content="Open report" Padding="10,3" Margin="6,0,0,0" IsEnabled="False"/>

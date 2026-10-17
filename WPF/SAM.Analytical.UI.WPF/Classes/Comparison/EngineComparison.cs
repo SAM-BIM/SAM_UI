@@ -234,11 +234,23 @@ namespace SAM.Analytical.UI.WPF
 
         public IReadOnlyList<EngineComparisonRow> AllRows => ModelRows.Concat(SpaceRows).ToList();
 
-        /// <summary>Fail bands that contribute to the numerical status.</summary>
-        public int ContributingFailCount => AllRows.Count(x => x.Band == "Fail" && !x.IsInformational);
+        /// <summary>
+        /// Fail bands that contribute to the numerical status, taken from SAM_Validation's authoritative split
+        /// (<see cref="ComparisonResult.ContributingFailCount"/>) rather than re-derived from the displayed rows.
+        /// </summary>
+        public int ContributingFailCount => ComparisonResult.ContributingFailCount;
 
-        /// <summary>Fail bands shown but excluded from the numerical status; they are always included in the gate's fail count.</summary>
-        public int InformationalFailCount => AllRows.Count(x => x.Band == "Fail" && x.IsInformational);
+        /// <summary>
+        /// Fail bands shown but excluded from the numerical status, taken from SAM_Validation's authoritative split
+        /// (<see cref="ComparisonResult.InformationalFailCount"/>). They are still included in the gate's fail count.
+        /// </summary>
+        public int InformationalFailCount => ComparisonResult.InformationalFailCount;
+
+        /// <summary>
+        /// Rows whose two engines declared incompatible units. Unlike an informational row (a peak hour or a whole-model peak
+        /// under different definitions) this is a genuine not-equivalent condition, so the view counts the two separately.
+        /// </summary>
+        public int UnitMismatchCount => AllRows.Count(x => x.IsUnitMismatch);
     }
 
     /// <summary>

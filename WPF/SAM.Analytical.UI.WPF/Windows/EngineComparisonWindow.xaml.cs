@@ -15,7 +15,7 @@ namespace SAM.Analytical.UI.WPF
     /// The Tas/OpenStudio comparison view (SAM_UI#231, Phase 1), opened by Run Simulation &gt; Both when its run finishes
     /// (<see cref="ShowRun"/>) and by Simulate &gt; Compare Tas/OpenStudio: choose a Tas and an OpenStudio B1a document - or a comparison
     /// run folder - or run both engines on a frozen copy of the open model, and see SAM_Validation's comparison of the two: model and
-    /// per-space metrics with units, differences and bands, which metrics are missing, not equivalent or not reported, the provenance,
+    /// per-space metrics with units, differences and bands, which metrics are missing, informational, unit-mismatched or not reported, the provenance,
     /// the diagnostics and the unmatched spaces; open or export the Markdown/CSV/JSON reports. When only one engine of a run completed,
     /// that engine's results are shown on their own, marked partially completed and not compared.
     /// <para>
@@ -131,14 +131,16 @@ namespace SAM.Analytical.UI.WPF
 
             Benchmark.Compare.ComparisonResult comparisonResult = engineComparison.ComparisonResult;
 
-            int notEquivalent = engineComparison.AllRows.Count(x => x.Status == EngineComparisonRowStatus.NotEquivalent);
+            //Informational rows (peak hours, whole-model peaks) are excluded from the numerical status by SAM_Validation's own rule;
+            //they are not "not equivalent" in the incompatible sense. Count them separately from a genuine unit mismatch.
             int missing = engineComparison.AllRows.Count(x => x.Status == EngineComparisonRowStatus.MissingOnTas || x.Status == EngineComparisonRowStatus.MissingOnOpenStudio);
+            int unitMismatch = engineComparison.UnitMismatchCount;
             int unavailable = engineComparison.AllRows.Count(x => x.Status == EngineComparisonRowStatus.Unavailable);
 
             string text = string.Format(
-                "Gate {0}: {1} match, {2} warn, {3} fail ({4} contributing to numerical status, {5} informational); {6} missing on one engine, {7} not equivalent, {8} not reported. Spaces: {9} matched, {10} only in Tas, {11} only in OpenStudio.",
+                "Gate {0}: {1} match, {2} warn, {3} fail ({4} contributing to numerical status, {5} informational and excluded); {6} missing on one engine, {7} unit mismatch, {8} not reported. Spaces: {9} matched, {10} only in Tas, {11} only in OpenStudio.",
                 Benchmark.Compare.Format.Gate(comparisonResult.Gate), comparisonResult.MatchCount, comparisonResult.WarnCount, comparisonResult.FailCount,
-                engineComparison.ContributingFailCount, engineComparison.InformationalFailCount, missing, notEquivalent, unavailable,
+                engineComparison.ContributingFailCount, engineComparison.InformationalFailCount, missing, unitMismatch, unavailable,
                 comparisonResult.SpaceDiagnostics.MatchedByGuid + comparisonResult.SpaceDiagnostics.MatchedByName, comparisonResult.SpaceDiagnostics.OnlyInTas.Count, comparisonResult.SpaceDiagnostics.OnlyInOpenStudio.Count);
 
             if (!comparisonResult.ProvenanceCompatibility.IsCompatible)
