@@ -1,0 +1,251 @@
+{
+  "schemaVersion": "1.0.0",
+  "provenance": {
+    "sourceModelName": "SingleBox",
+    "sourceModelGuid": "0123456789abcdef0123456789abcdef",
+    "sourceFileHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "canonicalModelHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "canonicalizationVersion": "1.0.0",
+    "samCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "runnerCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "engine": {
+      "kind": "TAS",
+      "name": "TAS",
+      "version": "9.5.3",
+      "sdkVersion": null
+    },
+    "route": "Native-TAS",
+    "weather": {
+      "identity": "London-Gatwick.epw",
+      "hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "designDaySource": "DDY",
+    "runTimestampUtc": "2026-07-21T12:00:00Z",
+    "durationSeconds": 12.5,
+    "state": "Success",
+    "resultSources": [
+      "AnalyticalModelSimulationResult",
+      "SpaceSimulationResult"
+    ],
+    "warnings": [],
+    "notes": []
+  },
+  "model": {
+    "consumptionHeating": {
+      "value": 1000,
+      "unit": "kWh",
+      "available": true
+    },
+    "consumptionCooling": {
+      "value": 500,
+      "unit": "kWh",
+      "available": true
+    },
+    "peakHeatingLoad": {
+      "value": 10,
+      "unit": "kW",
+      "available": true
+    },
+    "peakHeatingHour": {
+      "value": 200,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "peakCoolingLoad": {
+      "value": 8,
+      "unit": "kW",
+      "available": true
+    },
+    "peakCoolingHour": {
+      "value": 8759,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "floorArea": {
+      "value": 240,
+      "unit": "m2",
+      "available": true
+    },
+    "volume": {
+      "value": 720,
+      "unit": "m3",
+      "available": true
+    }
+  },
+  "spaces": [
+    {
+      "guid": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "name": "Office A",
+      "area": {
+        "value": 200,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 600,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 2000,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 205,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    },
+    {
+      "guid": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "name": "Office B",
+      "area": {
+        "value": 40,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 120,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 2100,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 205,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    },
+    {
+      "guid": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+      "name": "Plant, level 1",
+      "area": {
+        "value": 12,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 36,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 2000,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 205,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    }
+  ]
+}

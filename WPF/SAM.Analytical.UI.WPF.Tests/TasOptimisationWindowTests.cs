@@ -74,15 +74,18 @@ namespace SAM.Analytical.UI.WPF.Tests
                 RibbonGroup ribbonGroup = Assert.IsType<RibbonGroup>(analyticalWindow.FindName("RibbonGroup_Simulate_Simulate"));
                 List<RibbonButton> ribbonButtons = ribbonGroup.Items.OfType<RibbonButton>().ToList();
 
-                Assert.Equal(["RibbonButton_SolarSimulation", "RibbonButton_EnergySimulation", "RibbonButton_Optimisation"], ribbonButtons.Select(x => x.Name));
+                //#231 added Run Simulation, OpenStudio Simulation and Compare Tas / OpenStudio to the same tab.
+                Assert.Equal(
+                    ["RibbonButton_RunSimulation", "RibbonButton_SolarSimulation", "RibbonButton_EnergySimulation", "RibbonButton_OpenStudioSimulation", "RibbonButton_CompareTasOpenStudio", "RibbonButton_Optimisation"],
+                    ribbonButtons.Select(x => x.Name));
 
-                RibbonButton ribbonButton = ribbonButtons[2];
+                RibbonButton ribbonButton = ribbonButtons[5];
                 Assert.Equal("Optimisation", ribbonButton.Label);
                 Assert.NotNull(ribbonButton.LargeImageSource);
                 Assert.Equal("Find the design-variable values that minimise an objective by running a Tas model repeatedly. Works on a Tas project folder, not on the open model. Not the Part O Optimise (2B) command.", ribbonButton.ToolTipDescription);
 
                 //Energy Simulation needs an open model; Optimisation works on a Tas project folder.
-                Assert.False(ribbonButtons[1].IsEnabled);
+                Assert.False(ribbonButtons[2].IsEnabled);
                 Assert.True(ribbonButton.IsEnabled);
             }
             finally

@@ -63,6 +63,12 @@ namespace SAM.Analytical.UI.WPF.Windows
         /// what keeps a second click from starting a second run; <see cref="SetEnabled"/> leaves the button off while it is set.
         /// </summary>
         private bool openStudioSimulationRunning;
+
+        /// <summary>True while a Run Simulation &gt; Both run is going; it does not block the window either.</summary>
+        private bool engineComparisonRunning;
+
+        /// <summary>The engine last chosen in Run Simulation, offered again next time.</summary>
+        private SimulationEngineChoice runSimulationChoice = SimulationEngineChoice.Tas;
         
         public AnalyticalWindow()
         {
@@ -708,11 +714,23 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             RibbonButton_EnergySimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_ModelRun);
             RibbonButton_EnergySimulation.Click += RibbonButton_EnergySimulation_Click;
+            RibbonButton_EnergySimulation.ToolTipTitle = "Energy Simulation";
+            RibbonButton_EnergySimulation.ToolTipDescription = "The Tas energy simulation of the open model, as before. Also available as Run Simulation > Tas only.";
+
+            RibbonButton_RunSimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_ModelRun);
+            RibbonButton_RunSimulation.Click += RibbonButton_RunSimulation_Click;
+            RibbonButton_RunSimulation.ToolTipTitle = "Run Simulation";
+            RibbonButton_RunSimulation.ToolTipDescription = "Choose Tas only (the Energy Simulation, unchanged), OpenStudio/EnergyPlus only, or Both: one frozen snapshot simulated by Tas then OpenStudio and compared by SAM_Validation. If one engine fails, the other's results are kept and shown as partially completed.";
 
             RibbonButton_OpenStudioSimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_ModelRun);
             RibbonButton_OpenStudioSimulation.Click += RibbonButton_OpenStudioSimulation_Click;
             RibbonButton_OpenStudioSimulation.ToolTipTitle = "OpenStudio Simulation";
-            RibbonButton_OpenStudioSimulation.ToolTipDescription = "Run an annual OpenStudio/EnergyPlus simulation of a frozen copy of the open model (SAM_OpenStudio). The results are saved as a separate model in a new run folder; the open model and the Tas workflow are not changed. Needs OpenStudio 3.10 (openstudio.exe) installed.";
+            RibbonButton_CompareTasOpenStudio.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_ModelValidate);
+            RibbonButton_CompareTasOpenStudio.Click += RibbonButton_CompareTasOpenStudio_Click;
+            RibbonButton_CompareTasOpenStudio.ToolTipTitle = "Compare Tas / OpenStudio";
+            RibbonButton_CompareTasOpenStudio.ToolTipDescription = "Compare existing Tas and OpenStudio B1a documents or a comparison run folder, or run both engines (as Run Simulation > Both). Model and per-space results, differences and bands come from SAM_Validation. The open model and the Tas workflow are not changed.";
+
+            RibbonButton_OpenStudioSimulation.ToolTipDescription = "Run an annual OpenStudio/EnergyPlus simulation of a frozen copy of the open model (SAM_OpenStudio). The results are saved as a separate model in a new run folder; the open model and the Tas workflow are not changed. Needs OpenStudio 3.10 (openstudio.exe) installed. Also available as Run Simulation > OpenStudio/EnergyPlus only.";
 
             RibbonButton_Optimisation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_AlgorithmRun);
             RibbonButton_Optimisation.Click += RibbonButton_Optimisation_Click;
@@ -2273,6 +2291,12 @@ namespace SAM.Analytical.UI.WPF.Windows
 
         private void RibbonButton_EnergySimulation_Click(object sender, RoutedEventArgs e)
         {
+            SimulateTas();
+        }
+
+        /// <summary>Energy Simulation, and Run Simulation &gt; Tas only: the one Tas path, so both entry points behave the same.</summary>
+        private void SimulateTas()
+        {
             //uIAnalyticalModel?.EnergySimulation(windowHandle);
             //The ordinary simulation of the open model. It never completes a Part O run: the open model is the
             //design model, and a Part O case is simulated from Prepare & Run (PR-4). A pending run is dropped by
@@ -2282,7 +2306,45 @@ namespace SAM.Analytical.UI.WPF.Windows
             RefreshPartOButtons();
         }
 
+        private async void RibbonButton_RunSimulation_Click(object sender, RoutedEventArgs e)
+        {
+            if (uIAnalyticalModel == null)
+            {
+                return;
+            }
+
+            RunSimulationWindow runSimulationWindow = new RunSimulationWindow(runSimulationChoice, !openStudioSimulationRunning, !engineComparisonRunning)
+            {
+                Owner = this,
+            };
+
+            if (runSimulationWindow.ShowDialog() != true)
+            {
+                return;
+            }
+
+            runSimulationChoice = runSimulationWindow.EngineChoice;
+            switch (runSimulationChoice)
+            {
+                case SimulationEngineChoice.Tas:
+                    SimulateTas();
+                    break;
+                case SimulationEngineChoice.OpenStudio:
+                    await RunOpenStudioSimulationAsync();
+                    break;
+                case SimulationEngineChoice.Both:
+                    await RunBothEnginesAsync();
+                    break;
+            }
+        }
+
         private async void RibbonButton_OpenStudioSimulation_Click(object sender, RoutedEventArgs e)
+        {
+            await RunOpenStudioSimulationAsync();
+        }
+
+        /// <summary>OpenStudio Simulation, and Run Simulation &gt; OpenStudio/EnergyPlus only.</summary>
+        private async System.Threading.Tasks.Task RunOpenStudioSimulationAsync()
         {
             if (openStudioSimulationRunning || uIAnalyticalModel == null)
             {
@@ -2304,6 +2366,71 @@ namespace SAM.Analytical.UI.WPF.Windows
             {
                 openStudioSimulationRunning = false;
                 RibbonButton_OpenStudioSimulation.IsEnabled = uIAnalyticalModel != null;
+            }
+        }
+
+        /// <summary>
+        /// Run Simulation &gt; Both: one frozen snapshot, Tas then OpenStudio, SAM_Validation's comparison; the comparison window opens
+        /// with the run when it finishes, whatever its status (compared, partially completed, failed or cancelled).
+        /// </summary>
+        private async System.Threading.Tasks.Task RunBothEnginesAsync()
+        {
+            if (engineComparisonRunning || uIAnalyticalModel == null)
+            {
+                return;
+            }
+
+            engineComparisonRunning = true;
+            try
+            {
+                EngineComparisonRun? engineComparisonRun = await SimulateBothEngines();
+                if (engineComparisonRun != null)
+                {
+                    ShowEngineComparison(engineComparisonRun);
+                }
+            }
+            //A missing SAM_Validation or SAM_OpenStudio assembly fails when SimulateBothEngines is compiled; say what is missing.
+            catch (Exception exception) when (Query.IsOpenStudioLoadFailure(exception))
+            {
+                MessageBox.Show(this, "Run Simulation (Both) could not load its components (SAM.Analytical.Benchmark.Compare.dll and SAM.Analytical.Benchmark.dll from SAM_Validation\\build, and the SAM_OpenStudio assemblies).\n\n" + Query.OpenStudioLoadFailure(exception), "Run Simulation", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                engineComparisonRunning = false;
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private System.Threading.Tasks.Task<EngineComparisonRun?> SimulateBothEngines()
+        {
+            return uIAnalyticalModel!.SimulateBothEnginesAsync(this);
+        }
+
+        private void RibbonButton_CompareTasOpenStudio_Click(object sender, RoutedEventArgs e)
+        {
+            //A missing SAM_Validation or SAM_OpenStudio assembly fails when ShowEngineComparison is compiled; say what is missing.
+            try
+            {
+                ShowEngineComparison();
+            }
+            catch (Exception exception) when (Query.IsOpenStudioLoadFailure(exception))
+            {
+                MessageBox.Show(this, "Compare Tas / OpenStudio could not load its components (SAM.Analytical.Benchmark.Compare.dll and SAM.Analytical.Benchmark.dll from SAM_Validation\\build, and the SAM_OpenStudio assemblies).\n\n" + Query.OpenStudioLoadFailure(exception), "Compare Tas / OpenStudio", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private void ShowEngineComparison(EngineComparisonRun? engineComparisonRun = null)
+        {
+            EngineComparisonWindow engineComparisonWindow = new EngineComparisonWindow(uIAnalyticalModel)
+            {
+                Owner = this,
+            };
+
+            engineComparisonWindow.Show();
+            if (engineComparisonRun != null)
+            {
+                engineComparisonWindow.ShowRun(engineComparisonRun);
             }
         }
 
@@ -3244,6 +3371,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_OpenT3D.IsEnabled = false;
             RibbonButton_EditLibrary.IsEnabled = false;
             RibbonButton_EnergySimulation.IsEnabled = false;
+            RibbonButton_RunSimulation.IsEnabled = false;
             RibbonButton_OpenStudioSimulation.IsEnabled = false;
             RibbonButton_SolarSimulation.IsEnabled = false;
             RibbonButton_ImportWeatherData.IsEnabled = false;
@@ -3264,6 +3392,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             //RibbonButton_CreateTBD.IsEnabled = false;
             RibbonButton_EditLibrary.IsEnabled = false;
             RibbonButton_EnergySimulation.IsEnabled = false;
+            RibbonButton_RunSimulation.IsEnabled = false;
             RibbonButton_OpenStudioSimulation.IsEnabled = false;
             RibbonButton_SolarSimulation.IsEnabled = false;
             RibbonButton_ImportWeatherData.IsEnabled = false;
@@ -3323,6 +3452,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                 RibbonButton_MapInternalConditions.IsEnabled = true;
                 RibbonButton_MapInternalConditionsByTM59.IsEnabled = true;
                 RibbonButton_EnergySimulation.IsEnabled = true;
+                RibbonButton_RunSimulation.IsEnabled = true;
                 RibbonButton_OpenStudioSimulation.IsEnabled = !openStudioSimulationRunning;
                 RibbonButton_SolarSimulation.IsEnabled = true;
                 RibbonButton_ImportWeatherData.IsEnabled = true;

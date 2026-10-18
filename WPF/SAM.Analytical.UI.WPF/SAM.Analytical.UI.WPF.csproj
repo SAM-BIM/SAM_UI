@@ -184,6 +184,14 @@
     <Reference Include="SAM.Geometry.OpenStudio">
       <HintPath>..\..\..\SAM_OpenStudio\build\SAM.Geometry.OpenStudio.dll</HintPath>
     </Reference>
+    <!-- Simulate > Compare Tas / OpenStudio (SAM_UI#231): SAM_Validation's B1a schema and its comparator library (SAM#211). Every
+         comparison, band, gate and report comes from these; SAM_UI only lays them out. Built before SAM_UI by CI. -->
+    <Reference Include="SAM.Analytical.Benchmark">
+      <HintPath>..\..\..\SAM_Validation\build\SAM.Analytical.Benchmark.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Analytical.Benchmark.Compare">
+      <HintPath>..\..\..\SAM_Validation\build\SAM.Analytical.Benchmark.Compare.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <!-- The x64 native side of OpenStudio and of System.Data.SQLite, which no reference resolves: without them the first OpenStudio
        call throws DllNotFoundException at run time. As None items with CopyToOutputDirectory they also reach every project that

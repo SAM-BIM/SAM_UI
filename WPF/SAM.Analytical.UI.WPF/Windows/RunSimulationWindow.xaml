@@ -1,0 +1,34 @@
+<Window x:Class="SAM.Analytical.UI.WPF.RunSimulationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Run Simulation" Width="560" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <!-- SAM_UI#231: the unified Run Simulation command. It only chooses the engine; each choice runs the existing workflow for it
+         (Tas: Energy Simulation, unchanged; OpenStudio: SAM_UI#229; Both: one frozen snapshot, both producers in turn, SAM_Validation's
+         comparison). -->
+    <StackPanel Margin="12">
+        <TextBlock Text="Simulate the open model with:" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+        <RadioButton x:Name="RadioButton_Tas" GroupName="Engine" IsChecked="True" Margin="0,0,0,2" ToolTipService.ShowOnDisabled="True">
+            <TextBlock Text="Tas only" FontWeight="SemiBold"/>
+        </RadioButton>
+        <TextBlock Margin="20,0,0,10" TextWrapping="Wrap" Foreground="#555555"
+                   Text="The existing Energy Simulation, unchanged: its own settings dialog, results written back into the open model as before."/>
+
+        <RadioButton x:Name="RadioButton_OpenStudio" GroupName="Engine" Margin="0,0,0,2" ToolTipService.ShowOnDisabled="True">
+            <TextBlock Text="OpenStudio/EnergyPlus only" FontWeight="SemiBold"/>
+        </RadioButton>
+        <TextBlock Margin="20,0,0,10" TextWrapping="Wrap" Foreground="#555555"
+                   Text="An annual OpenStudio/EnergyPlus run of a frozen copy of the open model. Its results and diagnostics are saved as a separate model in a new run folder; the open model is not changed. Needs OpenStudio 3.10."/>
+
+        <RadioButton x:Name="RadioButton_Both" GroupName="Engine" Margin="0,0,0,2" ToolTipService.ShowOnDisabled="True">
+            <TextBlock Text="Both - Tas + OpenStudio/EnergyPlus" FontWeight="SemiBold"/>
+        </RadioButton>
+        <TextBlock Margin="20,0,0,10" TextWrapping="Wrap" Foreground="#555555"
+                   Text="One read-only snapshot of the model and one weather file; Tas then OpenStudio run on it (benchmark-tas and benchmark-openstudio, with their fixed workflow settings), each keeping its own outputs. When both complete, SAM_Validation compares them and the comparison window opens. If one engine fails, the other's results are kept and shown as partially completed - nothing is compared or filled in. The open model is not changed."/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+            <Button x:Name="Button_Run" Content="Run" Width="80" IsDefault="True" Margin="0,0,8,0"/>
+            <Button x:Name="Button_Cancel" Content="Cancel" Width="80" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
