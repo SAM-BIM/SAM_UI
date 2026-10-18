@@ -1,0 +1,13 @@
+{
+  "Run": "cancel/000000_SAM_AnalyticalModel_OpenStudio_20261018-084042_454bf00b",
+  "CompletedResultPublished": false,
+  "EngineExitCode": -1,
+  "LastObservedNativeUtc": "2026-10-18T08:40:57.8459393Z",
+  "EnergyPlusPid": 45448,
+  "Status": "Cancelled",
+  "ExternalKillUsed": false,
+  "FinalNativeProcessObservationEmpty": true,
+  "ClickUtc": "2026-10-18T08:40:58.026Z",
+  "OpenStudioPid": 49008,
+  "UiPid": 25072
+}

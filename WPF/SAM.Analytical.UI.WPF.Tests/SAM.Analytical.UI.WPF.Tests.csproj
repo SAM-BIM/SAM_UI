@@ -95,6 +95,14 @@
     <Reference Include="SAM.Core.Optimisation">
       <HintPath>..\..\..\SAM\build\SAM.Core.Optimisation.dll</HintPath>
     </Reference>
+    <!-- Simulate > OpenStudio Simulation (SAM_UI#229): the tests pass SAM_OpenStudio's result set through AddOpenStudioResults and
+         ask SAM.Core.OpenStudio where openstudio.exe is. Re-declared here for compilation, like the references above. -->
+    <Reference Include="SAM.Analytical.OpenStudio">
+      <HintPath>..\..\..\SAM_OpenStudio\build\SAM.Analytical.OpenStudio.dll</HintPath>
+    </Reference>
+    <Reference Include="SAM.Core.OpenStudio">
+      <HintPath>..\..\..\SAM_OpenStudio\build\SAM.Core.OpenStudio.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

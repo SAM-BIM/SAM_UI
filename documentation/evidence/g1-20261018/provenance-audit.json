@@ -1,0 +1,12 @@
+{
+  "fixturePreserved": true,
+  "weatherSource": "File",
+  "weatherSha256": "sha256:eded5c982c1da37e35930622badf7f0e0a0a82b30fd9410723ea3f1c4b52b80b",
+  "modelGuid": "b74990da-73b2-4097-8846-cc12560be0aa",
+  "benchmarkCanonicalModelHash": "sha256:356dcbed711b91d47a0f391ff306aaa352b102581f6a8f062da4858578026317",
+  "samCommit": "618db819300df8b698b3bbe5174a203244134738",
+  "openStudioCommit": "d4216f3525c01ca762c1b3e9b6d099733d037f54",
+  "designDaySource": "EmbeddedModel",
+  "strictMetricEquality": false,
+  "gate": "HOLD: required bit-exact standalone/benchmark equality not achieved; same-engine CLI repeats also vary. No tolerance change or deferral authorized."
+}

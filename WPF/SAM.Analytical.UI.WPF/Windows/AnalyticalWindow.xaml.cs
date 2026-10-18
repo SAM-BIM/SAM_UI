@@ -57,6 +57,12 @@ namespace SAM.Analytical.UI.WPF.Windows
         /// </para>
         /// </summary>
         private readonly PartORun partORun = new();
+
+        /// <summary>
+        /// True while a Simulate &gt; OpenStudio run is going. The run works on a frozen copy and does not block the window, so this is
+        /// what keeps a second click from starting a second run; <see cref="SetEnabled"/> leaves the button off while it is set.
+        /// </summary>
+        private bool openStudioSimulationRunning;
         
         public AnalyticalWindow()
         {
@@ -702,6 +708,11 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             RibbonButton_EnergySimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_ModelRun);
             RibbonButton_EnergySimulation.Click += RibbonButton_EnergySimulation_Click;
+
+            RibbonButton_OpenStudioSimulation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_ModelRun);
+            RibbonButton_OpenStudioSimulation.Click += RibbonButton_OpenStudioSimulation_Click;
+            RibbonButton_OpenStudioSimulation.ToolTipTitle = "OpenStudio Simulation";
+            RibbonButton_OpenStudioSimulation.ToolTipDescription = "Run an annual OpenStudio/EnergyPlus simulation of a frozen copy of the open model (SAM_OpenStudio). The results are saved as a separate model in a new run folder; the open model and the Tas workflow are not changed. Needs OpenStudio 3.10 (openstudio.exe) installed.";
 
             RibbonButton_Optimisation.LargeImageSource = SAM.Core.UI.WPF.Convert.ToBitmapSource(Properties.Resources.SAM_UI_AlgorithmRun);
             RibbonButton_Optimisation.Click += RibbonButton_Optimisation_Click;
@@ -2271,6 +2282,37 @@ namespace SAM.Analytical.UI.WPF.Windows
             RefreshPartOButtons();
         }
 
+        private async void RibbonButton_OpenStudioSimulation_Click(object sender, RoutedEventArgs e)
+        {
+            if (openStudioSimulationRunning || uIAnalyticalModel == null)
+            {
+                return;
+            }
+
+            openStudioSimulationRunning = true;
+            RibbonButton_OpenStudioSimulation.IsEnabled = false;
+            try
+            {
+                await SimulateOpenStudio();
+            }
+            //A missing or stale SAM_OpenStudio assembly fails when SimulateOpenStudio is compiled; say what is missing instead of crashing.
+            catch (Exception exception) when (Query.IsOpenStudioLoadFailure(exception))
+            {
+                MessageBox.Show(this, Query.OpenStudioLoadFailure(exception), "OpenStudio Simulation", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                openStudioSimulationRunning = false;
+                RibbonButton_OpenStudioSimulation.IsEnabled = uIAnalyticalModel != null;
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private System.Threading.Tasks.Task SimulateOpenStudio()
+        {
+            return uIAnalyticalModel!.SimulateOpenStudioAsync(this);
+        }
+
         private void RibbonButton_Optimisation_Click(object sender, RoutedEventArgs e)
         {
             //A missing SAM.Analytical.Tas.GenOpt.dll or a stale SAM.Math.dll fails when the window's types are first
@@ -3202,6 +3244,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             RibbonButton_OpenT3D.IsEnabled = false;
             RibbonButton_EditLibrary.IsEnabled = false;
             RibbonButton_EnergySimulation.IsEnabled = false;
+            RibbonButton_OpenStudioSimulation.IsEnabled = false;
             RibbonButton_SolarSimulation.IsEnabled = false;
             RibbonButton_ImportWeatherData.IsEnabled = false;
             RibbonButton_EditWeatherData.IsEnabled = false;
@@ -3221,6 +3264,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             //RibbonButton_CreateTBD.IsEnabled = false;
             RibbonButton_EditLibrary.IsEnabled = false;
             RibbonButton_EnergySimulation.IsEnabled = false;
+            RibbonButton_OpenStudioSimulation.IsEnabled = false;
             RibbonButton_SolarSimulation.IsEnabled = false;
             RibbonButton_ImportWeatherData.IsEnabled = false;
             RibbonButton_EditWeatherData.IsEnabled = false;
@@ -3279,6 +3323,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                 RibbonButton_MapInternalConditions.IsEnabled = true;
                 RibbonButton_MapInternalConditionsByTM59.IsEnabled = true;
                 RibbonButton_EnergySimulation.IsEnabled = true;
+                RibbonButton_OpenStudioSimulation.IsEnabled = !openStudioSimulationRunning;
                 RibbonButton_SolarSimulation.IsEnabled = true;
                 RibbonButton_ImportWeatherData.IsEnabled = true;
                 RibbonButton_EditWeatherData.IsEnabled = true;
