@@ -1,0 +1,30 @@
+[
+  {
+    "Metric": "Consumption Cooling",
+    "Standalone": 5764.530483239447,
+    "Benchmark": 5764.530483144583,
+    "Difference": 9.486393537372351E-08,
+    "Relative": 1.6456489500941057E-11
+  },
+  {
+    "Metric": "Peak Heating Load",
+    "Standalone": 19.82144246485972,
+    "Benchmark": 19.821442464872938,
+    "Difference": -1.3216094885137863E-11,
+    "Relative": -6.667574728004329E-13
+  },
+  {
+    "Metric": "Consumption Heating",
+    "Standalone": 31072.86245449682,
+    "Benchmark": 31072.862454810253,
+    "Difference": -3.134337021037936E-07,
+    "Relative": -1.0087055949854157E-11
+  },
+  {
+    "Metric": "Peak Cooling Load",
+    "Standalone": 14.079292685507252,
+    "Benchmark": 14.07929268578085,
+    "Difference": -2.735980331181054E-10,
+    "Relative": -1.943265469538972E-11
+  }
+]

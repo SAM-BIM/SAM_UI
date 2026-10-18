@@ -1,0 +1,11 @@
+{
+  "status": "Succeeded",
+  "startedUtc": "2026-10-18T08:55:02.4628828Z",
+  "finishedUtc": "2026-10-18T08:56:14.1641905Z",
+  "spaceGuid": "c7df54b3c0064fc5a7c6e6012dbb9b8e",
+  "snapshotName": "GF_07 LivingRoom",
+  "resultName": "GF_07 LivingRoom",
+  "liveSavedName": "G1_ISOLATION_EDIT",
+  "snapshotSha256": "8247570edfe72ebc801f97a048ffd7e53207f949baa378c591090716d001491b",
+  "passed": true
+}
