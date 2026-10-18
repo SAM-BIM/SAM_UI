@@ -1,0 +1,17 @@
+{
+  "criterion": "Exact equality of every numeric leaf of persisted simulation parameters, aligned by result type/name/load type and surface reference. No numerical tolerance. Run-generated result/zone identities and timestamps are metadata, not numerical outputs.",
+  "baselineCounts": {
+    "SAM.Analytical.SpaceSimulationResult": 2,
+    "SAM.Analytical.SurfaceSimulationResult": 28,
+    "SAM.Analytical.AdjacencyClusterSimulationResult": 2
+  },
+  "candidateCounts": {
+    "SAM.Analytical.SpaceSimulationResult": 2,
+    "SAM.Analytical.SurfaceSimulationResult": 28,
+    "SAM.Analytical.AdjacencyClusterSimulationResult": 2
+  },
+  "baselineNumbers": 608,
+  "candidateNumbers": 608,
+  "exactMatch": true,
+  "differences": []
+}

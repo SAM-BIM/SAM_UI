@@ -1,0 +1,23 @@
+[
+  {
+    "path": "C:\\TasOut\\pr237-g1-20261018\\explicit\\000000_SAM_AnalyticalModel_OpenStudio_20261018-084639_45a832b9\\run\\in.idf",
+    "objects": 163,
+    "normalizedSha256": "3b0dbe8f96a18c8b99b311811b2cccdc15c7b34046a549a0981a385cdf0da397",
+    "sameEngineeringFields": true,
+    "differentObjects": []
+  },
+  {
+    "path": "C:\\TasOut\\pr237-g1-20261018\\explicit\\benchmark-repeat-work\\SAM_OpenStudio_1b6415a0\\run\\in.idf",
+    "objects": 163,
+    "normalizedSha256": "3b0dbe8f96a18c8b99b311811b2cccdc15c7b34046a549a0981a385cdf0da397",
+    "sameEngineeringFields": true,
+    "differentObjects": []
+  },
+  {
+    "path": "C:\\TasOut\\pr237-g1-20261018\\explicit\\benchmark-work\\SAM_OpenStudio_2e63e0bb\\run\\in.idf",
+    "objects": 163,
+    "normalizedSha256": "3b0dbe8f96a18c8b99b311811b2cccdc15c7b34046a549a0981a385cdf0da397",
+    "sameEngineeringFields": true,
+    "differentObjects": []
+  }
+]

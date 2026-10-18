@@ -1,0 +1,26 @@
+[
+  {
+    "Metric": "consumptionHeating",
+    "First": 31072.862454810253,
+    "Second": 31072.86245415038,
+    "Delta": -6.598711479455233E-07
+  },
+  {
+    "Metric": "consumptionCooling",
+    "First": 5764.530483144583,
+    "Second": 5764.530483304694,
+    "Delta": 1.6011108527891338E-07
+  },
+  {
+    "Metric": "peakHeatingLoad",
+    "First": 19.821442464872938,
+    "Second": 19.821442464656073,
+    "Delta": -2.1686474838134018E-10
+  },
+  {
+    "Metric": "peakCoolingLoad",
+    "First": 14.07929268578085,
+    "Second": 14.079292685701251,
+    "Delta": -7.959854997352522E-11
+  }
+]
