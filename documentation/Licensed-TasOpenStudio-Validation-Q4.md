@@ -310,9 +310,11 @@ gains/plantroom in a Tas-only copy (or E+ copy) and rerun.
 Owner review of F1 and F2, which explain most of the disagreement. Then two bounded tasks: (a) after the HVAC conversion
 lands, a SAM_Tas PR for F4+F5(+F6) with updated benchmark goldens; (b) a SAM PR for the EPW writer (F1) with an
 EPW round-trip regression test, followed by a re-run of this validation with embedded weather. (c) For HungaryHouse,
-window-control mapping (F8) first: it is the largest isolated cause (≥ 40% of the heating gap from one window); then
-internal-gain alignment (plantroom, bathroom equipment, people); plant-capacity comparison last (not causal, see C6).
-Machine-local C6 runs: `C:\TasOut\licensed-e2e-20261019\experiments\hungary-window\{base,close}`.
+window-control mapping (F8) first (all windows 47.8% of the heating gap, GF_08 alone 40.6%): design milestone =
+`ZoneVentilation:WindandStackOpenArea` plus an EMS reproducing `zdwno`, off by default, with an explicit decision on
+whether to reproduce or correct the Part O settings (C7); then internal-gain alignment (plantroom, bathroom equipment,
+people); plant-capacity comparison last (not causal, see C6/C7).
+Machine-local C6/C7 runs: `C:\TasOut\licensed-e2e-20261019\experiments\hungary-window\{base,close,closeall}`.
 
 ## Evidence and files
 
