@@ -3,10 +3,10 @@
 Roadmap: SAM `documentation/SIMULATION_ROADMAP_Q4_2026.md`, task S04 (Phase A), finding F7 of SAM_UI#239. SAM_UI only;
 SAM_Validation's canonical JSON v1 and `canonicalizationVersion` are unchanged.
 
-Base: `sow/2026-Q4` `4d7f5bd8`. **Independent of S03** (SAM_UI#242): neither needs the other. Both PRs add the same
-`using System.Text.Json.Nodes;` line to `Modify/RunOpenStudioSimulation.cs` and otherwise touch different hunks; the
-combination was merged and tested locally (see the S03/S04 integration note in the PR description).
-Branch: `feature/s04-stable-canonical-snapshot`. Draft PR, not merged. **Validated content SHA: `0594e708`** (code and tests).
+Base: `sow/2026-Q4` `4d7f5bd8`. **Independent of S03** (SAM_UI#242): neither needs the other. Both append assertions to the end of
+`OpenStudioSimulationTests.RealRun_…`, so whichever merges second has a textual conflict there; keep both blocks (done in a
+local integration merge that passed the full suite, see the PR description).
+Branch: `feature/s04-stable-canonical-snapshot`. Draft PR, not merged. **Validated content SHA: `29ca1d1a`** (code and tests, after the review fixes; first content `0594e708`).
 Record commits follow it. The final PR head and hosted checks are in the PR description. `PROJECT_PROGRESS.md` is not touched.
 
 ## Status
@@ -40,8 +40,11 @@ and owner review. Not merged.
   A `.json` snapshot is written exactly as `Core.Convert.ToFile` writes JSON: a one-element array, with
   `Core.Convert.SerializerOptions(Indented)`. A model with no view state is therefore frozen byte for byte as before. Other
   file types go through `Core.Convert.ToFile`, as before.
-- **`Modify.WithViewState`:** the OpenStudio result model is built from the frozen copy. Before it is saved, it gets a copy
-  of the open model's view state back, so it opens with the views it had before S04.
+- **`Query.ViewState` / `Modify.WithViewState`:** the OpenStudio result model is built from the frozen copy.
+  - A copy of the open model's view state is taken at the moment of the snapshot, on the run's thread, as the snapshot
+    itself is.
+  - It is attached to the result model before saving, so the result model opens with the views it had before S04.
+  - Both steps are inside try/catch. A failure only adds a warning to the run's diagnostics and never changes the outcome.
 - **Unchanged:**
   - geometry, constructions, schedules, weather, design days, simulation options and native-model conversion;
   - the producers, SAM_Validation and its `canonicalizationVersion`;
@@ -63,7 +66,7 @@ and owner review. Not merged.
   input lost its UI-only state.
 
 ## Tests
-New `CanonicalSnapshotTests.cs`: 13 tests in the WPF collection, on the Part O multizone fixture (2 flats plus a corridor,
+New `CanonicalSnapshotTests.cs`: 14 tests in the WPF collection, on the Part O multizone fixture (2 flats plus a corridor,
 with spaces, panels, apertures, constructions, internal conditions and weather).
 - **Method:** models are saved, then reopened as the window opens them: `UIAnalyticalModel.Open`, then the window's
   default-view step using the production `UI.Query.DefaultViewSettings`. The canonical hash is computed as the producers
@@ -96,7 +99,7 @@ Local results on this laptop. Dependencies: SAM `62b54156`, SAM_Tas `e84aeff6`, 
 SAM_Validation `68eded0`, all on `sow/2026-Q4` and clean.
 - `dotnet build WPF/SAM.Analytical.UI.WPF.Tests -c Release`: 0 errors.
 - Focused (`CanonicalSnapshotTests|OpenStudioSimulationTests|EngineComparisonTests|WpfCollectionTests`):
-  **44/44 PASS**, including the real OpenStudio run.
+  **45/45 PASS** on `29ca1d1a`, including the real OpenStudio run.
 - **Mutation checks on `0594e708`** (each reverted), all caught:
 
   | Mutation | Tests failed |
@@ -107,7 +110,25 @@ SAM_Validation `68eded0`, all on `sow/2026-Q4` and clean.
   | Result model not given its view state back | 1 (the real OpenStudio run) |
 
   An earlier variant was also caught: removing the weather too failed 2 tests, on `1f24f8af`.
-- Full `SAM.Analytical.UI.WPF.Tests` (real `APPDATA`) on `0594e708`: **2873/2873 PASS** (2860 before plus 13 new).
+- Full `SAM.Analytical.UI.WPF.Tests` (real `APPDATA`): `0594e708` **2873/2873 PASS**; after the review fixes `29ca1d1a` **2874/2874 PASS** (2860 + 14 new).
+
+## Independent review (2026-10-19) and fixes in `29ca1d1a`
+A separate regression-minded review of the combined S03+S04 diff confirmed two S04 defects, both fixed:
+1. **Medium.** `WithViewState` read the live open model at the **end** of the OpenStudio run, on the worker thread, with no
+   guard. A collection change during the run could throw and turn a successful run into Failed, and it would have picked up
+   view edits made while the run was going.
+   - The view state is now copied at freeze time and attached inside a try/catch.
+   - The test now edits the source after the freeze and proves that the edit does not reach the result model.
+2. **Low.** An already-empty SAM.Analytical.UI set, written with no `"Parameters"` key, was kept along with its per-build
+   GUID.
+   - It is now dropped, like an emptied set.
+   - New test: such a model freezes byte for byte as one that never had the set. Mutation check: keeping the set → 1 fails.
+
+The review also confirmed:
+- the live model is never mutated, because `ToJsonObject` deep-clones parameter sets;
+- `.json` snapshots are byte-identical to `Core.Convert.ToFile`;
+- a missing directory returns null, as before;
+- duplicate same-name sets are all processed.
 
 ## Evidence (real producers, licensed laptop)
 Evidence is in `documentation/evidence/s04-20261019/`: `real-producers.txt`, plus a manifest and both B1a documents for each
