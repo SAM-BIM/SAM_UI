@@ -137,6 +137,22 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal(count_ParameterSets, snapshot.GetParameterSets().Count);
         }
 
+        /// <summary>
+        /// A model whose view state was removed keeps an empty SAM.Analytical.UI set - written with no "Parameters" at all, and still carrying
+        /// the per-build GUID. It is left out like an emptied one, so it freezes exactly as a model that never had the set.
+        /// </summary>
+        [WpfFact]
+        public void AnAlreadyEmptyUiParameterSet_IsLeftOutToo()
+        {
+            AnalyticalModel analyticalModel_Never = Model();
+            AnalyticalModel analyticalModel = new AnalyticalModel(analyticalModel_Never);
+            analyticalModel.SetValue(AnalyticalModelParameter.UIGeometrySettings, ViewState("3D View"));
+            Assert.True(analyticalModel.RemoveValue(AnalyticalModelParameter.UIGeometrySettings));
+            Assert.Contains(analyticalModel.ToJsonObject()["ParameterSets"]!.AsArray(), x => (string)x!["Name"]! == "SAM.Analytical.UI");
+
+            Assert.Equal(File.ReadAllBytes(Freeze(analyticalModel_Never, "never")), File.ReadAllBytes(Freeze(analyticalModel, "emptied")));
+        }
+
         /// <summary>A model with no view state is frozen byte for byte as before S04 (Core.Convert.ToFile's JSON).</summary>
         [WpfFact]
         public void Snapshot_OfAModelWithNoViewState_IsTheSameBytesAsBefore()
@@ -230,7 +246,11 @@ namespace SAM.Analytical.UI.WPF.Tests
             AnalyticalModel analyticalModel_Frozen = Core.Convert.ToSAM<AnalyticalModel>(Freeze(analyticalModel, "frozen")).Single();
             Assert.False(analyticalModel_Frozen.HasValue(AnalyticalModelParameter.UIGeometrySettings));
 
-            AnalyticalModel analyticalModel_Result = Modify.WithViewState(analyticalModel_Frozen, analyticalModel);
+            //Copied at freeze time: a view edited afterwards on the open model does not reach the result model.
+            UIGeometrySettings? viewState = Query.ViewState(analyticalModel);
+            analyticalModel.SetValue(AnalyticalModelParameter.UIGeometrySettings, ViewState("Edited after the freeze"));
+
+            AnalyticalModel analyticalModel_Result = Modify.WithViewState(analyticalModel_Frozen, viewState);
 
             Assert.True(analyticalModel_Result.TryGetValue(AnalyticalModelParameter.UIGeometrySettings, out UIGeometrySettings uIGeometrySettings_Result));
             Assert.Equal(uIGeometrySettings.ToJsonObject().ToJsonString(), uIGeometrySettings_Result.ToJsonObject().ToJsonString());

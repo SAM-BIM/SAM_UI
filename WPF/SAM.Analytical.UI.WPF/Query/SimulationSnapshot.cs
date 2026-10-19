@@ -37,8 +37,14 @@ namespace SAM.Analytical.UI.WPF
 
             foreach (JsonObject parameterSet in parameterSets.OfType<JsonObject>().Where(x => Text(x["Name"]) == name_ParameterSet).ToList())
             {
+                //An empty set is written without "Parameters" at all: it is dropped like an emptied one.
                 if (parameterSet["Parameters"] is not JsonArray parameters)
                 {
+                    if (parameterSet["Parameters"] == null)
+                    {
+                        parameterSets.Remove(parameterSet);
+                    }
+
                     continue;
                 }
 
@@ -62,21 +68,35 @@ namespace SAM.Analytical.UI.WPF
         }
     }
 
+    public static partial class Query
+    {
+        /// <summary>
+        /// A copy of <paramref name="analyticalModel"/>'s view state (<c>UI Geometry Settings</c>), taken now - at freeze time, so that later
+        /// edits to the open model cannot reach it - for <see cref="Modify.WithViewState"/>; null when it has none.
+        /// </summary>
+        public static Geometry.UI.UIGeometrySettings? ViewState(AnalyticalModel analyticalModel)
+        {
+            return analyticalModel != null
+                && analyticalModel.TryGetValue(UI.AnalyticalModelParameter.UIGeometrySettings, out Geometry.UI.UIGeometrySettings uIGeometrySettings)
+                && uIGeometrySettings != null
+                ? new Geometry.UI.UIGeometrySettings(uIGeometrySettings)
+                : null;
+        }
+    }
+
     public static partial class Modify
     {
         /// <summary>
-        /// Gives <paramref name="analyticalModel"/> - a model derived from a snapshot, such as the OpenStudio result model - a copy of the view
-        /// state of <paramref name="analyticalModel_Source"/>, which <see cref="Query.SimulationSnapshotJsonObject"/> left out of the snapshot. So a
-        /// result model opens with the views it opened with before S04. Returns <paramref name="analyticalModel"/>.
+        /// Gives <paramref name="analyticalModel"/> - a model derived from a snapshot, such as the OpenStudio result model - a copy of
+        /// <paramref name="viewState"/> (<see cref="Query.ViewState"/> of the open model when it was frozen), which
+        /// <see cref="Query.SimulationSnapshotJsonObject"/> left out of the snapshot. So a result model opens with the views it opened with
+        /// before S04. Returns <paramref name="analyticalModel"/>.
         /// </summary>
-        public static AnalyticalModel WithViewState(AnalyticalModel analyticalModel, AnalyticalModel? analyticalModel_Source)
+        public static AnalyticalModel WithViewState(AnalyticalModel analyticalModel, Geometry.UI.UIGeometrySettings? viewState)
         {
-            if (analyticalModel != null
-                && analyticalModel_Source != null
-                && analyticalModel_Source.TryGetValue(UI.AnalyticalModelParameter.UIGeometrySettings, out Geometry.UI.UIGeometrySettings uIGeometrySettings)
-                && uIGeometrySettings != null)
+            if (analyticalModel != null && viewState != null)
             {
-                analyticalModel.SetValue(UI.AnalyticalModelParameter.UIGeometrySettings, new Geometry.UI.UIGeometrySettings(uIGeometrySettings));
+                analyticalModel.SetValue(UI.AnalyticalModelParameter.UIGeometrySettings, new Geometry.UI.UIGeometrySettings(viewState));
             }
 
             return analyticalModel!;
