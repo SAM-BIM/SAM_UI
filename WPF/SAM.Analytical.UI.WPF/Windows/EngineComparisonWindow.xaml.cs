@@ -241,10 +241,34 @@ namespace SAM.Analytical.UI.WPF
             Compare(tas, openStudio, null);
         }
 
-        private async Task RunAsync()
+        /// <summary>Test seam (S02): what Run runs once it holds the model's simulation guard. Null is the real run.</summary>
+        internal Func<Task<EngineComparisonRun?>>? BothEnginesSimulation { get; set; }
+
+        /// <summary>Test seam (S02): how a refused start is told. Null is a message box.</summary>
+        internal Action<string>? SimulationRefused { get; set; }
+
+        internal async Task RunAsync()
         {
-            if (running || uIAnalyticalModel == null)
+            if (uIAnalyticalModel == null)
             {
+                return;
+            }
+
+            //The same guard as Run Simulation > Both in the main window: one simulation at a time for the model (S02), this window's
+            //own run included.
+            SimulationGuard? simulationGuard = SimulationGuard.TryAcquire(uIAnalyticalModel, SimulationGuard.Both, out string? simulation_Running);
+            if (simulationGuard == null)
+            {
+                string message = SimulationGuard.RefusalMessage(simulation_Running!);
+                if (SimulationRefused != null)
+                {
+                    SimulationRefused(message);
+                }
+                else
+                {
+                    MessageBox.Show(this, message, Title, MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+
                 return;
             }
 
@@ -254,10 +278,11 @@ namespace SAM.Analytical.UI.WPF
             EngineComparisonRun? run;
             try
             {
-                run = await uIAnalyticalModel.SimulateBothEnginesAsync(this);
+                run = await (BothEnginesSimulation != null ? BothEnginesSimulation() : uIAnalyticalModel.SimulateBothEnginesAsync(this));
             }
             finally
             {
+                simulationGuard.Dispose();
                 running = false;
                 Button_Run.IsEnabled = uIAnalyticalModel != null;
             }
