@@ -1,0 +1,22 @@
+// S01b licensed-test fixture (not product code). Stands in for benchmark-tas.exe in Run Simulation > Both: creates a
+// DIRECTORY at the TSD path the real producer will simulate to (<--tbd> with .tsd), so TAS cannot write it and refuses
+// natively (return code 0, error log "Error accessing the TSD file for writing"), then runs the REAL producer named by
+// S01B_REAL_TAS with exactly the same arguments and returns its exit code. Its output goes to this process's output.
+using System;
+using System.Diagnostics;
+using System.IO;
+
+string real = Environment.GetEnvironmentVariable("S01B_REAL_TAS") ?? throw new InvalidOperationException("S01B_REAL_TAS is not set");
+int index = Array.IndexOf(args, "--tbd");
+if (index < 0 || index + 1 >= args.Length) { Console.Error.WriteLine("no --tbd"); return 2; }
+string tsd = Path.ChangeExtension(args[index + 1], ".tsd");
+Directory.CreateDirectory(tsd);
+Console.WriteLine("[s01b-wrapper] refusal injected: directory at " + tsd);
+Console.WriteLine("[s01b-wrapper] running " + real);
+
+ProcessStartInfo processStartInfo = new ProcessStartInfo(real) { UseShellExecute = false };
+foreach (string arg in args) { processStartInfo.ArgumentList.Add(arg); }
+using Process process = Process.Start(processStartInfo)!;
+process.WaitForExit();
+Console.WriteLine("[s01b-wrapper] real producer exit code " + process.ExitCode);
+return process.ExitCode;

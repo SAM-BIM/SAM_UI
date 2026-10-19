@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "1.0.0",
+  "provenance": {
+    "sourceModelName": "000000_SAM_AnalyticalModel",
+    "sourceModelGuid": "1988f7b93ec047d0b87bf9cb345d9eab",
+    "sourceFileHash": "sha256:02486a9bde4b73157286ce472137fecd6759719f42b16a8e4fe9935d5094523a",
+    "canonicalModelHash": "sha256:a3df983c3d8d7a83c5059c2146d0649ba593f88d0a1e4a37d22dbd270f354835",
+    "canonicalizationVersion": "1.0.0",
+    "samCommit": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+    "runnerCommit": "e84aeff687033354e3f17891635fdf10d42ad68f",
+    "engine": {
+      "kind": "TAS",
+      "name": "Tas",
+      "version": "9.5.7.0",
+      "sdkVersion": null
+    },
+    "route": "Native-TAS",
+    "weather": {
+      "identity": "weather",
+      "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+    },
+    "designDaySource": "None",
+    "runTimestampUtc": "2026-10-19T18:37:23.4610119Z",
+    "durationSeconds": 19.5293247,
+    "state": "Success",
+    "resultSources": [
+      "SAM.Analytical.Tas"
+    ],
+    "warnings": [],
+    "notes": [
+      "Shared gbXML was exported from the source model (no --gbxml supplied)."
+    ]
+  },
+  "model": {
+    "consumptionHeating": {
+      "value": 220.62682055425643,
+      "unit": "kWh",
+      "available": true
+    },
+    "consumptionCooling": {
+      "value": 5540.314465834558,
+      "unit": "kWh",
+      "available": true
+    },
+    "peakHeatingLoad": {
+      "value": 1.4238231201171876,
+      "unit": "kW",
+      "available": true
+    },
+    "peakHeatingHour": {
+      "value": 775,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "peakCoolingLoad": {
+      "value": 3.126279052734375,
+      "unit": "kW",
+      "available": true
+    },
+    "peakCoolingHour": {
+      "value": 3901,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "floorArea": {
+      "value": 50,
+      "unit": "m2",
+      "available": true
+    },
+    "volume": {
+      "value": 150,
+      "unit": "m3",
+      "available": true
+    }
+  },
+  "spaces": [
+    {
+      "guid": "cb68bed195af496bb255a13ffa5c58e9",
+      "name": "Office",
+      "area": {
+        "value": 50,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 150,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 1927.0106201171875,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 1926.94873046875,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 936,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 3415.618896484375,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 3415.45556640625,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 4358,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    }
+  ]
+}

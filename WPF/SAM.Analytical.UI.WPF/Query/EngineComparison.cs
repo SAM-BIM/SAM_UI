@@ -176,6 +176,47 @@ namespace SAM.Analytical.UI.WPF
         }
 
         /// <summary>
+        /// The warnings and notes a FAILED producer wrote into its B1a document (S01b), one line each: <c>Tas warning: ...</c>,
+        /// <c>Tas note: ...</c>. For a refused Tas simulation the warnings are SAM_Tas' <c>TAS-SIM-001</c> errors, carrying the TAS
+        /// return code and error log. Read as plain JSON (<c>provenance.warnings</c> and <c>provenance.notes</c>) rather than through the
+        /// validating reader, so a failure document that does not validate still says why; one that cannot be read gives one line
+        /// saying so. A <c>provenance</c> that is not an object gives no lines, and never throws, so the run goes on to the other engine.
+        /// Nothing else of the document is used: it is never a result.
+        /// </summary>
+        public static IEnumerable<string> BenchmarkFailureLines(ComparisonEngine comparisonEngine, string path)
+        {
+            string engine = ComparisonEngineText(comparisonEngine);
+
+            System.Text.Json.Nodes.JsonObject? provenance;
+            try
+            {
+                provenance = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))?["provenance"] as System.Text.Json.Nodes.JsonObject;
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is System.Text.Json.JsonException || exception is InvalidOperationException)
+            {
+                return new[] { string.Format("{0}: the failed producer's document could not be read ({1}: {2})", engine, exception.GetType().Name, exception.Message) };
+            }
+
+            List<string> result = new List<string>();
+            foreach ((string name, string label) in new[] { ("warnings", "warning"), ("notes", "note") })
+            {
+                if (provenance?[name] is System.Text.Json.Nodes.JsonArray jsonArray)
+                {
+                    foreach (System.Text.Json.Nodes.JsonNode? jsonNode in jsonArray)
+                    {
+                        string? text = jsonNode is System.Text.Json.Nodes.JsonValue jsonValue && jsonValue.TryGetValue(out string? value) ? value : jsonNode?.ToJsonString();
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            result.Add(string.Format("{0} {1}: {2}", engine, label, text));
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// A Run Simulation &gt; Both run's status, producers (exit code, duration, log, error) and diagnostics, as text; empty for no run.
         /// </summary>
         public static IEnumerable<string> EngineComparisonRunLines(EngineComparisonRun? engineComparisonRun)

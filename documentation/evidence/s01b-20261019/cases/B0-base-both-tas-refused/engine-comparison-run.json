@@ -1,0 +1,66 @@
+{
+  "schema": "sam-ui.engine-comparison-run/1",
+  "id": "fba4e40f",
+  "status": "PartiallyCompleted",
+  "startedUtc": "2026-10-19T18:36:29.8428942Z",
+  "finishedUtc": "2026-10-19T18:36:55.8343591Z",
+  "sourcePath": "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\box-aperture.json",
+  "modelName": "000000_SAM_AnalyticalModel",
+  "snapshot": {
+    "path": "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\snapshot.json",
+    "sha256": "sha256:ffe4a7e3cf7a740baf94ed2de9a2bce1fb7575b52c125c224936c5b54c095ca1"
+  },
+  "weather": {
+    "source": "File",
+    "path": "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\weather.epw",
+    "sha256": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+  },
+  "producers": [
+    {
+      "engine": "Tas",
+      "executable": "C:\\TasOut\\s01b\\wrapper\\out\\benchmark-tas.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\weather.epw",
+        "--tbd",
+        "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\tas\\000000_SAM_AnalyticalModel.tbd",
+        "--out",
+        "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\benchmark-TAS.json"
+      ],
+      "exitCode": 5,
+      "durationSeconds": 17.275,
+      "log": "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\benchmark-tas.log",
+      "benchmark": "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\benchmark-TAS.json",
+      "error": "The producer exited with code 5 (2 usage, 3 input/IO, 4 validation, 5 producer failure); see benchmark-tas.log",
+      "succeeded": false
+    },
+    {
+      "engine": "OpenStudio",
+      "executable": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_OpenStudio\\benchmark\\SAM.Analytical.OpenStudio.Benchmark\\bin\\x64\\Release\\net8.0\\benchmark-openstudio.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\weather.epw",
+        "--out",
+        "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\benchmark-OpenStudio.json",
+        "--work",
+        "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\openstudio"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 8.239,
+      "log": "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\benchmark-openstudio.log",
+      "benchmark": "C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\benchmark-OpenStudio.json",
+      "error": null,
+      "succeeded": true
+    }
+  ],
+  "gate": null,
+  "reports": [],
+  "diagnostics": [
+    "Partially completed: not compared - Tas did not complete. The OpenStudio results (benchmark-OpenStudio.json) are kept and shown on their own; no Tas result is substituted."
+  ],
+  "error": null
+}

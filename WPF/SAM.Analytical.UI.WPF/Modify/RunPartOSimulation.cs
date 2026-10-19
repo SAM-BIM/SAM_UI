@@ -123,12 +123,28 @@ namespace SAM.Analytical.UI.WPF
         /// <returns>The model the workflow returned, or null where it did not run, failed or was cancelled.</returns>
         public static AnalyticalModel RunPartOSimulation(AnalyticalModel analyticalModel, PartOSimulationContext partOSimulationContext, string projectName, PartORun partORun, CancellationToken externalCancellationToken, out string path_TBD, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes, out string refusal, PartOCanonicalTBD partOCanonicalTBD = null, PartOWorkflowRunner partOWorkflowRunner = null)
         {
+            return RunPartOSimulation(analyticalModel, partOSimulationContext, projectName, partORun, externalCancellationToken, out path_TBD, out path_TSD, out cancelled, out fullYear, out notes, out refusal, out string _, partOCanonicalTBD, partOWorkflowRunner);
+        }
+
+        /// <summary>
+        /// <see cref="RunPartOSimulation(AnalyticalModel, PartOSimulationContext, string, PartORun, CancellationToken, out string, out string, out bool, out bool, out List{string}, out string, PartOCanonicalTBD, PartOWorkflowRunner)"/>,
+        /// also saying why a workflow that started and was not cancelled returned no model (S01b).
+        /// </summary>
+        /// <param name="failure">
+        /// What the TAS workflow reported about its failure - the TAS return code, the error log and its Error diagnostics
+        /// (<c>TAS-SIM-001</c> for a refused simulation), see <see cref="Query.TasWorkflowFailure"/>. Null where the run returned a
+        /// model, was cancelled, never started (<paramref name="refusal"/>), reported nothing, or was run by a
+        /// <paramref name="partOWorkflowRunner"/> (which has no way to say).
+        /// </param>
+        public static AnalyticalModel RunPartOSimulation(AnalyticalModel analyticalModel, PartOSimulationContext partOSimulationContext, string projectName, PartORun partORun, CancellationToken externalCancellationToken, out string path_TBD, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes, out string refusal, out string? failure, PartOCanonicalTBD partOCanonicalTBD = null, PartOWorkflowRunner partOWorkflowRunner = null)
+        {
             path_TBD = null;
             path_TSD = null;
             cancelled = false;
             fullYear = false;
             notes = [];
             refusal = null;
+            failure = null;
 
             if (analyticalModel is null || partOSimulationContext is null || string.IsNullOrWhiteSpace(projectName))
             {
@@ -514,9 +530,10 @@ namespace SAM.Analytical.UI.WPF
                 //
                 // The seam, and the only substitutable step on this path - see PartOWorkflowRunner. The
                 // null default IS Modify.RunWorkflow with exactly the arguments it always had, so no
-                // existing caller's behaviour depends on this line having been written.
+                // existing caller's behaviour depends on this line having been written. The failure text is
+                // only read by a caller (S01b); the workflow run is the same.
                 result = partOWorkflowRunner is null
-                    ? Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled, true)
+                    ? Modify.RunWorkflow(analyticalModel, workflowSettings, cancellationToken, out cancelled, out failure, true)
                     : partOWorkflowRunner(analyticalModel, workflowSettings, cancellationToken, out cancelled);
             }
 

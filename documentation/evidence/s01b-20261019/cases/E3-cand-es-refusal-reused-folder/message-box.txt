@@ -1,0 +1,12 @@
+﻿Title: Simulation failed
+Simulation failed: the TAS simulation did not complete, so this run produced no results.
+
+TAS return code: 0
+TAS error log: C:\TasOut\s01b\runs\E3-cand-es-refusal-reused-folder\out\box_error_log.txt
+Error: Simulating Model: TAS refused the simulation: TBDDocument.simulate returned 0. TAS return code: 0; TAS error log: C:\TasOut\s01b\runs\E3-cand-es-refusal-reused-folder\out\box_error_log.txt. (TAS-SIM-001)
+Error: Simulating Model: TAS wrote an error log for this run: C:\TasOut\s01b\runs\E3-cand-es-refusal-reused-folder\out\box_error_log.txt (TAS return code: 0)
+Error accessing the TSD file for writing (TAS-SIM-001)
+Error: Simulating Model: The run produced no output file: C:\TasOut\s01b\runs\E3-cand-es-refusal-reused-folder\out\box.tsd TAS return code: 0; TAS error log: C:\TasOut\s01b\runs\E3-cand-es-refusal-reused-folder\out\box_error_log.txt. (TAS-SIM-001)
+
+The open model was not changed.
+ Time elapsed: 0min15sec

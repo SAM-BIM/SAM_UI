@@ -1076,6 +1076,47 @@ namespace SAM.Analytical.UI.WPF.Tests
             return Modify.SimulatePartO(journey.UIAnalyticalModel, journey.PartORun, partOSimulationCase, Runner, replaceExistingResults);
         }
 
+        /// <summary>
+        /// S01b, through the one simulation core Energy Simulation and Run Simulation &gt; Tas also use: a workflow that returns no model is
+        /// a failed simulation, even with a full-size TSD and a workflow JSON beside the TBD (an earlier run's, or a refusal's stub). The
+        /// outcome says so first, the run is not completed, and the design is untouched.
+        /// </summary>
+        [WpfFact]
+        public void A_workflow_that_returns_no_model_is_a_failed_simulation_whatever_files_are_in_the_folder()
+        {
+            Journey journey = Open();
+            Assert.Equal(PartOPreparationResult.Adopted, Accept(journey, PartOWorkflowScenario.Text_Iteration1a));
+            string snapshot_Design = File.ReadAllText(path_Design);
+
+            PartOSimulationCase partOSimulationCase = new()
+            {
+                WeatherData = new WeatherData("Fixture", "Fixture", 51.5, -0.1, 25),
+                OutputDirectory = directory_Root,
+                SolarCalculationMethod = SolarCalculationMethod.TAS,
+            };
+
+            PartOSimulationOutcome partOSimulationOutcome = Modify.SimulatePartO(journey.UIAnalyticalModel, journey.PartORun, partOSimulationCase, (AnalyticalModel analyticalModel, WorkflowSettings workflowSettings, CancellationToken cancellationToken, out bool cancelled) =>
+            {
+                cancelled = false;
+
+                //What a reused folder can hold: results and a workflow JSON that are not this run's.
+                File.WriteAllBytes(Path.ChangeExtension(workflowSettings.Path_TBD, "tsd"), new byte[1024 * 1024]);
+                File.WriteAllText(Path.ChangeExtension(workflowSettings.Path_TBD, "json"), Core.Convert.ToString(analyticalModel));
+
+                return null;
+            });
+
+            Assert.True(partOSimulationOutcome.Ran);
+            Assert.False(partOSimulationOutcome.Cancelled);
+            Assert.False(partOSimulationOutcome.Completed);
+            Assert.Equal(Query.TasSimulationFailedNoDetail, partOSimulationOutcome.Failure);
+            Assert.True(partOSimulationOutcome.NeedsAttention);
+            Assert.StartsWith("Simulation failed", partOSimulationOutcome.Message);
+            Assert.DoesNotContain("successfuly converted", partOSimulationOutcome.Message);
+            Assert.NotEqual(PartORunState.WorkflowCompleted, journey.PartORun.State);
+            Assert.Equal(snapshot_Design, File.ReadAllText(path_Design));
+        }
+
         [WpfFact]
         public void A_new_session_is_refused_the_folder_of_an_earlier_run_unless_the_replacement_was_confirmed()
         {
