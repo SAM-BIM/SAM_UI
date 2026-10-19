@@ -1,0 +1,400 @@
+﻿== IZAMs
+== ICs
+IC[0] GF_07 LivingRoom
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[1] GF_07 LivingRoom - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=21 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[2] GF_12 EntranceHall
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[3] GF_12 EntranceHall - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=18 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[4] GF_09 WC
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[5] GF_09 WC - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=21 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[6] GF_08 Bathroom
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[7] GF_08 Bathroom - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=24 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[8] GF_05 Stairs
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[9] GF_05 Stairs - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=18 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[10] GF_10 Closet
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[11] GF_10 Closet - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=21 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[12] GF_11 Bedroom
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[13] GF_11 Bedroom - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=21 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[14] 01_13 Bedroom
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[15] 01_13 Bedroom - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=21 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[16] 01_17 Gallery
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[17] 01_17 Gallery - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=18 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[18] 01_18 Void
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[19] 01_18 Void - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[20] 01_16 Bathroom
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[21] 01_16 Bathroom - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=24 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[22] 01_11 Void
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[23] 01_11 Void - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[24] 01_15 Plantroom
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[25] 01_15 Plantroom - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=6 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+IC[26] 01_14 Bedroom
+  freshAirRate=0
+   ticI: type=ticHourlyProfile value=0 factor=0.15 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticHourlyProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticHourlyProfile value=-50 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticHourlyProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticHourlyProfile value=0 factor=1 sb=0 sched=-
+IC[27] 01_14 Bedroom - HDD
+  freshAirRate=8
+   ticI: type=ticValueProfile value=0.15 factor=1 sb=0 sched=-
+   ticV: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+   thermo ticUL: type=ticValueProfile value=150 factor=1 sb=150 sched=-
+   thermo ticLL: type=ticValueProfile value=21 factor=1 sb=-50 sched=-
+   thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
+   thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
+== Zones
+Z1 GF_12 EntranceHall IC=GF_12 EntranceHall vol=20.36302 maxHeat=272.4145 sizeHeat=0
+   S0 type=tbdLink area=0.40 BE=SIM_INT_SLD_FLR BEType=4 link=01_11 Void
+   S1 type=tbdLink area=5.34 BE=SIM_INT_SLD_Partition BEType=1 link=GF_11 Bedroom
+   S2 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_11 Bedroom
+   S3 type=tbdLink area=1.71 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_11 Bedroom
+   S4 type=tbdLink area=4.72 BE=SIM_INT_SLD_Partition BEType=1 link=GF_05 Stairs
+   S5 type=tbdGround area=8.85 BE=SIM_EXT_GRD_FLR FLR01 BEType=11 link=-
+   S6 type=tbdExposed area=7.14 BE=SIM_EXT_SLD BEType=2 link=-
+   S7 type=tbdExposed area=0.33 BE=Doors: SIM_EXT_SLD -frame BEType=15 link=-
+   S8 type=tbdExposed area=1.96 BE=Doors: SIM_EXT_SLD -pane BEType=12 link=-
+   S9 type=tbdExposed area=0.33 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S10 type=tbdExposed area=1.96 BE=Windows: SIM_EXT_GLZ_57232B2B -pane BEType=12 link=-
+   S11 type=tbdLink area=7.90 BE=SIM_INT_SLD_FLR BEType=4 link=01_17 Gallery
+   S12 type=tbdLink area=1.15 BE=SIM_INT_SLD_Partition BEType=1 link=GF_05 Stairs
+   S13 type=tbdLink area=4.98 BE=SIM_INT_SLD_Partition BEType=1 link=GF_07 LivingRoom
+   S14 type=tbdLink area=0.22 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_07 LivingRoom
+   S15 type=tbdLink area=2.68 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_07 LivingRoom
+   S16 type=tbdLink area=0.17 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_05 Stairs
+   S17 type=tbdLink area=1.41 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_05 Stairs
+   S18 type=tbdLink area=3.83 BE=SIM_INT_SLD_Partition BEType=1 link=GF_09 WC
+   S19 type=tbdLink area=0.17 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_09 WC
+   S20 type=tbdLink area=1.41 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_09 WC
+   S21 type=tbdLink area=1.81 BE=SIM_INT_SLD_Partition BEType=1 link=GF_09 WC
+   S22 type=tbdLink area=0.55 BE=SIM_INT_SLD_FLR BEType=4 link=01_16 Bathroom
+Z2 GF_09 WC IC=GF_09 WC vol=6.712853 maxHeat=79.82 sizeHeat=0
+   S0 type=tbdLink area=3.60 BE=SIM_INT_SLD_Partition BEType=1 link=GF_07 LivingRoom
+   S1 type=tbdLink area=5.40 BE=SIM_INT_SLD_Partition BEType=1 link=GF_08 Bathroom
+   S2 type=tbdGround area=2.71 BE=SIM_EXT_GRD_FLR FLR01 BEType=11 link=-
+   S3 type=tbdLink area=5.42 BE=SIM_INT_SLD_Partition BEType=1 link=GF_05 Stairs
+   S4 type=tbdLink area=2.71 BE=SIM_INT_SLD_FLR BEType=4 link=01_16 Bathroom
+   S5 type=tbdLink area=3.83 BE=SIM_INT_SLD_Partition BEType=1 link=GF_12 EntranceHall
+   S6 type=tbdLink area=0.17 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_12 EntranceHall
+   S7 type=tbdLink area=1.41 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_12 EntranceHall
+   S8 type=tbdLink area=1.81 BE=SIM_INT_SLD_Partition BEType=1 link=GF_12 EntranceHall
+Z3 GF_08 Bathroom IC=GF_08 Bathroom vol=10.39671 maxHeat=230.301 sizeHeat=0
+   S0 type=tbdLink area=4.63 BE=SIM_INT_SLD_FLR BEType=4 link=01_16 Bathroom
+   S1 type=tbdExposed area=3.96 BE=SIM_EXT_SLD BEType=2 link=-
+   S2 type=tbdExposed area=0.29 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S3 type=tbdExposed area=1.15 BE=Windows: SIM_EXT_GLZ_57232B2B -pane BEType=12 link=-
+   S4 type=tbdGround area=4.63 BE=SIM_EXT_GRD_FLR FLR01 BEType=11 link=-
+   S5 type=tbdLink area=7.71 BE=SIM_INT_SLD_Partition BEType=1 link=GF_07 LivingRoom
+   S6 type=tbdLink area=4.04 BE=SIM_INT_SLD_Partition BEType=1 link=GF_10 Closet
+   S7 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_10 Closet
+   S8 type=tbdLink area=1.71 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_10 Closet
+   S9 type=tbdLink area=5.40 BE=SIM_INT_SLD_Partition BEType=1 link=GF_09 WC
+   S10 type=tbdLink area=1.78 BE=SIM_INT_SLD_Partition BEType=1 link=GF_05 Stairs
+Z4 GF_05 Stairs IC=GF_05 Stairs vol=28.16451 maxHeat=89.5315 sizeHeat=0
+   S0 type=tbdLink area=4.63 BE=SIM_INT_SLD_FLR BEType=4 link=01_11 Void
+   S1 type=tbdLink area=6.05 BE=SIM_INT_SLD_Partition BEType=1 link=GF_11 Bedroom
+   S2 type=tbdLink area=6.30 BE=SIM_INT_SLD_Partition BEType=1 link=GF_10 Closet
+   S3 type=tbdGround area=4.63 BE=SIM_EXT_GRD_FLR FLR01 BEType=11 link=-
+   S4 type=tbdLink area=4.72 BE=SIM_INT_SLD_Partition BEType=1 link=GF_12 EntranceHall
+   S5 type=tbdLink area=1.78 BE=SIM_INT_SLD_Partition BEType=1 link=GF_08 Bathroom
+   S6 type=tbdLink area=1.15 BE=SIM_INT_SLD_Partition BEType=1 link=GF_12 EntranceHall
+   S7 type=tbdLink area=5.42 BE=SIM_INT_SLD_Partition BEType=1 link=GF_09 WC
+   S8 type=tbdLink area=0.17 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_12 EntranceHall
+   S9 type=tbdLink area=1.41 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_12 EntranceHall
+Z5 GF_10 Closet IC=GF_10 Closet vol=9.00768 maxHeat=173.3879 sizeHeat=0
+   S0 type=tbdLink area=5.93 BE=SIM_INT_SLD_Partition BEType=1 link=GF_11 Bedroom
+   S1 type=tbdLink area=6.30 BE=SIM_INT_SLD_Partition BEType=1 link=GF_05 Stairs
+   S2 type=tbdGround area=4.15 BE=SIM_EXT_GRD_FLR FLR01 BEType=11 link=-
+   S3 type=tbdLink area=4.04 BE=SIM_INT_SLD_Partition BEType=1 link=GF_08 Bathroom
+   S4 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_08 Bathroom
+   S5 type=tbdLink area=1.71 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_08 Bathroom
+   S6 type=tbdLink area=4.15 BE=SIM_INT_SLD_FLR BEType=4 link=01_15 Plantroom
+   S7 type=tbdExposed area=3.90 BE=SIM_EXT_SLD BEType=2 link=-
+   S8 type=tbdExposed area=0.33 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S9 type=tbdExposed area=2.07 BE=Windows: SIM_EXT_GLZ_57232B2B -pane BEType=12 link=-
+Z6 GF_11 Bedroom IC=GF_11 Bedroom vol=51.52805 maxHeat=716.8181 sizeHeat=0
+   S0 type=tbdLink area=21.76 BE=SIM_INT_SLD_FLR BEType=4 link=01_14 Bedroom
+   S1 type=tbdExposed area=10.20 BE=SIM_EXT_SLD BEType=2 link=-
+   S2 type=tbdExposed area=11.14 BE=SIM_EXT_SLD BEType=2 link=-
+   S3 type=tbdExposed area=0.56 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S4 type=tbdExposed area=7.50 BE=Windows: SIM_EXT_GLZ -pane BEType=12 link=-
+   S5 type=tbdGround area=21.76 BE=SIM_EXT_GRD_FLR FLR01 BEType=11 link=-
+   S6 type=tbdLink area=5.93 BE=SIM_INT_SLD_Partition BEType=1 link=GF_10 Closet
+   S7 type=tbdExposed area=10.20 BE=SIM_EXT_SLD BEType=2 link=-
+   S8 type=tbdLink area=6.05 BE=SIM_INT_SLD_Partition BEType=1 link=GF_05 Stairs
+   S9 type=tbdLink area=5.34 BE=SIM_INT_SLD_Partition BEType=1 link=GF_12 EntranceHall
+   S10 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_12 EntranceHall
+   S11 type=tbdLink area=1.71 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_12 EntranceHall
+Z7 01_13 Bedroom IC=01_13 Bedroom vol=57.33914 maxHeat=722.5676 sizeHeat=0
+   S0 type=tbdExposed area=5.06 BE=SIM_EXT_SLD BEType=2 link=-
+   S1 type=tbdExposed area=18.36 BE=SIM_EXT_SLD BEType=2 link=-
+   S2 type=tbdExposed area=0.36 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S3 type=tbdExposed area=2.94 BE=Windows: SIM_EXT_GLZ -pane BEType=12 link=-
+   S4 type=tbdExposed area=5.00 BE=SIM_EXT_SLD BEType=2 link=-
+   S5 type=tbdExposed area=17.51 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S6 type=tbdExposed area=17.41 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S7 type=tbdLink area=21.76 BE=SIM_INT_SLD_FLR BEType=4 link=GF_07 LivingRoom
+   S8 type=tbdExposed area=4.99 BE=SIM_EXT_SLD_FLR Exposed BEType=19 link=-
+   S9 type=tbdLink area=19.80 BE=SIM_INT_SLD_Partition BEType=1 link=01_17 Gallery
+   S10 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=01_17 Gallery
+   S11 type=tbdLink area=1.68 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_17 Gallery
+Z8 01_17 Gallery IC=01_17 Gallery vol=58.34032 maxHeat=496.6585 sizeHeat=0
+   S0 type=tbdLink area=6.12 BE=SIM_INT_SLD_Partition BEType=1 link=01_14 Bedroom
+   S1 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=01_14 Bedroom
+   S2 type=tbdLink area=1.68 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_14 Bedroom
+   S3 type=tbdExposed area=10.60 BE=SIM_EXT_SLD BEType=2 link=-
+   S4 type=tbdLink area=19.80 BE=SIM_INT_SLD_Partition BEType=1 link=01_13 Bedroom
+   S5 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=01_13 Bedroom
+   S6 type=tbdLink area=1.68 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_13 Bedroom
+   S7 type=tbdExposed area=1.52 BE=SIM_EXT_SLD BEType=2 link=-
+   S8 type=tbdLink area=13.68 BE=SIM_INT_SLD_Partition BEType=1 link=01_18 Void
+   S9 type=tbdExposed area=5.31 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S10 type=tbdExposed area=30.78 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S11 type=tbdLink area=12.31 BE=SIM_INT_SLD_FLR BEType=4 link=GF_07 LivingRoom
+   S12 type=tbdLink area=7.90 BE=SIM_INT_SLD_FLR BEType=4 link=GF_12 EntranceHall
+   S13 type=tbdExposed area=7.45 BE=SIM_EXT_SLD_FLR Exposed BEType=19 link=-
+   S14 type=tbdLink area=7.83 BE=SIM_INT_SLD_Partition BEType=1 link=01_18 Void
+   S15 type=tbdLink area=7.55 BE=SIM_INT_SLD_Partition BEType=1 link=01_16 Bathroom
+   S16 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=01_16 Bathroom
+   S17 type=tbdLink area=1.68 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_16 Bathroom
+   S18 type=tbdLink area=8.22 BE=SIM_INT_SLD_Partition BEType=1 link=01_11 Void
+   S19 type=tbdLink area=0.12 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_11 Void
+Z9 01_18 Void IC=01_18 Void vol=9.118059 maxHeat=0 sizeHeat=1
+   S0 type=tbdLink area=8.75 BE=SIM_INT_SLD_FLR BEType=4 link=GF_07 LivingRoom
+   S1 type=tbdExposed area=2.76 BE=SIM_EXT_SLD BEType=2 link=-
+   S2 type=tbdLink area=13.68 BE=SIM_INT_SLD_Partition BEType=1 link=01_17 Gallery
+   S3 type=tbdLink area=13.68 BE=SIM_INT_SLD_Partition BEType=1 link=01_16 Bathroom
+   S4 type=tbdExposed area=9.66 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S5 type=tbdLink area=7.83 BE=SIM_INT_SLD_Partition BEType=1 link=01_17 Gallery
+   S6 type=tbdExposed area=1.76 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+Z10 01_16 Bathroom IC=01_16 Bathroom vol=26.9662 maxHeat=420.1361 sizeHeat=0
+   S0 type=tbdExposed area=2.12 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S1 type=tbdExposed area=3.31 BE=SIM_EXT_SLD BEType=2 link=-
+   S2 type=tbdLink area=4.63 BE=SIM_INT_SLD_FLR BEType=4 link=GF_08 Bathroom
+   S3 type=tbdLink area=2.63 BE=SIM_INT_SLD_FLR BEType=4 link=GF_07 LivingRoom
+   S4 type=tbdLink area=13.68 BE=SIM_INT_SLD_Partition BEType=1 link=01_18 Void
+   S5 type=tbdExposed area=11.60 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S6 type=tbdLink area=2.93 BE=SIM_INT_SLD_Partition BEType=1 link=01_15 Plantroom
+   S7 type=tbdLink area=0.16 BE=Doors: SIM_INT_SLD -frame BEType=15 link=01_15 Plantroom
+   S8 type=tbdLink area=1.27 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_15 Plantroom
+   S9 type=tbdLink area=9.32 BE=SIM_INT_SLD_Partition BEType=1 link=01_11 Void
+   S10 type=tbdLink area=7.55 BE=SIM_INT_SLD_Partition BEType=1 link=01_17 Gallery
+   S11 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=01_17 Gallery
+   S12 type=tbdLink area=1.68 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_17 Gallery
+   S13 type=tbdLink area=2.71 BE=SIM_INT_SLD_FLR BEType=4 link=GF_09 WC
+   S14 type=tbdLink area=0.55 BE=SIM_INT_SLD_FLR BEType=4 link=GF_12 EntranceHall
+Z11 01_11 Void IC=01_11 Void vol=7.564548 maxHeat=0 sizeHeat=1
+   S0 type=tbdLink area=8.22 BE=SIM_INT_SLD_Partition BEType=1 link=01_17 Gallery
+   S1 type=tbdLink area=0.12 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_17 Gallery
+   S2 type=tbdLink area=6.37 BE=SIM_INT_SLD_Partition BEType=1 link=01_15 Plantroom
+   S3 type=tbdLink area=0.40 BE=SIM_INT_SLD_FLR BEType=4 link=GF_12 EntranceHall
+   S4 type=tbdLink area=4.63 BE=SIM_INT_SLD_FLR BEType=4 link=GF_05 Stairs
+   S5 type=tbdLink area=9.32 BE=SIM_INT_SLD_Partition BEType=1 link=01_14 Bedroom
+   S6 type=tbdExposed area=1.85 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S7 type=tbdLink area=9.32 BE=SIM_INT_SLD_Partition BEType=1 link=01_16 Bathroom
+   S8 type=tbdExposed area=4.73 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+Z12 01_15 Plantroom IC=01_15 Plantroom vol=5.746545 maxHeat=46.01523 sizeHeat=0
+   S0 type=tbdExposed area=5.41 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S1 type=tbdLink area=4.36 BE=SIM_INT_SLD_Partition BEType=1 link=01_14 Bedroom
+   S2 type=tbdExposed area=2.89 BE=SIM_EXT_SLD BEType=2 link=-
+   S3 type=tbdLink area=4.15 BE=SIM_INT_SLD_FLR BEType=4 link=GF_10 Closet
+   S4 type=tbdLink area=6.37 BE=SIM_INT_SLD_Partition BEType=1 link=01_11 Void
+   S5 type=tbdLink area=2.93 BE=SIM_INT_SLD_Partition BEType=1 link=01_16 Bathroom
+   S6 type=tbdLink area=0.16 BE=Doors: SIM_INT_SLD -frame BEType=15 link=01_16 Bathroom
+   S7 type=tbdLink area=1.27 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_16 Bathroom
+Z13 01_14 Bedroom IC=01_14 Bedroom vol=57.33917 maxHeat=698.307 sizeHeat=0
+   S0 type=tbdLink area=21.76 BE=SIM_INT_SLD_FLR BEType=4 link=GF_11 Bedroom
+   S1 type=tbdExposed area=4.69 BE=SIM_EXT_SLD BEType=2 link=-
+   S2 type=tbdLink area=4.36 BE=SIM_INT_SLD_Partition BEType=1 link=01_15 Plantroom
+   S3 type=tbdExposed area=16.42 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S4 type=tbdExposed area=18.36 BE=SIM_EXT_SLD BEType=2 link=-
+   S5 type=tbdExposed area=0.36 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S6 type=tbdExposed area=2.94 BE=Windows: SIM_EXT_GLZ -pane BEType=12 link=-
+   S7 type=tbdLink area=9.32 BE=SIM_INT_SLD_Partition BEType=1 link=01_11 Void
+   S8 type=tbdExposed area=3.33 BE=SIM_EXT_SLD_FLR Exposed BEType=19 link=-
+   S9 type=tbdLink area=6.12 BE=SIM_INT_SLD_Partition BEType=1 link=01_17 Gallery
+   S10 type=tbdLink area=0.18 BE=Doors: SIM_INT_SLD -frame BEType=15 link=01_17 Gallery
+   S11 type=tbdLink area=1.68 BE=Doors: SIM_INT_SLD -pane BEType=12 link=01_17 Gallery
+   S12 type=tbdExposed area=16.33 BE=SIM_EXT_SLD_Roof BEType=3 link=-
+   S13 type=tbdExposed area=4.74 BE=SIM_EXT_SLD BEType=2 link=-

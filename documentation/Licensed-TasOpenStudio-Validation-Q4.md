@@ -97,8 +97,48 @@ affect results (`c3-application-events.txt`). Recommend reporting that signature
 First-level numbers: heating Tas 4507.4 vs E+ 1751.2 kWh (E+ identical to the 17 Oct OpenStudio-only run, 1751.176);
 cooling 0 vs 5.2 kWh. The Tas excess is concentrated in the bathrooms (GF_08: 1425.6 vs 102.7 kWh; 01_16: 660.7 vs
 200.8 kWh), whose Tas infiltration/ventilation loss (GF_08 −1583 kWh) is far beyond their 0.15 ACH infiltration, which
-both engines received. Suspected cause: the model's `Air` panels are open holes with inter-zone air exchange in Tas, while
-SAM_OpenStudio writes `Construction:AirBoundary` with Air Exchange Method `None`. **Not confirmed** (next task).
+both engines received. The earlier `Air`-panel suspicion is **refuted for the bathrooms** (C6 below): neither bathroom
+touches an `Air` panel, and Tas has no IZAM and no inter-zone air movement. The dominant cause of GF_08 is Tas window
+opening (C6, confirmed experimentally).
+
+### C6 — Window-opening experiment (Tas only, 19 Oct, `experiments\hungary-window`, evidence `window-opening/`)
+
+Inputs: the run's `…\tas\000000_SAM_AnalyticalModel.tbd` (sha256 `EE2E4A0B…1545`, untouched; copies simulated with
+`tbdDocument.simulate(1, 365, 0, 1, 0, 0, …)`, i.e. aperture output already on, 4–5 s each; no other licensed Tas activity).
+
+- **Mechanism (confirmed).** Every window pane carries a Tas aperture type (35° opening, Cd 0.43–0.54) with the Part O
+  function `zdwno,0,22.00,24.00,99.00` (EDSL TBD "Aperture Functions": zone control with an added overnight rule — if the
+  controlling zone is above 23 °C at 11 pm the aperture stays fully open until 8 am). In the TSD: GF_08 opening ramps
+  linearly with zone temperature (mean 0.05 @22 °C, 0.48 @23, 0.99 @24, 1.00 above); 49 of 49 nights with GF_08 > 23 °C at
+  hour index 22 are fully open 00–07 (1 false positive among 315 other nights).
+- **GF_08 airflow (baseline, measured).** Window open > 0 in 5988 h, fully open 1472 h; mean airflow 0.032 m³/s (11 ACH),
+  max 0.249 m³/s (86 ACH). ρ·cp·Q·ΔT from the TSD aperture airflow = 1812 kWh vs the TSD infiltration/ventilation loss
+  1583 kWh. Heating hits the 230 W capacity in 4915 h; zone dry-bulb is below 23.9 °C in 4836 h (mean 23.4 °C).
+- **Baseline re-run reproduces the original TSD bit-for-bit** (max difference 0 over every zone summary column; building
+  heating 4507.443 kWh).
+- **Closed GF_08 window.** A new building element with the same construction replaced only GF_08's pane (shared aperture
+  type, also used by EntranceHall and Closet, left untouched); no glazing, geometry or construction removed.
+
+| Quantity | Baseline | GF_08 window closed | Change |
+|---|---|---|---|
+| GF_08 heating | 1425.6 kWh | 387.6 kWh | −1037.9 (−73%) |
+| GF_08 infiltration/ventilation loss | 1583.4 kWh | 71.3 kWh | −1512.1 |
+| GF_08 mean temperature | 23.38 °C | 25.66 °C | +2.28 |
+| GF_08 hours < 23.9 °C | 4836 | 8 | |
+| GF_08 hours at heating cap (230 W) | 4915 | 30 | |
+| GF_08 heat to neighbours (bldg transfer) | −160 kWh | −587 kWh | |
+| 01_16 bathroom heating | 660.7 kWh | 642.4 kWh | −18.3 |
+| Whole-building heating | 4507.4 kWh | 3388.9 kWh | −1118.5 |
+
+Contribution to the 2756.3 kWh model difference (Tas 4507.4 − E+ 1751.2): closing only GF_08's window removes **1118.5 kWh
+(40.6%)**, of which GF_08 itself is 1037.9 kWh (37.7%) and 80.6 kWh is warmer-neighbour knock-on in other zones. GF_08's own
+gap to E+ (1322.9 kWh) is 78% explained; the residual (387.6 vs 102.7 kWh) coincides with a −587 kWh heat flow to Tas
+neighbours at 21–22 °C, whereas E+ neighbours float at 26–48 °C. 01_16 (no window, no Air panel) is unchanged (−18 kWh).
+The 230 W cap was not the cause: it is a symptom (cap hours fall 4915 → 30) and E+'s autosized peak (142 W) is lower anyway.
+
+Open: other windowed zones are untested (bedrooms/living show −1.2…−2.6 MWh infiltration/ventilation loss but are offset by
+gains); the 01_16 gap (460 kWh) and GF_08 residual are consistent with the whole-house temperature/internal-gain difference
+(E+ unconditioned mean 26–32 °C, plantroom 2480 vs 1752 kWh) but this is not yet isolated by experiment.
 
 ## Findings
 
@@ -138,7 +178,12 @@ SAM_OpenStudio writes `Construction:AirBoundary` with Air Exchange Method `None`
 
 - Box cooling: ≈20% E+ > Tas after aligning ventilation (radiant split and ground excluded) — engine surface heat
   balance/sky/glazing algorithms suspected, not identified.
-- HungaryHouse heating: Tas bathrooms; inter-zone `Air` panel treatment suspected, not confirmed.
+- HungaryHouse heating: GF_08 is mostly Tas window opening (F8, confirmed by C6); remaining 1637.7 kWh model gap
+  (01_16, GF_08 residual, bedrooms/living) is attributed by data to whole-house temperature and internal-gain differences
+  but not isolated by experiment. The `Air`-panel explanation is refuted for the bathrooms.
+- **F8 (input mapping, model fidelity).** SAM_Tas writes `zdwno` aperture functions that Tas executes (35° opening,
+  22–24 °C ramp, overnight latch); SAM_OpenStudio converts no opening properties (diagnostic only). The engines therefore
+  simulate different buildings. Not a software defect in either engine; the mapping needs an owner decision.
 - F1–F7 remain open; no product change made.
 
 ## Reproduce
@@ -150,6 +195,9 @@ SAM_OpenStudio writes `Construction:AirBoundary` with Air Exchange Method `None`
 3. `benchmark-compare.exe --tas … --openstudio … --out x` and compare bytes with the run folder.
 4. Native outputs: `tools/TsdDump.cs` / `TbdDump.cs` (compile in Windows PowerShell with `Interop.TSD.dll`/`Interop.TBD.dll`
    preloaded; open **copies** read-only, only while Tas is idle), `tools/EsoSummary.cs`, `tools/Align.cs`.
+5a. Window experiment (C6): copy the run's `.tbd` twice; compile `window-opening/tools/*.cs` with `csc /platform:x64` against
+   the matching `Interop.TBD.dll`/`Interop.TSD.dll`; `RunClosedWindow <copy>.tbd <copy>.tsd base|close`, then
+   `ZoneSummary <tsd> <prefix>`; only while no other Tas process runs.
 5. E+ experiments: copy the producer's `run\in.idf`, change one object (byte-preserving, CRLF), run
    `energyplus.exe -w <run>\weather.epw -d . in.idf`.
 
@@ -157,7 +205,10 @@ SAM_OpenStudio writes `Construction:AirBoundary` with Air Exchange Method `None`
 
 Owner review of F1 and F2, which explain most of the disagreement. Then two bounded tasks: (a) after the HVAC conversion
 lands, a SAM_Tas PR for F4+F5(+F6) with updated benchmark goldens; (b) a SAM PR for the EPW writer (F1) with an
-EPW round-trip regression test, followed by a re-run of this validation with embedded weather.
+EPW round-trip regression test, followed by a re-run of this validation with embedded weather. (c) For HungaryHouse,
+window-control mapping (F8) first: it is the largest isolated cause (≥ 40% of the heating gap from one window); then
+internal-gain alignment (plantroom, bathroom equipment, people); plant-capacity comparison last (not causal, see C6).
+Machine-local C6 runs: `C:\TasOut\licensed-e2e-20261019\experiments\hungary-window\{base,close}`.
 
 ## Evidence and files
 
