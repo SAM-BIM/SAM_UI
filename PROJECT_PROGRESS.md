@@ -1,5 +1,15 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Q4 licensed Tas/OpenStudio end-to-end validation (#239) closeout - 2026-10-19
+
+- **PR/status:** [SAM-BIM/SAM_UI#239](https://github.com/SAM-BIM/SAM_UI/pull/239) complete, merged into `sow/2026-Q4` as `d5aa34b29b9a01af76bb0dc457021b83cb5adc7a` (parents base `4ee45fef` and approved head `d57dab702e33395458b35d5b1c5654c5c07f2366`; merge tree equals that head). The owner approved it with the roadmap after the pre-merge checks. It was merged after SAM-BIM/SAM#213 (roadmap, `b4e68148`).
+- **Completed/files:** documentation only. Record `documentation/Licensed-TasOpenStudio-Validation-Q4.md`; evidence `documentation/evidence/licensed-e2e-20261019/` (B1a, comparison outputs, TSD/TBD/ESO summaries, screenshots, and analysis tools that no project or `SAM_UI.sln` builds). Licensed Both runs from the real UI on Q4 `4ee45fef`: box embedded and explicit EPW, and HungaryHouse. All are workflow PASS, and the HungaryHouse Tas crash was not reproduced. Findings F1-F9; C6-C8 window-opening diagnosis.
+- **S00 reconciliation (commit `d57dab70`, record only):** the embedded-weather runs and numbers are superseded by SAM#212 (F1 fixed, `5ac57033`). C6-C8, ASHRAE 140 and the engine-physics attributions are frozen under Phase C. All licensed-run evidence is kept unchanged. Findings map to roadmap tasks: F4-F6 to S10, F3 to S11, F7 to S04, and F2/F8/F9 to owner decisions in S07. The record's next step is superseded by `SAM/documentation/SIMULATION_ROADMAP_Q4_2026.md`.
+- **Validation:** final-head checks at `d57dab70`: Build `39274358248` and SPDX `39274358150` PASS. Post-merge Q4 Build `39275881141` PASS. `git diff --check` is clean for the reconciliation commit. Five evidence tool files added earlier in `1b7972dd` keep a trailing blank line at EOF, which `git diff --check` reports. They were left untouched as evidence. No simulation was re-run in the merge session.
+- **Unresolved:** F2-F9 (see roadmap). HungaryHouse is machine-local (`C:\TasOut\licensed-e2e-20261019`). Its provenance and redistribution permission are not established, so it is not committed as a fixture.
+- **Cleanup:** remote `validation/licensed-tas-openstudio-e2e-q4` was deleted with an expected-SHA lease (`d57dab70`) after it was verified merged and used by no open PR. The local branch is kept because the worktree `SAM_UI-wt-e2e-validation` uses it. Worktrees are not removed automatically.
+- **Next step:** none for this PR. Further simulation work follows the SAM roadmap, one owner-started task at a time; no task is active.
+
 ## Q4 OpenStudio Simulation and Tas/OpenStudio comparison merged - 2026-10-18
 
 - **Status:** complete, closed. Two owner-authorized merges into `sow/2026-Q4`, each as a merge commit pinned to its exact approved head; no protection bypass.
