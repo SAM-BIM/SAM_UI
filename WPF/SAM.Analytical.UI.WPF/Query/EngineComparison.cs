@@ -180,16 +180,17 @@ namespace SAM.Analytical.UI.WPF
         /// <c>Tas note: ...</c>. For a refused Tas simulation the warnings are SAM_Tas' <c>TAS-SIM-001</c> errors, carrying the TAS
         /// return code and error log. Read as plain JSON (<c>provenance.warnings</c> and <c>provenance.notes</c>) rather than through the
         /// validating reader, so a failure document that does not validate still says why; one that cannot be read gives one line
-        /// saying so. Nothing else of the document is used: it is never a result.
+        /// saying so. A <c>provenance</c> that is not an object gives no lines, and never throws, so the run goes on to the other engine.
+        /// Nothing else of the document is used: it is never a result.
         /// </summary>
         public static IEnumerable<string> BenchmarkFailureLines(ComparisonEngine comparisonEngine, string path)
         {
             string engine = ComparisonEngineText(comparisonEngine);
 
-            System.Text.Json.Nodes.JsonNode? provenance;
+            System.Text.Json.Nodes.JsonObject? provenance;
             try
             {
-                provenance = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))?["provenance"];
+                provenance = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))?["provenance"] as System.Text.Json.Nodes.JsonObject;
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is System.Text.Json.JsonException || exception is InvalidOperationException)
             {

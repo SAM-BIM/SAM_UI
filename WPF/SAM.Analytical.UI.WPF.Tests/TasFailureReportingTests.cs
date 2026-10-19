@@ -306,5 +306,46 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.StartsWith("Tas: the failed producer's document could not be read", line);
             Assert.Empty(Query.BenchmarkFailureLines(ComparisonEngine.Tas, empty));
         }
+
+        [Theory]
+        [InlineData("{\"provenance\":\"unexpected\"}")]
+        [InlineData("{\"provenance\":[1,2]}")]
+        [InlineData("{\"provenance\":42}")]
+        [InlineData("{\"provenance\":null}")]
+        [InlineData("{}")]
+        [InlineData("{\"provenance\":{\"warnings\":\"unexpected\",\"notes\":{\"a\":1}}}")]
+        public void FailureLines_OfValidJsonWithAnUnexpectedProvenanceShape_SayNothing_AndDoNotThrow(string json)
+        {
+            string path = Path.Combine(directory, "malformed.json");
+            File.WriteAllText(path, json);
+
+            Assert.Empty(Query.BenchmarkFailureLines(ComparisonEngine.Tas, path));
+        }
+
+        [Fact]
+        public void Both_WithTasFailedOnAMalformedDocument_StillRunsOpenStudio_AndIsPartiallyCompleted()
+        {
+            List<ComparisonEngine> calls = new List<ComparisonEngine>();
+            EngineComparisonRun run = Run(producerRun =>
+            {
+                calls.Add(producerRun.Engine);
+                if (producerRun.Engine == ComparisonEngine.Tas)
+                {
+                    File.WriteAllText(Out(producerRun), "{\"provenance\":\"unexpected\"}");
+                    return 5;
+                }
+
+                File.Copy(Resource("scenario-benchmark-OpenStudio.json"), Out(producerRun));
+                return 0;
+            });
+
+            Assert.Equal(new[] { ComparisonEngine.Tas, ComparisonEngine.OpenStudio }, calls);
+            Assert.Null(run.Exception);
+            Assert.Equal(EngineComparisonRunStatus.PartiallyCompleted, run.Status);
+            Assert.False(run.ProducerRuns[0].Succeeded);
+            Assert.True(run.ProducerRuns[1].Succeeded);
+            Assert.DoesNotContain(run.Diagnostics, x => x.StartsWith("Tas warning:", StringComparison.Ordinal) || x.StartsWith("Tas note:", StringComparison.Ordinal));
+            Assert.Contains(run.Diagnostics, x => x.Contains("not compared - Tas did not complete"));
+        }
     }
 }
