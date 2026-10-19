@@ -80,20 +80,20 @@ namespace SAM.Analytical.UI.WPF
                 return null;
             }
 
-            string contentSha256 = SimulationRunProvenance.CanonicalSha256(weatherData);
+            string contentSha256 = SimulationRunProvenance.WeatherContentSha256(weatherData);
 
             //Embedded means the very weather the model carries, by content: a remembered or chosen weather that happens to be labelled
             //as the model's is not.
             string? embeddedSha256 = null;
             if (analyticalModel_Source != null && analyticalModel_Source.TryGetValue(Analytical.AnalyticalModelParameter.WeatherData, out WeatherData weatherData_Embedded) && weatherData_Embedded != null)
             {
-                embeddedSha256 = SimulationRunProvenance.CanonicalSha256(weatherData_Embedded);
+                embeddedSha256 = SimulationRunProvenance.WeatherContentSha256(weatherData_Embedded);
             }
 
             section.Json["source"] = embeddedSha256 == contentSha256 ? "Embedded" : "Explicit";
             section.Set("name", weatherData.Name, "the weather has no name");
             section.Json["contentSha256"] = contentSha256;
-            section.Json["contentHashOf"] = "the SAM WeatherData JSON given to TAS, canonical JSON v1 (SAM_Validation)";
+            section.Json["contentHashOf"] = "the SAM WeatherData JSON given to TAS without its own Guid, canonical JSON v1 (SAM_Validation)";
 
             if (!string.IsNullOrWhiteSpace(weatherFilePath) && System.IO.File.Exists(weatherFilePath))
             {

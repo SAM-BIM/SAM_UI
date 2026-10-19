@@ -98,6 +98,14 @@ namespace SAM.Analytical.UI.WPF
             return result;
         }
 
+        internal void ForgetUnknownUnder(string prefix)
+        {
+            foreach (string itemPath in unknown.Select(x => x.Key).Where(x => x.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+            {
+                unknown.Remove(itemPath);
+            }
+        }
+
         internal void RecordUnknown(string itemPath, string reason)
         {
             unknown[itemPath] = string.IsNullOrWhiteSpace(reason) ? "no reason was given" : reason;
@@ -209,22 +217,42 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>The registered command line of the <c>TBD.Document</c> COM server (LocalServer32), or null. Read only; never throws.</summary>
         public static string? TasComServerCommand()
         {
-            try
+            //Both registry views: a 32-bit-only registration is not visible in the 64-bit view, and the reverse.
+            foreach (Microsoft.Win32.RegistryView registryView in new[] { Microsoft.Win32.RegistryView.Registry64, Microsoft.Win32.RegistryView.Registry32 })
             {
-                using Microsoft.Win32.RegistryKey? progId = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(@"TBD.Document\CLSID");
-                string? clsid = progId?.GetValue(null) as string;
-                if (string.IsNullOrWhiteSpace(clsid))
+                try
                 {
-                    return null;
-                }
+                    using Microsoft.Win32.RegistryKey classesRoot = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.ClassesRoot, registryView);
+                    using Microsoft.Win32.RegistryKey? progId = classesRoot.OpenSubKey(@"TBD.Document\CLSID");
+                    string? clsid = progId?.GetValue(null) as string;
+                    if (string.IsNullOrWhiteSpace(clsid))
+                    {
+                        continue;
+                    }
 
-                using Microsoft.Win32.RegistryKey? localServer = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(@"CLSID\" + clsid + @"\LocalServer32");
-                return localServer?.GetValue(null) as string;
+                    using Microsoft.Win32.RegistryKey? localServer = classesRoot.OpenSubKey(@"CLSID\" + clsid + @"\LocalServer32");
+                    if (localServer?.GetValue(null) is string command && !string.IsNullOrWhiteSpace(command))
+                    {
+                        return command;
+                    }
+                }
+                catch (Exception)
+                {
+                }
             }
-            catch (Exception)
-            {
-                return null;
-            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// "sha256:" and the SHA-256 of a WeatherData's canonical JSON v1 without its own top-level Guid: the same weather read twice (each
+        /// read gives the object a new Guid) has the same content hash; any change to its data changes it.
+        /// </summary>
+        public static string WeatherContentSha256(Weather.WeatherData weatherData)
+        {
+            JsonObject jsonObject = weatherData.ToJsonObject() ?? throw new InvalidOperationException("the weather has no JSON form");
+            jsonObject.Remove("Guid");
+            return Benchmark.BenchmarkCanonicalJson.ComputeSha256(jsonObject.ToJsonString());
         }
 
         /// <summary>The executable of a registered command line: the quoted part, else up to the first ".exe"; 8.3 names are expanded. Null when none.</summary>
@@ -465,6 +493,9 @@ namespace SAM.Analytical.UI.WPF
         public void SetUnknown(string key, string reason)
         {
             Json[key] = SimulationRunProvenance.Unknown;
+
+            //The whole item is unknown now: reasons filed for its sub-items no longer describe anything in the provenance.
+            owner.ForgetUnknownUnder(ItemPath(key) + ".");
             RecordUnknown(key, reason);
         }
 

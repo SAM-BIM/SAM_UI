@@ -23,6 +23,7 @@ namespace SAM.Analytical.UI.WPF.Tests
     /// with every unknown item named with its reason. No engine runs here: producers are faked as in <see cref="EngineComparisonTests"/>,
     /// the Tas route's record is driven through its own writer, and a real OpenStudio run is the existing RealRun test.
     /// </summary>
+    [Collection(ProcessEnvironmentCollection.Name)]
     public class SimulationRunProvenanceTests : IDisposable
     {
         private readonly string directory;
@@ -214,6 +215,39 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Null(SimulationRunProvenance.EnergyPlusVersionFromErr(null));
         }
 
+        /// <summary>A collector that fails part-way leaves its whole item unknown, with no reasons left for sub-items it had filed.</summary>
+        [Fact]
+        public void AFailedCollector_LeavesItsItemUnknown_WithNoStaleReasons()
+        {
+            SimulationRunProvenance provenance = new SimulationRunProvenance("Tas");
+            ProvenanceSection weather = provenance.Root.Section("weather");
+            SimulationRunProvenance.Guard(provenance.Root, "weather", () =>
+            {
+                weather.SetUnknown("file", "not read from a file");
+                throw new InvalidOperationException("half way");
+            });
+
+            JsonObject json = provenance.ToJsonObject();
+            Assert.Equal("unknown", (string)json["weather"]!);
+            Assert.Contains("half way", (string)json["unknown"]!["weather"]!);
+            Assert.Null(json["unknown"]!["weather.file"]);
+            AssertEveryUnknownHasAReason(json);
+        }
+
+        /// <summary>The weather's content hash ignores the object's own Guid (new on every read) and nothing else.</summary>
+        [Fact]
+        public void WeatherContentHash_IgnoresOnlyTheWeathersOwnGuid()
+        {
+            WeatherData weatherData = Weather("Read", 0.0);
+            JsonObject jsonObject = weatherData.ToJsonObject();
+            jsonObject["Guid"] = Guid.NewGuid().ToString();
+            WeatherData weatherData_ReadAgain = new WeatherData(jsonObject);
+
+            Assert.NotEqual(weatherData.Guid, weatherData_ReadAgain.Guid);
+            Assert.Equal(SimulationRunProvenance.WeatherContentSha256(weatherData), SimulationRunProvenance.WeatherContentSha256(weatherData_ReadAgain));
+            Assert.NotEqual(SimulationRunProvenance.WeatherContentSha256(weatherData), SimulationRunProvenance.WeatherContentSha256(Weather("Read", 0.5)));
+        }
+
         // ---------------------------------------------------------------- Tas only
 
         [Fact]
@@ -227,7 +261,7 @@ namespace SAM.Analytical.UI.WPF.Tests
 
             Assert.Equal("Tas", (string)provenance["route"]!);
             JsonObject weather = provenance["weather"]!.AsObject();
-            string contentSha256 = SimulationRunProvenance.CanonicalSha256(weatherData);
+            string contentSha256 = SimulationRunProvenance.WeatherContentSha256(weatherData);
             Assert.Equal("Embedded", (string)weather["source"]!);
             Assert.Equal("Embedded", (string)weather["name"]!);
             Assert.Equal(contentSha256, (string)weather["contentSha256"]!);
@@ -270,7 +304,7 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.Equal("Explicit", (string)weather["source"]!);
             Assert.Equal(path_Weather, (string)weather["file"]!["path"]!);
             Assert.Equal(Query.Sha256(path_Weather), (string)weather["file"]!["sha256"]!);
-            Assert.Equal(SimulationRunProvenance.CanonicalSha256(weatherData), (string)weather["contentSha256"]!);
+            Assert.Equal(SimulationRunProvenance.WeatherContentSha256(weatherData), (string)weather["contentSha256"]!);
             AssertEveryUnknownHasAReason(provenance);
         }
 
@@ -590,6 +624,18 @@ namespace SAM.Analytical.UI.WPF.Tests
             int count = 0;
             Walk(provenance, string.Empty);
             Assert.True(unknown.Count >= count, string.Format("{0} unknown items but {1} reasons", count, unknown.Count));
+
+            //...and the other way round: every reason names an item that is "unknown" (none left behind by a section that became unknown).
+            foreach (string itemPath in unknown.Select(x => x.Key).Where(x => !x.Contains('[')))
+            {
+                JsonNode? jsonNode = provenance;
+                foreach (string name in itemPath.Split('.'))
+                {
+                    jsonNode = jsonNode is JsonObject jsonObject ? jsonObject[name] : null;
+                }
+
+                Assert.True(jsonNode is JsonValue jsonValue && jsonValue.TryGetValue(out string? text) && text == SimulationRunProvenance.Unknown, "the reason for '" + itemPath + "' names no unknown item");
+            }
 
             void Walk(JsonNode? jsonNode, string path)
             {
