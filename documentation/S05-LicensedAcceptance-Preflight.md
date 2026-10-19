@@ -25,6 +25,9 @@ acceptance results.
 - **Drivers:** the S01b UI Automation drivers in `documentation/evidence/s01b-20261019/tools/` were used unchanged.
   `drive-tas.ps1` covers Energy Simulation and Run Simulation > Tas, with `-BlockTsd` refusal injection. `drive-both.ps1`
   covers Run Simulation > Both.
+- **Results unchanged by S03/S04:** case 3's `comparison.csv` has the same content as the committed pre-S03/S04 S01b run B2
+  (`documentation/evidence/s01b-20261019/cases/B2-cand-both-success/`, same model and EPW). Only line endings differ, from
+  the Git checkout. Both engines' B1a model metrics are bit-identical.
 - **Evidence:** `documentation/evidence/s05-preflight-20261019/`, which holds each case's driver log, message-box text or
   diagnostics, and manifest, plus three screenshots.
 
