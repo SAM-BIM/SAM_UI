@@ -1,5 +1,22 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Q4 S01 TAS silent-failure detection and reporting (S01b, #240) closeout - 2026-10-19
+
+- **PR/status:** [SAM-BIM/SAM_UI#240](https://github.com/SAM-BIM/SAM_UI/pull/240) complete, merged into `sow/2026-Q4` as `5b379191606e502762ef20272d3120d68bdc8923` (parents base `68705375` and approved head `531db2892bc714e766c87a29ac7982b476342dfe`; merge tree equals that head). The owner approved it in chat on 2026-10-19 after final-head CI. No repository approval rule applies, and GitHub does not allow the author to approve their own PR. With SAM-BIM/SAM_Tas#103 (S01a, merged `e483877c`, closeout `e84aeff6`) this completes roadmap task **S01**.
+- **Completed:** Energy Simulation and Run Simulation > Tas share one core. A workflow that started, was not cancelled and returned no model is now reported in a "Simulation failed" box, with the TAS return code, the error log and every `TAS-SIM-001` error from `WorkflowCalculator`. On a failure the open model is not replaced and no TPD is made. Success is decided only from this run's workflow result, never from files in the folder. Run Simulation > Both adds the failed producer's own B1a warnings and notes to the run diagnostics, the window and the manifest. Its status semantics are unchanged (PartiallyCompleted/Failed, never Compared). Review correction `f1157173`: a valid failure document whose `provenance` is not an object no longer throws and stops Both before OpenStudio runs. Record: `documentation/S01b-Tas-FailureReporting-PR.md`; evidence: `documentation/evidence/s01b-20261019/`.
+- **Files:** `Query/TasWorkflowFailure.cs` (new); `Modify/RunWorkflow.cs` and `Modify/RunPartOSimulation.cs` (new `out failure` overloads; the old signatures delegate); `Modify/Simulate.cs`; `Classes/PartO/PartOSimulationCase.cs` (`PartOSimulationOutcome.Failure`); `Modify/RunEngineComparison.cs`; `Query/EngineComparison.cs` (`BenchmarkFailureLines`); tests `TasFailureReportingTests.cs` and one test in `PartODesignModelProtectionTests.cs`.
+- **Validation:**
+  - Local on validated content `f1157173`: full `SAM.Analytical.UI.WPF.Tests` **2852/2852** with the real `APPDATA`. A test run with `APPDATA` redirected fails 34 Part O tests for missing installed resources (environmental). Three mutation checks were caught.
+  - Licensed real-UI runs on `1002c5f1` (UI Automation, TAS 9.5.7, box model). The refusal was injected natively: a directory at the TSD path makes TAS return 0 and write an error log. Energy Simulation, Run Simulation > Tas, reused-folder and Both refusal cases all PASS. Successful runs, candidate vs baseline: persisted results exact on 602/602 numbers; Both `comparison.csv`/`.md` byte-identical. Licensed OpenStudio-only: NOT RUN (code path untouched).
+  - Hosted: final-head Build #828 (`39306729745`) and SPDX #533 (`39306729680`) PASS. Post-merge Q4 Build #829 (`39308472112`) PASS; its log shows all 14 dependencies cloned at `sow/2026-Q4`.
+- **Cleanup:** remote `feature/s01b-tas-failure-reporting` was deleted with an expected-SHA lease (`531db289`) after it was verified merged and used by no open PR. No dependency repository had a same-named branch. The local branch was deleted after the checkout returned clean to Q4. Worktrees were not touched; the baseline app for the licensed A/B was built in `SAM_UI-wt-e2e-validation`, whose product tree equals `68705375`.
+- **Unresolved:**
+  - On a refusal, TAS itself opens its error log in Notepad (TAS behaviour, unchanged).
+  - A custom `PartOWorkflowRunner` cannot pass failure detail.
+  - Machine-local evidence (apps, runs, persisted `box.json`) is in `C:\TasOut\s01b` and is not committed.
+  - The SAM roadmap (`SAM/documentation/SIMULATION_ROADMAP_Q4_2026.md`) still lists S01 as "Next". Updating it needs a reviewed SAM PR, which has not been opened.
+- **Next step:** owner decision on the roadmap status PR for S01. Then S02 (shared simulation concurrency guard) as a separate owner-started task: new session, Claude Opus 5.5, effort High, Build mode.
+
 ## Q4 licensed Tas/OpenStudio end-to-end validation (#239) closeout - 2026-10-19
 
 - **PR/status:** [SAM-BIM/SAM_UI#239](https://github.com/SAM-BIM/SAM_UI/pull/239) complete, merged into `sow/2026-Q4` as `d5aa34b29b9a01af76bb0dc457021b83cb5adc7a` (parents base `4ee45fef` and approved head `d57dab702e33395458b35d5b1c5654c5c07f2366`; merge tree equals that head). The owner approved it with the roadmap after the pre-merge checks. It was merged after SAM-BIM/SAM#213 (roadmap, `b4e68148`).
