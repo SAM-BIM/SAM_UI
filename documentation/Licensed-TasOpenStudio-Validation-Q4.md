@@ -117,7 +117,8 @@ Inputs: the run's `…\tas\000000_SAM_AnalyticalModel.tbd` (sha256 `EE2E4A0B…1
 - **Baseline re-run reproduces the original TSD bit-for-bit** (max difference 0 over every zone summary column; building
   heating 4507.443 kWh).
 - **Closed GF_08 window.** A new building element with the same construction replaced only GF_08's pane (shared aperture
-  type, also used by EntranceHall and Closet, left untouched); no glazing, geometry or construction removed.
+  type, also used by LivingRoom, EntranceHall and Closet — corrected in C7 after a zone-index fix in the inventory tool —
+  left untouched); no glazing, geometry or construction removed.
 
 | Quantity | Baseline | GF_08 window closed | Change |
 |---|---|---|---|
@@ -136,9 +137,110 @@ gap to E+ (1322.9 kWh) is 78% explained; the residual (387.6 vs 102.7 kWh) coinc
 neighbours at 21–22 °C, whereas E+ neighbours float at 26–48 °C. 01_16 (no window, no Air panel) is unchanged (−18 kWh).
 The 230 W cap was not the cause: it is a symptom (cap hours fall 4915 → 30) and E+'s autosized peak (142 W) is lower anyway.
 
-Open: other windowed zones are untested (bedrooms/living show −1.2…−2.6 MWh infiltration/ventilation loss but are offset by
-gains); the 01_16 gap (460 kWh) and GF_08 residual are consistent with the whole-house temperature/internal-gain difference
-(E+ unconditioned mean 26–32 °C, plantroom 2480 vs 1752 kWh) but this is not yet isolated by experiment.
+Open (superseded by C7): other windowed zones were untested here; the 01_16 gap (460 kWh) and GF_08 residual are
+consistent with the whole-house temperature/internal-gain difference (E+ unconditioned mean 26–32 °C, plantroom 2480 vs
+1752 kWh) but not isolated by experiment.
+
+### C7 — All-window sensitivity and Part O control audit (Tas only, 19 Oct; evidence `window-opening/`)
+
+**Inventory (confirmed from TBD, TSD and the SAM model).** 9 operable panes in 7 zones, all with the same Part O function
+`zdwno,0,22.00,24.00,99.00`, 35° opening, no schedule, `sheltered = 0`; the SAM model carries
+`PartOOpeningProperties` (Width × Height = the full pane area, OpeningAngle 35, Factor 1; the loaded snapshot also
+shows `OpeningRestriction = Unrestricted`, night 08–23, which are **not** in the input `HungaryHouse.json`, i.e. defaults).
+Doors, frames, the entrance door and all other zones have no aperture type. No cooling is modelled (upper limit 150 °C).
+The three aperture types are attached to building elements shared across zones (so one element cannot be edited per room):
+
+| Zone | Floor | Heating setpoint | Pane area (m²) | Cd | Shared building element used by |
+|---|---|---|---|---|---|
+| GF_07 LivingRoom | ground | 21 °C | 6.67 / 8.28 / 2.07 (3 panes) | 0.426 / 0.478 / 0.539 | all three elements |
+| GF_12 EntranceHall | ground | 18 °C | 1.96 | 0.539 | LivingRoom, EntranceHall, GF_08, Closet |
+| GF_08 Bathroom | ground | **24 °C** | 1.15 | 0.539 | same |
+| GF_10 Closet | ground | 21 °C | 2.07 | 0.539 | same |
+| GF_11 Bedroom | ground | 21 °C | 7.50 | 0.426 | LivingRoom, GF_11, 01_13, 01_14 |
+| 01_13 Bedroom | upper | 21 °C | 2.94 | 0.426 | same |
+| 01_14 Bedroom | upper | 21 °C | 2.94 | 0.426 | same |
+
+(`aperture-inventory.csv`; WC, Stairs, Gallery, Voids, Plantroom and 01_16 Bathroom have no operable window.)
+
+**Behaviour in the baseline TSD (measured).** Part O is implemented as documented: in every zone, all nights with the zone
+above 23 °C at hour index 22 are fully open 00–07 (LivingRoom 13/13, EntranceHall 17/17, GF_08 49/49, Closet 15/15,
+GF_11 17/17, 01_13 49/49, 01_14 52/52). Daytime opening ramps linearly with zone temperature from 22 °C (closed) to 24 °C
+(fully open). Mean airflow / ACH by zone: LivingRoom 0.269 m³/s (8.0), EntranceHall 0.019 (3.4), **GF_08 0.032 (11.1)**,
+Closet 0.016 (6.2), GF_11 0.067 (4.7), 01_13 0.035 (2.2), 01_14 0.039 (2.4) (`aperture-behaviour-baseline.csv`).
+
+**Three-scenario heating (Tas, full year; `three-scenario-comparison.csv`).** A original; B only GF_08's window closed (C6);
+C all aperture types detached from the three building elements (glazing, geometry, constructions, infiltration, internal
+conditions, plant and weather unchanged; one run, 0.9 s). E+ = unchanged OpenStudio run, 1751.18 kWh.
+
+| | A original | B GF_08 closed | C all closed | E+ |
+|---|---|---|---|---|
+| Whole-building heating | 4507.4 | 3388.9 | **3190.5** | 1751.2 |
+| Change vs A | — | −1118.5 | **−1317.0** | |
+| Change vs B | | — | −198.5 | |
+| GF_08 Bathroom | 1425.6 | 387.6 | 348.5 | 102.8 |
+| 01_16 Bathroom | 660.7 | 642.4 | 596.5 | 200.8 |
+| LivingRoom | 799.5 | 776.3 | 719.5 | 458.4 |
+| GF_11 / 01_13 / 01_14 Bedroom | 397.3 / 486.5 / 334.0 | 391.1 / 483.3 / 331.6 | 381.1 / 459.3 / 321.5 | 214.5 / 330.6 / 170.6 |
+| Infiltration/ventilation loss, all zones | 9520 | — | 3275 | |
+
+- A → C: −1317.0 kWh, **47.8% of the 2756.3 kWh gap**. B → C adds only −198.5 kWh (7.2% of the gap): GF_08 is the dominant
+  single window; the other six windowed zones add about 18% of the B effect. GF_08 itself is 1037.9 of the 1317.0 kWh (79%)
+  of what all windows do on heating. Effects are not additive: GF_08's own change is −1037.9 (B) vs −1077.0 (C) and the
+  other zones' changes depend on the temperatures set by the open windows.
+- Remaining Tas − E+ difference with all windows closed: **1439.3 kWh** (3190.5 vs 1751.2). Per zone (C − E+): 01_16
+  +395.7, LivingRoom +261.1, GF_08 +245.7, GF_11 +166.5, 01_14 +150.9, 01_13 +128.7, EntranceHall +79.0, Closet +18.5,
+  Gallery −64.0. (E+ zone ideal-loads sum 1795.8 vs the reported 1751.18: 44.6 kWh unexplained inside the E+ summary.)
+- Temperatures: closing windows lifts mean zone temperature from 21–22 °C to 25–27 °C in occupied rooms (GF_08 23.4 → 28.9,
+  01_16 25.6 → 28.7, plantroom 31.5 → 35.1; E+ 26–32 °C, plantroom 48 °C). Tas has no cooling, so the closed-window case
+  overheats, as E+ does. GF_08 hours at the 230 W cap 4915 → 28; hours below 23.9 °C 4836 → 6. Other zones' cap hours
+  change little (LivingRoom 54 → 48). SAM's unmet-hours step (uncapped re-run) was not repeated; cap hours are the
+  proxy used here.
+- Infiltration/ventilation loss: GF_08 1583 → 87 kWh; LivingRoom 2562 → 854; GF_11 1333 → 378; 01_13 1264 → 410;
+  01_14 1458 → 431; EntranceHall 387 → 135; Closet 210 → 62. Zones without windows gain a little (Stairs 142 → 191,
+  Gallery 299 → 386, 01_16 184 → 222) because they are warmer.
+
+**Part O control audit (GF_08).** Findings, classified:
+1. *Confirmed:* GF_08 (setpoint 24 °C) has a ramp starting 2 K **below** its heating setpoint, so the window is partly open
+   whenever the heater is trying to hold 24 °C (opening 0.05 @22, 0.48 @23, 0.99 @24 °C): heating and natural ventilation
+   run against each other for 4915 h at the cap. Other zones (setpoints 18–21 °C) have the ramp above their setpoint, so
+   it only relieves overheating. The same string was applied to every window regardless of setpoint.
+2. *Confirmed:* the string has four numeric fields after `zdwno` (`0, 22, 24, 99`) while the EDSL page lists five inputs
+   (zone, lower, upper, cut-off, upper wind speed) and does not document a string format or the meaning of zone index 0.
+   Whether `99` is the cut-off or the wind-speed limit (the other defaulting) is **unresolved**; in either case one
+   protection is effectively disabled. Needs an EDSL/Tas confirmation of the string format.
+3. *Supported:* EDSL's Zone Control example is 22/24/25 °C with a 5 m/s wind limit; the task brief cites 22–26 °C daytime
+   control and accessibility/security conditions for overnight opening (not found on the fetched EDSL page, unverified). The model's `Unrestricted` night
+   setting is a loader default (absent from the input file), so overnight opening on every window, including ground
+   floor and the bathroom, was probably not an authored decision. Not changed here; flagged as an assumption to confirm.
+4. *Confirmed:* the controls are Part O overheating-assessment controls. Using them in a **heating** energy comparison
+   makes Tas windows ventilate during heating hours; E+ has none, so this is a model-definition difference, not an engine
+   defect.
+
+**Recommendation for window-control implementation (design assessment only; nothing implemented).**
+Separate two goals: *reproducing the Tas model* (carry `zdwno`, 22–24 °C ramp, overnight latch, Cd, 35°, as authored) and
+*correcting control assumptions* (setpoint-aware ramp, security restrictions, wind/cut-off) — the latter is an owner/design
+decision and must be an explicit option, never a silent default.
+- **Simplified `ZoneVentilation:DesignFlowRate`:** cheap and robust, but invents a flow instead of using area, Cd, wind and
+  stack, so it cannot honour opening angle/Cd, and a schedule cannot hold the overnight latch. Fit only for a rough parity check.
+- **`ZoneVentilation:WindandStackOpenArea`:** closest physically to Tas apertures (opening area × Cd, wind + stack, indoor/outdoor
+  temperature limits), no AirflowNetwork needed, compatible with Ideal Loads and with `Construction:AirBoundary` as written
+  today. Its native temperature limits are step-like, so the 22–24 °C ramp and the 23 °C/23:00 latch need a controlled opening
+  fraction (EMS or schedule actuator) per zone. **Recommended next milestone:** this object plus a small EMS control that
+  reproduces `zdwno` exactly, off by default, with a Tas-parity test on GF_08 and the all-closed baseline (3190.5 kWh) as
+  the control. Verify in E+ that it sees the 35° opening and Cd the same way Tas does before trusting parity.
+- **`AirflowNetwork` (multizone):** the right tool for buoyancy-driven inter-zone flow through stairs, voids and open
+  doors and for real pressure effects, but it replaces infiltration with crack/opening components, adds a pressure model and
+  run time, and its interaction with Ideal Loads and AirBoundary mixing must be verified. Defer; consider only after the
+  open-door and Air-panel representations are reviewed.
+- **Custom logic:** limited to the overnight latch and ramp (EMS); anything else (security restrictions, wind cut-off)
+  belongs in the data model first.
+- Also decide before implementing: heating comparisons should use equal window assumptions in both engines. Until then
+  the fair like-for-like Tas run is scenario C (heating 3190.5 kWh vs 1751.2 kWh).
+
+Unresolved after C7: 1439.3 kWh (52.2% of the original gap). Attributed by data, not isolated: 01_16 (396), LivingRoom
+(261), GF_08 residual (246) and bedrooms (446) — E+ zones float at 26–32 °C with plantroom 48 °C and 42% more plantroom
+gain, Tas neighbours are cooler, and E+ internal gains differ (equipment, people latent). Next experiment: align internal
+gains/plantroom in a Tas-only copy (or E+ copy) and rerun.
 
 ## Findings
 
@@ -178,12 +280,14 @@ gains); the 01_16 gap (460 kWh) and GF_08 residual are consistent with the whole
 
 - Box cooling: ≈20% E+ > Tas after aligning ventilation (radiant split and ground excluded) — engine surface heat
   balance/sky/glazing algorithms suspected, not identified.
-- HungaryHouse heating: GF_08 is mostly Tas window opening (F8, confirmed by C6); remaining 1637.7 kWh model gap
-  (01_16, GF_08 residual, bedrooms/living) is attributed by data to whole-house temperature and internal-gain differences
-  but not isolated by experiment. The `Air`-panel explanation is refuted for the bathrooms.
+- HungaryHouse heating: Tas window opening (F8, C6/C7) explains 1317.0 kWh (47.8%) of the 2756.3 kWh gap; the remaining
+  1439.3 kWh (01_16, GF_08 residual, living, bedrooms) is attributed by data to whole-house temperature and internal-gain
+  differences but not isolated by experiment. The `Air`-panel explanation is refuted for the bathrooms.
 - **F8 (input mapping, model fidelity).** SAM_Tas writes `zdwno` aperture functions that Tas executes (35° opening,
   22–24 °C ramp, overnight latch); SAM_OpenStudio converts no opening properties (diagnostic only). The engines therefore
-  simulate different buildings. Not a software defect in either engine; the mapping needs an owner decision.
+  simulate different buildings. Not a software defect in either engine; the mapping needs an owner decision. C7: the same
+  `zdwno,0,22,24,99` string is on all 9 windows, its ramp starts below GF_08's 24 °C setpoint, the string has one field
+  fewer than EDSL documents, and `Unrestricted` night opening is a loader default; see C7 for the audit.
 - F1–F7 remain open; no product change made.
 
 ## Reproduce

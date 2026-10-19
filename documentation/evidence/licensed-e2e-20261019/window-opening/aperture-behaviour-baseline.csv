@@ -1,0 +1,8 @@
+﻿zone,apertureSurfaces,paneArea_m2,hoursOpenGt0,hoursFullyOpen,meanOpenFraction,meanFlowIn_m3s,meanACH,maxACH,nightsTzGt23_at_idx22,nightsFullyOpen_00_07,nightsFullyOpen_when_not_triggered,flowDT_kWh
+GF_07 LivingRoom,3,17.02,3293,750,0.124,0.2690,7.96,214,13,13,1,2332
+GF_12 EntranceHall,1,1.96,2957,879,0.147,0.0191,3.37,64,17,17,0,344
+GF_08 Bathroom,1,1.15,5988,1472,0.262,0.0322,11.13,86,49,49,1,1812
+GF_10 Closet,1,2.07,2711,809,0.132,0.0156,6.23,153,15,15,1,197
+GF_11 Bedroom,1,7.50,3296,894,0.149,0.0673,4.70,88,17,17,2,1273
+01_13 Bedroom,1,2.94,3519,1446,0.231,0.0352,2.21,47,49,49,7,1153
+01_14 Bedroom,1,2.94,3780,1505,0.237,0.0387,2.43,16,52,52,7,1376

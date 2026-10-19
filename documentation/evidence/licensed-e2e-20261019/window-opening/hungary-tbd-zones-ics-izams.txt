@@ -225,6 +225,26 @@ IC[27] 01_14 Bedroom - HDD
    thermo ticHUL: type=ticValueProfile value=100 factor=1 sb=100 sched=-
    thermo ticHLL: type=ticValueProfile value=0 factor=1 sb=0 sched=-
 == Zones
+Z0 GF_07 LivingRoom IC=GF_07 LivingRoom vol=121.5954 maxHeat=1360.338 sizeHeat=0
+   S0 type=tbdGround area=45.44 BE=SIM_EXT_GRD_FLR FLR01 BEType=11 link=-
+   S1 type=tbdExposed area=14.10 BE=SIM_EXT_SLD BEType=2 link=-
+   S2 type=tbdExposed area=0.53 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S3 type=tbdExposed area=6.67 BE=Windows: SIM_EXT_GLZ -pane BEType=12 link=-
+   S4 type=tbdLink area=12.31 BE=SIM_INT_SLD_FLR BEType=4 link=01_17 Gallery
+   S5 type=tbdLink area=4.98 BE=SIM_INT_SLD_Partition BEType=1 link=GF_12 EntranceHall
+   S6 type=tbdLink area=0.22 BE=Doors: SIM_INT_SLD -frame BEType=15 link=GF_12 EntranceHall
+   S7 type=tbdLink area=2.68 BE=Doors: SIM_INT_SLD -pane BEType=12 link=GF_12 EntranceHall
+   S8 type=tbdLink area=21.76 BE=SIM_INT_SLD_FLR BEType=4 link=01_13 Bedroom
+   S9 type=tbdExposed area=10.32 BE=SIM_EXT_SLD BEType=2 link=-
+   S10 type=tbdExposed area=0.60 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S11 type=tbdExposed area=8.28 BE=Windows: SIM_EXT_GLZ_BC81A3C1 -pane BEType=12 link=-
+   S12 type=tbdExposed area=18.90 BE=SIM_EXT_SLD BEType=2 link=-
+   S13 type=tbdExposed area=0.33 BE=Windows: SIM_EXT_GLZ -frame BEType=15 link=-
+   S14 type=tbdExposed area=2.07 BE=Windows: SIM_EXT_GLZ_57232B2B -pane BEType=12 link=-
+   S15 type=tbdLink area=8.75 BE=SIM_INT_SLD_FLR BEType=4 link=01_18 Void
+   S16 type=tbdLink area=2.63 BE=SIM_INT_SLD_FLR BEType=4 link=01_16 Bathroom
+   S17 type=tbdLink area=3.60 BE=SIM_INT_SLD_Partition BEType=1 link=GF_09 WC
+   S18 type=tbdLink area=7.71 BE=SIM_INT_SLD_Partition BEType=1 link=GF_08 Bathroom
 Z1 GF_12 EntranceHall IC=GF_12 EntranceHall vol=20.36302 maxHeat=272.4145 sizeHeat=0
    S0 type=tbdLink area=0.40 BE=SIM_INT_SLD_FLR BEType=4 link=01_11 Void
    S1 type=tbdLink area=5.34 BE=SIM_INT_SLD_Partition BEType=1 link=GF_11 Bedroom

@@ -14,10 +14,9 @@ public static class P {
   Console.WriteLine("== ICs");
   for(int i=0;;i++){ TBD.InternalCondition ic=null; try{ic=b.GetIC(i);}catch{} if(ic==null)break; Console.WriteLine("IC["+i+"] "+ic.name); TBD.InternalGain g=ic.GetInternalGain(); if(g!=null){ Console.WriteLine("  freshAirRate="+g.freshAirRate); foreach(TBD.Profiles pr in Enum.GetValues(typeof(TBD.Profiles))){TBD.profile p=null; try{p=g.GetProfile((int)pr);}catch{} if(p!=null&&(pr==TBD.Profiles.ticI||pr==TBD.Profiles.ticV)) Console.WriteLine("   "+pr+": "+Pr(p));}} TBD.Thermostat t=ic.GetThermostat(); if(t!=null){ foreach(TBD.Profiles pr in Enum.GetValues(typeof(TBD.Profiles))){TBD.profile p=null; try{p=t.GetProfile((int)pr);}catch{} if(p!=null) Console.WriteLine("   thermo "+pr+": "+Pr(p));}} }
   Console.WriteLine("== Zones");
-  for(int i=1;;i++){ TBD.zone z=null; try{z=b.GetZone(i);}catch{} if(z==null)break; string icn="-"; try{icn=z.GetIC(0).name;}catch{try{icn=z.GetIC(1).name;}catch{}}
+  for(int i=0;;i++){ TBD.zone z=null; try{z=b.GetZone(i);}catch{} if(z==null)break; string icn="-"; try{icn=z.GetIC(0).name;}catch{try{icn=z.GetIC(1).name;}catch{}}
    Console.WriteLine("Z"+i+" "+z.name+" IC="+icn+" vol="+z.volume+" maxHeat="+z.maxHeatingLoad+" sizeHeat="+z.sizeHeating);
    for(int k=0;;k++){ TBD.zoneSurface s=null; try{s=z.GetSurface(k);}catch{} if(s==null)break; string link="-"; try{ if(s.linkSurface!=null) link=s.linkSurface.zone.name;}catch{}
     string be="-",bt="-"; try{be=s.buildingElement.name; bt=s.buildingElement.BEType.ToString();}catch{}
     Console.WriteLine(string.Format(CultureInfo.InvariantCulture,"   S{0} type={1} area={2:F2} BE={3} BEType={4} link={5}",k,s.type,s.area,be,bt,link)); } }
   doc.close(); } }
-

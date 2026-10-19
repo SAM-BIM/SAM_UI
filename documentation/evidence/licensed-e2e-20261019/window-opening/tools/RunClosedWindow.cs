@@ -16,7 +16,10 @@ public static class R { public static int Main(string[] a){
   target.buildingElement=nb;
   Console.WriteLine("reassigned GF_08 pane from '"+old.name+"' to '"+nb.name+"' (area "+target.area.ToString("F3",CultureInfo.InvariantCulture)+"), aperture types on new BE: "+(Try(()=>nb.GetApertureType(0))==null?"none":"PRESENT"));
   doc.save(); }
- if(File.Exists(tsd)) File.Delete(tsd);
+ if(mode=="closeall"){
+  int removed=0; for(int i=0;i<b.GetBECount();i++){ TBD.buildingElement e=null; try{e=b.GetBuildingElement(i);}catch{} if(e==null)continue;
+   while(true){ TBD.ApertureType t=null; try{t=e.GetApertureType(0);}catch{} if(t==null)break; Console.WriteLine("removing aperture type '"+t.name+"' from BE '"+e.name+"'"); e.RemoveApertureType(0); removed++; if(removed>50)break; } }
+  Console.WriteLine("aperture types detached: "+removed); doc.save(); } if(File.Exists(tsd)) File.Delete(tsd);
  var sw=System.Diagnostics.Stopwatch.StartNew();
  doc.simulate(1,365,0,1,0,0,tsd,1,0);
  Console.WriteLine("simulate returned after "+sw.Elapsed.TotalSeconds.ToString("F1")+" s");
