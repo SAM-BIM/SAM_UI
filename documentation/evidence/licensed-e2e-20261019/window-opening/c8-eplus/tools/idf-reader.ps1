@@ -1,0 +1,1 @@
+function Read-Idf($path){ $txt=[IO.File]::ReadAllText($path); $objs=New-Object System.Collections.Generic.List[object]; $clean=[regex]::Replace($txt,'!.*',''); foreach($m in [regex]::Matches($clean,'(?s)([^;]+);')){ $parts=$m.Groups[1].Value.Split(',') | % { $_.Trim() }; $objs.Add([pscustomobject]@{Type=$parts[0];F=@($parts | select -Skip 1)}) }; $objs }

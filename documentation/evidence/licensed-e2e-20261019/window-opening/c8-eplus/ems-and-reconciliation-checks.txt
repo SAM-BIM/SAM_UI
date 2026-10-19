@@ -1,0 +1,23 @@
+C8 native-output checks (all from eplusout.eso/.edd/.eio/.err of the isolated runs; E+ 25.2.0, IDF version 25.1)
+
+Baseline A (unchanged generated IDF + Budapest.epw): Zone Ideal Loads Supply Air Total Heating Energy, run period only
+  = 1751.17648238525 kWh (producer benchmark: 1751.1764823852507). Sensible heating = total heating; outdoor-air heating = 0.
+  Design-day environments: environment 1 (cooling DD) 0.000 kWh, environment 2 (heating DD, 24 h) 44.599 kWh.
+  => the "44.6 kWh" difference is the heating-design-day hours in the earlier per-zone EsoSummary (n=8808 = 8760 + 48),
+  not a different metric and not a defect. The benchmark reads EnvironmentType = 3 (run period) only.
+
+EMS verification, run Ccap_cal (52560 ten-minute timesteps, 6 per hour):
+  - Actuator available in eplusout.edd: GF08_OPENFRAC, Schedule:Constant, Schedule Value. ZoneVentilation:WindandStackOpenArea
+    listed in eplusout.eio (Natural; min/max indoor -100/100; delta T -100; max wind 40 m/s).
+  - Calling point BeginTimestepBeforePredictor. Sensor Zone Mean Air Temperature = the PREVIOUS timestep's reported zone
+    temperature: max |sensed - T(previous timestep)| = 0.0 in all four capped variants (one 10-min lag).
+  - Built-in Hour = 0..23 (hour of the current timestep), Minute = 10..60 (end of timestep); 144 distinct (Hour,Minute) pairs.
+  - Opening fraction = clip((sensed Tz - 22)/2, 0, 1) outside the latch: max error <= 1.8e-15 in all four variants.
+  - Part O latch (Ccap_cal): evaluated on the first timestep of Hour 23 (sensor = zone temperature at 23:00), 365 nights
+    evaluated, 116 triggered (sensed Tz > 23 C); latch = 1 and fraction = 1.0 for every timestep from 23:00 until Hour 8,
+    0 violations; latch = 0 for every timestep in Hours 8..22. (Tas, same rule on its hourly values: 49 nights.)
+  - Ventilation flow = 0 in every hour with fraction = 0 (0 violations).
+  - eplusout.err: 0 Severe in the default variants; 6 Severe warmup LOADS-convergence messages (other zones, temperature
+    convergence passes) in the two *_cal capped variants; run completes successfully.
+Unlimited Ideal Loads (B_default, B_cal and the C pair): fraction = 1.0 in all 8760 h, zone pinned at 24.0 C by the heater,
+  whole-building heating 124,044 kWh (default) / 46,969 kWh (cal): control runaway, not a usable result.

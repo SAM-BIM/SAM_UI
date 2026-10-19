@@ -1,0 +1,149 @@
+scope,metric,unit,availability,tasValue,openStudioValue,absoluteDifference,relativeDifference,relativePercent,signedDifference,band,note,toleranceProfile,warnRelative,failRelative,hourWarnAbsolute,hourFailAbsolute,nearZeroFloor,informational
+model,consumptionHeating,kWh,Both,4507.442786032021,1751.1764823852507,2756.26630364677,0.6114922439366465,61.149224393664646,-2756.26630364677,Fail,,default,0.05,0.15,1,24,1,false
+model,consumptionCooling,kWh,Both,0,5.249993252633034,5.249993252633034,1,100,5.249993252633034,Fail,,default,0.05,0.15,1,24,1,false
+model,peakHeatingLoad,kW,Both,4.71291552734375,5.720615732562658,1.0077002052189084,0.17615240252599346,17.615240252599346,1.0077002052189084,Fail,informational (excluded from the numerical status),default,0.05,0.15,1,24,0.01,true
+model,peakHeatingHour,hourOfYear,Both,919,775,144,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+model,peakCoolingLoad,kW,Both,0,0.04022509385030127,0.04022509385030127,1,100,0.04022509385030127,Fail,informational (excluded from the numerical status),default,0.05,0.15,1,24,0.01,true
+model,peakCoolingHour,hourOfYear,Both,0,7974,786,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+model,floorArea,m2,Both,167.95195245742798,167.95195207345205,3.839759301627055E-07,2.2862248669602973E-09,2.2862248669602975E-07,-3.839759301627055E-07,Match,,default,0.05,0.15,1,24,0.01,false
+model,volume,m3,Both,470.1821608543396,470.1821620538829,1.1995433055744797E-06,2.5512309959496336E-09,2.5512309959496334E-07,1.1995433055744797E-06,Match,,default,0.05,0.15,1,24,0.01,false
+025eb80f65d745b799511b78ac2f82fb,area,m2,Both,6.6920779999999995,6.6920779999999995,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+025eb80f65d745b799511b78ac2f82fb,volume,m3,Both,9.118059598283878,9.118059598283878,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+025eb80f65d745b799511b78ac2f82fb,heating.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+025eb80f65d745b799511b78ac2f82fb,heating.peakLoad,W,Neither,,,,,,,N/A,unavailable (Neither),default,0.05,0.15,1,24,10,false
+025eb80f65d745b799511b78ac2f82fb,heating.peakHour,hourOfYear,Neither,,,,,,,N/A,unavailable (Neither),default,0.05,0.15,1,24,0,true
+025eb80f65d745b799511b78ac2f82fb,heating.unmetHours,h,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,0.5,false
+025eb80f65d745b799511b78ac2f82fb,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+025eb80f65d745b799511b78ac2f82fb,cooling.peakLoad,W,Neither,,,,,,,N/A,unavailable (Neither),default,0.05,0.15,1,24,10,false
+025eb80f65d745b799511b78ac2f82fb,cooling.peakHour,hourOfYear,Neither,,,,,,,N/A,unavailable (Neither),default,0.05,0.15,1,24,0,true
+025eb80f65d745b799511b78ac2f82fb,cooling.unmetHours,h,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,0.5,false
+0872cd39962f43c3b62a6e031a76c24a,area,m2,Both,21.280010175465385,21.280010175465385,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+0872cd39962f43c3b62a6e031a76c24a,volume,m3,Both,57.33913699268221,57.33913699268221,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+0872cd39962f43c3b62a6e031a76c24a,heating.designLoad,W,Both,722.5675659179688,1132.1053783341051,409.5378124161364,0.36174884445719346,36.17488444571934,409.5378124161364,Fail,,default,0.05,0.15,1,24,10,false
+0872cd39962f43c3b62a6e031a76c24a,heating.peakLoad,W,Both,722.5675659179688,1185.0374713835374,462.4699054655687,0.39025762191775476,39.02576219177548,462.4699054655687,Fail,,default,0.05,0.15,1,24,10,false
+0872cd39962f43c3b62a6e031a76c24a,heating.peakHour,hourOfYear,Both,8,919,911,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+0872cd39962f43c3b62a6e031a76c24a,heating.unmetHours,h,Both,26,0,26,1,100,-26,Fail,,default,0.05,0.15,1,24,0.5,false
+0872cd39962f43c3b62a6e031a76c24a,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+0872cd39962f43c3b62a6e031a76c24a,cooling.peakLoad,W,OpenStudioOnly,,15.588918884421572,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+0872cd39962f43c3b62a6e031a76c24a,cooling.peakHour,hourOfYear,OpenStudioOnly,,7974,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+0872cd39962f43c3b62a6e031a76c24a,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+13a0403ab3a543608613b0ce9bf52d92,area,m2,Both,3.647967799712404,3.647967799712404,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+13a0403ab3a543608613b0ce9bf52d92,volume,m3,Both,10.396708229180378,10.396708229180378,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+13a0403ab3a543608613b0ce9bf52d92,heating.designLoad,W,Both,230.30104064941406,132.91466431648962,97.38637633292444,0.4228655504912596,42.286555049125965,-97.38637633292444,Fail,,default,0.05,0.15,1,24,10,false
+13a0403ab3a543608613b0ce9bf52d92,heating.peakLoad,W,Both,230.30104064941406,141.77039650450115,88.53064414491291,0.38441269694340024,38.44126969434002,-88.53064414491291,Fail,,default,0.05,0.15,1,24,10,false
+13a0403ab3a543608613b0ce9bf52d92,heating.peakHour,hourOfYear,Both,9,918,909,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+13a0403ab3a543608613b0ce9bf52d92,heating.unmetHours,h,Both,4587,0,4587,1,100,-4587,Fail,,default,0.05,0.15,1,24,0.5,false
+13a0403ab3a543608613b0ce9bf52d92,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+13a0403ab3a543608613b0ce9bf52d92,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+13a0403ab3a543608613b0ce9bf52d92,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+13a0403ab3a543608613b0ce9bf52d92,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+21bdbb806b4f4e2fbad0632b19fdf14b,area,m2,Both,2.9450000000000016,2.9450000000000016,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+21bdbb806b4f4e2fbad0632b19fdf14b,volume,m3,Both,5.746544632499992,5.746544632499992,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+21bdbb806b4f4e2fbad0632b19fdf14b,heating.designLoad,W,TasOnly,46.01523208618164,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+21bdbb806b4f4e2fbad0632b19fdf14b,heating.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+21bdbb806b4f4e2fbad0632b19fdf14b,heating.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+21bdbb806b4f4e2fbad0632b19fdf14b,heating.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+21bdbb806b4f4e2fbad0632b19fdf14b,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+21bdbb806b4f4e2fbad0632b19fdf14b,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+21bdbb806b4f4e2fbad0632b19fdf14b,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+21bdbb806b4f4e2fbad0632b19fdf14b,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+312fab2f1ba64756b47ccc3dcb21ac8a,area,m2,Both,2.355387206192353,2.355387206192353,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+312fab2f1ba64756b47ccc3dcb21ac8a,volume,m3,Both,6.712853537648204,6.712853537648204,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+312fab2f1ba64756b47ccc3dcb21ac8a,heating.designLoad,W,TasOnly,79.81999969482422,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+312fab2f1ba64756b47ccc3dcb21ac8a,heating.peakLoad,W,Both,61.84077453613281,0,61.84077453613281,1,100,-61.84077453613281,Fail,,default,0.05,0.15,1,24,10,false
+312fab2f1ba64756b47ccc3dcb21ac8a,heating.peakHour,hourOfYear,Both,918,0,918,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+312fab2f1ba64756b47ccc3dcb21ac8a,heating.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+312fab2f1ba64756b47ccc3dcb21ac8a,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+312fab2f1ba64756b47ccc3dcb21ac8a,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+312fab2f1ba64756b47ccc3dcb21ac8a,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+312fab2f1ba64756b47ccc3dcb21ac8a,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+354b8786b4714f3c9941cec051a93361,area,m2,Both,3.0986077487352315,3.0986077487352315,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+354b8786b4714f3c9941cec051a93361,volume,m3,Both,9.007679927026205,9.007679927026205,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+354b8786b4714f3c9941cec051a93361,heating.designLoad,W,Both,173.3878631591797,241.94985081709015,68.56198765791046,0.28337272135679936,28.337272135679935,68.56198765791046,Fail,,default,0.05,0.15,1,24,10,false
+354b8786b4714f3c9941cec051a93361,heating.peakLoad,W,Both,173.3878631591797,262.9986126750142,89.61074951583453,0.3407270806655014,34.07270806655014,89.61074951583453,Fail,,default,0.05,0.15,1,24,10,false
+354b8786b4714f3c9941cec051a93361,heating.peakHour,hourOfYear,Both,8,919,911,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+354b8786b4714f3c9941cec051a93361,heating.unmetHours,h,Both,20,0,20,1,100,-20,Fail,,default,0.05,0.15,1,24,0.5,false
+354b8786b4714f3c9941cec051a93361,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+354b8786b4714f3c9941cec051a93361,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+354b8786b4714f3c9941cec051a93361,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+354b8786b4714f3c9941cec051a93361,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+4377cbd6712349e68fdae8814ff9c5d9,area,m2,Both,5.03787628653,5.03787628653,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+4377cbd6712349e68fdae8814ff9c5d9,volume,m3,Both,7.564547888993382,7.564547888993382,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+4377cbd6712349e68fdae8814ff9c5d9,heating.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+4377cbd6712349e68fdae8814ff9c5d9,heating.peakLoad,W,Neither,,,,,,,N/A,unavailable (Neither),default,0.05,0.15,1,24,10,false
+4377cbd6712349e68fdae8814ff9c5d9,heating.peakHour,hourOfYear,Neither,,,,,,,N/A,unavailable (Neither),default,0.05,0.15,1,24,0,true
+4377cbd6712349e68fdae8814ff9c5d9,heating.unmetHours,h,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,0.5,false
+4377cbd6712349e68fdae8814ff9c5d9,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+4377cbd6712349e68fdae8814ff9c5d9,cooling.peakLoad,W,Neither,,,,,,,N/A,unavailable (Neither),default,0.05,0.15,1,24,10,false
+4377cbd6712349e68fdae8814ff9c5d9,cooling.peakHour,hourOfYear,Neither,,,,,,,N/A,unavailable (Neither),default,0.05,0.15,1,24,0,true
+4377cbd6712349e68fdae8814ff9c5d9,cooling.unmetHours,h,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,0.5,false
+6e7ef8487b714da3b730e0f226af927e,area,m2,Both,23.55004650825489,23.55004650825489,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+6e7ef8487b714da3b730e0f226af927e,volume,m3,Both,58.340316505330264,58.340316505330264,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+6e7ef8487b714da3b730e0f226af927e,heating.designLoad,W,Both,496.6584777832031,237.94647430111968,258.71200348208345,0.5209052398276267,52.09052398276267,-258.71200348208345,Fail,,default,0.05,0.15,1,24,10,false
+6e7ef8487b714da3b730e0f226af927e,heating.peakLoad,W,Both,237.14552307128906,255.38609020627572,18.240567134986662,0.0714234949924396,7.142349499243961,18.240567134986662,Warn,,default,0.05,0.15,1,24,10,false
+6e7ef8487b714da3b730e0f226af927e,heating.peakHour,hourOfYear,Both,925,919,6,,,,Warn,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+6e7ef8487b714da3b730e0f226af927e,heating.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+6e7ef8487b714da3b730e0f226af927e,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+6e7ef8487b714da3b730e0f226af927e,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+6e7ef8487b714da3b730e0f226af927e,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+6e7ef8487b714da3b730e0f226af927e,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+7ee49aac87b24671bb00ed1b291806a1,area,m2,Both,9.409999999999991,9.409999999999991,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+7ee49aac87b24671bb00ed1b291806a1,volume,m3,Both,26.966204214472434,26.966204214472434,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+7ee49aac87b24671bb00ed1b291806a1,heating.designLoad,W,Both,420.1361083984375,170.6033487306563,249.5327596677812,0.59393314375906,59.393314375906,-249.5327596677812,Fail,,default,0.05,0.15,1,24,10,false
+7ee49aac87b24671bb00ed1b291806a1,heating.peakLoad,W,Both,420.1205139160156,190.23285633754685,229.88765757846878,0.5471945548091579,54.71945548091579,-229.88765757846878,Fail,,default,0.05,0.15,1,24,10,false
+7ee49aac87b24671bb00ed1b291806a1,heating.peakHour,hourOfYear,Both,914,919,5,,,,Warn,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+7ee49aac87b24671bb00ed1b291806a1,heating.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+7ee49aac87b24671bb00ed1b291806a1,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+7ee49aac87b24671bb00ed1b291806a1,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+7ee49aac87b24671bb00ed1b291806a1,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+7ee49aac87b24671bb00ed1b291806a1,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+8d2d2a0234584fe4b171e5a9373f1b4d,area,m2,Both,4.634866891556,4.634866891556,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+8d2d2a0234584fe4b171e5a9373f1b4d,volume,m3,Both,28.16450759620351,28.16450759620351,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+8d2d2a0234584fe4b171e5a9373f1b4d,heating.designLoad,W,Both,89.53150177001953,42.95932098342112,46.57218078659841,0.5201764727037511,52.017647270375114,-46.57218078659841,Fail,,default,0.05,0.15,1,24,10,false
+8d2d2a0234584fe4b171e5a9373f1b4d,heating.peakLoad,W,Both,57.714630126953125,39.290501428394045,18.42412869855908,0.31922804768967733,31.922804768967733,-18.42412869855908,Fail,,default,0.05,0.15,1,24,10,false
+8d2d2a0234584fe4b171e5a9373f1b4d,heating.peakHour,hourOfYear,Both,919,774,145,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+8d2d2a0234584fe4b171e5a9373f1b4d,heating.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+8d2d2a0234584fe4b171e5a9373f1b4d,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+8d2d2a0234584fe4b171e5a9373f1b4d,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+8d2d2a0234584fe4b171e5a9373f1b4d,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+8d2d2a0234584fe4b171e5a9373f1b4d,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+affc43b0b5b3445f85d5cea8a7b88d4f,area,m2,Both,6.955039759539971,6.955039759539971,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+affc43b0b5b3445f85d5cea8a7b88d4f,volume,m3,Both,20.363019689898447,20.363019689898447,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+affc43b0b5b3445f85d5cea8a7b88d4f,heating.designLoad,W,Both,272.4144592285156,128.39770297845777,144.01675625005785,0.5286678124865942,52.86678124865942,-144.01675625005785,Fail,,default,0.05,0.15,1,24,10,false
+affc43b0b5b3445f85d5cea8a7b88d4f,heating.peakLoad,W,Both,206.66387939453125,133.44180276969487,73.22207662483638,0.3543051492082558,35.43051492082558,-73.22207662483638,Fail,,default,0.05,0.15,1,24,10,false
+affc43b0b5b3445f85d5cea8a7b88d4f,heating.peakHour,hourOfYear,Both,919,774,145,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+affc43b0b5b3445f85d5cea8a7b88d4f,heating.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+affc43b0b5b3445f85d5cea8a7b88d4f,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+affc43b0b5b3445f85d5cea8a7b88d4f,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+affc43b0b5b3445f85d5cea8a7b88d4f,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+affc43b0b5b3445f85d5cea8a7b88d4f,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+c7df54b3c0064fc5a7c6e6012dbb9b8e,area,m2,Both,38.98503142608865,38.98503142608865,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+c7df54b3c0064fc5a7c6e6012dbb9b8e,volume,m3,Both,121.59536233412693,121.59536233412693,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+c7df54b3c0064fc5a7c6e6012dbb9b8e,heating.designLoad,W,Both,1360.33837890625,1826.2977053599664,465.95932645371636,0.2551387569979315,25.513875699793147,465.95932645371636,Fail,,default,0.05,0.15,1,24,10,false
+c7df54b3c0064fc5a7c6e6012dbb9b8e,heating.peakLoad,W,Both,1360.33837890625,1789.983042212367,429.6446633061171,0.2400272254954375,24.00272254954375,429.6446633061171,Fail,,default,0.05,0.15,1,24,10,false
+c7df54b3c0064fc5a7c6e6012dbb9b8e,heating.peakHour,hourOfYear,Both,8,775,767,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+c7df54b3c0064fc5a7c6e6012dbb9b8e,heating.unmetHours,h,Both,32,0,32,1,100,-32,Fail,,default,0.05,0.15,1,24,0.5,false
+c7df54b3c0064fc5a7c6e6012dbb9b8e,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+c7df54b3c0064fc5a7c6e6012dbb9b8e,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+c7df54b3c0064fc5a7c6e6012dbb9b8e,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+c7df54b3c0064fc5a7c6e6012dbb9b8e,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+d8294f2a30b445ca9f6ba83c8dcf4903,area,m2,Both,18.080018143643976,18.080018143643976,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+d8294f2a30b445ca9f6ba83c8dcf4903,volume,m3,Both,51.52805170938531,51.52805170938531,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+d8294f2a30b445ca9f6ba83c8dcf4903,heating.designLoad,W,Both,716.8180541992188,917.4634857707837,200.64543157156493,0.21869582243155733,21.869582243155733,200.64543157156493,Fail,,default,0.05,0.15,1,24,10,false
+d8294f2a30b445ca9f6ba83c8dcf4903,heating.peakLoad,W,Both,716.8180541992188,936.597538158675,219.77948395945623,0.2346573368018206,23.465733680182062,219.77948395945623,Fail,,default,0.05,0.15,1,24,10,false
+d8294f2a30b445ca9f6ba83c8dcf4903,heating.peakHour,hourOfYear,Both,8,727,719,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+d8294f2a30b445ca9f6ba83c8dcf4903,heating.unmetHours,h,Both,32,0,32,1,100,-32,Fail,,default,0.05,0.15,1,24,0.5,false
+d8294f2a30b445ca9f6ba83c8dcf4903,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+d8294f2a30b445ca9f6ba83c8dcf4903,cooling.peakLoad,W,OpenStudioOnly,,28.706458861941027,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+d8294f2a30b445ca9f6ba83c8dcf4903,cooling.peakHour,hourOfYear,OpenStudioOnly,,7991,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+d8294f2a30b445ca9f6ba83c8dcf4903,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,area,m2,Both,21.280022127733165,21.280022127733165,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,volume,m3,Both,57.3391691981517,57.3391691981517,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,heating.designLoad,W,Both,698.3070068359375,909.1363259848785,210.82931914894095,0.23190066563509823,23.190066563509824,210.82931914894095,Fail,,default,0.05,0.15,1,24,10,false
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,heating.peakLoad,W,Both,698.3070068359375,989.0652526300596,290.7582457941221,0.2939727636988118,29.39727636988118,290.7582457941221,Fail,,default,0.05,0.15,1,24,10,false
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,heating.peakHour,hourOfYear,Both,728,919,191,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,heating.unmetHours,h,Both,10,0,10,1,100,-10,Fail,,default,0.05,0.15,1,24,0.5,false
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,cooling.designLoad,W,TasOnly,0,,,,,,N/A,unavailable (TasOnly),default,0.05,0.15,1,24,10,false
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,cooling.peakLoad,W,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,10,false
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,cooling.peakHour,hourOfYear,OpenStudioOnly,,0,,,,,N/A,unavailable (OpenStudioOnly),default,0.05,0.15,1,24,0,true
+d94f4dbee3d24ff1bcb341e2c5c6ec6d,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false

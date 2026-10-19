@@ -1,0 +1,45 @@
+# Weather alignment: Tas TSD external temperature vs EPW dry bulb (row i)
+A=B.externalTemperature sum=90411.200  B=epwDryBulb sum=90411.200  n=8760
+  lag -2: r=0.97833 rms=1.8668
+  lag -1: r=0.99174 rms=1.1527
+  lag  0: r=1.00000 rms=0.0000
+  lag  1: r=0.99174 rms=1.1527
+  lag  2: r=0.97833 rms=1.8668
+  monthly A/B: -717/-717 370/370 4079/4079 7360/7360 11412/11412 14207/14207 15799/15799 14950/14950 11006/11006 7652/7652 3858/3858 434/434
+
+A=B.globalRadiation sum=1276358.000  B=epwGHI sum=1276358.000  n=8760
+  lag -2: r=0.82643 rms=127.6676
+  lag -1: r=0.95259 rms=66.7212
+  lag  0: r=1.00000 rms=0.0000
+  lag  1: r=0.95259 rms=66.7212
+  lag  2: r=0.82643 rms=127.6676
+  monthly A/B: 37000/37000 57245/57245 103870/103870 137171/137171 168022/168022 182836/182836 178506/178506 156487/156487 116922/116922 72449/72449 38054/38054 27796/27796
+
+# Zone air temperature: Tas vs E+ no-OA (e3)
+A=Z1.dryBulbTemp sum=201432.887  B=Zone Mean Air Temperature sum=704005024.562  n=8760
+  lag -2: r=-0.14069 rms=393137.8221
+  lag -1: r=-0.20436 rms=393115.5994
+  lag  0: r=-0.28946 rms=393113.5586
+  lag  1: r=-0.44644 rms=393006.6630
+  lag  2: r=-0.44371 rms=392869.8153
+  monthly A/B: 15192/248471732 14057/188485448 16268/35274851 16514/8326863 18105/55705 18110/0 18933/0 18749/0 17461/0 17157/6095456 15541/38128224 15345/179166746
+
+# Heating load W: Tas vs E+ no-OA sensible
+# Cooling load W: Tas vs E+ no-OA sensible
+# Solar W: Tas zone solar gain vs E+ window transmitted
+A=Z1.solarGain sum=4009722.904  B=Transmitted Solar sum=9598.210  n=8760
+  lag -2: r=0.07438 rms=768.8699
+  lag -1: r=0.13152 rms=768.5333
+  lag  0: r=0.18466 rms=768.2171
+  lag  1: r=0.22322 rms=768.0633
+  lag  2: r=0.24805 rms=767.9797
+  monthly A/B: 208459/0 282267/0 381190/0 388123/0 409306/493 412876/3283 433223/3772 414722/1889 385493/161 310266/0 209084/0 174715/0
+
+# Gains W: Tas equipment vs E+ equipment
+A=Z1.equipmentSensibleGain sum=5475000.000  B=Electric Equipment Total Heating sum=56.878  n=8760
+  lag -2: r=0.35307 rms=865.3672
+  lag -1: r=0.45714 rms=865.3177
+  lag  0: r=0.53219 rms=865.2683
+  lag  1: r=0.54905 rms=865.3177
+  lag  2: r=0.50731 rms=865.3671
+  monthly A/B: 465000/4 420000/4 465000/5 450000/5 465000/5 450000/5 465000/5 465000/5 450000/5 465000/5 450000/4 465000/4

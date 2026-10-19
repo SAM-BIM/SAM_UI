@@ -1,0 +1,20 @@
+environments=1 hourlyStamps=61320
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone People Total Heating Energy [J] | n=8760 | sum=2140.6015 kWh | max=488.72 W @h8
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Lights Total Heating Energy [J] | n=8760 | sum=1606.0000 kWh | max=400.00 W @h8
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Electric Equipment Total Heating Energy [J] | n=8760 | sum=5475.0000 kWh | max=1250.00 W @h8
+SAM_SPACE_OFFICE_CB68BED1,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8760 | sum=2592.6255 kWh | max=1531.90 W @h2316
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Mean Air Temperature [C] | n=8760 | mean=21.210 | min=16.000 | max=27.790 @h3883
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Operative Temperature [C] | n=8760 | mean=21.200 | min=15.049 | max=27.593 @h3883
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Infiltration Sensible Heat Loss Energy [J] | n=8760 | sum=1012.6107 kWh | max=356.53 W @h919
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Infiltration Sensible Heat Gain Energy [J] | n=8760 | sum=9.6055 kWh | max=82.58 W @h4382
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Air Relative Humidity [%] | n=8760 | mean=41.562 | min=8.164 | max=96.910 @h4611
+SAM_IDEALLOADS_OFFICE_CB68BED1,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8760 | sum=2810.0183 kWh | max=3343.73 W @h919
+SAM_IDEALLOADS_OFFICE_CB68BED1,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8760 | sum=2810.0183 kWh | max=3343.73 W @h919
+SAM_IDEALLOADS_OFFICE_CB68BED1,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8760 | sum=3432.5972 kWh | max=3335.32 W @h4381
+SAM_IDEALLOADS_OFFICE_CB68BED1,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8760 | sum=3832.5030 kWh | max=5206.16 W @h5029
+SAM_IDEALLOADS_OFFICE_CB68BED1,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8760 | sum=2769.7127 kWh | max=1701.53 W @h920
+SAM_IDEALLOADS_OFFICE_CB68BED1,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8760 | sum=54.2121 kWh | max=477.72 W @h4382
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Heating Setpoint Not Met Time [hr] | n=8760 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8760 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Cooling Setpoint Not Met Time [hr] | n=8760 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_OFFICE_CB68BED1,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8760 | mean=0.000 | min=0.000 | max=0.000 @h0

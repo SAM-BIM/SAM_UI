@@ -1,0 +1,39 @@
+building=000000_SAM_AnalyticalModel latitude=47.517 longitude=19.033 timeZone=1
+IC[0] Office includeSolarInMRT=-1
+  gain S39_OfficeOpen: lightingRadProp=0.3 occupantRadProp=0.2 equipmentRadProp=0.1 freshAirRate=12 personGain=130 targetIlluminance=500
+    ticI: type=ticHourlyProfile value=0 factor=0.2 setback=0 schedule=-
+    ticV: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticLG: type=ticHourlyProfile value=0 factor=8 setback=0 schedule=-
+    ticOSG: type=ticHourlyProfile value=0 factor=5.639098 setback=0 schedule=-
+    ticOLG: type=ticHourlyProfile value=0 factor=4.135338 setback=0 schedule=-
+    ticESG: type=ticHourlyProfile value=0 factor=25 setback=0 schedule=-
+    ticELG: type=ticHourlyProfile value=0 factor=0 setback=0 schedule=-
+    ticCOG: type=ticHourlyProfile value=0 factor=0 setback=0 schedule=-
+    ticASG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticALG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+  heatingEmitter UFH radiantProportion=0 viewCoefficient=0.248
+  coolingEmitter FCU radiantProportion=0 viewCoefficient=0.519
+  thermostat CLG_7to19_25 & HTG_7to19_21 & No Humidification & No Dehumidification radiantProportion=0 controlRange=0 proportionalControl=0
+    ticUL: type=ticHourlyProfile value=150 factor=1 setback=150 schedule=-
+    ticLL: type=ticHourlyProfile value=-50 factor=1 setback=-50 schedule=-
+    ticHUL: type=ticHourlyProfile value=100 factor=1 setback=100 schedule=-
+    ticHLL: type=ticHourlyProfile value=0 factor=1 setback=0 schedule=-
+IC[1] Office - HDD includeSolarInMRT=0
+  gain S39_OfficeOpen - HDD: lightingRadProp=0.3 occupantRadProp=0.2 equipmentRadProp=0.1 freshAirRate=8 personGain=120 targetIlluminance=0
+    ticI: type=ticValueProfile value=0.2 factor=1 setback=0 schedule=-
+    ticV: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticLG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticOSG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticOLG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticESG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticELG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticCOG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticASG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+    ticALG: type=ticValueProfile value=0 factor=1 setback=0 schedule=-
+  heatingEmitter New Heating Emitter radiantProportion=0 viewCoefficient=0.248
+  coolingEmitter New Cooling Emitter radiantProportion=0 viewCoefficient=0.519
+  thermostat HTG_7to19_21 radiantProportion=0 controlRange=0 proportionalControl=0
+    ticUL: type=ticValueProfile value=150 factor=1 setback=150 schedule=-
+    ticLL: type=ticValueProfile value=21 factor=1 setback=-50 schedule=-
+    ticHUL: type=ticValueProfile value=100 factor=1 setback=100 schedule=-
+    ticHLL: type=ticValueProfile value=0 factor=1 setback=0 schedule=-

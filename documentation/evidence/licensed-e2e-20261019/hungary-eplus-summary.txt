@@ -1,0 +1,236 @@
+environments=3 hourlyStamps=61656
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone People Total Heating Energy [J] | n=8808 | sum=1775.3903 kWh | max=326.86 W @h8
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone People Total Heating Energy [J] | n=8808 | sum=1665.1932 kWh | max=306.58 W @h8
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone People Total Heating Energy [J] | n=8808 | sum=1084.3883 kWh | max=227.29 W @h9
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone People Total Heating Energy [J] | n=8808 | sum=1699.6579 kWh | max=312.92 W @h8
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Lights Total Heating Energy [J] | n=8808 | sum=98.1817 kWh | max=53.51 W @h18
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Lights Total Heating Energy [J] | n=8808 | sum=92.0877 kWh | max=50.18 W @h18
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Lights Total Heating Energy [J] | n=8808 | sum=15.2148 kWh | max=8.29 W @h18
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Lights Total Heating Energy [J] | n=8808 | sum=38.5495 kWh | max=21.01 W @h18
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Lights Total Heating Energy [J] | n=8808 | sum=101.4774 kWh | max=55.30 W @h18
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Lights Total Heating Energy [J] | n=8808 | sum=17.0100 kWh | max=9.27 W @h18
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Lights Total Heating Energy [J] | n=8808 | sum=166.7649 kWh | max=90.88 W @h18
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Lights Total Heating Energy [J] | n=8808 | sum=16.9841 kWh | max=9.26 W @h18
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Lights Total Heating Energy [J] | n=8808 | sum=9.9310 kWh | max=5.41 W @h18
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Lights Total Heating Energy [J] | n=8808 | sum=15.2148 kWh | max=8.29 W @h18
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Lights Total Heating Energy [J] | n=8808 | sum=79.8593 kWh | max=43.52 W @h18
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Lights Total Heating Energy [J] | n=8808 | sum=32.4634 kWh | max=17.69 W @h18
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=595.1802 kWh | max=100.57 W @h8
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=558.2378 kWh | max=94.33 W @h8
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=2479.8342 kWh | max=281.54 W @h0
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=645.2221 kWh | max=167.44 W @h18
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=673.7324 kWh | max=174.84 W @h18
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=733.2838 kWh | max=190.29 W @h18
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=664.0682 kWh | max=172.33 W @h18
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Electric Equipment Total Heating Energy [J] | n=8808 | sum=569.7918 kWh | max=96.28 W @h8
+Solar Enclosure 1,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+Solar Enclosure 2,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=477.5022 kWh | max=511.03 W @h972
+SAM_SPACE_01_11_VOID_4377CBD6,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_SPACE_01_13_BEDROOM_0872CD39,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=653.5168 kWh | max=715.34 W @h16
+SAM_SPACE_01_14_BEDROOM_D94F4DBE,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=609.6501 kWh | max=712.96 W @h7
+SAM_SPACE_01_15_PLANTROOM_21BDBB80,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_SPACE_01_16_BATHROOM_7EE49AAC,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_SPACE_GF_07_LIVINGROOM_C7DF54B3,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=3574.6246 kWh | max=2581.69 W @h1430
+SAM_SPACE_GF_08_BATHROOM_13A0403A,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=96.2941 kWh | max=56.34 W @h4642
+SAM_SPACE_GF_09_WC_312FAB2F,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_SPACE_GF_10_CLOSET_354B8786,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=181.8895 kWh | max=106.43 W @h4642
+SAM_SPACE_GF_11_BEDROOM_D8294F2A,Enclosure Windows Total Transmitted Solar Radiation Energy [J] | n=8808 | sum=1491.3620 kWh | max=1744.07 W @h7
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Mean Air Temperature [C] | n=8808 | mean=31.582 | min=20.814 | max=45.984 @h23
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Operative Temperature [C] | n=8808 | mean=31.540 | min=20.788 | max=45.940 @h23
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Mean Air Temperature [C] | n=8808 | mean=28.408 | min=16.000 | max=47.855 @h18
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Operative Temperature [C] | n=8808 | mean=28.042 | min=15.608 | max=47.589 @h17
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Mean Air Temperature [C] | n=8808 | mean=30.298 | min=16.000 | max=49.511 @h9
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Operative Temperature [C] | n=8808 | mean=30.008 | min=15.845 | max=49.287 @h9
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Mean Air Temperature [C] | n=8808 | mean=48.230 | min=36.799 | max=62.633 @h22
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Operative Temperature [C] | n=8808 | mean=45.941 | min=34.558 | max=60.327 @h22
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Mean Air Temperature [C] | n=8808 | mean=31.619 | min=24.000 | max=46.791 @h21
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Operative Temperature [C] | n=8808 | mean=31.247 | min=23.173 | max=46.077 @h21
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Mean Air Temperature [C] | n=8808 | mean=26.630 | min=18.000 | max=41.189 @h20
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Operative Temperature [C] | n=8808 | mean=26.775 | min=17.532 | max=41.326 @h20
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Mean Air Temperature [C] | n=8808 | mean=26.988 | min=17.125 | max=41.459 @h22
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Operative Temperature [C] | n=8808 | mean=26.995 | min=17.138 | max=41.459 @h21
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Mean Air Temperature [C] | n=8808 | mean=27.693 | min=18.000 | max=41.639 @h16
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Operative Temperature [C] | n=8808 | mean=27.848 | min=17.647 | max=41.749 @h16
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Mean Air Temperature [C] | n=8808 | mean=28.274 | min=16.000 | max=47.930 @h17
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Operative Temperature [C] | n=8808 | mean=28.191 | min=15.595 | max=47.809 @h17
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Mean Air Temperature [C] | n=8808 | mean=31.897 | min=24.000 | max=48.426 @h20
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Operative Temperature [C] | n=8808 | mean=31.197 | min=22.773 | max=47.036 @h20
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Mean Air Temperature [C] | n=8808 | mean=32.787 | min=21.049 | max=49.927 @h21
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Operative Temperature [C] | n=8808 | mean=31.996 | min=20.621 | max=48.298 @h21
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Mean Air Temperature [C] | n=8808 | mean=27.638 | min=16.000 | max=43.046 @h18
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Operative Temperature [C] | n=8808 | mean=27.757 | min=16.152 | max=43.189 @h18
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Mean Air Temperature [C] | n=8808 | mean=29.886 | min=16.000 | max=53.155 @h8
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Operative Temperature [C] | n=8808 | mean=29.510 | min=15.618 | max=52.872 @h8
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Mean Air Temperature [C] | n=8808 | mean=27.397 | min=18.000 | max=41.576 @h16
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Operative Temperature [C] | n=8808 | mean=27.570 | min=17.450 | max=41.672 @h16
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=647.9269 kWh | max=140.30 W @h967
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=670.0668 kWh | max=131.72 W @h967
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=157.9259 kWh | max=24.36 W @h967
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=319.4755 kWh | max=64.01 W @h967
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=564.1518 kWh | max=122.19 W @h967
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=110.2538 kWh | max=22.91 W @h8509
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=1116.1848 kWh | max=243.72 W @h967
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=136.7156 kWh | max=27.04 W @h967
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=83.1952 kWh | max=16.59 W @h957
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=98.2840 kWh | max=22.18 W @h967
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=581.1292 kWh | max=116.54 W @h967
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Infiltration Sensible Heat Loss Energy [J] | n=8808 | sum=206.8542 kWh | max=44.01 W @h8508
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Infiltration Sensible Heat Gain Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Air Relative Humidity [%] | n=8808 | mean=8.659 | min=3.693 | max=15.783 @h31
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Air Relative Humidity [%] | n=8808 | mean=61.895 | min=23.146 | max=100.000 @h124
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Air Relative Humidity [%] | n=8808 | mean=56.306 | min=22.715 | max=99.936 @h8046
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Air Relative Humidity [%] | n=8808 | mean=8.333 | min=2.517 | max=16.533 @h5081
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Air Relative Humidity [%] | n=8808 | mean=20.337 | min=5.380 | max=41.679 @h7539
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Air Relative Humidity [%] | n=8808 | mean=27.117 | min=7.772 | max=53.629 @h7538
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Air Relative Humidity [%] | n=8808 | mean=11.300 | min=4.666 | max=19.947 @h8
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Air Relative Humidity [%] | n=8808 | mean=25.559 | min=5.831 | max=50.942 @h5082
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Air Relative Humidity [%] | n=8808 | mean=38.030 | min=12.176 | max=76.105 @h8038
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Air Relative Humidity [%] | n=8808 | mean=20.085 | min=4.860 | max=40.995 @h5081
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Air Relative Humidity [%] | n=8808 | mean=19.155 | min=4.068 | max=40.072 @h5081
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Air Relative Humidity [%] | n=8808 | mean=25.544 | min=6.475 | max=49.309 @h7539
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Air Relative Humidity [%] | n=8808 | mean=62.182 | min=22.114 | max=100.000 @h25
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Air Relative Humidity [%] | n=8808 | mean=26.033 | min=5.722 | max=51.893 @h5082
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_11_VOID_4377CBD6,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_13_BEDROOM_0872CD39,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_14_BEDROOM_D94F4DBE,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_15_PLANTROOM_21BDBB80,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_16_BATHROOM_7EE49AAC,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_17_GALLERY_6E7EF848,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_01_18_VOID_025EB80F,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_05_STAIRS_8D2D2A02,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_07_LIVINGROOM_C7DF54B3,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_08_BATHROOM_13A0403A,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_09_WC_312FAB2F,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_10_CLOSET_354B8786,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_11_BEDROOM_D8294F2A,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Heating Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Heating Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Cooling Setpoint Not Met Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_THERMALZONE_GF_12_ENTRANCEHALL_AFFC43B0,Zone Cooling Setpoint Not Met While Occupied Time [hr] | n=8808 | mean=0.000 | min=0.000 | max=0.000 @h0
+SAM_IDEALLOADS_01_13_BEDROOM_0872CD39,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=330.5830 kWh | max=1185.04 W @h967
+SAM_IDEALLOADS_01_13_BEDROOM_0872CD39,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=330.5830 kWh | max=1185.04 W @h967
+SAM_IDEALLOADS_01_13_BEDROOM_0872CD39,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_13_BEDROOM_0872CD39,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.6665 kWh | max=15.59 W @h8022
+SAM_IDEALLOADS_01_13_BEDROOM_0872CD39,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_13_BEDROOM_0872CD39,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_14_BEDROOM_D94F4DBE,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=170.5492 kWh | max=989.07 W @h967
+SAM_IDEALLOADS_01_14_BEDROOM_D94F4DBE,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=170.5492 kWh | max=989.07 W @h967
+SAM_IDEALLOADS_01_14_BEDROOM_D94F4DBE,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_14_BEDROOM_D94F4DBE,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_14_BEDROOM_D94F4DBE,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_14_BEDROOM_D94F4DBE,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_15_PLANTROOM_21BDBB80,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_15_PLANTROOM_21BDBB80,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_15_PLANTROOM_21BDBB80,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_15_PLANTROOM_21BDBB80,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_15_PLANTROOM_21BDBB80,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_15_PLANTROOM_21BDBB80,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_16_BATHROOM_7EE49AAC,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=200.7881 kWh | max=190.23 W @h967
+SAM_IDEALLOADS_01_16_BATHROOM_7EE49AAC,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=200.7881 kWh | max=190.23 W @h967
+SAM_IDEALLOADS_01_16_BATHROOM_7EE49AAC,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_16_BATHROOM_7EE49AAC,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_16_BATHROOM_7EE49AAC,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_16_BATHROOM_7EE49AAC,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_17_GALLERY_6E7EF848,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=172.6576 kWh | max=255.39 W @h967
+SAM_IDEALLOADS_01_17_GALLERY_6E7EF848,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=172.6576 kWh | max=255.39 W @h967
+SAM_IDEALLOADS_01_17_GALLERY_6E7EF848,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_17_GALLERY_6E7EF848,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_17_GALLERY_6E7EF848,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_01_17_GALLERY_6E7EF848,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_05_STAIRS_8D2D2A02,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=9.5167 kWh | max=42.54 W @h30
+SAM_IDEALLOADS_GF_05_STAIRS_8D2D2A02,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=9.5167 kWh | max=42.54 W @h30
+SAM_IDEALLOADS_GF_05_STAIRS_8D2D2A02,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_05_STAIRS_8D2D2A02,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_05_STAIRS_8D2D2A02,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_05_STAIRS_8D2D2A02,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_07_LIVINGROOM_C7DF54B3,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=458.3874 kWh | max=1803.43 W @h31
+SAM_IDEALLOADS_GF_07_LIVINGROOM_C7DF54B3,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=458.3874 kWh | max=1803.43 W @h31
+SAM_IDEALLOADS_GF_07_LIVINGROOM_C7DF54B3,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_07_LIVINGROOM_C7DF54B3,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_07_LIVINGROOM_C7DF54B3,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_07_LIVINGROOM_C7DF54B3,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_08_BATHROOM_13A0403A,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=102.7454 kWh | max=141.77 W @h966
+SAM_IDEALLOADS_GF_08_BATHROOM_13A0403A,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=102.7454 kWh | max=141.77 W @h966
+SAM_IDEALLOADS_GF_08_BATHROOM_13A0403A,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_08_BATHROOM_13A0403A,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_08_BATHROOM_13A0403A,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_08_BATHROOM_13A0403A,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_09_WC_312FAB2F,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_09_WC_312FAB2F,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_09_WC_312FAB2F,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_09_WC_312FAB2F,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_09_WC_312FAB2F,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_09_WC_312FAB2F,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_10_CLOSET_354B8786,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=82.5543 kWh | max=263.00 W @h967
+SAM_IDEALLOADS_GF_10_CLOSET_354B8786,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=82.5543 kWh | max=263.00 W @h967
+SAM_IDEALLOADS_GF_10_CLOSET_354B8786,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_10_CLOSET_354B8786,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_10_CLOSET_354B8786,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_10_CLOSET_354B8786,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_11_BEDROOM_D8294F2A,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=214.5431 kWh | max=936.60 W @h775
+SAM_IDEALLOADS_GF_11_BEDROOM_D8294F2A,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=214.5431 kWh | max=936.60 W @h775
+SAM_IDEALLOADS_GF_11_BEDROOM_D8294F2A,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_11_BEDROOM_D8294F2A,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=4.6562 kWh | max=28.71 W @h8039
+SAM_IDEALLOADS_GF_11_BEDROOM_D8294F2A,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_11_BEDROOM_D8294F2A,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_12_ENTRANCEHALL_AFFC43B0,Zone Ideal Loads Supply Air Sensible Heating Energy [J] | n=8808 | sum=53.4510 kWh | max=133.44 W @h822
+SAM_IDEALLOADS_GF_12_ENTRANCEHALL_AFFC43B0,Zone Ideal Loads Supply Air Total Heating Energy [J] | n=8808 | sum=53.4510 kWh | max=133.44 W @h822
+SAM_IDEALLOADS_GF_12_ENTRANCEHALL_AFFC43B0,Zone Ideal Loads Supply Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_12_ENTRANCEHALL_AFFC43B0,Zone Ideal Loads Supply Air Total Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_12_ENTRANCEHALL_AFFC43B0,Zone Ideal Loads Outdoor Air Sensible Heating Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
+SAM_IDEALLOADS_GF_12_ENTRANCEHALL_AFFC43B0,Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J] | n=8808 | sum=0.0000 kWh | max=0.00 W @h0
