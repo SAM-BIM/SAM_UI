@@ -1,5 +1,45 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Q4 S02 shared simulation concurrency guard (#241) closeout - 2026-10-19
+
+- **PR/status:** [SAM-BIM/SAM_UI#241](https://github.com/SAM-BIM/SAM_UI/pull/241) complete, merged into `sow/2026-Q4` as `49eebe138db3b750f0bdca030a9bdb20ac1bb6e4`.
+  - Parents: base `ce23dca1` and approved head `426655f3ec144c272d8fa1ff2363e21e95c9c223`, pinned with `--match-head-commit`; the merge tree equals that head.
+  - The owner approved the merge in chat on 2026-10-19 ("merge when green").
+  - Validated content SHA: `578ede41`. `426655f3` is record-only.
+  - This completes roadmap task **S02**.
+- **Completed:** a new `SimulationGuard` (`Classes/SimulationGuard.cs`) allows one simulation at a time per open model.
+  - The key is the window's `UIAnalyticalModel` instance.
+  - It replaces the `openStudioSimulationRunning` and `engineComparisonRunning` flags.
+  - **Entry points that take it** before any dialog or worker, releasing it in `finally`:
+    - Energy Simulation and Run Simulation > Tas (`SimulateTas`);
+    - OpenStudio Simulation and Run Simulation > OpenStudio;
+    - Run Simulation > Both;
+    - the comparison window's Run;
+    - Optimisation's "Run Energy Simulation…" follow-up.
+  - **A refused start** shows "<simulation> is already running for this model, so nothing was started." and changes nothing else. The Run Simulation button refuses before its dialog opens.
+  - **Both** holds one guard, and its internal Tas then OpenStudio producers run inside it.
+  - **Unchanged:** physics, conversion, comparison, B1a and status semantics. There is no queue and no parallel execution.
+  - Record: `documentation/S02-SimulationConcurrencyGuard-PR.md`.
+- **Files:**
+  - `WPF/SAM.Analytical.UI.WPF/Classes/SimulationGuard.cs` (new);
+  - `Windows/AnalyticalWindow.xaml.cs` (guard, plus internal test seams `TasSimulation`/`OpenStudioSimulation`/`BothEnginesSimulation`/`SimulationRefused`);
+  - `Windows/EngineComparisonWindow.xaml.cs`;
+  - tests `SimulationConcurrencyGuardTests.cs` (8 new).
+- **Validation:**
+  - **Local, on `578ede41`:** focused tests 9/9 PASS. Two mutation checks were caught (no Tas guard: 2 fail; no release: 3 fail). Full `SAM.Analytical.UI.WPF.Tests` **2860/2860** PASS with the real `APPDATA`.
+  - **Hosted, final head `426655f3`:** Build #830 (`39313616193`) PASS and SPDX (`39313616449`) PASS.
+  - **Post-merge Q4:** Build #831 (`39315268759`) was in progress at the time of this closeout and was not waited for (the owner said it was not needed).
+- **Cleanup:** the remote `feature/s02-simulation-concurrency-guard` branch was deleted.
+  - Checks before deleting: lease on `426655f3`; verified merged; no open PR used it; no dependency repository had a branch with the same name.
+  - The local branch was deleted after the checkout returned to Q4.
+- **Unresolved:**
+  - **Model reopened during a run:** "Same model" means the `UIAnalyticalModel` instance. So a model reopened while an OpenStudio or Both run goes in the background is not blocked; each such run writes into its own new run folder.
+  - **Part O Hub:** its simulations (Prepare & Run, `SimulatePartO`) are not guarded. This needs an owner decision.
+  - **Scope:** the guard does not cover other processes or other SAM_UI instances.
+  - **Licensed check:** no licensed real-UI concurrent-start attempt was run; it is part of roadmap S05.
+  - **Roadmap:** the SAM roadmap still lists S01 as "Next" and S02 as "Not started". Updating it needs a reviewed SAM PR.
+- **Next step:** owner decision on the roadmap status update and the Part O Hub guard. Then S03 as a separate owner-started task: new session, Claude Opus 5.5, effort High, Build mode.
+
 ## Q4 S01 TAS silent-failure detection and reporting (S01b, #240) closeout - 2026-10-19
 
 - **PR/status:** [SAM-BIM/SAM_UI#240](https://github.com/SAM-BIM/SAM_UI/pull/240) complete, merged into `sow/2026-Q4` as `5b379191606e502762ef20272d3120d68bdc8923` (parents base `68705375` and approved head `531db2892bc714e766c87a29ac7982b476342dfe`; merge tree equals that head). The owner approved it in chat on 2026-10-19 after final-head CI. No repository approval rule applies, and GitHub does not allow the author to approve their own PR. With SAM-BIM/SAM_Tas#103 (S01a, merged `e483877c`, closeout `e84aeff6`) this completes roadmap task **S01**.
