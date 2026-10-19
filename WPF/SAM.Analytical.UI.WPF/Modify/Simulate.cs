@@ -11,6 +11,7 @@ using SAM.Core.Windows.WPF;
 using SAM.Weather;
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -152,6 +153,7 @@ namespace SAM.Analytical.UI.WPF
                 UpdateConstructionLayersByPanelType = simulateWindow.UpdateConstructionLayersByPanelType,
                 TextMap = simulateWindow.SelectedTextMap,
                 WeatherData = simulateWindow.SelectedWeatherData,
+                WeatherFilePath = simulateWindow.SelectedWeatherDataPath,
                 ZoneCategory = simulateWindow.SelectedZoneCategory,
                 Simulate = simulateWindow.Simulate,
 
@@ -263,6 +265,78 @@ namespace SAM.Analytical.UI.WPF
             return Simulate(uIAnalyticalModel, partORun, analyticalModel, simulateInputs, true, partOWorkflowRunner);
         }
 
+        /// <summary>Keeps a TAS run's exception on its record (S03) and returns false, so an exception filter that calls it never catches.</summary>
+        private static bool RecordException(TasSimulationRun? tasSimulationRun, Exception exception)
+        {
+            if (tasSimulationRun is not null)
+            {
+                tasSimulationRun.Exception = exception;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Writes a TAS run's record beside its TBD (S03), its provenance collected by <paramref name="provenance"/>. Called from a finally:
+        /// neither collecting the provenance nor writing the file may change how the run ended, so a failure of either is only a note on the
+        /// record (and on the record's absence, nothing).
+        /// </summary>
+        internal static void WriteTasSimulationManifest(TasSimulationRun tasSimulationRun, Func<SimulationRunProvenance> provenance)
+        {
+            tasSimulationRun.FinishedUtc = DateTime.UtcNow;
+
+            try
+            {
+                tasSimulationRun.Provenance = provenance();
+            }
+            catch (Exception exception)
+            {
+                tasSimulationRun.Notes.Add("Warning: the run provenance could not be collected: " + exception.GetType().Name + ": " + exception.Message);
+            }
+
+            if (string.IsNullOrWhiteSpace(tasSimulationRun.Directory) || string.IsNullOrWhiteSpace(tasSimulationRun.ProjectName) || !System.IO.Directory.Exists(tasSimulationRun.Directory))
+            {
+                return;
+            }
+
+            string path = TasSimulationRun.ManifestPathOf(tasSimulationRun.Directory!, tasSimulationRun.ProjectName!);
+            try
+            {
+                System.IO.File.WriteAllText(path, tasSimulationRun.ToJson());
+                tasSimulationRun.ManifestPath = path;
+            }
+            catch (Exception exception)
+            {
+                tasSimulationRun.Notes.Add("Warning: the run record could not be written: " + exception.GetType().Name + ": " + exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// The ordinary command's core (Energy Simulation / Run Simulation &gt; Tas: no Part O run, no case folder), quiet, with the dialog's
+        /// weather given and the TAS workflow step supplied - for a test of what that core records (S03). Full year, sizing and unmet hours,
+        /// the TAS solar calculation with Direct T3D, no exports. Null <paramref name="partOWorkflowRunner"/> is TAS.
+        /// </summary>
+        internal static PartOSimulationOutcome Simulate(UIAnalyticalModel uIAnalyticalModel, string projectName, string outputDirectory, WeatherData weatherData, string? weatherFilePath, PartOWorkflowRunner partOWorkflowRunner)
+        {
+            SimulateInputs simulateInputs = new()
+            {
+                ProjectName = projectName,
+                OutputDirectory = outputDirectory,
+                UnmetHours = true,
+                FullYearSimulation = true,
+                FullYearSimulation_From = 1,
+                FullYearSimulation_To = 365,
+                Sizing = true,
+                SolarCalculationMethod = SolarCalculationMethod.TAS,
+                DirectT3D = true,
+                WeatherData = weatherData,
+                WeatherFilePath = weatherFilePath,
+                Simulate = true,
+            };
+
+            return Simulate(uIAnalyticalModel, null, uIAnalyticalModel?.JSAMObject, simulateInputs, true, partOWorkflowRunner);
+        }
+
         /// <summary>What the Simulate dialog hands back, as values - so the dialog path and the Hub path share one core.</summary>
         private sealed class SimulateInputs
         {
@@ -284,6 +358,10 @@ namespace SAM.Analytical.UI.WPF
             public bool UpdateConstructionLayersByPanelType;
             public TextMap TextMap;
             public WeatherData WeatherData;
+
+            /// <summary>The file <see cref="WeatherData"/> was read from in the Simulate dialog; null for the model's or a remembered weather (S03 provenance only).</summary>
+            public string WeatherFilePath;
+
             public string ZoneCategory;
             public bool Simulate;
 
@@ -493,7 +571,54 @@ namespace SAM.Analytical.UI.WPF
                 // the zones, the shading, the workflow - and the Part O arming that goes before it. Extracted
                 // so an Iteration 2B optimisation can repeat this exact case over a changed design without a
                 // second copy of it existing to drift. See Modify.RunPartOSimulation.
-                AnalyticalModel analyticalModel_Workflow = Modify.RunPartOSimulation(analyticalModel, partOSimulationContext, projectName, partORun, CancellationToken.None, out path_TBD, out string _, out cancelled, out workflowSimulatedFullYear, out List<string> notes_Simulation, out string refusal_Simulation, out failure_Simulation, null, partOWorkflowRunner);
+                // S03: the ordinary command (Energy Simulation, Run Simulation > Tas) records each run - its outcome, files and provenance -
+                // beside the TBD. Not the Part O routes, whose case folders and run records are their own.
+                TasSimulationRun? tasSimulationRun = partORun is null && simulateInputs.PartOOutputCase is null
+                    ? new TasSimulationRun
+                    {
+                        Id = Guid.NewGuid().ToString("N").Substring(0, 8),
+                        StartedUtc = DateTime.UtcNow,
+                        Directory = outputDirectory,
+                        SourcePath = uIAnalyticalModel.Path,
+                        ProjectName = projectName,
+                        ModelName = analyticalModel_Source.Name,
+                        ModelGuid = analyticalModel_Source.Guid,
+                    }
+                    : null;
+
+                AnalyticalModel analyticalModel_Workflow = null;
+                List<string> notes_Simulation = null;
+                string refusal_Simulation = null;
+                string path_TSD_Run = null;
+                WorkflowSettings? workflowSettings_Run = null;
+                try
+                {
+                    analyticalModel_Workflow = Modify.RunPartOSimulation(analyticalModel, partOSimulationContext, projectName, partORun, CancellationToken.None, out path_TBD, out path_TSD_Run, out cancelled, out workflowSimulatedFullYear, out notes_Simulation, out refusal_Simulation, out failure_Simulation, out workflowSettings_Run, null, partOWorkflowRunner);
+                }
+                catch (Exception exception) when (RecordException(tasSimulationRun, exception))
+                {
+                    // Never reached: the filter only records the exception and returns false, so it propagates exactly as before.
+                    throw;
+                }
+                finally
+                {
+                    if (tasSimulationRun is not null)
+                    {
+                        tasSimulationRun.TbdPath = path_TBD != null && System.IO.File.Exists(path_TBD) ? path_TBD : null;
+                        tasSimulationRun.TsdPath = path_TSD_Run != null && System.IO.File.Exists(path_TSD_Run) ? path_TSD_Run : null;
+                        tasSimulationRun.Refusal = refusal_Simulation;
+                        tasSimulationRun.Failure = failure_Simulation;
+                        if (notes_Simulation is not null)
+                        {
+                            tasSimulationRun.Notes.AddRange(notes_Simulation);
+                        }
+
+                        tasSimulationRun.Status = TasSimulationRun.StatusOf(analyticalModel_Workflow is not null, cancelled, refusal_Simulation, tasSimulationRun.Exception);
+
+                        JsonObject inputs = Query.TasRunInputs(simulateInputs.Simulate, fullYearSimulation, fullYearSimulation_From, fullYearSimulation_To, sizing, unmetHours, useWidths, solarCalculationMethod, simulateInputs.DirectT3D, updateConstructionLayersByPanelType, createTM59, createSAP, createTPD, createPartL, printRoomDataSheets, zoneCategory);
+                        WriteTasSimulationManifest(tasSimulationRun, () => Query.TasRunProvenance(analyticalModel_Source, weatherData, simulateInputs.WeatherFilePath, workflowSettings_Run, inputs, SimulationRunProvenance.TasComServerCommand()));
+                    }
+                }
 
                 notes_Simulate.AddRange(notes_Simulation);
 
