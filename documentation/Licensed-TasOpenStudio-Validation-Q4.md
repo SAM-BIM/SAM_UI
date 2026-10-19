@@ -1,17 +1,42 @@
 # Licensed Tas / OpenStudio end-to-end validation (Q4, 2026-10-19)
 
-Status: **validation complete; documentation-only draft PR. No product, test, physics, tolerance or baseline change.**
+Status: **validation complete; documentation-only PR, open for owner review. No product, test, physics, tolerance or
+baseline change.** Reconciled to the simulation roadmap on 2026-10-19 (see "Status reconciliation" below).
 Base: `sow/2026-Q4` (SAM_UI `4ee45fef`). Record branch: `validation/licensed-tas-openstudio-e2e-q4`.
 Context: SAM_Validation#15, SAM_UI#237 and SAM_UI#238 are merged; the owner now has an active Tas licence. This record
 is the licensed end-to-end acceptance and the first diagnosis of the Tas/OpenStudio numerical differences.
 Machine-local run root: `C:\TasOut\licensed-e2e-20261019` (must be copied/provisioned elsewhere). Selected portable
 evidence: `documentation/evidence/licensed-e2e-20261019/`.
 
+## Status reconciliation (roadmap task S00, 2026-10-19)
+
+The simulation work is now ordered by the canonical roadmap `SAM/documentation/SIMULATION_ROADMAP_Q4_2026.md`
+(SAM-BIM/SAM#213; on `sow/2026-Q4` after it merges). Phase A is reliable Tas / OpenStudio / Both workflows and failure
+handling, Phase B is independent verification of native-model conversion and imported results, and Phase C (engine
+comparison science) is frozen. **Numerical Tas/EnergyPlus agreement is not an acceptance requirement.** Everything
+below is kept unchanged as evidence; this section only states how it is now classified.
+
+| Part of this record | Classification |
+|---|---|
+| Workflow results (Result table, Phase B, HungaryHouse C1-C5, crash not reproduced) | **Kept** as licensed-run evidence of the merged G1/G2 workflows on Q4 `4ee45fef`. Input to roadmap S05, which repeats the runs on S01-S04 content. |
+| Embedded-weather runs and numbers (box embedded row, Phase D "embedded weather" rows, e0/e1) | **Superseded** by SAM-BIM/SAM#212 (F1 fixed, merged `5ac57033`). They were made with the pre-F1 EPW writer and are not comparable with later runs; kept only as the evidence that located F1. Explicit-EPW runs are unaffected. |
+| F1 | **Resolved** by SAM-BIM/SAM#212. |
+| F4, F5, F6 (Tas result extraction) | Roadmap S10 (Tas results round-trip). |
+| F3 (total vs sensible cooling) | Roadmap S11 (OpenStudio results round-trip). |
+| F7 (canonical hash not stable) | Roadmap S04. |
+| F2, F8, F9 (ventilation, window opening, zone volume) | Owner decisions recorded in roadmap S07; no parity converter. |
+| C6, C7, C8, the remaining box-cooling and HungaryHouse heating residuals, Phase D engine-physics attributions | **Frozen** (Phase C). Evidence kept; no further experiments, ASHRAE 140 or engine-physics work without a new owner decision. |
+| "Recommended next step" (below) | Replaced by the roadmap; the original text is in commit `d342c7e2`/`1b7972dd`. |
+
+Relevant Phase A acceptance (roadmap S05): every Tas only / OpenStudio only / Both case reports PASS, FAIL, NOT RUN or
+BLOCKED, and each reported status, output file and failure message matches what the engines did. HungaryHouse is
+machine-local; its provenance and redistribution permission are not established, so it is not committed as a fixture.
+
 ## Result
 
 | Test | Tas | OpenStudio | Comparison | Result |
 |---|---|---|---|---|
-| Small reference model, embedded weather (box-aperture; same inputs as historical `box-both`) | Licensed, exit 0, 21 s, Success | E+ 25.1.0 / SDK 3.10.0, exit 0, 6 s | Compared; 6/0/10/2, 4 contributing + 6 informational; Coverage Warn; Provenance + Reconciliation Pass | **PASS** (workflow); numbers differ, explained below |
+| Small reference model, embedded weather (box-aperture; same inputs as historical `box-both`) | Licensed, exit 0, 21 s, Success | E+ 25.1.0 / SDK 3.10.0, exit 0, 6 s | Compared; 6/0/10/2, 4 contributing + 6 informational; Coverage Warn; Provenance + Reconciliation Pass | **PASS** (workflow); numbers differ, explained below; numbers superseded by SAM#212 (pre-F1 EPW writer) |
 | Small reference model, explicit source EPW (Budapest TMYx) | Licensed, exit 0, 18 s | exit 0, 6 s | Compared; 6/0/10/2 | **PASS** (workflow) |
 | Large building (HungaryHouse, 14 spaces / 84 panels / 20 apertures, embedded design days, explicit EPW) | Licensed, exit 0, 38 s, TSD written (crash **not reproduced**) | exit 0, 37 s | Compared; 48/3/41, 56 N/A, 14/14 spaces matched | **PASS** (workflow); numbers differ, first-level diagnosis only |
 
@@ -101,7 +126,7 @@ both engines received. The earlier `Air`-panel suspicion is **refuted for the ba
 touches an `Air` panel, and Tas has no IZAM and no inter-zone air movement. The dominant cause of GF_08 is Tas window
 opening (C6, confirmed experimentally).
 
-### C6 — Window-opening experiment (Tas only, 19 Oct, `experiments\hungary-window`, evidence `window-opening/`)
+### C6 — Window-opening experiment (frozen, Phase C; Tas only, 19 Oct, `experiments\hungary-window`, evidence `window-opening/`)
 
 Inputs: the run's `…\tas\000000_SAM_AnalyticalModel.tbd` (sha256 `EE2E4A0B…1545`, untouched; copies simulated with
 `tbdDocument.simulate(1, 365, 0, 1, 0, 0, …)`, i.e. aperture output already on, 4–5 s each; no other licensed Tas activity).
@@ -141,7 +166,7 @@ Open (superseded by C7): other windowed zones were untested here; the 01_16 gap 
 consistent with the whole-house temperature/internal-gain difference (E+ unconditioned mean 26–32 °C, plantroom 2480 vs
 1752 kWh) but not isolated by experiment.
 
-### C7 — All-window sensitivity and Part O control audit (Tas only, 19 Oct; evidence `window-opening/`)
+### C7 — All-window sensitivity and Part O control audit (frozen, Phase C; Tas only, 19 Oct; evidence `window-opening/`)
 
 **Inventory (confirmed from TBD, TSD and the SAM model).** 9 operable panes in 7 zones, all with the same Part O function
 `zdwno,0,22.00,24.00,99.00`, 35° opening, no schedule, `sheltered = 0`; the SAM model carries
@@ -242,7 +267,7 @@ Unresolved after C7: 1439.3 kWh (52.2% of the original gap). Attributed by data,
 gain, Tas neighbours are cooler, and E+ internal gains differ (equipment, people latent). Next experiment: align internal
 gains/plantroom in a Tas-only copy (or E+ copy) and rerun.
 
-### C8 — EnergyPlus window-ventilation proof of concept (GF_08 only; E+ 25.2.0; evidence `window-opening/c8-eplus/`)
+### C8 — EnergyPlus window-ventilation proof of concept (frozen, Phase C; GF_08 only; E+ 25.2.0; evidence `window-opening/c8-eplus/`)
 
 Isolated copies of the generated `in.idf` and the explicit `Budapest.epw` (runs in `experiments\hungary-eplus-vent`). Added
 for GF_08 only: `ZoneVentilation:WindandStackOpenArea` + a `Schedule:Constant` opening-area fraction driven by EMS
@@ -339,7 +364,7 @@ one authored control string plus one legacy default; neither was chosen for heat
 
 ## Findings
 
-- **F1 (SAM defect, weather, high impact).** `SAM.Weather.Query.DataString` (SAM `SAM/SAM.Weather/Query/DataString.cs`)
+- **F1 (SAM defect, weather, high impact; resolved by SAM-BIM/SAM#212, merged `5ac57033`).** `SAM.Weather.Query.DataString` (SAM `SAM/SAM.Weather/Query/DataString.cs`)
   writes EPW extraterrestrial horizontal, extraterrestrial direct-normal, horizontal IR and **global horizontal as 0**,
   writes `DirectSolarRadiation` (here global − diffuse, i.e. direct **horizontal**) into the **direct-normal** column, writes
   total sky cover as a 0–1 fraction (EPW expects tenths) and opaque sky cover 0. Non-solar fields round-trip exactly.
@@ -384,7 +409,8 @@ one authored control string plus one legacy default; neither was chosen for heat
   `zdwno,0,22,24,99` string is on all 9 windows, its ramp starts below GF_08's 24 °C setpoint, the string has one field
   fewer than EDSL documents, and `Unrestricted` night opening is a loader default; see C7 for the audit.
 - **F9 (model fidelity, found in C8).** E+ computes zone volume from geometry while Tas uses the SAM space volume; ratios E+/Tas range 0.49–3.00 (GF_08 1.34), the benchmark shows the SAM value for both. Infiltration (ACH × volume) and air thermal mass therefore differ; cause not investigated.
-- F1–F9 remain open; no product change made.
+- F1 is resolved by SAM-BIM/SAM#212; F2–F9 remain open and are mapped to roadmap tasks in "Status reconciliation". No
+  product change was made in this PR.
 
 ## Reproduce
 
@@ -403,12 +429,16 @@ one authored control string plus one legacy default; neither was chosen for heat
 
 ## Recommended next step
 
-Owner review of F1 and F2, which explain most of the disagreement. Then two bounded tasks: (a) after the HVAC conversion
+**Superseded (S00, 2026-10-19).** The next step is owner review of this PR and of the roadmap (SAM-BIM/SAM#213); further
+work follows the roadmap's task register, one task at a time. The original recommendation is kept below for reference:
+(a) maps to S10; in (b) the EPW fix is done (SAM#212) and the embedded-weather re-run moves to S05; (c) and the natural-ventilation milestone are frozen (Phase C).
+
+*Original (pre-S00):* Owner review of F1 and F2, which explain most of the disagreement. Then two bounded tasks: (a) after the HVAC conversion
 lands, a SAM_Tas PR for F4+F5(+F6) with updated benchmark goldens; (b) a SAM PR for the EPW writer (F1) with an
 EPW round-trip regression test, followed by a re-run of this validation with embedded weather. (c) For HungaryHouse,
 window-control mapping (F8) first (all windows 47.8% of the heating gap, GF_08 alone 40.6%). C8 result: the E+ EMS ramp/latch mechanics are verified, but `WindandStackOpenArea` only approximates Tas flow with fitted parameters and an Ideal Loads capacity limit, so the next milestone is an opt-in, off-by-default natural-ventilation design PR (authored area/Cd/ramp/latch, no Tas-default propagation) plus an AirflowNetwork single-zone PoC before any parity claim, with an explicit decision on reproducing vs correcting the Part O settings (C7/C8); then internal-gain alignment (plantroom, bathroom equipment,
 people); plant-capacity comparison last (not causal, see C6/C7).
-Machine-local C6/C7 runs: `C:\TasOut\licensed-e2e-20261019\experiments\hungary-window\{base,close,closeall}`; C8: `experimentshungary-eplus-vent{A,B*,C*,Bcap*,Ccap*}`.
+Machine-local C6/C7 runs: `C:\TasOut\licensed-e2e-20261019\experiments\hungary-window\{base,close,closeall}`; C8: `experiments\hungary-eplus-vent{A,B*,C*,Bcap*,Ccap*}`.
 
 ## Evidence and files
 
