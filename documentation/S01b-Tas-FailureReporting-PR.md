@@ -4,8 +4,8 @@ Roadmap: SAM `documentation/SIMULATION_ROADMAP_Q4_2026.md`, task S01 (Phase A). 
 (SAM-BIM/SAM_Tas#103, merged `e483877c`, closeout `e84aeff6`) is the SAM_Tas half.
 
 Base: `sow/2026-Q4` `68705375`. Branch: `feature/s01b-tas-failure-reporting`. One PR, draft, not merged.
-**Validated content SHA: `1002c5f1`** (all code and tests). Record and evidence commits follow; the final PR head and hosted
-checks are in the PR description. `PROJECT_PROGRESS.md` is not touched (post-merge closeout only).
+**Validated content SHA: `f1157173`** (code and tests; the review correction below on top of `1002c5f1`, which the
+licensed UI runs used). Record commits follow; the final PR head and hosted checks are in the PR description. `PROJECT_PROGRESS.md` is not touched (post-merge closeout only).
 
 ## Status
 Implementation, unit tests and licensed UI checks complete on 2026-10-19 (this laptop, TAS licensed). Awaiting owner
@@ -135,6 +135,20 @@ Reproduce: build both apps as above; `tools/run-tas-case.ps1 -Name <n> -App base
 [-BlockTsd] [-ReuseFrom <case>]`; `tools/run-both-case.ps1 -Name <n> -App base|ab [-RefuseTas]` (sets `SAM_BENCHMARK_*`,
 `SAM_COMMIT`, OpenStudio 3.10 `bin` on `PATH`); `tools/compare-persisted.ps1` (S01a's comparator). Machine-local:
 `C:\TasOut\s01b` (apps, runs, `box.json`s), TAS licence, OpenStudio 3.10 runtime under `.icon-migration\runtime`.
+
+## Review correction (2026-10-19, `f1157173`)
+- **Finding (confirmed):** `Query.BenchmarkFailureLines` caught parse errors only. For valid JSON whose `provenance` is not
+  an object (`{"provenance":"unexpected"}`, `[1,2]`, `42`), `provenance?["warnings"]` threw `InvalidOperationException`
+  ("The node must be of type 'JsonObject'") outside the catch. `RunEngineComparison` then ended `Failed` without running
+  OpenStudio. Reproduced by the new tests before the fix (3 theory cases threw; the Both test saw calls `[Tas]` only).
+- **Fix:** `provenance` is taken `as JsonObject`; any other shape gives no lines. One line of logic in
+  `Query/EngineComparison.cs`; no other change.
+- **Tests:** `FailureLines_OfValidJsonWithAnUnexpectedProvenanceShape_SayNothing_AndDoNotThrow` (6 shapes, including a
+  non-array `warnings` and missing/null `provenance`) and `Both_WithTasFailedOnAMalformedDocument_StillRunsOpenStudio_AndIsPartiallyCompleted`
+  (OpenStudio runs, status `PartiallyCompleted`, no exception) - PASS. Normal failed-document reporting, success and
+  cancellation unchanged (`Both_WithTasRefused_…`, `EngineComparisonTests` incl. `Run_Cancelled_StopsAndSaysSo`): focused
+  37/37 PASS. Full `SAM.Analytical.UI.WPF.Tests` **2852/2852** PASS (real `APPDATA`). Licensed UI runs not repeated:
+  the change only affects a malformed failure document, which the real producer does not write.
 
 ## Unresolved issues and risks
 - TAS opens the error log in Notepad on a refusal; SAM now also shows its own box. Not changed (TAS behaviour).
