@@ -481,13 +481,19 @@ namespace SAM.Analytical.UI.WPF
             // closed. A dialog per space would be unusable on a block of flats.
             List<string> notes_Simulate = [];
 
+            // S01b: a simulation that started, was not cancelled and returned no model - a TAS refusal (TAS-SIM-001) or any other
+            // workflow failure. Decided from the workflow's own return, never from files in the output folder, so a TSD or JSON an
+            // earlier run left there cannot make it look complete. failure_Simulation is what the workflow reported, or null.
+            bool simulationFailed = false;
+            string? failure_Simulation = null;
+
             if(simulateInputs.Simulate)
             {
                 // The whole path to a TSD - materials, construction layers, the TBD, the solar calculation,
                 // the zones, the shading, the workflow - and the Part O arming that goes before it. Extracted
                 // so an Iteration 2B optimisation can repeat this exact case over a changed design without a
                 // second copy of it existing to drift. See Modify.RunPartOSimulation.
-                AnalyticalModel analyticalModel_Workflow = Modify.RunPartOSimulation(analyticalModel, partOSimulationContext, projectName, partORun, CancellationToken.None, out path_TBD, out string _, out cancelled, out workflowSimulatedFullYear, out List<string> notes_Simulation, out string refusal_Simulation, null, partOWorkflowRunner);
+                AnalyticalModel analyticalModel_Workflow = Modify.RunPartOSimulation(analyticalModel, partOSimulationContext, projectName, partORun, CancellationToken.None, out path_TBD, out string _, out cancelled, out workflowSimulatedFullYear, out List<string> notes_Simulation, out string refusal_Simulation, out failure_Simulation, null, partOWorkflowRunner);
 
                 notes_Simulate.AddRange(notes_Simulation);
 
@@ -505,6 +511,8 @@ namespace SAM.Analytical.UI.WPF
 
                     return partOSimulationOutcome;
                 }
+
+                simulationFailed = !cancelled && analyticalModel_Workflow == null;
 
                 if (!cancelled && analyticalModel_Workflow != null)
                 {
@@ -639,7 +647,8 @@ namespace SAM.Analytical.UI.WPF
                 }
             }
 
-            if(!cancelled && createTPD)
+            // Not after a failed simulation: the TSD at this path is then the refusal's stub or an earlier run's, never this run's.
+            if(!cancelled && !simulationFailed && createTPD)
             {
                 string directory = System.IO.Path.GetDirectoryName(path_TBD);
                 string fileName = System.IO.Path.GetFileNameWithoutExtension(path_TBD);
@@ -682,6 +691,10 @@ namespace SAM.Analytical.UI.WPF
             {
                 message = "Simulation cancelled.";
             }
+            else if (simulationFailed)
+            {
+                message = Query.TasSimulationFailedMessage(failure_Simulation, createSAP || createTM59 || createPartL, converted, createTPD, partORun is null);
+            }
             else
             {
                 message = converted ? "Model successfuly converted." : "Model could not be converted.";
@@ -712,6 +725,7 @@ namespace SAM.Analytical.UI.WPF
             }
 
             partOSimulationOutcome.Cancelled = cancelled;
+            partOSimulationOutcome.Failure = simulationFailed ? failure_Simulation ?? Query.TasSimulationFailedNoDetail : null;
             partOSimulationOutcome.Elapsed = timeSpan;
             partOSimulationOutcome.Message = message;
             partOSimulationOutcome.Notes.AddRange(notes_Simulate);
@@ -722,7 +736,14 @@ namespace SAM.Analytical.UI.WPF
             //everything this box said - without an OK to click on success.
             if (!quiet)
             {
-                MessageBox.Show(message);
+                if (simulationFailed)
+                {
+                    MessageBox.Show(message, "Simulation failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                {
+                    MessageBox.Show(message);
+                }
             }
 
             // The Part O case NEVER replaces the open model: the window stays on the design model, and the result is
@@ -732,7 +753,10 @@ namespace SAM.Analytical.UI.WPF
             // null, and pushing that back would replace the model the user still has open with nothing. Not
             // adopting it really does leave the loaded model untouched, because everything above this point
             // worked on the copy taken before the first mutation.
-            if (partORun is null && !cancelled && analyticalModel != null)
+            //
+            // A failed simulation is not adopted either (S01b): it added no results, and replacing the open model would present the
+            // results it already held as if this run had produced them.
+            if (partORun is null && !cancelled && !simulationFailed && analyticalModel != null)
             {
                 uIAnalyticalModel.SetJSAMObject(analyticalModel, new FullModification());
             }

@@ -85,6 +85,12 @@ namespace SAM.Analytical.UI.WPF
 
         public bool Cancelled { get; set; }
 
+        /// <summary>
+        /// Why a simulation that started and was not cancelled returned no model (S01b), or null: what the TAS workflow reported
+        /// (return code, error log, <c>TAS-SIM-001</c>), or <see cref="Query.TasSimulationFailedNoDetail"/> where it reported nothing.
+        /// </summary>
+        public string? Failure { get; set; }
+
         public TimeSpan Elapsed { get; set; }
 
         /// <summary>The dialog path's own closing message, verbatim.</summary>
@@ -100,6 +106,6 @@ namespace SAM.Analytical.UI.WPF
         public string Refusal { get; set; }
 
         /// <summary>Whether anything in this outcome needs a person's attention beyond an inline line.</summary>
-        public bool NeedsAttention => Refusal is not null || Note_PartORun is not null || Notes.Count != 0;
+        public bool NeedsAttention => Refusal is not null || Failure is not null || Note_PartORun is not null || Notes.Count != 0;
     }
 }

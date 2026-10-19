@@ -153,6 +153,13 @@ namespace SAM.Analytical.UI.WPF
                     {
                         producerRun.Error = string.Format("The producer exited with code {0} (2 usage, 3 input/IO, 4 validation, 5 producer failure); see {1}", producerRun.ExitCode, Path.GetFileName(producerRun.LogPath));
                     }
+
+                    //S01b: why it failed, as the failed producer's own document says (for a refused Tas run, the TAS-SIM-001 warnings with the
+                    //TAS return code and error log). Its results are still never used.
+                    if (!producerRun.Succeeded && producerRun.BenchmarkPath != null)
+                    {
+                        result.Diagnostics.AddRange(Query.BenchmarkFailureLines(engine, producerRun.BenchmarkPath));
+                    }
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();

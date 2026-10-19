@@ -48,7 +48,23 @@ namespace SAM.Analytical.UI.WPF
         /// </param>
         public static AnalyticalModel? RunWorkflow(this AnalyticalModel analyticalModel, WorkflowSettings workflowSettings, CancellationToken externalCancellationToken, out bool cancelled, bool analyticalModel_Owned = false)
         {
+            return RunWorkflow(analyticalModel, workflowSettings, externalCancellationToken, out cancelled, out string? _, analyticalModel_Owned);
+        }
+
+        /// <summary>
+        /// <see cref="RunWorkflow(AnalyticalModel, WorkflowSettings, CancellationToken, out bool, bool)"/>, also saying why a run that
+        /// was not cancelled returned no model (S01b).
+        /// </summary>
+        /// <param name="failure">
+        /// Null when the workflow returned a model or was cancelled. Otherwise what the workflow reported about its failure - the TAS
+        /// return code, the error log and every Error diagnostic (<c>TAS-SIM-001</c> for a refused simulation), see
+        /// <see cref="Query.TasWorkflowFailure"/> - or null when it reported nothing. Taken from this run's own
+        /// <c>WorkflowCalculator</c>, never from files in the output folder.
+        /// </param>
+        public static AnalyticalModel? RunWorkflow(this AnalyticalModel analyticalModel, WorkflowSettings workflowSettings, CancellationToken externalCancellationToken, out bool cancelled, out string? failure, bool analyticalModel_Owned = false)
+        {
             cancelled = false;
+            failure = null;
 
             if (analyticalModel == null)
             {
@@ -76,12 +92,13 @@ namespace SAM.Analytical.UI.WPF
                     //Run) this changes nothing.
                     IDisposable cancelScope = partOProgressHost.AllowCancel();
 
+                    WorkflowCalculator workflowCalculator = new WorkflowCalculator(workflowSettings)
+                    {
+                        CancellationToken = cancellationTokenSource_PartO.Token
+                    };
+
                     try
                     {
-                        WorkflowCalculator workflowCalculator = new WorkflowCalculator(workflowSettings)
-                        {
-                            CancellationToken = cancellationTokenSource_PartO.Token
-                        };
 
                         workflowCalculator.Updating += (s, e) => partOProgressHost.Detail(e.Description);
 
@@ -106,6 +123,8 @@ namespace SAM.Analytical.UI.WPF
                         cancelled = true;
                         result = null;
                     }
+
+                    failure = Failure(workflowCalculator, result, cancelled);
                 }
 
                 return result;
@@ -121,14 +140,14 @@ namespace SAM.Analytical.UI.WPF
                 // one has already run.
                 ProgressWindowHost progressWindowHost = new ProgressWindowHost("Tas Workflow", 1, true, Analytical.Tas.Query.CancelNote(null));
 
+                WorkflowCalculator workflowCalculator = new WorkflowCalculator(workflowSettings)
+                {
+                    CancellationToken = cancellationTokenSource.Token
+                };
+
                 try
                 {
                     progressWindowHost.CancelRequested += (s, e) => cancellationTokenSource.Cancel();
-
-                    WorkflowCalculator workflowCalculator = new WorkflowCalculator(workflowSettings)
-                    {
-                        CancellationToken = cancellationTokenSource.Token
-                    };
 
                     workflowCalculator.StepsCounted += (s, e) =>
                     {
@@ -167,9 +186,17 @@ namespace SAM.Analytical.UI.WPF
                     cancelled = true;
                     result = null;
                 }
+
+                failure = Failure(workflowCalculator, result, cancelled);
             }
 
             return result;
+        }
+
+        /// <summary>The failure text of a finished run: null for a model or a cancel; see <see cref="Query.TasWorkflowFailure"/>.</summary>
+        private static string? Failure(WorkflowCalculator workflowCalculator, AnalyticalModel? result, bool cancelled)
+        {
+            return cancelled || result != null ? null : Query.TasWorkflowFailure(workflowCalculator.GetDiagnostics(), workflowCalculator.SimulationEvidence);
         }
 
         public static Dictionary<string, AnalyticalModel>? RunWorkflow(this IEnumerable<AnalyticalModel> analyticalModels, WorkflowSettings workflowSettings, string directory, bool parallel = true, int? maxDegreeOfParallelism = null, bool saveAnalyticalModels = false)
