@@ -177,19 +177,19 @@ conditions, plant and weather unchanged; one run, 0.9 s). E+ = unchanged OpenStu
 | Whole-building heating | 4507.4 | 3388.9 | **3190.5** | 1751.2 |
 | Change vs A | — | −1118.5 | **−1317.0** | |
 | Change vs B | | — | −198.5 | |
-| GF_08 Bathroom | 1425.6 | 387.6 | 348.5 | 102.8 |
-| 01_16 Bathroom | 660.7 | 642.4 | 596.5 | 200.8 |
-| LivingRoom | 799.5 | 776.3 | 719.5 | 458.4 |
-| GF_11 / 01_13 / 01_14 Bedroom | 397.3 / 486.5 / 334.0 | 391.1 / 483.3 / 331.6 | 381.1 / 459.3 / 321.5 | 214.5 / 330.6 / 170.6 |
+| GF_08 Bathroom | 1425.6 | 387.6 | 348.5 | 100.9 |
+| 01_16 Bathroom | 660.7 | 642.4 | 596.5 | 197.8 |
+| LivingRoom | 799.5 | 776.3 | 719.5 | 444.3 |
+| GF_11 / 01_13 / 01_14 Bedroom | 397.3 / 486.5 / 334.0 | 391.1 / 483.3 / 331.6 | 381.1 / 459.3 / 321.5 | 208.9 / 324.1 / 166.0 |
 | Infiltration/ventilation loss, all zones | 9520 | — | 3275 | |
 
 - A → C: −1317.0 kWh, **47.8% of the 2756.3 kWh gap**. B → C adds only −198.5 kWh (7.2% of the gap): GF_08 is the dominant
   single window; the other six windowed zones add about 18% of the B effect. GF_08 itself is 1037.9 of the 1317.0 kWh (79%)
   of what all windows do on heating. Effects are not additive: GF_08's own change is −1037.9 (B) vs −1077.0 (C) and the
   other zones' changes depend on the temperatures set by the open windows.
-- Remaining Tas − E+ difference with all windows closed: **1439.3 kWh** (3190.5 vs 1751.2). Per zone (C − E+): 01_16
-  +395.7, LivingRoom +261.1, GF_08 +245.7, GF_11 +166.5, 01_14 +150.9, 01_13 +128.7, EntranceHall +79.0, Closet +18.5,
-  Gallery −64.0. (E+ zone ideal-loads sum 1795.8 vs the reported 1751.18: 44.6 kWh unexplained inside the E+ summary.)
+- Remaining Tas − E+ difference with all windows closed: **1439.3 kWh** (3190.5 vs 1751.2). Per zone (C − E+, run-period E+ values as corrected in C8): 01_16
+  +398.7, LivingRoom +275.2, GF_08 +247.6, GF_11 +172.2, 01_14 +155.5, 01_13 +135.2, EntranceHall +81.3, Closet +20.0,
+  Gallery −59.2. (The first C7 draft used E+ per-zone sums that included the 24-hour heating design day: 44.6 kWh, see C8.)
 - Temperatures: closing windows lifts mean zone temperature from 21–22 °C to 25–27 °C in occupied rooms (GF_08 23.4 → 28.9,
   01_16 25.6 → 28.7, plantroom 31.5 → 35.1; E+ 26–32 °C, plantroom 48 °C). Tas has no cooling, so the closed-window case
   overheats, as E+ does. GF_08 hours at the 230 W cap 4915 → 28; hours below 23.9 °C 4836 → 6. Other zones' cap hours
@@ -237,10 +237,105 @@ decision and must be an explicit option, never a silent default.
 - Also decide before implementing: heating comparisons should use equal window assumptions in both engines. Until then
   the fair like-for-like Tas run is scenario C (heating 3190.5 kWh vs 1751.2 kWh).
 
-Unresolved after C7: 1439.3 kWh (52.2% of the original gap). Attributed by data, not isolated: 01_16 (396), LivingRoom
-(261), GF_08 residual (246) and bedrooms (446) — E+ zones float at 26–32 °C with plantroom 48 °C and 42% more plantroom
+Unresolved after C7: 1439.3 kWh (52.2% of the original gap). Attributed by data, not isolated: 01_16 (399), LivingRoom
+(275), GF_08 residual (248) and bedrooms (463) — E+ zones float at 26–32 °C with plantroom 48 °C and 42% more plantroom
 gain, Tas neighbours are cooler, and E+ internal gains differ (equipment, people latent). Next experiment: align internal
 gains/plantroom in a Tas-only copy (or E+ copy) and rerun.
+
+### C8 — EnergyPlus window-ventilation proof of concept (GF_08 only; E+ 25.2.0; evidence `window-opening/c8-eplus/`)
+
+Isolated copies of the generated `in.idf` and the explicit `Budapest.epw` (runs in `experiments\hungary-eplus-vent`). Added
+for GF_08 only: `ZoneVentilation:WindandStackOpenArea` + a `Schedule:Constant` opening-area fraction driven by EMS
+(`BeginTimestepBeforePredictor`; ramp 22→24 °C; optional Part O latch: Tz > 23 °C at 23:00 → fully open until 08:00).
+Infiltration (0.15 ACH), setpoints, weather and internal gains unchanged. Not a product implementation.
+
+**Reconciliation of the 44.6 kWh (resolved, no defect).** The unchanged baseline reproduces **1751.176 kWh** (`Zone Ideal Loads
+Supply Air Total Heating Energy`, run period only = the producer metric; sensible = total; outdoor-air heating 0). The
+24-hour *heating design day* contributes 44.599 kWh: my per-zone figures came from an E+ ESO summary that included both
+sizing-day environments (n = 8808 = 8760 + 48). Per-zone E+ values in C7 are corrected above (e.g. GF_08 100.9, not 102.8).
+The E+ used here is 25.2.0 (IDF version 25.1 → warning); its baseline equals the 25.1.0 OpenStudio run to 12 digits.
+
+**Native-output verification** (details in `ems-and-reconciliation-checks.txt`). The actuator and the ventilation object
+exist in `.edd`/`.eio`. The EMS sensor returns the *previous* timestep's zone temperature exactly (one 10-minute lag;
+`Hour` 0–23, `Minute` 10–60). Fraction = ramp(sensed Tz) to 2e-15; the latch is evaluated on the first step of hour 23
+(116 of 365 nights triggered), holds fraction 1.0 from 23:00 to 08:00 and never leaks into hours 8–22 (0 violations);
+flow is zero whenever the fraction is zero. Caveats: 6 warmup *loads*-convergence Severe messages (other zones) in the
+`*_cal` capped runs; Tas evaluates hourly values while E+ uses instants (Tas opening vs ramp(hourly Tz): RMS 0.17).
+
+**Two findings from running it, before any comparison.**
+1. *Unlimited Ideal Loads break the control.* The ramp reaches full opening at 24 °C = GF_08's setpoint; an unlimited heater
+   holds exactly 24.0 °C, so the window is fully open for 8760 h and heating explodes (**124,044 kWh** with default
+   wind/stack inputs, 46,969 kWh calibrated). Tas avoided this because its heater is capped at the 230.3 W design load. A
+   like-for-like E+ run therefore needs `Heating Limit = LimitCapacity, 230.301 W` on GF_08 (the `cap` variants below). The
+   capacity assumption is part of the comparison, not a detail.
+2. *Zone volumes differ between the engines.* E+ computes geometric volume (GF_08 13.88 m³, floor 4.63 m²); Tas uses the SAM
+   space volume (10.40 m³). Across zones E+/Tas = 0.49 (Stairs) … 3.00 (01_18 Void), 1.34 for GF_08, so E+ infiltration
+   (0.15 ACH × volume) is larger there. The benchmark reports identical volumes (the SAM value), so this is invisible in the
+   comparison. Not investigated further; flagged.
+
+**Variants** (capacity-limited GF_08; opening area 1.15 m² = Tas pane W×H, Cd 0.539, effective angle 0). "default" =
+autocalculated wind effectiveness, height difference 1.1 m (half window height). "cal" = wind effectiveness 0.0096
+(Cw·A = 0.011 m², fitted on Tas hourly wind/ΔT/flow, R² 0.43) and height difference 0.19 m (fitted); both are calibrations
+against Tas flows, not derived from SAM data. B = ramp only, C = full Part O.
+
+| GF_08 / whole building | Tas A (C6) | E+ B default | E+ C default | E+ B cal | E+ C cal |
+|---|---|---|---|---|---|
+| Whole-building heating (kWh) | 4507.4 | 3477.0 | 3520.2 | 3355.9 | 3422.6 |
+| Change vs E+ baseline 1751.2 | (Tas: +1118.5 vs closed) | +1725.8 | +1769.0 | +1604.7 | +1671.4 |
+| GF_08 heating (kWh) | 1425.6 | 1617.6 | 1655.3 | 1530.9 | 1583.1 |
+| GF_08 mean zone temperature (°C) | 23.38 | 20.29 | 19.89 | 21.19 | 20.69 |
+| Ventilation + infiltration loss (kWh) | 1583.4 | 3395.6 | 3512.7 | 2942.4 | 3116.1 |
+| Mean window airflow (m³/s) | 0.0322 | 0.1121 | 0.1302 | 0.0513 | 0.0588 |
+| Peak window airflow (m³/s) | 0.249 | 1.847 | 1.847 | 0.142 | 0.191 |
+| Mean opening fraction / hours fully open | 0.262 / 1472 | 0.292 / 796 | 0.344 / 1506 | 0.357 / 1140 | 0.420 / 2072 |
+| Hours at the 230 W cap / hours < 23.9 °C | 4915 / 4836 | 3395 / 7864 | 4049 / 7871 | 2611 / 7509 | 3467 / 7514 |
+
+(Tas "loss" is the TSD infiltration/ventilation channel; E+ is ventilation + infiltration sensible heat loss.)
+
+**Airflow character** (hours with opening > 0.5, flow per unit opening, hourly). Tas: mean 0.102 m³/s, max 0.249, correlation
+with |Tz − Tout| **0.81**, with wind **0.09** — stack-dominated single-sided flow. E+ default: mean 0.314 (3.1×), max 1.847
+(7.4×), correlation with wind 0.52, with ΔT −0.21 — wind-dominated: the standard cross-ventilation wind term is far too strong
+for one window. E+ cal: mean 0.1185 (1.16×), max 0.191, correlation with ΔT **0.95**, wind 0.04. Mean flow in latched (fully
+open) night hours: Tas 0.116 m³/s, E+ cal 0.131 (1.12×), E+ default 0.357 (3.1×).
+
+**Overnight behaviour.** Tas latched 49 nights (441 h); E+ cal latched 116 nights (1044 h) because E+ GF_08 is warmer at 23:00
+more often (no cooling, hotter neighbours); the rule itself is reproduced exactly. Hourly opening-fraction correlation Tas vs E+
+cal = 0.77. The latch adds +52 kWh (GF_08) and +67 kWh (building) in E+ cal, +38/+43 kWh with default parameters; the matching
+Tas effect was not isolated (no Tas run without the latch, none needed).
+
+**Double counting.** None found: the 0.15 ACH `ZoneInfiltration:DesignFlowRate` is untouched (5.8–6.5e-4 m³/s) and window flow
+is a separate `ZoneVentilation` object, as in Tas where infiltration and aperture flow are separate channels.
+
+**What the heating numbers do and do not show.** Annual GF_08 heating lands near Tas (1531–1655 vs 1425.6 kWh), but the
+mechanisms differ: E+ loses about twice the air heat (2942–3513 vs 1583 kWh) while sitting 2–3.5 K colder, with far more hours
+below 23.9 °C. Annual heating agreement is **not** evidence of equivalence. Whole-building heating rises by 1605–1769 kWh in
+E+ against 1118.5 kWh for the same window in Tas.
+
+**Confirmed limitations.**
+- The default `WindandStackOpenArea` wind term (Cw autocalculated) overstates single-window flow ≈3× mean, 7× peak.
+- Reproducing Tas flow-per-opening needs a wind-suppressed, stack-calibrated set (Cw≈0.01, DH≈0.19 m) with no basis in SAM
+  data; the area has no definition for "35° opening" either.
+- Ideal Loads need a heating capacity limit on GF_08 or the Part O ramp runs away; 230.3 W is a Tas sizing result.
+- Different zone volumes (up to 3×), 10-minute vs hourly control timing and E+ zones floating hotter all change the
+  temperatures that drive the ramp, so even a good flow model would not give the Tas heating answer.
+
+**Authored versus default (SAM code and input file).** The `zdwno,0,22.00,24.00,99.00` string is **not** a SAM default: the
+Grasshopper components, `Create.AnalyticalModel` and the tests default to `zdwno,0,19.00,21.00,99.00`, and `22.00,24.00`
+appears nowhere in SAM source, so it was authored (or imported) in the model. Width/Height, OpeningAngle 35° and Factor 1 are
+in the input file. `OpeningRestriction = Unrestricted` and night hours 08–23 are **not** in `HungaryHouse.json`; they come from
+the documented legacy deserialisation default (missing key → `Unrestricted`). Overnight and heating-hour opening is therefore
+one authored control string plus one legacy default; neither was chosen for heating energy, and Part O is an overheating test.
+
+**Recommendation.**
+- A SAM_OpenStudio *converter* PR that reproduces Tas is **not yet justified**: parity needs fitted parameters, a
+  capacity-limit decision and volume alignment. The EMS and ventilation mechanics are proven sound (verified above).
+- Justified now, as a small opt-in design PR (off by default): an explicit per-model/per-aperture natural-ventilation switch,
+  authored opening area/Cd/ramp/latch (not inferred from Tas defaults), `WindandStackOpenArea` with a *stated* wind
+  effectiveness, the EMS ramp and latch proven here, and a diagnostic that refuses Ideal Loads without a capacity limit when
+  the control reaches the heating setpoint. Never propagate `zdwno` or `Unrestricted` automatically.
+- Before any parity claim: an `AirflowNetwork` single-zone PoC (`SimpleOpening`/`DetailedOpening`, same area, Cd and ramp) to
+  see whether pressure-driven bidirectional flow reproduces Tas's stack-dominated flow without fitted wind terms; also align
+  zone volumes and decide the capacity assumption. Until then compare heating with equal window assumptions (scenario C).
 
 ## Findings
 
@@ -288,7 +383,8 @@ gains/plantroom in a Tas-only copy (or E+ copy) and rerun.
   simulate different buildings. Not a software defect in either engine; the mapping needs an owner decision. C7: the same
   `zdwno,0,22,24,99` string is on all 9 windows, its ramp starts below GF_08's 24 °C setpoint, the string has one field
   fewer than EDSL documents, and `Unrestricted` night opening is a loader default; see C7 for the audit.
-- F1–F7 remain open; no product change made.
+- **F9 (model fidelity, found in C8).** E+ computes zone volume from geometry while Tas uses the SAM space volume; ratios E+/Tas range 0.49–3.00 (GF_08 1.34), the benchmark shows the SAM value for both. Infiltration (ACH × volume) and air thermal mass therefore differ; cause not investigated.
+- F1–F9 remain open; no product change made.
 
 ## Reproduce
 
@@ -310,11 +406,9 @@ gains/plantroom in a Tas-only copy (or E+ copy) and rerun.
 Owner review of F1 and F2, which explain most of the disagreement. Then two bounded tasks: (a) after the HVAC conversion
 lands, a SAM_Tas PR for F4+F5(+F6) with updated benchmark goldens; (b) a SAM PR for the EPW writer (F1) with an
 EPW round-trip regression test, followed by a re-run of this validation with embedded weather. (c) For HungaryHouse,
-window-control mapping (F8) first (all windows 47.8% of the heating gap, GF_08 alone 40.6%): design milestone =
-`ZoneVentilation:WindandStackOpenArea` plus an EMS reproducing `zdwno`, off by default, with an explicit decision on
-whether to reproduce or correct the Part O settings (C7); then internal-gain alignment (plantroom, bathroom equipment,
+window-control mapping (F8) first (all windows 47.8% of the heating gap, GF_08 alone 40.6%). C8 result: the E+ EMS ramp/latch mechanics are verified, but `WindandStackOpenArea` only approximates Tas flow with fitted parameters and an Ideal Loads capacity limit, so the next milestone is an opt-in, off-by-default natural-ventilation design PR (authored area/Cd/ramp/latch, no Tas-default propagation) plus an AirflowNetwork single-zone PoC before any parity claim, with an explicit decision on reproducing vs correcting the Part O settings (C7/C8); then internal-gain alignment (plantroom, bathroom equipment,
 people); plant-capacity comparison last (not causal, see C6/C7).
-Machine-local C6/C7 runs: `C:\TasOut\licensed-e2e-20261019\experiments\hungary-window\{base,close,closeall}`.
+Machine-local C6/C7 runs: `C:\TasOut\licensed-e2e-20261019\experiments\hungary-window\{base,close,closeall}`; C8: `experimentshungary-eplus-vent{A,B*,C*,Bcap*,Ccap*}`.
 
 ## Evidence and files
 

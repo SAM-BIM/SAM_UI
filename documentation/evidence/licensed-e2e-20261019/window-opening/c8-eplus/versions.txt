@@ -1,0 +1,1 @@
+E+ exe: C:\Program Files\ladybug_tools\openstudio\EnergyPlus\energyplus.exe (Program Version,EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.10.19 11:08,)

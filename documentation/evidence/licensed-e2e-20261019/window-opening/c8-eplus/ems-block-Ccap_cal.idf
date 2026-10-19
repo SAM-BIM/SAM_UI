@@ -1,0 +1,99 @@
+
+
+
+!- ===== C8 proof of concept: GF_08 natural ventilation (isolated copy; not product output) =====
+ScheduleTypeLimits,
+  GF08_Fraction, 0, 1, Continuous;
+
+Schedule:Constant,
+  GF08_OpenFrac,                          !- Name
+  GF08_Fraction,                          !- Schedule Type Limits Name
+  0;                                      !- Hourly Value
+
+ZoneVentilation:WindandStackOpenArea,
+  GF08_PartO_Window,                      !- Name
+  SAM_ThermalZone_GF_08_Bathroom_13a0403a, !- Zone or Space Name
+  1.15,                                  !- Opening Area {m2}
+  GF08_OpenFrac,                          !- Opening Area Fraction Schedule Name
+  0.0096,                                    !- Opening Effectiveness {dimensionless}
+  0,                                 !- Effective Angle {deg}
+  0.19,                                    !- Height Difference {m}
+  0.539;                                    !- Discharge Coefficient for Opening
+
+EnergyManagementSystem:Sensor,
+  GF08_Tz_Sensor,                         !- Name
+  SAM_ThermalZone_GF_08_Bathroom_13a0403a, !- Output:Variable or Output:Meter Index Key Name
+  Zone Mean Air Temperature;              !- Output:Variable or Output:Meter Name
+
+EnergyManagementSystem:Actuator,
+  GF08_OpenFrac_Act,                      !- Name
+  GF08_OpenFrac,                          !- Actuated Component Unique Name
+  Schedule:Constant,                      !- Actuated Component Type
+  Schedule Value;                         !- Actuated Component Control Type
+
+EnergyManagementSystem:GlobalVariable,
+  GF08_Latch,
+  GF08_LatchEval;
+
+EnergyManagementSystem:Program,
+  GF08_PartO_Control,                     !- Name
+  SET GF08_HourDbg = Hour,
+  SET GF08_MinDbg = Minute,
+  SET GF08_Ramp = (GF08_Tz_Sensor - 22.0) / 2.0,
+  SET GF08_Ramp = @Max GF08_Ramp 0.0,
+  SET GF08_Ramp = @Min GF08_Ramp 1.0,
+  IF Hour == 0,
+    SET GF08_LatchEval = 0,
+  ENDIF,
+  IF (Hour == 23) && (GF08_LatchEval == 0),
+    SET GF08_LatchEval = 1,
+    IF GF08_Tz_Sensor > 23.0,
+      SET GF08_Latch = 1,
+    ELSE,
+      SET GF08_Latch = 0,
+    ENDIF,
+  ENDIF,
+  IF Hour == 8,
+    SET GF08_Latch = 0,
+  ENDIF,
+  IF ((Hour >= 23) || (Hour < 8)) && (GF08_Latch == 1),
+    SET GF08_Frac = 1.0,
+  ELSE,
+    SET GF08_Frac = GF08_Ramp,
+  ENDIF,
+  SET GF08_OpenFrac_Act = GF08_Frac;
+
+EnergyManagementSystem:ProgramCallingManager,
+  GF08_PartO_Manager,                     !- Name
+  BeginTimestepBeforePredictor,           !- EnergyPlus Model Calling Point
+  GF08_PartO_Control;                     !- Program Name 1
+
+EnergyManagementSystem:OutputVariable,
+  GF08 Opening Fraction Command, GF08_Frac, Averaged, ZoneTimestep, GF08_PartO_Control, ;
+EnergyManagementSystem:OutputVariable,
+  GF08 Latch State, GF08_Latch, Averaged, ZoneTimestep, , ;
+EnergyManagementSystem:OutputVariable,
+  GF08 Sensed Tz, GF08_Tz_Sensor, Averaged, ZoneTimestep, , C;
+EnergyManagementSystem:OutputVariable,
+  GF08 Hour Seen, GF08_HourDbg, Averaged, ZoneTimestep, GF08_PartO_Control, ;
+EnergyManagementSystem:OutputVariable,
+  GF08 Minute Seen, GF08_MinDbg, Averaged, ZoneTimestep, GF08_PartO_Control, ;
+
+Output:EnergyManagementSystem,
+  Verbose, Verbose, ErrorsOnly;
+
+Output:Variable, EMS, GF08 Opening Fraction Command, Hourly;
+Output:Variable, EMS, GF08 Latch State, Hourly;
+Output:Variable, EMS, GF08 Opening Fraction Command, Timestep;
+Output:Variable, EMS, GF08 Latch State, Timestep;
+Output:Variable, EMS, GF08 Sensed Tz, Timestep;
+Output:Variable, EMS, GF08 Hour Seen, Timestep;
+Output:Variable, EMS, GF08 Minute Seen, Timestep;
+Output:Variable, SAM_ThermalZone_GF_08_Bathroom_13a0403a, Zone Mean Air Temperature, Timestep;
+Output:Variable, SAM_ThermalZone_GF_08_Bathroom_13a0403a, Zone Ventilation Sensible Heat Loss Energy, Hourly;
+Output:Variable, SAM_ThermalZone_GF_08_Bathroom_13a0403a, Zone Ventilation Sensible Heat Gain Energy, Hourly;
+Output:Variable, SAM_ThermalZone_GF_08_Bathroom_13a0403a, Zone Ventilation Current Density Volume Flow Rate, Hourly;
+Output:Variable, SAM_ThermalZone_GF_08_Bathroom_13a0403a, Zone Ventilation Current Density Air Change Rate, Hourly;
+Output:Variable, SAM_ThermalZone_GF_08_Bathroom_13a0403a, Zone Infiltration Current Density Volume Flow Rate, Hourly;
+Output:Variable, *, Site Wind Speed, Hourly;
+Output:Variable, *, Site Outdoor Air Drybulb Temperature, Hourly;
