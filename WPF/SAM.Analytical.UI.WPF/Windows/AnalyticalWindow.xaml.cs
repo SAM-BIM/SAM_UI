@@ -58,15 +58,6 @@ namespace SAM.Analytical.UI.WPF.Windows
         /// </summary>
         private readonly PartORun partORun = new();
 
-        /// <summary>
-        /// True while a Simulate &gt; OpenStudio run is going. The run works on a frozen copy and does not block the window, so this is
-        /// what keeps a second click from starting a second run; <see cref="SetEnabled"/> leaves the button off while it is set.
-        /// </summary>
-        private bool openStudioSimulationRunning;
-
-        /// <summary>True while a Run Simulation &gt; Both run is going; it does not block the window either.</summary>
-        private bool engineComparisonRunning;
-
         /// <summary>The engine last chosen in Run Simulation, offered again next time.</summary>
         private SimulationEngineChoice runSimulationChoice = SimulationEngineChoice.Tas;
         
@@ -2294,14 +2285,74 @@ namespace SAM.Analytical.UI.WPF.Windows
             SimulateTas();
         }
 
-        /// <summary>Energy Simulation, and Run Simulation &gt; Tas only: the one Tas path, so both entry points behave the same.</summary>
-        private void SimulateTas()
+        /// <summary>Test seam (S02): what Energy Simulation / Run Simulation &gt; Tas runs once it holds the guard. Null is the real Tas simulation.</summary>
+        internal Action? TasSimulation { get; set; }
+
+        /// <summary>Test seam (S02): what OpenStudio Simulation / Run Simulation &gt; OpenStudio runs once it holds the guard. Null is the real run.</summary>
+        internal Func<System.Threading.Tasks.Task>? OpenStudioSimulation { get; set; }
+
+        /// <summary>Test seam (S02): what Run Simulation &gt; Both runs once it holds the guard. Null is the real run.</summary>
+        internal Func<System.Threading.Tasks.Task<EngineComparisonRun?>>? BothEnginesSimulation { get; set; }
+
+        /// <summary>Test seam (S02): how a refused start is told. Null is a message box.</summary>
+        internal Action<string>? SimulationRefused { get; set; }
+
+        /// <summary>The model's simulation guard for <paramref name="simulation"/>; null, after saying what already runs, when it is held (S02).</summary>
+        private SimulationGuard? AcquireSimulationGuard(UIAnalyticalModel uIAnalyticalModel, string simulation)
         {
-            //uIAnalyticalModel?.EnergySimulation(windowHandle);
-            //The ordinary simulation of the open model. It never completes a Part O run: the open model is the
-            //design model, and a Part O case is simulated from Prepare & Run (PR-4). A pending run is dropped by
-            //this simulation's own model replacement, which is the intended behaviour.
-            uIAnalyticalModel?.Simulate(partORun);
+            SimulationGuard? simulationGuard = SimulationGuard.TryAcquire(uIAnalyticalModel, simulation, out string? running);
+            if (simulationGuard == null)
+            {
+                ShowSimulationRefused(running!);
+            }
+
+            return simulationGuard;
+        }
+
+        private void ShowSimulationRefused(string running)
+        {
+            string message = SimulationGuard.RefusalMessage(running);
+            if (SimulationRefused != null)
+            {
+                SimulationRefused(message);
+                return;
+            }
+
+            MessageBox.Show(this, message, "Simulation already running", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        /// <summary>Energy Simulation, and Run Simulation &gt; Tas only: the one Tas path, so both entry points behave the same.</summary>
+        internal void SimulateTas()
+        {
+            UIAnalyticalModel? uIAnalyticalModel_Simulated = uIAnalyticalModel;
+            if (uIAnalyticalModel_Simulated != null)
+            {
+                SimulationGuard? simulationGuard = AcquireSimulationGuard(uIAnalyticalModel_Simulated, SimulationGuard.Tas);
+                if (simulationGuard == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    //uIAnalyticalModel?.EnergySimulation(windowHandle);
+                    //The ordinary simulation of the open model. It never completes a Part O run: the open model is the
+                    //design model, and a Part O case is simulated from Prepare & Run (PR-4). A pending run is dropped by
+                    //this simulation's own model replacement, which is the intended behaviour.
+                    if (TasSimulation != null)
+                    {
+                        TasSimulation();
+                    }
+                    else
+                    {
+                        uIAnalyticalModel_Simulated.Simulate(partORun);
+                    }
+                }
+                finally
+                {
+                    simulationGuard.Dispose();
+                }
+            }
 
             RefreshPartOButtons();
         }
@@ -2313,7 +2364,15 @@ namespace SAM.Analytical.UI.WPF.Windows
                 return;
             }
 
-            RunSimulationWindow runSimulationWindow = new RunSimulationWindow(runSimulationChoice, !openStudioSimulationRunning, !engineComparisonRunning)
+            //Said before the dialog, so no engine is offered while one runs; each run still takes the guard itself.
+            string? running = SimulationGuard.Running(uIAnalyticalModel);
+            if (running != null)
+            {
+                ShowSimulationRefused(running);
+                return;
+            }
+
+            RunSimulationWindow runSimulationWindow = new RunSimulationWindow(runSimulationChoice)
             {
                 Owner = this,
             };
@@ -2324,7 +2383,13 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
 
             runSimulationChoice = runSimulationWindow.EngineChoice;
-            switch (runSimulationChoice)
+            await RunSimulationAsync(runSimulationChoice);
+        }
+
+        /// <summary>Run Simulation's chosen engine, through the same path as its own ribbon button.</summary>
+        internal async System.Threading.Tasks.Task RunSimulationAsync(SimulationEngineChoice simulationEngineChoice)
+        {
+            switch (simulationEngineChoice)
             {
                 case SimulationEngineChoice.Tas:
                     SimulateTas();
@@ -2344,18 +2409,25 @@ namespace SAM.Analytical.UI.WPF.Windows
         }
 
         /// <summary>OpenStudio Simulation, and Run Simulation &gt; OpenStudio/EnergyPlus only.</summary>
-        private async System.Threading.Tasks.Task RunOpenStudioSimulationAsync()
+        internal async System.Threading.Tasks.Task RunOpenStudioSimulationAsync()
         {
-            if (openStudioSimulationRunning || uIAnalyticalModel == null)
+            if (uIAnalyticalModel == null)
             {
                 return;
             }
 
-            openStudioSimulationRunning = true;
+            //Taken before any dialog or worker: the run works on a frozen copy and does not block the window, so this is what keeps
+            //a second start (from any entry point) from running alongside it; SetEnabled leaves the button off while it is held.
+            SimulationGuard? simulationGuard = AcquireSimulationGuard(uIAnalyticalModel, SimulationGuard.OpenStudio);
+            if (simulationGuard == null)
+            {
+                return;
+            }
+
             RibbonButton_OpenStudioSimulation.IsEnabled = false;
             try
             {
-                await SimulateOpenStudio();
+                await (OpenStudioSimulation != null ? OpenStudioSimulation() : SimulateOpenStudio());
             }
             //A missing or stale SAM_OpenStudio assembly fails when SimulateOpenStudio is compiled; say what is missing instead of crashing.
             catch (Exception exception) when (Query.IsOpenStudioLoadFailure(exception))
@@ -2364,7 +2436,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
             finally
             {
-                openStudioSimulationRunning = false;
+                simulationGuard.Dispose();
                 RibbonButton_OpenStudioSimulation.IsEnabled = uIAnalyticalModel != null;
             }
         }
@@ -2373,17 +2445,23 @@ namespace SAM.Analytical.UI.WPF.Windows
         /// Run Simulation &gt; Both: one frozen snapshot, Tas then OpenStudio, SAM_Validation's comparison; the comparison window opens
         /// with the run when it finishes, whatever its status (compared, partially completed, failed or cancelled).
         /// </summary>
-        private async System.Threading.Tasks.Task RunBothEnginesAsync()
+        internal async System.Threading.Tasks.Task RunBothEnginesAsync()
         {
-            if (engineComparisonRunning || uIAnalyticalModel == null)
+            if (uIAnalyticalModel == null)
             {
                 return;
             }
 
-            engineComparisonRunning = true;
+            //One guard for the whole run: Both's own Tas then OpenStudio producers run inside it.
+            SimulationGuard? simulationGuard = AcquireSimulationGuard(uIAnalyticalModel, SimulationGuard.Both);
+            if (simulationGuard == null)
+            {
+                return;
+            }
+
             try
             {
-                EngineComparisonRun? engineComparisonRun = await SimulateBothEngines();
+                EngineComparisonRun? engineComparisonRun = await (BothEnginesSimulation != null ? BothEnginesSimulation() : SimulateBothEngines());
                 if (engineComparisonRun != null)
                 {
                     ShowEngineComparison(engineComparisonRun);
@@ -2396,7 +2474,7 @@ namespace SAM.Analytical.UI.WPF.Windows
             }
             finally
             {
-                engineComparisonRunning = false;
+                simulationGuard.Dispose();
             }
         }
 
@@ -2469,11 +2547,10 @@ namespace SAM.Analytical.UI.WPF.Windows
 
             tasOptimisationWindow.ShowDialog();
 
-            //"Run Energy Simulation…" after the best design was applied: the ordinary Energy Simulation of the open model.
+            //"Run Energy Simulation…" after the best design was applied: the ordinary Energy Simulation of the open model, under its guard (S02).
             if (tasOptimisationWindow.EnergySimulationRequested)
             {
-                uIAnalyticalModel?.Simulate(partORun);
-                RefreshPartOButtons();
+                SimulateTas();
             }
         }
 
@@ -3453,7 +3530,7 @@ namespace SAM.Analytical.UI.WPF.Windows
                 RibbonButton_MapInternalConditionsByTM59.IsEnabled = true;
                 RibbonButton_EnergySimulation.IsEnabled = true;
                 RibbonButton_RunSimulation.IsEnabled = true;
-                RibbonButton_OpenStudioSimulation.IsEnabled = !openStudioSimulationRunning;
+                RibbonButton_OpenStudioSimulation.IsEnabled = SimulationGuard.Running(uIAnalyticalModel) != SimulationGuard.OpenStudio;
                 RibbonButton_SolarSimulation.IsEnabled = true;
                 RibbonButton_ImportWeatherData.IsEnabled = true;
                 RibbonButton_EditWeatherData.IsEnabled = true;
