@@ -3,7 +3,7 @@
 Roadmap: SAM `documentation/SIMULATION_ROADMAP_Q4_2026.md`, task S03 (Phase A). SAM_UI only; no SAM_Validation schema change.
 
 Base: `sow/2026-Q4` `4d7f5bd8` (S02 closeout; S01 SAM_Tas#103 / SAM_UI#240 and S02 SAM_UI#241 merged).
-Branch: `feature/s03-simulation-provenance`. One PR, not merged. **Validated content SHA: `29926a2f`** (code and tests).
+Branch: `feature/s03-simulation-provenance`. One PR, not merged. **Validated content SHA: `87126efc`** (code and tests, after the review fixes; first content `29926a2f`).
 Record commits follow it. The final PR head and hosted checks are in the PR description. `PROJECT_PROGRESS.md` is not
 touched (post-merge closeout only).
 
@@ -35,7 +35,7 @@ and owner review. Not merged.
   a thrown exception (recorded through an exception filter, so it still propagates unchanged). The status is the workflow's
   own return (`TasSimulationRun.StatusOf`), never read from files (S01b). Provenance:
   - engine: the registered `TBD.Document` COM server (`LocalServer32`), its product version (the TAS version) and SHA-256;
-  - weather: `Embedded` only when the weather given to TAS has the same content hash (SAM WeatherData, canonical JSON v1)
+  - weather: `Embedded` only when the weather given to TAS has the same content hash (SAM WeatherData without its own Guid, canonical JSON v1)
     as the model's embedded weather, else `Explicit`; the file it was read from in the Simulate dialog, with its SHA-256;
   - design days: `DerivedFromWeather` only when the days handed to TAS equal those derived from the run's weather;
   - settings: the `WorkflowSettings` actually handed to `WorkflowCalculator` (new internal overload of
@@ -70,7 +70,7 @@ and owner review. Not merged.
   those files are.
 
 ## Tests
-- New `SimulationRunProvenanceTests.cs` (44): build stamp parsing; SAM assemblies identified by path and SHA-256;
+- New `SimulationRunProvenanceTests.cs` (46): build stamp parsing; SAM assemblies identified by path and SHA-256;
   `SAM_COMMIT` set in the environment is not used and an unstamped build is unknown with its reason; executable identity
   (hash, versions, apphost `.dll`), missing and version-less files; the TAS COM server (registered, versioned, version-less,
   not registered) and command-line parsing; EnergyPlus version from `eplusout.err`; Tas embedded weather + derived design days
@@ -92,11 +92,28 @@ and owner review. Not merged.
 Local results on this laptop. Dependencies: SAM `62b54156`, SAM_Tas `e84aeff6`, SAM_OpenStudio `d4216f3`,
 SAM_Validation `68eded0`, all `sow/2026-Q4`, clean.
 - `dotnet build WPF/SAM.Analytical.UI.WPF.Tests -c Release`: 0 errors; no new warnings in the changed files.
-- Focused (`SimulationRunProvenanceTests|TasRunManifestTests|TasFailureReportingTests|SimulationConcurrencyGuardTests|EngineComparisonTests|OpenStudioSimulationTests|WpfCollectionTests`): **105/105 PASS**, including the real OpenStudio run.
+- Focused (`SimulationRunProvenanceTests|TasRunManifestTests|TasFailureReportingTests|SimulationConcurrencyGuardTests|EngineComparisonTests|OpenStudioSimulationTests|WpfCollectionTests`): **107/107 PASS** on `87126efc` (105/105 on `29926a2f`), including the real OpenStudio run.
 - Mutation checks on `29926a2f` (each reverted): no Tas record → 6 fail; `SAM_COMMIT` used as source revision → 1 fails;
   weather "Embedded" by presence instead of content → 3 fail; status ignores an exception → 2 fail.
-- Full `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c Release` (real `APPDATA`) on `29926a2f`: **2910/2910 PASS** (2860 before plus 50 new).
+- Full `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c Release` (real `APPDATA`): `29926a2f` **2910/2910 PASS**; after the review fixes `87126efc` **2912/2912 PASS** (2860 + 52 new).
 - Real engines (manifest evidence, not the S05 real-UI acceptance): Tas only explicit and embedded, OpenStudio only explicit and embedded, Both with and without `SAM_COMMIT`; see below.
+
+## Independent review (2026-10-19) and fixes in `87126efc`
+A separate regression-minded review of the combined S03+S04 diff confirmed no S03 status, exception, cancellation or
+output change: the exception filter, definite assignment, overload delegation and Part O gating were checked. Fixes:
+- **Weather `contentSha256`** included the WeatherData's own `Guid`, which is new on every read, so it was not a true
+  content hash. It now leaves that `Guid` out. The S03 evidence manifests were written on `29926a2f`, before this fix, so
+  their `contentSha256` values include the `Guid`. `Embedded` detection was correct either way.
+- **`TBD.Document`** is now looked up in both registry views, so a 32-bit-only registration is no longer reported as "none".
+- **No stale reasons:** a collector that fails part-way now leaves its item `unknown` with no reasons left over for its
+  sub-items. The test helper also checks that every reason names an item that is `unknown`.
+- **Tests that set `SAM_COMMIT`** now run in a non-parallel `ProcessEnvironmentCollection`.
+- **New tests (2), mutation-checked:** removing the stale-reason cleanup → 1 fails; keeping the `Guid` in the content
+  hash → 1 fails.
+- **Accepted, not changed:**
+  - The weather file is hashed when the run ends, not when the dialog read it.
+  - Provenance for the Tas route is collected on the UI thread in the `finally`. The TBD.exe hash is cached per process;
+    the added time was not measured.
 
 ## Representative manifest evidence
 `documentation/evidence/s03-20261019/` (README there): six manifests from real engines on this licensed laptop, driven
@@ -139,6 +156,9 @@ WPF ribbon. Excerpt of `tas-explicit/box.tas-run.json` (real TAS 9.5.7, Budapest
   developer-built producers does not *complete* without `SAM_COMMIT` (finding above). Owner decision: accept until S06, or
   a separate producer/SAM_Validation change (for example an explicit unknown `samCommit`).
 - The Part O routes (Hub, guided Part O) write no `tas-run.json`.
+- **Merge with S04 (SAM_UI#243).** Both PRs append assertions to the end of `OpenStudioSimulationTests.RealRun_…`, so
+  whichever PR merges second has a textual conflict there. The resolution is to keep both blocks. It was resolved that
+  way in a local integration merge, which passed the full suite (see the PR description).
 - No licensed real-UI run of the three routes on this content (roadmap S05). See the evidence README for what was run.
 - `sourceRevision` of an installed build is the SAM_Deploy commit (what its installer stamps), not a SAM commit; the record
   says so in `sourceRevisionOf`.
