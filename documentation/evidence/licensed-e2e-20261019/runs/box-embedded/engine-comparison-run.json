@@ -1,0 +1,68 @@
+{
+  "schema": "sam-ui.engine-comparison-run/1",
+  "id": "7228de06",
+  "status": "Compared",
+  "startedUtc": "2026-10-19T06:13:22.2601690Z",
+  "finishedUtc": "2026-10-19T06:13:49.5299172Z",
+  "sourcePath": "C:\\TasOut\\licensed-e2e-20261019\\box\\box-aperture.json",
+  "modelName": "000000_SAM_AnalyticalModel",
+  "snapshot": {
+    "path": "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\snapshot.json",
+    "sha256": "sha256:cb920a676eea6df6ef3b151d157e9631f8d8707b5b46a1740eabb44beb50b5cf"
+  },
+  "weather": {
+    "source": "Embedded",
+    "path": "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\weather.epw",
+    "sha256": "sha256:e1353bd2600a401f76262d52a8e16176a15dc45a4967e58d9107c374704abf7c"
+  },
+  "producers": [
+    {
+      "engine": "Tas",
+      "executable": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_Tas\\build\\benchmark-tas.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\weather.epw",
+        "--tbd",
+        "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\tas\\000000_SAM_AnalyticalModel.tbd",
+        "--out",
+        "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\benchmark-TAS.json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 21.054,
+      "log": "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\benchmark-tas.log",
+      "benchmark": "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\benchmark-TAS.json",
+      "error": null,
+      "succeeded": true
+    },
+    {
+      "engine": "OpenStudio",
+      "executable": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_OpenStudio\\benchmark\\SAM.Analytical.OpenStudio.Benchmark\\bin\\x64\\Release\\net8.0\\benchmark-openstudio.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\weather.epw",
+        "--out",
+        "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\benchmark-OpenStudio.json",
+        "--work",
+        "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\openstudio"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 5.856,
+      "log": "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\benchmark-openstudio.log",
+      "benchmark": "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\benchmark-OpenStudio.json",
+      "error": null,
+      "succeeded": true
+    }
+  ],
+  "gate": "Fail",
+  "reports": [
+    "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\comparison.md",
+    "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\comparison.csv",
+    "C:\\TasOut\\licensed-e2e-20261019\\box\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-061322_7228de06\\comparison-summary.json"
+  ],
+  "diagnostics": [],
+  "error": null
+}

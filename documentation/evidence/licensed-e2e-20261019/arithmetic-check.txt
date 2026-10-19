@@ -1,0 +1,4 @@
+hist-box-both : rows checked=16 mismatches=0
+hungary : rows checked=92 mismatches=1
+box-epw : rows checked=16 mismatches=0
+box-embedded : rows checked=16 mismatches=0

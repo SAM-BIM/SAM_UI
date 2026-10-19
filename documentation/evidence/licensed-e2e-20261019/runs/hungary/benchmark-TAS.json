@@ -1,0 +1,890 @@
+{
+  "schemaVersion": "1.0.0",
+  "provenance": {
+    "sourceModelName": "000000_SAM_AnalyticalModel",
+    "sourceModelGuid": "a527e890fceb465fbb50f4b6874f3a4c",
+    "sourceFileHash": "sha256:9d2744416e9c4fe21248b19961aaa048393eadec5952b8a52d5d49357afcc1ca",
+    "canonicalModelHash": "sha256:21b085d16fcb282ce57c96f37ea2c29ff62914e381afe4b00bd5f9f2d34d44e0",
+    "canonicalizationVersion": "1.0.0",
+    "samCommit": "618db819300df8b698b3bbe5174a203244134738",
+    "runnerCommit": "a34a298dde2803de514081a0ed72ac3ff790997b",
+    "engine": {
+      "kind": "TAS",
+      "name": "Tas",
+      "version": "9.5.7.0",
+      "sdkVersion": null
+    },
+    "route": "Native-TAS",
+    "weather": {
+      "identity": "weather",
+      "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+    },
+    "designDaySource": "EmbeddedModel",
+    "runTimestampUtc": "2026-10-19T06:43:25.786963Z",
+    "durationSeconds": 36.9737191,
+    "state": "Success",
+    "resultSources": [
+      "SAM.Analytical.Tas"
+    ],
+    "warnings": [],
+    "notes": [
+      "Shared gbXML was exported from the source model (no --gbxml supplied)."
+    ]
+  },
+  "model": {
+    "consumptionHeating": {
+      "value": 4507.442786032021,
+      "unit": "kWh",
+      "available": true
+    },
+    "consumptionCooling": {
+      "value": 0,
+      "unit": "kWh",
+      "available": true
+    },
+    "peakHeatingLoad": {
+      "value": 4.71291552734375,
+      "unit": "kW",
+      "available": true
+    },
+    "peakHeatingHour": {
+      "value": 919,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "peakCoolingLoad": {
+      "value": 0,
+      "unit": "kW",
+      "available": true
+    },
+    "peakCoolingHour": {
+      "value": 0,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "floorArea": {
+      "value": 167.95195245742798,
+      "unit": "m2",
+      "available": true
+    },
+    "volume": {
+      "value": 470.1821608543396,
+      "unit": "m3",
+      "available": true
+    }
+  },
+  "spaces": [
+    {
+      "guid": "025eb80f65d745b799511b78ac2f82fb",
+      "name": "01_18 Void",
+      "area": {
+        "value": 6.6920779999999995,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 9.118059598283878,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "0872cd39962f43c3b62a6e031a76c24a",
+      "name": "01_13 Bedroom",
+      "area": {
+        "value": 21.280010175465385,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 57.33913699268221,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 722.5675659179688,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 722.5675659179688,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 8,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 26,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "13a0403ab3a543608613b0ce9bf52d92",
+      "name": "GF_08 Bathroom",
+      "area": {
+        "value": 3.647967799712404,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 10.396708229180378,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 230.30104064941406,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 230.30104064941406,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 9,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 4587,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "21bdbb806b4f4e2fbad0632b19fdf14b",
+      "name": "01_15 Plantroom",
+      "area": {
+        "value": 2.9450000000000016,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 5.746544632499992,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 46.01523208618164,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "312fab2f1ba64756b47ccc3dcb21ac8a",
+      "name": "GF_09 WC",
+      "area": {
+        "value": 2.355387206192353,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 6.712853537648204,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 79.81999969482422,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 61.84077453613281,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 918,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "354b8786b4714f3c9941cec051a93361",
+      "name": "GF_10 Closet",
+      "area": {
+        "value": 3.0986077487352315,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 9.007679927026205,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 173.3878631591797,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 173.3878631591797,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 8,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 20,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "4377cbd6712349e68fdae8814ff9c5d9",
+      "name": "01_11 Void",
+      "area": {
+        "value": 5.03787628653,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 7.564547888993382,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "6e7ef8487b714da3b730e0f226af927e",
+      "name": "01_17 Gallery",
+      "area": {
+        "value": 23.55004650825489,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 58.340316505330264,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 496.6584777832031,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 237.14552307128906,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 925,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "7ee49aac87b24671bb00ed1b291806a1",
+      "name": "01_16 Bathroom",
+      "area": {
+        "value": 9.409999999999991,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 26.966204214472434,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 420.1361083984375,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 420.1205139160156,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 914,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "8d2d2a0234584fe4b171e5a9373f1b4d",
+      "name": "GF_05 Stairs",
+      "area": {
+        "value": 4.634866891556,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 28.16450759620351,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 89.53150177001953,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 57.714630126953125,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "affc43b0b5b3445f85d5cea8a7b88d4f",
+      "name": "GF_12 EntranceHall",
+      "area": {
+        "value": 6.955039759539971,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 20.363019689898447,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 272.4144592285156,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 206.66387939453125,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "c7df54b3c0064fc5a7c6e6012dbb9b8e",
+      "name": "GF_07 LivingRoom",
+      "area": {
+        "value": 38.98503142608865,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 121.59536233412693,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 1360.33837890625,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 1360.33837890625,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 8,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 32,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "d8294f2a30b445ca9f6ba83c8dcf4903",
+      "name": "GF_11 Bedroom",
+      "area": {
+        "value": 18.080018143643976,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 51.52805170938531,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 716.8180541992188,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 716.8180541992188,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 8,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 32,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "d94f4dbee3d24ff1bcb341e2c5c6ec6d",
+      "name": "01_14 Bedroom",
+      "area": {
+        "value": 21.280022127733165,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 57.3391691981517,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 698.3070068359375,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 698.3070068359375,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 728,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 10,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    }
+  ]
+}

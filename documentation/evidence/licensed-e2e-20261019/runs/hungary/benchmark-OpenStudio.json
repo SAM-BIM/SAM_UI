@@ -1,0 +1,958 @@
+{
+  "schemaVersion": "1.0.0",
+  "provenance": {
+    "sourceModelName": "000000_SAM_AnalyticalModel",
+    "sourceModelGuid": "a527e890fceb465fbb50f4b6874f3a4c",
+    "sourceFileHash": "sha256:9d2744416e9c4fe21248b19961aaa048393eadec5952b8a52d5d49357afcc1ca",
+    "canonicalModelHash": "sha256:21b085d16fcb282ce57c96f37ea2c29ff62914e381afe4b00bd5f9f2d34d44e0",
+    "canonicalizationVersion": "1.0.0",
+    "samCommit": "618db819300df8b698b3bbe5174a203244134738",
+    "runnerCommit": "d4216f3525c01ca762c1b3e9b6d099733d037f54",
+    "engine": {
+      "kind": "OpenStudio",
+      "name": "EnergyPlus",
+      "version": "25.1.0",
+      "sdkVersion": "3.10.0"
+    },
+    "route": "Native-OpenStudio",
+    "weather": {
+      "identity": "weather",
+      "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+    },
+    "designDaySource": "EmbeddedModel",
+    "runTimestampUtc": "2026-10-19T06:44:04.3276172Z",
+    "durationSeconds": 13.7229377,
+    "state": "Success",
+    "resultSources": [
+      "SAM.Analytical.OpenStudio"
+    ],
+    "warnings": [
+      "[SAM-OS-GEO-001] Warning: Aperture would be degenerate in EnergyPlus: its vertices collapse to 2 side(s) under the 0.01 m proximity rule (sliver geometry); skipped \u2014 repair the source aperture (SAM Aperture 24df7efc-1805-40ef-a7e7-fc8cd33c7225) \u2192 SAM_SubSurface_SIM_INT_SLD_11_24df7efc",
+      "[SAM-OS-GEO-001] Warning: Aperture would be degenerate in EnergyPlus: its vertices collapse to 2 side(s) under the 0.01 m proximity rule (sliver geometry); skipped \u2014 repair the source aperture (SAM Aperture 24df7efc-1805-40ef-a7e7-fc8cd33c7225) \u2192 SAM_SubSurface_SIM_INT_SLD_8_24df7efc",
+      "[SAM-OS-GEO-002] Warning: Removed 1 duplicate/collinear vertices (7 \u2192 6) (SAM Panel 9525acbb-71d0-4e09-beb4-20825202fa1f) \u2192 SAM_Surface_SIM_INT_SLD_FLR_11_9525acbb",
+      "[SAM-OS-GEO-002] Warning: Removed 1 duplicate/collinear vertices (7 \u2192 6) (SAM Panel 9525acbb-71d0-4e09-beb4-20825202fa1f) \u2192 SAM_Surface_SIM_INT_SLD_FLR_4_9525acbb",
+      "[SAM-OS-GEO-002] Warning: Removed 1 duplicate/collinear vertices (7 \u2192 6) (SAM Panel d112c262-362c-4e80-9265-55d8385289a7) \u2192 SAM_Surface_SIM_EXT_GRD_FLR_FLR01_4_d112c262",
+      "[SAM-OS-GEO-002] Warning: Removed 10 duplicate/collinear vertices (15 \u2192 5) (SAM Panel 9605c081-960c-4204-9ea7-b9d0ce5ecf82) \u2192 SAM_Surface_SIM_INT_SLD_FLR_13_9605c081",
+      "[SAM-OS-GEO-002] Warning: Removed 10 duplicate/collinear vertices (15 \u2192 5) (SAM Panel 9605c081-960c-4204-9ea7-b9d0ce5ecf82) \u2192 SAM_Surface_SIM_INT_SLD_FLR_6_9605c081",
+      "[SAM-OS-GEO-002] Warning: Removed 11 duplicate/collinear vertices (15 \u2192 4) (SAM Panel eb313b0a-6b48-4279-a2d4-7f88cfac3c97) \u2192 SAM_Surface_SIM_EXT_GRD_FLR_FLR01_6_eb313b0a",
+      "[SAM-OS-GEO-002] Warning: Removed 12 duplicate/collinear vertices (17 \u2192 5) (SAM Panel 4dd3f4f2-9c41-4aff-8a74-87e55ecbf381) \u2192 SAM_Surface_SIM_EXT_SLD_FLR_Exposed_8_4dd3f4f2",
+      "[SAM-OS-GEO-002] Warning: Removed 12 duplicate/collinear vertices (18 \u2192 6) (SAM Panel ab1bdb45-5dce-4fdc-889c-622d35a54ee7) \u2192 SAM_Surface_SIM_INT_SLD_FLR_0_ab1bdb45",
+      "[SAM-OS-GEO-002] Warning: Removed 13 duplicate/collinear vertices (20 \u2192 7) (SAM Panel 2fdf4184-838c-454f-acd1-b3efb35e08ea) \u2192 SAM_Surface_SIM_EXT_SLD_FLR_Exposed_7_2fdf4184",
+      "[SAM-OS-GEO-002] Warning: Removed 14 duplicate/collinear vertices (18 \u2192 4) (SAM Panel ab1bdb45-5dce-4fdc-889c-622d35a54ee7) \u2192 SAM_Surface_SIM_INT_SLD_FLR_7_ab1bdb45",
+      "[SAM-OS-GEO-002] Warning: Removed 14 duplicate/collinear vertices (20 \u2192 6) (SAM Panel a10a7a36-f696-455c-87fc-6cf3c4af093a) \u2192 SAM_Surface_SIM_EXT_SLD_0_a10a7a36",
+      "[SAM-OS-GEO-002] Warning: Removed 17 duplicate/collinear vertices (24 \u2192 7) (SAM Panel 7da3b4ec-d56e-4308-9470-03840f81c246) \u2192 SAM_Surface_SIM_EXT_GRD_FLR_FLR01_0_7da3b4ec",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel 304137db-7ca7-406f-8fd2-2a40a90a4d91) \u2192 SAM_Surface_SIM_INT_SLD_FLR_0_304137db",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel 304137db-7ca7-406f-8fd2-2a40a90a4d91) \u2192 SAM_Surface_SIM_INT_SLD_FLR_9_304137db",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel 46748422-6946-403f-8b92-e541bdfa6806) \u2192 SAM_Surface_SIM_EXT_SLD_8_46748422",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel 5ff33694-7651-4fc9-99d2-1df97c72fcf7) \u2192 SAM_Surface_SIM_EXT_GRD_FLR_FLR01_5_5ff33694",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel b9425bc5-bc74-44b1-ab57-038579a614d3) \u2192 SAM_Surface_SIM_EXT_SLD_6_b9425bc5",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel c668837d-34ef-465c-8a2b-1d96faa11fb8) \u2192 SAM_Surface_SIM_EXT_SLD_10_c668837d",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel ddc53dfb-89ea-4907-a720-40a05ba9eb2f) \u2192 SAM_Surface_SIM_INT_SLD_FLR_12_ddc53dfb",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel ddc53dfb-89ea-4907-a720-40a05ba9eb2f) \u2192 SAM_Surface_SIM_INT_SLD_FLR_5_ddc53dfb",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel e982e233-c3c7-443f-8e72-e1414cfd7a11) \u2192 SAM_Surface_SIM_INT_SLD_Partition_11_e982e233",
+      "[SAM-OS-GEO-002] Warning: Removed 2 duplicate/collinear vertices (6 \u2192 4) (SAM Panel e982e233-c3c7-443f-8e72-e1414cfd7a11) \u2192 SAM_Surface_SIM_INT_SLD_Partition_8_e982e233",
+      "[SAM-OS-GEO-002] Warning: Removed 3 duplicate/collinear vertices (11 \u2192 8) (SAM Panel 2373dee4-5fae-4552-bc6a-bf6a3b926b3b) \u2192 SAM_Surface_SIM_EXT_GRD_FLR_FLR01_1_2373dee4",
+      "[SAM-OS-GEO-002] Warning: Removed 3 duplicate/collinear vertices (7 \u2192 4) (SAM Panel 6ef72c4a-6cfe-4839-862b-3b5884026cb3) \u2192 SAM_Surface_SIM_EXT_GRD_FLR_FLR01_3_6ef72c4a",
+      "[SAM-OS-GEO-002] Warning: Removed 3 duplicate/collinear vertices (7 \u2192 4) (SAM Panel 7dbfb73e-24b7-4ce7-b380-26651faf2b02) \u2192 SAM_Surface_SIM_EXT_SLD_FLR_Exposed_13_7dbfb73e",
+      "[SAM-OS-GEO-002] Warning: Removed 3 duplicate/collinear vertices (7 \u2192 4) (SAM Panel bdfe1887-f40d-44cf-a108-f903de8d69ea) \u2192 SAM_Surface_SIM_INT_SLD_FLR_10_bdfe1887",
+      "[SAM-OS-GEO-002] Warning: Removed 3 duplicate/collinear vertices (7 \u2192 4) (SAM Panel bdfe1887-f40d-44cf-a108-f903de8d69ea) \u2192 SAM_Surface_SIM_INT_SLD_FLR_3_bdfe1887",
+      "[SAM-OS-GEO-002] Warning: Removed 3 duplicate/collinear vertices (7 \u2192 4) (SAM Panel e79ed3b6-8a14-4c1b-bbef-0ac5ad4cc8b7) \u2192 SAM_Surface_SIM_INT_SLD_FLR_0_e79ed3b6",
+      "[SAM-OS-GEO-002] Warning: Removed 3 duplicate/collinear vertices (7 \u2192 4) (SAM Panel e79ed3b6-8a14-4c1b-bbef-0ac5ad4cc8b7) \u2192 SAM_Surface_SIM_INT_SLD_FLR_10_e79ed3b6",
+      "[SAM-OS-GEO-002] Warning: Removed 4 duplicate/collinear vertices (8 \u2192 4) (SAM Panel 90e290fb-acd7-4869-a5a6-a88ab8d4a4b5) \u2192 SAM_Surface_SIM_EXT_SLD_7_90e290fb",
+      "[SAM-OS-GEO-002] Warning: Removed 4 duplicate/collinear vertices (8 \u2192 4) (SAM Panel 976a502c-fd38-4b41-9c8f-6df45eb318c9) \u2192 SAM_Surface_SIM_EXT_SLD_5_976a502c",
+      "[SAM-OS-GEO-002] Warning: Removed 4 duplicate/collinear vertices (8 \u2192 4) (SAM Panel b5cfef9d-d61a-4a33-9fa3-c181ba5447d6) \u2192 SAM_Surface_SIM_EXT_SLD_3_b5cfef9d",
+      "[SAM-OS-GEO-002] Warning: Removed 4 duplicate/collinear vertices (8 \u2192 4) (SAM Panel d5360b9a-cce9-4583-a7e7-985b0161ae4c) \u2192 SAM_Surface_SIM_EXT_SLD_7_d5360b9a",
+      "[SAM-OS-GEO-002] Warning: Removed 4 duplicate/collinear vertices (8 \u2192 4) (SAM Panel dc004ac8-e855-46b9-ad73-dd26c8fca0a1) \u2192 SAM_Surface_SIM_EXT_SLD_1_dc004ac8",
+      "[SAM-OS-GEO-002] Warning: Removed 5 duplicate/collinear vertices (11 \u2192 6) (SAM Panel eac60a33-bf37-4255-a9a9-86b88486013c) \u2192 SAM_Surface_SIM_INT_SLD_FLR_0_eac60a33",
+      "[SAM-OS-GEO-002] Warning: Removed 5 duplicate/collinear vertices (11 \u2192 6) (SAM Panel eac60a33-bf37-4255-a9a9-86b88486013c) \u2192 SAM_Surface_SIM_INT_SLD_FLR_8_eac60a33",
+      "[SAM-OS-GEO-002] Warning: Removed 6 duplicate/collinear vertices (10 \u2192 4) (SAM Panel b2ceb2f0-16b9-4711-afe8-84c5d5073f4d) \u2192 SAM_Surface_SIM_INT_SLD_FLR_1_b2ceb2f0",
+      "[SAM-OS-GEO-002] Warning: Removed 6 duplicate/collinear vertices (10 \u2192 4) (SAM Panel b2ceb2f0-16b9-4711-afe8-84c5d5073f4d) \u2192 SAM_Surface_SIM_INT_SLD_FLR_8_b2ceb2f0",
+      "[SAM-OS-GEO-002] Warning: Removed 6 duplicate/collinear vertices (10 \u2192 4) (SAM Panel e651d6ae-0dee-4f8a-bf92-3c63732b821d) \u2192 SAM_Surface_SIM_EXT_SLD_6_e651d6ae",
+      "[SAM-OS-GEO-002] Warning: Removed 7 duplicate/collinear vertices (12 \u2192 5) (SAM Panel fffe6b7c-6554-4388-8b48-2a1af9321321) \u2192 SAM_Surface_SIM_EXT_SLD_8_fffe6b7c",
+      "[SAM-OS-GEO-002] Warning: Removed 9 duplicate/collinear vertices (14 \u2192 5) (SAM Panel 55a8c3b8-94de-439b-94d2-2331f5b78bce) \u2192 SAM_Surface_SIM_EXT_SLD_0_55a8c3b8",
+      "[SAM-OS-GEO-002] Warning: Removed 9 duplicate/collinear vertices (14 \u2192 5) (SAM Panel 6d8d3d15-314a-4dde-bc66-35ba0e30dc36) \u2192 SAM_Surface_SIM_EXT_SLD_0_6d8d3d15",
+      "[SAM-OS-GEO-002] Warning: Removed 9 duplicate/collinear vertices (14 \u2192 5) (SAM Panel 9516906c-832b-49c0-8960-ad019a33ff78) \u2192 SAM_Surface_SIM_EXT_SLD_6_9516906c",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 0944207e-e492-45ac-a962-06891228f02f) \u2192 SAM_InternalCondition_S21_DomStore_dc8aa269",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 0fce4eca-718f-441e-9262-586b3a86f827) \u2192 SAM_InternalCondition_S15_DomBath_fed079cd",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 4c0a6313-bc80-4388-afe6-c4f43d97f450) \u2192 SAM_InternalCondition_S00_Unconditioned_924d7fd2",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 6be45072-bce2-4765-b85f-2f32862ca20b) \u2192 SAM_InternalCondition_S22_DomToilet_1b0c5a3e",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 7a96ac57-e5e6-4697-b433-52fce9d6e6b5) \u2192 SAM_InternalCondition_S16_DomBed_baece118",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 817fc162-7c50-48a5-be38-2f4b195281be) \u2192 SAM_InternalCondition_S20_DomLiving_28619b20",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition a4fa3b9e-3a47-4b65-9f87-7d5f5a1a7283) \u2192 SAM_InternalCondition_S16_DomBed_8521df7f",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition d27581a5-c45e-4ea8-a7a1-6322e509bf64) \u2192 SAM_InternalCondition_S15_DomBath_8f261a30",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition db2bc3b9-53f7-4c1f-83dd-ba3525e51567) \u2192 SAM_InternalCondition_S17_DomCirculation_3d3b8e9e",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition dd085a1e-ac39-425b-9f37-29506b53f612) \u2192 SAM_InternalCondition_S17_DomCirculation_08f6e1dc",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition de8a8726-58a9-41ad-934e-7ab759aff4f7) \u2192 SAM_InternalCondition_S16_DomBed_4bdd0777",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition ea700b3c-a049-4e12-8acf-da82fd8ac80f) \u2192 SAM_InternalCondition_S35_MechPlant_69a598cf",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition f050b569-0bb0-4582-86ff-fce5e0c1dbdf) \u2192 SAM_InternalCondition_S00_Unconditioned_ab9965d6",
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition f71a8c74-a5aa-4970-8f9b-5be7be923f41) \u2192 SAM_InternalCondition_S17_DomCirculation_21eac1e6",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London_TRY ANN CLG 0% CONDS DB=\u003EGRad\u0027 carries no usable barometric-pressure profile; the elevation-based standard (101025 Pa) is written instead of leaving the EnergyPlus 31000 Pa default",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London_TRY ANN CLG 0% CONDS DB=\u003EGRad\u0027: the hourly humidity profile was approximated as a constant dew point (12.6 \u00B0C) from 33% RH at the maximum-dry-bulb hour",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London_TRY ANN CLG 0% CONDS DB=\u003EGRad\u0027: the hourly solar profile was approximated by the ASHRAEClearSky model with clearness 1.0; daily dry-bulb range, mean wind/pressure and the SummerDesignDay day type are derived from the SAM hourly profile",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London_TRY ANN HTG 100% CONDS DB\u0027 carries no usable barometric-pressure profile; the elevation-based standard (101025 Pa) is written instead of leaving the EnergyPlus 31000 Pa default",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London_TRY ANN HTG 100% CONDS DB\u0027: the hourly humidity profile was approximated as a constant dew point (-5.2 \u00B0C) from 86% RH at the maximum-dry-bulb hour",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London_TRY ANN HTG 100% CONDS DB\u0027: the hourly solar profile was approximated by the ASHRAEClearSky model with clearness 0.0; daily dry-bulb range, mean wind/pressure and the WinterDesignDay day type are derived from the SAM hourly profile"
+    ],
+    "notes": [
+      "[SAM-OS-RUN-002] Information: Annual weather source: explicit EPW (weather.epw)",
+      "[SAM-OS-RUN-002] Information: Design-day source: AnalyticalModel heating/cooling design days (2 imported)",
+      "[SAM-OS-RUN-002] Information: Ground temperatures taken from the SAM model WeatherData (depth 0 m set, 12 monthly values)"
+    ]
+  },
+  "model": {
+    "consumptionHeating": {
+      "value": 1751.1764823852507,
+      "unit": "kWh",
+      "available": true
+    },
+    "consumptionCooling": {
+      "value": 5.249993252633034,
+      "unit": "kWh",
+      "available": true
+    },
+    "peakHeatingLoad": {
+      "value": 5.720615732562658,
+      "unit": "kW",
+      "available": true
+    },
+    "peakHeatingHour": {
+      "value": 775,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "peakCoolingLoad": {
+      "value": 0.04022509385030127,
+      "unit": "kW",
+      "available": true
+    },
+    "peakCoolingHour": {
+      "value": 7974,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "floorArea": {
+      "value": 167.95195207345205,
+      "unit": "m2",
+      "available": true
+    },
+    "volume": {
+      "value": 470.1821620538829,
+      "unit": "m3",
+      "available": true
+    }
+  },
+  "spaces": [
+    {
+      "guid": "025eb80f65d745b799511b78ac2f82fb",
+      "name": "01_18 Void",
+      "area": {
+        "value": 6.6920779999999995,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 9.118059598283878,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    },
+    {
+      "guid": "0872cd39962f43c3b62a6e031a76c24a",
+      "name": "01_13 Bedroom",
+      "area": {
+        "value": 21.280010175465385,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 57.33913699268221,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 1132.1053783341051,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 1185.0374713835374,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 15.588918884421572,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 7974,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "13a0403ab3a543608613b0ce9bf52d92",
+      "name": "GF_08 Bathroom",
+      "area": {
+        "value": 3.647967799712404,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 10.396708229180378,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 132.91466431648962,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 141.77039650450115,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 918,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "21bdbb806b4f4e2fbad0632b19fdf14b",
+      "name": "01_15 Plantroom",
+      "area": {
+        "value": 2.9450000000000016,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 5.746544632499992,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "312fab2f1ba64756b47ccc3dcb21ac8a",
+      "name": "GF_09 WC",
+      "area": {
+        "value": 2.355387206192353,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 6.712853537648204,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "354b8786b4714f3c9941cec051a93361",
+      "name": "GF_10 Closet",
+      "area": {
+        "value": 3.0986077487352315,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 9.007679927026205,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 241.94985081709015,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 262.9986126750142,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "4377cbd6712349e68fdae8814ff9c5d9",
+      "name": "01_11 Void",
+      "area": {
+        "value": 5.03787628653,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 7.564547888993382,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    },
+    {
+      "guid": "6e7ef8487b714da3b730e0f226af927e",
+      "name": "01_17 Gallery",
+      "area": {
+        "value": 23.55004650825489,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 58.340316505330264,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 237.94647430111968,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 255.38609020627572,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "7ee49aac87b24671bb00ed1b291806a1",
+      "name": "01_16 Bathroom",
+      "area": {
+        "value": 9.409999999999991,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 26.966204214472434,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 170.6033487306563,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 190.23285633754685,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "8d2d2a0234584fe4b171e5a9373f1b4d",
+      "name": "GF_05 Stairs",
+      "area": {
+        "value": 4.634866891556,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 28.16450759620351,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 42.95932098342112,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 39.290501428394045,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 774,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "affc43b0b5b3445f85d5cea8a7b88d4f",
+      "name": "GF_12 EntranceHall",
+      "area": {
+        "value": 6.955039759539971,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 20.363019689898447,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 128.39770297845777,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 133.44180276969487,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 774,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "c7df54b3c0064fc5a7c6e6012dbb9b8e",
+      "name": "GF_07 LivingRoom",
+      "area": {
+        "value": 38.98503142608865,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 121.59536233412693,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 1826.2977053599664,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 1789.983042212367,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 775,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "d8294f2a30b445ca9f6ba83c8dcf4903",
+      "name": "GF_11 Bedroom",
+      "area": {
+        "value": 18.080018143643976,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 51.52805170938531,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 917.4634857707837,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 936.597538158675,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 727,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 28.706458861941027,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 7991,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "d94f4dbee3d24ff1bcb341e2c5c6ec6d",
+      "name": "01_14 Bedroom",
+      "area": {
+        "value": 21.280022127733165,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 57.3391691981517,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 909.1363259848785,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 989.0652526300596,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 0,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 0,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    }
+  ]
+}

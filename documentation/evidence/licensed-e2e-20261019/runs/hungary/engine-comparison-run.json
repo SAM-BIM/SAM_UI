@@ -1,0 +1,68 @@
+{
+  "schema": "sam-ui.engine-comparison-run/1",
+  "id": "fe8d0daa",
+  "status": "Compared",
+  "startedUtc": "2026-10-19T06:43:24.5535962Z",
+  "finishedUtc": "2026-10-19T06:44:40.6049029Z",
+  "sourcePath": "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\HungaryHouse.json",
+  "modelName": "000000_SAM_AnalyticalModel",
+  "snapshot": {
+    "path": "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\snapshot.json",
+    "sha256": "sha256:9d2744416e9c4fe21248b19961aaa048393eadec5952b8a52d5d49357afcc1ca"
+  },
+  "weather": {
+    "source": "File",
+    "path": "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\weather.epw",
+    "sha256": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+  },
+  "producers": [
+    {
+      "engine": "Tas",
+      "executable": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_Tas\\build\\benchmark-tas.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\weather.epw",
+        "--tbd",
+        "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\tas\\000000_SAM_AnalyticalModel.tbd",
+        "--out",
+        "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\benchmark-TAS.json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 38.493,
+      "log": "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\benchmark-tas.log",
+      "benchmark": "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\benchmark-TAS.json",
+      "error": null,
+      "succeeded": true
+    },
+    {
+      "engine": "OpenStudio",
+      "executable": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_OpenStudio\\benchmark\\SAM.Analytical.OpenStudio.Benchmark\\bin\\x64\\Release\\net8.0\\benchmark-openstudio.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\weather.epw",
+        "--out",
+        "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\benchmark-OpenStudio.json",
+        "--work",
+        "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\openstudio"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 36.954,
+      "log": "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\benchmark-openstudio.log",
+      "benchmark": "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\benchmark-OpenStudio.json",
+      "error": null,
+      "succeeded": true
+    }
+  ],
+  "gate": "Fail",
+  "reports": [
+    "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\comparison.md",
+    "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\comparison.csv",
+    "C:\\TasOut\\licensed-e2e-20261019\\hungary\\c5-both-ui\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-064324_fe8d0daa\\comparison-summary.json"
+  ],
+  "diagnostics": [],
+  "error": null
+}

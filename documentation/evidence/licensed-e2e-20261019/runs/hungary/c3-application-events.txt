@@ -1,0 +1,125 @@
+
+
+TimeCreated  : 19-Oct-26 8:42:09 AM
+Id           : 1001
+ProviderName : Windows Error Reporting
+Msg          : Fault bucket 2127675561177927180, type 1
+               Event Name: APPCRASH
+               Response: Niedostępny
+               Cab Id: 0
+
+               Problem signature:
+               P1: tas3d.exe
+               P2: 1.0.0.1
+               P3: 6166ae27
+               P4: tas3d.exe
+               P5: 1.0.0.1
+               P6: 6166ae27
+               P7: c000041d
+               P8: 0158445b
+               P9:
+               P10:
+
+               Attached files:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.5679e85c-e515-404d-96b1-2687a438654f.tmp.WERInternalMetadata.xml
+
+               These files may be
+
+TimeCreated  : 19-Oct-26 8:42:07 AM
+Id           : 1001
+ProviderName : Windows Error Reporting
+Msg          : Fault bucket , type 0
+               Event Name: APPCRASH
+               Response: Not available
+               Cab Id: 0
+
+               Problem signature:
+               P1: tas3d.exe
+               P2: 1.0.0.1
+               P3: 6166ae27
+               P4: tas3d.exe
+               P5: 1.0.0.1
+               P6: 6166ae27
+               P7: c000041d
+               P8: 0158445b
+               P9:
+               P10:
+
+               Attached files:
+
+               These files may be available here:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportQueue\AppCrash_tas3d.exe_b145f1888ec2b47496528ecc6f64cbb9c80f3ab_72f
+
+TimeCreated  : 19-Oct-26 8:42:06 AM
+Id           : 1001
+ProviderName : Windows Error Reporting
+Msg          : Fault bucket 1557862582372620270, type 1
+               Event Name: APPCRASH
+               Response: Niedostępny
+               Cab Id: 0
+
+               Problem signature:
+               P1: tas3d.exe
+               P2: 1.0.0.1
+               P3: 6166ae27
+               P4: tas3d.exe
+               P5: 1.0.0.1
+               P6: 6166ae27
+               P7: c0000005
+               P8: 0158445b
+               P9:
+               P10:
+
+               Attached files:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.3832d50a-4cc1-42f3-ad33-e9fb7a475040.tmp.WERInternalMetadata.xml
+
+               These files may be
+
+TimeCreated  : 19-Oct-26 8:42:05 AM
+Id           : 1000
+ProviderName : Application Error
+Msg          : Faulting application name: tas3d.exe, version: 1.0.0.1, time stamp: 0x6166ae27
+               Faulting module name: tas3d.exe, version: 1.0.0.1, time stamp: 0x6166ae27
+               Exception code: 0xc000041d
+               Fault offset: 0x0158445b
+               Faulting process id: 0x118C
+               Faulting application start time: 0x1DD5F94F2ADA12E
+               Faulting application path: C:\PROGRA~1\ENVIRO~1\Tas\x86\tas3d.exe
+               Faulting module path: C:\PROGRA~1\ENVIRO~1\
+
+TimeCreated  : 19-Oct-26 8:42:04 AM
+Id           : 1001
+ProviderName : Windows Error Reporting
+Msg          : Fault bucket , type 0
+               Event Name: APPCRASH
+               Response: Not available
+               Cab Id: 0
+
+               Problem signature:
+               P1: tas3d.exe
+               P2: 1.0.0.1
+               P3: 6166ae27
+               P4: tas3d.exe
+               P5: 1.0.0.1
+               P6: 6166ae27
+               P7: c0000005
+               P8: 0158445b
+               P9:
+               P10:
+
+               Attached files:
+
+               These files may be available here:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportQueue\AppCrash_tas3d.exe_10da5938cfa4bd4f1f684f261abbe582460690_72f0
+
+TimeCreated  : 19-Oct-26 8:42:02 AM
+Id           : 1000
+ProviderName : Application Error
+Msg          : Faulting application name: tas3d.exe, version: 1.0.0.1, time stamp: 0x6166ae27
+               Faulting module name: tas3d.exe, version: 1.0.0.1, time stamp: 0x6166ae27
+               Exception code: 0xc0000005
+               Fault offset: 0x0158445b
+               Faulting process id: 0x118C
+               Faulting application start time: 0x1DD5F94F2ADA12E
+               Faulting application path: C:\PROGRA~1\ENVIRO~1\Tas\x86\tas3d.exe
+               Faulting module path: C:\PROGRA~1\ENVIRO~1\
