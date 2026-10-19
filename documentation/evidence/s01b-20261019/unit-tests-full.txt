@@ -1,0 +1,2 @@
+Passed!  - Failed:     0, Passed:  2845, Skipped:     0, Total:  2845, Duration: 4 m 10 s - SAM.Analytical.UI.WPF.Tests.dll (net8.0)
+APPDATA-redirected run (environmental, see record): Failed!  - Failed:    34, Passed:  2811, Skipped:     0, Total:  2845, Duration: 3 m 8 s - SAM.Analytical.UI.WPF.Tests.dll (net8.0)

@@ -1,0 +1,71 @@
+{
+  "schema": "sam-ui.engine-comparison-run/1",
+  "id": "70cca5f6",
+  "status": "PartiallyCompleted",
+  "startedUtc": "2026-10-19T18:35:27.5582344Z",
+  "finishedUtc": "2026-10-19T18:35:52.5593030Z",
+  "sourcePath": "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\box-aperture.json",
+  "modelName": "000000_SAM_AnalyticalModel",
+  "snapshot": {
+    "path": "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\snapshot.json",
+    "sha256": "sha256:8077c480814d886d54350cb19d1cd624471317e7e5509b430edcb27125be1df0"
+  },
+  "weather": {
+    "source": "File",
+    "path": "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\weather.epw",
+    "sha256": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+  },
+  "producers": [
+    {
+      "engine": "Tas",
+      "executable": "C:\\TasOut\\s01b\\wrapper\\out\\benchmark-tas.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\weather.epw",
+        "--tbd",
+        "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\tas\\000000_SAM_AnalyticalModel.tbd",
+        "--out",
+        "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\benchmark-TAS.json"
+      ],
+      "exitCode": 5,
+      "durationSeconds": 17.42,
+      "log": "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\benchmark-tas.log",
+      "benchmark": "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\benchmark-TAS.json",
+      "error": "The producer exited with code 5 (2 usage, 3 input/IO, 4 validation, 5 producer failure); see benchmark-tas.log",
+      "succeeded": false
+    },
+    {
+      "engine": "OpenStudio",
+      "executable": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_OpenStudio\\benchmark\\SAM.Analytical.OpenStudio.Benchmark\\bin\\x64\\Release\\net8.0\\benchmark-openstudio.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\weather.epw",
+        "--out",
+        "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\benchmark-OpenStudio.json",
+        "--work",
+        "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\openstudio"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 7.107,
+      "log": "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\benchmark-openstudio.log",
+      "benchmark": "C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\benchmark-OpenStudio.json",
+      "error": null,
+      "succeeded": true
+    }
+  ],
+  "gate": null,
+  "reports": [],
+  "diagnostics": [
+    "Tas warning: TAS-SIM-001: TAS refused the simulation: TBDDocument.simulate returned 0. TAS return code: 0; TAS error log: C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\tas\\000000_SAM_AnalyticalModel_error_log.txt.",
+    "Tas warning: TAS-SIM-001: TAS wrote an error log for this run: C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\tas\\000000_SAM_AnalyticalModel_error_log.txt (TAS return code: 0)\r\nError accessing the TSD file for writing",
+    "Tas warning: TAS-SIM-001: The run produced no output file: C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\tas\\000000_SAM_AnalyticalModel.tsd TAS return code: 0; TAS error log: C:\\TasOut\\s01b\\runs\\B1-cand-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183527_70cca5f6\\tas\\000000_SAM_AnalyticalModel_error_log.txt.",
+    "Tas note: Shared gbXML was exported from the source model (no --gbxml supplied).",
+    "Tas note: The TAS workflow refused the run (see warnings: the simulation failure, with the TAS return code and error log where TAS gave one); measurements are unavailable.",
+    "Partially completed: not compared - Tas did not complete. The OpenStudio results (benchmark-OpenStudio.json) are kept and shown on their own; no Tas result is substituted."
+  ],
+  "error": null
+}

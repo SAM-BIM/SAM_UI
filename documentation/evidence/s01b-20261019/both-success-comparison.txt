@@ -1,0 +1,7 @@
+B2 (candidate) vs B3 (baseline), Run Simulation > Both, box + Budapest EPW, both Compared, same banner (Gate Fail: 6 match, 0 warn, 10 fail; 2 missing).
+comparison.csv: byte-identical
+comparison.md: byte-identical
+benchmark-TAS.json: identical apart from runTimestampUtc, durationSeconds, sourceFileHash, canonicalModelHash
+benchmark-OpenStudio.json: identical apart from runTimestampUtc, durationSeconds, sourceFileHash, canonicalModelHash
+comparison-summary.json: identical apart from runTimestampUtc, durationSeconds, sourceFileHash, canonicalModelHash
+sourceFileHash/canonicalModelHash differ between any two loads of the same model (F7, roadmap S04: UI ParameterSet GUIDs regenerated on load); not S01b.

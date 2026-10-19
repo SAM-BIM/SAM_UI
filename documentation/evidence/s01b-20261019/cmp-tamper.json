@@ -1,0 +1,23 @@
+{
+    "criterion":  "Exact equality of every numeric leaf of persisted simulation parameters, aligned by result type/name/load type and surface reference. No tolerance. Run-generated identities and timestamps are metadata.",
+    "baseline":  "C:\\TasOut\\s01b\\runs\\S2-cand-es-success\\out\\box.json",
+    "candidate":  "C:\\TasOut\\s01b\\tamper-box.json",
+    "baselineCounts":  {
+                           "SAM.Analytical.SpaceSimulationResult":  2,
+                           "SAM.Analytical.SurfaceSimulationResult":  28
+                       },
+    "candidateCounts":  {
+                            "SAM.Analytical.SpaceSimulationResult":  2,
+                            "SAM.Analytical.SurfaceSimulationResult":  28
+                        },
+    "baselineNumbers":  602,
+    "candidateNumbers":  602,
+    "exactMatch":  false,
+    "differences":  [
+                        {
+                            "path":  "SAM.Analytical.SpaceSimulationResult/Office/Cooling/Dry Bulb Temperature",
+                            "baseline":  25.000001907348633,
+                            "candidate":  25.00000290734863
+                        }
+                    ]
+}

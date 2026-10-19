@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "1.0.0",
+  "provenance": {
+    "sourceModelName": "000000_SAM_AnalyticalModel",
+    "sourceModelGuid": "1988f7b93ec047d0b87bf9cb345d9eab",
+    "sourceFileHash": "sha256:ffe4a7e3cf7a740baf94ed2de9a2bce1fb7575b52c125c224936c5b54c095ca1",
+    "canonicalModelHash": "sha256:6d455480d148b86d2c3a452255d451d06244ce84e2db01f2ef0d3102fd15fe51",
+    "canonicalizationVersion": "1.0.0",
+    "samCommit": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+    "runnerCommit": "e84aeff687033354e3f17891635fdf10d42ad68f",
+    "engine": {
+      "kind": "TAS",
+      "name": "Tas",
+      "version": "9.5.7.0",
+      "sdkVersion": null
+    },
+    "route": "Native-TAS",
+    "weather": {
+      "identity": "weather",
+      "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+    },
+    "designDaySource": "None",
+    "runTimestampUtc": "2026-10-19T18:36:30.9996383Z",
+    "durationSeconds": 15.9624706,
+    "state": "Failure",
+    "resultSources": [],
+    "warnings": [
+      "TAS-SIM-001: TAS refused the simulation: TBDDocument.simulate returned 0. TAS return code: 0; TAS error log: C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\tas\\000000_SAM_AnalyticalModel_error_log.txt.",
+      "TAS-SIM-001: TAS wrote an error log for this run: C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\tas\\000000_SAM_AnalyticalModel_error_log.txt (TAS return code: 0)\r\nError accessing the TSD file for writing",
+      "TAS-SIM-001: The run produced no output file: C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\tas\\000000_SAM_AnalyticalModel.tsd TAS return code: 0; TAS error log: C:\\TasOut\\s01b\\runs\\B0-base-both-tas-refused\\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\\tas\\000000_SAM_AnalyticalModel_error_log.txt."
+    ],
+    "notes": [
+      "Shared gbXML was exported from the source model (no --gbxml supplied).",
+      "The TAS workflow refused the run (see warnings: the simulation failure, with the TAS return code and error log where TAS gave one); measurements are unavailable."
+    ]
+  },
+  "model": {
+    "consumptionHeating": {
+      "value": null,
+      "unit": "kWh",
+      "available": false
+    },
+    "consumptionCooling": {
+      "value": null,
+      "unit": "kWh",
+      "available": false
+    },
+    "peakHeatingLoad": {
+      "value": null,
+      "unit": "kW",
+      "available": false
+    },
+    "peakHeatingHour": {
+      "value": null,
+      "unit": "hourOfYear",
+      "available": false
+    },
+    "peakCoolingLoad": {
+      "value": null,
+      "unit": "kW",
+      "available": false
+    },
+    "peakCoolingHour": {
+      "value": null,
+      "unit": "hourOfYear",
+      "available": false
+    },
+    "floorArea": {
+      "value": null,
+      "unit": "m2",
+      "available": false
+    },
+    "volume": {
+      "value": null,
+      "unit": "m3",
+      "available": false
+    }
+  },
+  "spaces": [
+    {
+      "guid": "cb68bed195af496bb255a13ffa5c58e9",
+      "name": "Office",
+      "area": {
+        "value": 50,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 150,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakHour": {
+          "value": null,
+          "unit": "hourOfYear",
+          "available": false
+        },
+        "unmetHours": {
+          "value": null,
+          "unit": "h",
+          "available": false
+        }
+      }
+    }
+  ]
+}

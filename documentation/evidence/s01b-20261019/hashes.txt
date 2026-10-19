@@ -1,0 +1,19 @@
+# sha256, 2026-10-19 (machine-local paths; C:\TasOut\s01b is not committed)
+## inputs
+472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 *Budapest.epw
+99ba2ab9db625d3872e5087f6c47bb50427bbd5fa2f7e110202242a4fcd5ca23 *box-aperture.json
+## apps (SAM Analytical.csproj Release, OutDir, APPDATA/USERPROFILE redirected for the build only)
+6639d6552aed19cddb24acc50936fdd8214f7875e0d4b16069d27c970614ebdc *app-base/SAM.Analytical.UI.WPF.dll
+6fb598e1fe13f2d38cd0d8ee511d3b8e2c116d838446a9182944f06af58e0e2f *app-cand/SAM.Analytical.UI.WPF.dll
+6fb598e1fe13f2d38cd0d8ee511d3b8e2c116d838446a9182944f06af58e0e2f *app-ab/SAM.Analytical.UI.WPF.dll
+app-ab = app-base + candidate SAM.Analytical.UI.WPF.dll/.pdb (assembly version 1.0.0.0 both); app-base vs app-cand differ only in SAM_UI's own assemblies (rebuild), every dependency identical
+## SAM_Tas build (merged S01a, SAM_Tas e84aeff6; hashes equal the S01a record's a3be6931 candidate)
+84fb3e619305760131318c4a2dbaede84133abbe4d21fd08f9ab8a4fb4d91300 *SAM.Analytical.Tas.dll
+2a0aab0f4373db71a5957fed31f40167d10c76fa3fd2d0aace3fb7c39879312d *SAM.Core.Tas.dll
+b58159f16543c50779924b5a3f9a2694ec133d9820685b15428d34364f662c39 *SAM.Analytical.Tas.Benchmark.dll
+7a70ba2d29f4cf49da2f7074fff7aabe356c98ddd3bd4b95fb54cba47ca3c412 *benchmark-tas.dll
+07ab3e45b107bdd28a7d6b3622d05014b1edb95e015f86e5dc3e9c7a9ab3fbd2 *benchmark-tas.exe
+## SAM_OpenStudio producer (d4216f3)
+644059197b0638bdbfcf7d41b3a7c375b40198a7f53336d907c3e727619a5e06 *benchmark-openstudio.exe
+## refusal wrapper (test fixture)
+fa04b428ce284ab381edac2ea4b9735e301fd55ab90d9b89fdc8fdcba8f0de34 *wrapper/out/benchmark-tas.dll

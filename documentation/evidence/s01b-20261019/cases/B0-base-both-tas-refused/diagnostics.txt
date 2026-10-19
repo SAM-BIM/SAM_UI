@@ -1,0 +1,17 @@
+﻿Banner: PARTIALLY COMPLETED - not compared: Tas did not complete (The producer exited with code 5 (2 usage, 3 input/IO, 4 validation, 5 producer failure); see benchmark-tas.log). Showing the OpenStudio results only; no Tas result is substituted and nothing is banded. See Diagnostics.
+
+Not compared: only OpenStudio completed. No gate, difference or band is given, and no result is substituted for the other engine.
+
+OpenStudio run: Success
+  Warning: [SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 9e54af09-65fb-4f64-98d7-200db3be2457) → SAM_InternalCondition_S39_OfficeOpen_30b69a1f
+  Note: [SAM-OS-RUN-002] Information: Annual weather source: explicit EPW (weather.epw)
+  Note: [SAM-OS-RUN-002] Information: Ground temperatures taken from the SAM model WeatherData (depth 0.5 m set, 12 monthly values)
+  Note: [SAM-OS-RUN-002] Information: No design-day source supplied; sizing-period runs stay disabled unless OpenStudioConversionOptions.RunSizingPeriods overrides
+  Result sources: SAM.Analytical.OpenStudio
+
+Run: Partially completed - C:\TasOut\s01b\runs\B0-base-both-tas-refused\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f
+Tas producer: did not complete, C:\TasOut\s01b\wrapper\out\benchmark-tas.exe, exit code 5, 17.3 s, log C:\TasOut\s01b\runs\B0-base-both-tas-refused\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\benchmark-tas.log
+  The producer exited with code 5 (2 usage, 3 input/IO, 4 validation, 5 producer failure); see benchmark-tas.log
+OpenStudio producer: completed, C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_OpenStudio\benchmark\SAM.Analytical.OpenStudio.Benchmark\bin\x64\Release\net8.0\benchmark-openstudio.exe, exit code 0, 8.2 s, log C:\TasOut\s01b\runs\B0-base-both-tas-refused\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\benchmark-openstudio.log
+Partially completed: not compared - Tas did not complete. The OpenStudio results (benchmark-OpenStudio.json) are kept and shown on their own; no Tas result is substituted.
+Run record: C:\TasOut\s01b\runs\B0-base-both-tas-refused\000000_SAM_AnalyticalModel_TasOpenStudio_20261019-183629_fba4e40f\engine-comparison-run.json
