@@ -119,16 +119,58 @@ namespace SAM.Analytical.UI.WPF.Tests
             AnalyticalModel analyticalModel = Model();
             analyticalModel.SetValue(AnalyticalModelParameter.UIGeometrySettings, ViewState("3D View"));
 
+            //Expected: the model's JSON less the one parameter, and less its set because that leaves it empty.
             JsonObject expected = analyticalModel.ToJsonObject();
-            JsonObject uiParameterSet = expected["ParameterSets"]!.AsArray().Select(x => x!.AsObject()).Single(x => (string)x["Name"]! == "SAM.Analytical.UI");
+            JsonArray parameterSets = expected["ParameterSets"]!.AsArray();
+            JsonObject uiParameterSet = parameterSets.Select(x => x!.AsObject()).Single(x => (string)x["Name"]! == "SAM.Analytical.UI");
             JsonArray parameters = uiParameterSet["Parameters"]!.AsArray();
             parameters.Remove(parameters.Single(x => (string)x!["Name"]! == "UI Geometry Settings"));
+            Assert.Empty(parameters);
+            parameterSets.Remove(uiParameterSet);
+            int count_ParameterSets = parameterSets.Count;
 
             AnalyticalModel snapshot = Core.Convert.ToSAM<AnalyticalModel>(Freeze(analyticalModel, "snapshot")).Single();
 
             Assert.Equal(new AnalyticalModel(expected).ToJsonObject().ToJsonString(), snapshot.ToJsonObject().ToJsonString());
             Assert.False(snapshot.HasValue(AnalyticalModelParameter.UIGeometrySettings));
             Assert.True(snapshot.HasValue(Analytical.AnalyticalModelParameter.WeatherData));
+            Assert.Equal(count_ParameterSets, snapshot.GetParameterSets().Count);
+        }
+
+        /// <summary>A model with no view state is frozen byte for byte as before S04 (Core.Convert.ToFile's JSON).</summary>
+        [WpfFact]
+        public void Snapshot_OfAModelWithNoViewState_IsTheSameBytesAsBefore()
+        {
+            AnalyticalModel analyticalModel = Model();
+            Assert.False(analyticalModel.HasValue(AnalyticalModelParameter.UIGeometrySettings));
+
+            string path_Before = Path.Combine(directory, "pre-s04.json");
+            Assert.True(Core.Convert.ToFile(analyticalModel, path_Before));
+
+            Assert.Equal(File.ReadAllBytes(path_Before), File.ReadAllBytes(Freeze(analyticalModel, "s04")));
+        }
+
+        /// <summary>
+        /// The view state's set carries the SAM.Analytical.UI assembly's GUID - its module version id, new with every build of SAM_UI. Two
+        /// builds' copies of one model (simulated by giving that set another GUID) still give the same snapshot and canonical hash.
+        /// </summary>
+        [WpfFact]
+        public void ViewStateFromAnotherBuildOfSamUi_GivesTheSameCanonicalHash()
+        {
+            AnalyticalModel analyticalModel = Model();
+            analyticalModel.SetValue(AnalyticalModelParameter.UIGeometrySettings, ViewState("3D View"));
+
+            JsonObject jsonObject = analyticalModel.ToJsonObject();
+            JsonObject uiParameterSet = jsonObject["ParameterSets"]!.AsArray().Select(x => x!.AsObject()).Single(x => (string)x["Name"]! == "SAM.Analytical.UI");
+            Assert.NotEqual(Guid.Empty.ToString(), (string)uiParameterSet["Guid"]!);
+            uiParameterSet["Guid"] = Guid.NewGuid().ToString();
+            AnalyticalModel analyticalModel_OtherBuild = new AnalyticalModel(jsonObject);
+
+            string snapshot_1 = Freeze(analyticalModel, "1");
+            string snapshot_2 = Freeze(analyticalModel_OtherBuild, "2");
+
+            Assert.Equal(Query.Sha256(snapshot_1), Query.Sha256(snapshot_2));
+            Assert.Equal(ProducerCanonicalHash(snapshot_1), ProducerCanonicalHash(snapshot_2));
         }
 
         /// <summary>G. Freezing never changes the model given - not its view state, not anything else.</summary>

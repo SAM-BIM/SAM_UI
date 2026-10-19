@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
 using System.Threading;
 
 namespace SAM.Analytical.UI.WPF
@@ -100,18 +101,30 @@ namespace SAM.Analytical.UI.WPF
         /// Writes <paramref name="analyticalModel"/> to <paramref name="path"/> and returns the model read back from that file: an
         /// independent copy whose content is exactly the file's. Null when either step fails.
         /// <para>
-        /// The file is <see cref="Query.SimulationSnapshot"/> of the model (S04): everything except SAM_UI's view state, which is
+        /// The file is <see cref="Query.SimulationSnapshotJsonObject"/> of the model (S04): everything except SAM_UI's view state, which is
         /// regenerated on every open and would otherwise give the same model a different snapshot and canonical hash in each session.
+        /// A JSON snapshot is written exactly as <c>Core.Convert.ToFile</c> writes a JSON file, so a model with no view state gives the
+        /// same bytes as before S04.
         /// </para>
         /// </summary>
         public static AnalyticalModel? FreezeAnalyticalModel(this AnalyticalModel analyticalModel, string path)
         {
-            if (analyticalModel == null || string.IsNullOrWhiteSpace(path))
+            if (analyticalModel == null || string.IsNullOrWhiteSpace(path) || !System.IO.Directory.Exists(Path.GetDirectoryName(path)))
             {
                 return null;
             }
 
-            if (!Core.Convert.ToFile(Query.SimulationSnapshot(analyticalModel), path))
+            JsonObject? jsonObject = Query.SimulationSnapshotJsonObject(analyticalModel);
+            if (jsonObject == null)
+            {
+                return null;
+            }
+
+            if (Core.Query.SAMFileType(path) == Core.SAMFileType.Json)
+            {
+                File.WriteAllText(path, new JsonArray(jsonObject).ToJsonString(Core.Convert.SerializerOptions(Core.Formatting.Indented)));
+            }
+            else if (!Core.Convert.ToFile(new AnalyticalModel(jsonObject), path))
             {
                 return null;
             }
