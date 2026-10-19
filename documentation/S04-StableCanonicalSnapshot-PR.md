@@ -36,7 +36,7 @@ and owner review. Not merged.
 - **`Modify.FreezeAnalyticalModel`:** writes that JSON for the one snapshot both routes use:
   - Run Simulation > Both: the file both producers hash (`sourceFileHash`, `canonicalModelHash`) and simulate;
   - OpenStudio Simulation: the frozen copy is read back from it and converted.
-  
+
   A `.json` snapshot is written exactly as `Core.Convert.ToFile` writes JSON: a one-element array, with
   `Core.Convert.SerializerOptions(Indented)`. A model with no view state is therefore frozen byte for byte as before. Other
   file types go through `Core.Convert.ToFile`, as before.
