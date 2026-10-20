@@ -1,0 +1,13 @@
+﻿Title: OpenStudio Simulation
+The OpenStudio/EnergyPlus simulation finished. The open model was not changed.
+
+Run folder: C:\TasOut\s05\runs\c2-openstudio-explicit\000000_SAM_AnalyticalModel_OpenStudio_20261020-053948_275dbafb
+Result model: 000000_SAM_AnalyticalModel_OpenStudio.json (13 results)
+Weather: File
+EnergyPlus: exit code 0, 10 warnings, 0 severe, 0 fatal
+
+Diagnostics:
+- Warning SAM-OS-IC-001: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope)
+
+Open the run folder?
+

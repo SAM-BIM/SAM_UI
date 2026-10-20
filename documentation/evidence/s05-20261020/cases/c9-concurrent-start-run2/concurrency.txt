@@ -1,0 +1,15 @@
+﻿Energy Simulation (ribbon): REFUSED: A Tas + OpenStudio run is already running for this model, so nothing was started.
+
+Wait until it finishes, or cancel it, then start the simulation again. | first run's progress window open before: True, after: True
+Run Simulation (ribbon): REFUSED: A Tas + OpenStudio run is already running for this model, so nothing was started.
+
+Wait until it finishes, or cancel it, then start the simulation again. | first run's progress window open before: True, after: True
+OpenStudio Simulation (ribbon): REFUSED: A Tas + OpenStudio run is already running for this model, so nothing was started.
+
+Wait until it finishes, or cancel it, then start the simulation again. | first run's progress window open before: True, after: True
+Comparison window Run: REFUSED: An OpenStudio simulation is already running for this model, so nothing was started.
+
+Wait until it finishes, or cancel it, then start the simulation again. | first run's progress window open before: True, after: True
+Energy Simulation during OpenStudio (ribbon): REFUSED: An OpenStudio simulation is already running for this model, so nothing was started.
+
+Wait until it finishes, or cancel it, then start the simulation again. | first run's progress window open before: True, after: True

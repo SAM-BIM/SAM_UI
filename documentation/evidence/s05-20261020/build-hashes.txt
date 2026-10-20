@@ -1,0 +1,15 @@
+# S05 build hashes (2026-10-20). Dependency stack: BuildAlls_v5 skip2027 (Debug, Rebuild) at build-revisions.txt; app: MSBuild Release Rebuild of SAM_UI ad1f2486.
+5e6a1a7da6077e17274bee3a3ce995dc6f382a3671e824c12afb6b9233ff74ef *SAM/build/SAM.Weather.dll
+186f03095d4ec2352fe4dfecf7144561f566c09d6a99d50e5d443d5c0a783e12 *SAM/build/SAM.Analytical.dll
+166c28cee37681a5276befd3133104821a7a1d6b7e888f6b657d203a41fb3132 *SAM/build/SAM.Core.dll
+07ab3e45b107bdd28a7d6b3622d05014b1edb95e015f86e5dc3e9c7a9ab3fbd2 *SAM_Tas/build/benchmark-tas.exe
+2c13740afdfa6b7478f04e219097362fc6b9d4ef4c10ceed166ec14d51ada7a9 *SAM_Tas/build/benchmark-tas.dll
+c4f19541b888298349390af2eaef795efbd8929b1ef8dfd542e09f753987e44a *SAM_Tas/build/SAM.Analytical.Tas.dll
+644059197b0638bdbfcf7d41b3a7c375b40198a7f53336d907c3e727619a5e06 *C:/Users/michal/Documents/GitHub/SAM-BIM/SAM_OpenStudio/benchmark/SAM.Analytical.OpenStudio.Benchmark/bin/x64/Debug/net8.0/benchmark-openstudio.exe
+4f53433a8617d12c78f792e5885d0ad9b2f027f676d76ba9ec9eb0670a5740dd *C:/Users/michal/Documents/GitHub/SAM-BIM/SAM_OpenStudio/benchmark/SAM.Analytical.OpenStudio.Benchmark/bin/x64/Debug/net8.0/benchmark-openstudio.dll
+965716bd87ded52ded7ac085810ef6b93d1fb3a000f0e12e9f74be32b7958c66 *C:/Users/michal/Documents/GitHub/SAM-BIM/SAM_OpenStudio/benchmark/SAM.Analytical.OpenStudio.Benchmark/bin/x64/Debug/net8.0/SAM.Analytical.OpenStudio.dll
+4b90a15b30c0fc9c305db2e8683c5d0d20c2f1bb810b19bc52c06147bf323c16 *SAM_Validation/build/SAM.Analytical.Benchmark.dll
+d9db90db60c0e4cfac1833adc3da0a3b04c2f96d0fd8b23a02c6307c0db9da2e *SAM_Validation/build/SAM.Analytical.Benchmark.Compare.dll
+b1d436d557577e0b096eddd026fefe303e04877c06aa676dca7e28d857d1fa2d *C:/TasOut/s05/app/SAM Analytical.exe
+0d4e368af288068fde16519e92f60c25a7e0f10740680ac0c750f32f43002a15 *C:/TasOut/s05/app/SAM.Analytical.UI.WPF.dll
+5e6a1a7da6077e17274bee3a3ce995dc6f382a3671e824c12afb6b9233ff74ef *C:/TasOut/s05/app/SAM.Weather.dll

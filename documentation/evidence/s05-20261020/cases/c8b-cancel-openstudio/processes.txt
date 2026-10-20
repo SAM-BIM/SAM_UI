@@ -1,0 +1,2 @@
+﻿2026-10-20T05:50:56.4216194Z [running, before Cancel] openstudio.exe#56332(parent 51980), energyplus.exe#36496(parent 56332)
+2026-10-20T05:51:03.4796590Z [3 s after the summary] none

@@ -1,0 +1,5 @@
+﻿Banner: CANCELLED - nothing to show or compare. See Diagnostics for each engine's exit code, error and log.
+
+Run: Cancelled - C:\TasOut\s05\runs\c8a-cancel-both\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054952_eb0e846a
+Tas producer: did not complete, C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_Tas\build\benchmark-tas.exe, exit code -, 5.3 s, log C:\TasOut\s05\runs\c8a-cancel-both\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054952_eb0e846a\benchmark-tas.log
+Run record: C:\TasOut\s05\runs\c8a-cancel-both\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054952_eb0e846a\engine-comparison-run.json

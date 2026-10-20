@@ -1,0 +1,19 @@
+{
+    "criterion":  "Exact equality of every numeric leaf of persisted simulation parameters, aligned by result type/name/load type and surface reference. No tolerance. Run-generated identities and timestamps are metadata.",
+    "baseline":  "C:\\TasOut\\s01b\\runs\\S1-base-es-success\\out\\box.json",
+    "candidate":  "C:\\TasOut\\s05\\runs\\c1-tas-run-simulation\\out\\box.json",
+    "baselineCounts":  {
+                           "SAM.Analytical.SpaceSimulationResult":  2,
+                           "SAM.Analytical.SurfaceSimulationResult":  28
+                       },
+    "candidateCounts":  {
+                            "SAM.Analytical.SpaceSimulationResult":  2,
+                            "SAM.Analytical.SurfaceSimulationResult":  28
+                        },
+    "baselineNumbers":  602,
+    "candidateNumbers":  602,
+    "exactMatch":  true,
+    "differences":  [
+
+                    ]
+}

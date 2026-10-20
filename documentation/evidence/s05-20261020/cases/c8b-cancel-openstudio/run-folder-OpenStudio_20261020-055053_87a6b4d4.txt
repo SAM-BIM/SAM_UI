@@ -1,0 +1,7 @@
+000000_SAM_AnalyticalModel.osm
+000000_SAM_AnalyticalModel.osw
+generated_files
+openstudio-run.json
+run
+snapshot.json
+weather.epw

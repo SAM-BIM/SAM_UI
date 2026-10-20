@@ -1,0 +1,29 @@
+scope,metric,unit,availability,tasValue,openStudioValue,absoluteDifference,relativeDifference,relativePercent,signedDifference,band,note,toleranceProfile,warnRelative,failRelative,hourWarnAbsolute,hourFailAbsolute,nearZeroFloor,informational
+model,consumptionHeating,kWh,Both,250.31320778632164,32586.624958703087,32336.311750916764,0.9923185292093445,99.23185292093444,32336.311750916764,Fail,,default,0.05,0.15,1,24,1,false
+model,consumptionCooling,kWh,Both,9895.84994206661,3928.4621857377015,5967.387756328909,0.6030192243479697,60.30192243479697,-5967.387756328909,Fail,,default,0.05,0.15,1,24,1,false
+model,peakHeatingLoad,kW,Both,1.866144775390625,17.98919781223135,16.123053036840723,0.8962630354688865,89.62630354688865,16.123053036840723,Fail,informational (excluded from the numerical status),default,0.05,0.15,1,24,0.01,true
+model,peakHeatingHour,hourOfYear,Both,919,919,0,,,,Match,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+model,peakCoolingLoad,kW,Both,5.26841064453125,22.221319656078137,16.952909011546886,0.7629118915496004,76.29118915496004,16.952909011546886,Fail,informational (excluded from the numerical status),default,0.05,0.15,1,24,0.01,true
+model,peakCoolingHour,hourOfYear,Both,3902,5029,1127,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+model,floorArea,m2,Both,80,80,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+model,volume,m3,Both,240,240,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+36181d863fae4cd999a7397be71f1147,area,m2,Both,40,40,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+36181d863fae4cd999a7397be71f1147,volume,m3,Both,120,120,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+36181d863fae4cd999a7397be71f1147,heating.designLoad,W,Both,1423.5592041015625,742.7775192618877,680.7816848396748,0.47822505932890236,47.82250593289024,-680.7816848396748,Fail,,default,0.05,0.15,1,24,10,false
+36181d863fae4cd999a7397be71f1147,heating.peakLoad,W,Both,1423.5155029296875,8986.196025194962,7562.680522265275,0.8415886434105689,84.1588643410569,7562.680522265275,Fail,,default,0.05,0.15,1,24,10,false
+36181d863fae4cd999a7397be71f1147,heating.peakHour,hourOfYear,Both,936,919,17,,,,Warn,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+36181d863fae4cd999a7397be71f1147,heating.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+36181d863fae4cd999a7397be71f1147,cooling.designLoad,W,Both,2915.32373046875,2733.000340122116,182.32339034663391,0.06253967216097762,6.253967216097762,-182.32339034663391,Warn,,default,0.05,0.15,1,24,10,false
+36181d863fae4cd999a7397be71f1147,cooling.peakLoad,W,Both,2915.218017578125,11119.755912860499,8204.537895282374,0.7378343517229057,73.78343517229057,8204.537895282374,Fail,,default,0.05,0.15,1,24,10,false
+36181d863fae4cd999a7397be71f1147,cooling.peakHour,hourOfYear,Both,4358,5029,671,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+36181d863fae4cd999a7397be71f1147,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+ac7a101a974e4f48962092d649ccf0ad,area,m2,Both,40,40,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+ac7a101a974e4f48962092d649ccf0ad,volume,m3,Both,120,120,0,0,0,0,Match,,default,0.05,0.15,1,24,0.01,false
+ac7a101a974e4f48962092d649ccf0ad,heating.designLoad,W,Both,1423.5572509765625,742.6694335805023,680.8878173960602,0.47830026992519625,47.83002699251963,-680.8878173960602,Fail,,default,0.05,0.15,1,24,10,false
+ac7a101a974e4f48962092d649ccf0ad,heating.peakLoad,W,Both,1423.5166015625,9003.001787036388,7579.485185473888,0.841884225368893,84.18842253688929,7579.485185473888,Fail,,default,0.05,0.15,1,24,10,false
+ac7a101a974e4f48962092d649ccf0ad,heating.peakHour,hourOfYear,Both,936,919,17,,,,Warn,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+ac7a101a974e4f48962092d649ccf0ad,heating.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false
+ac7a101a974e4f48962092d649ccf0ad,cooling.designLoad,W,Both,2614.4775390625,2697.479436878951,83.00189781645122,0.03077016887753792,3.0770168877537922,83.00189781645122,Match,,default,0.05,0.15,1,24,10,false
+ac7a101a974e4f48962092d649ccf0ad,cooling.peakLoad,W,Both,2614.3857421875,11101.563743217635,8487.178001030135,0.7645029292576258,76.45029292576257,8487.178001030135,Fail,,default,0.05,0.15,1,24,10,false
+ac7a101a974e4f48962092d649ccf0ad,cooling.peakHour,hourOfYear,Both,4359,5029,670,,,,Fail,circular hour difference; informational (excluded from the numerical status),default,0.05,0.15,1,24,0,true
+ac7a101a974e4f48962092d649ccf0ad,cooling.unmetHours,h,Both,0,0,0,0,0,0,Match,,default,0.05,0.15,1,24,0.5,false

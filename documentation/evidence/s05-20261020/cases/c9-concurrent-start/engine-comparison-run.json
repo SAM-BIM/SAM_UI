@@ -1,0 +1,231 @@
+{
+  "schema": "sam-ui.engine-comparison-run/1",
+  "id": "c4d119de",
+  "status": "Compared",
+  "startedUtc": "2026-10-20T05:51:56.5947668Z",
+  "finishedUtc": "2026-10-20T05:52:24.4325037Z",
+  "sourcePath": "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\box-aperture.json",
+  "modelName": "000000_SAM_AnalyticalModel",
+  "snapshot": {
+    "path": "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\snapshot.json",
+    "sha256": "sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05"
+  },
+  "weather": {
+    "source": "File",
+    "path": "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\weather.epw",
+    "sha256": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+  },
+  "producers": [
+    {
+      "engine": "Tas",
+      "executable": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_Tas\\build\\benchmark-tas.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\weather.epw",
+        "--tbd",
+        "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\tas\\000000_SAM_AnalyticalModel.tbd",
+        "--out",
+        "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\benchmark-TAS.json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 20.361,
+      "log": "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\benchmark-tas.log",
+      "benchmark": "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\benchmark-TAS.json",
+      "error": null,
+      "succeeded": true
+    },
+    {
+      "engine": "OpenStudio",
+      "executable": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_OpenStudio\\benchmark\\SAM.Analytical.OpenStudio.Benchmark\\bin\\x64\\Debug\\net8.0\\benchmark-openstudio.exe",
+      "arguments": [
+        "--model",
+        "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\snapshot.json",
+        "--weather",
+        "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\weather.epw",
+        "--out",
+        "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\benchmark-OpenStudio.json",
+        "--work",
+        "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\openstudio"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 7.112,
+      "log": "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\benchmark-openstudio.log",
+      "benchmark": "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\benchmark-OpenStudio.json",
+      "error": null,
+      "succeeded": true
+    }
+  ],
+  "gate": "Fail",
+  "reports": [
+    "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\comparison.md",
+    "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\comparison.csv",
+    "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\comparison-summary.json"
+  ],
+  "diagnostics": [],
+  "error": null,
+  "provenance": {
+    "schema": "sam-ui.run-provenance/1",
+    "route": "Both",
+    "application": {
+      "entryAssembly": {
+        "name": "SAM Analytical",
+        "version": "1.0.0.0",
+        "informationalVersion": "1.0.0",
+        "path": "C:\\TasOut\\s05\\app\\SAM Analytical.dll",
+        "sha256": "sha256:22f51eafdabd1804b6abca0ce92516f8e3b3293533eafdf0dec495fbce9d146f"
+      },
+      "sourceRevision": "unknown",
+      "sourceRevisionOf": "the \u002Bbuild metadata of SAM.Analytical.UI.WPF\u0027s InformationalVersion; SAM_Deploy installers stamp their SAM_Deploy commit, which pins every repository",
+      "components": [
+        {
+          "name": "SAM.Core",
+          "version": "1.0.0.0",
+          "informationalVersion": "1.0.0",
+          "path": "C:\\TasOut\\s05\\app\\SAM.Core.dll",
+          "sha256": "sha256:166c28cee37681a5276befd3133104821a7a1d6b7e888f6b657d203a41fb3132"
+        },
+        {
+          "name": "SAM.Analytical",
+          "version": "1.0.0.0",
+          "informationalVersion": "1.0.0",
+          "path": "C:\\TasOut\\s05\\app\\SAM.Analytical.dll",
+          "sha256": "sha256:186f03095d4ec2352fe4dfecf7144561f566c09d6a99d50e5d443d5c0a783e12"
+        },
+        {
+          "name": "SAM.Analytical.UI.WPF",
+          "version": "1.0.0.0",
+          "informationalVersion": "1.0.0",
+          "path": "C:\\TasOut\\s05\\app\\SAM.Analytical.UI.WPF.dll",
+          "sha256": "sha256:0d4e368af288068fde16519e92f60c25a7e0f10740680ac0c750f32f43002a15"
+        },
+        {
+          "name": "SAM.Analytical.Benchmark",
+          "version": "1.0.0.0",
+          "informationalVersion": "1.0.0",
+          "path": "C:\\TasOut\\s05\\app\\SAM.Analytical.Benchmark.dll",
+          "sha256": "sha256:4b90a15b30c0fc9c305db2e8683c5d0d20c2f1bb810b19bc52c06147bf323c16"
+        },
+        {
+          "name": "SAM.Analytical.Benchmark.Compare",
+          "version": "1.0.0.0",
+          "informationalVersion": "1.0.0",
+          "path": "C:\\TasOut\\s05\\app\\SAM.Analytical.Benchmark.Compare.dll",
+          "sha256": "sha256:d9db90db60c0e4cfac1833adc3da0a3b04c2f96d0fd8b23a02c6307c0db9da2e"
+        }
+      ]
+    },
+    "producers": {
+      "Tas": {
+        "executable": {
+          "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_Tas\\build\\benchmark-tas.exe",
+          "sha256": "sha256:07ab3e45b107bdd28a7d6b3622d05014b1edb95e015f86e5dc3e9c7a9ab3fbd2",
+          "fileVersion": "1.0.0.0",
+          "productVersion": "1.0.0",
+          "assembly": {
+            "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_Tas\\build\\benchmark-tas.dll",
+            "sha256": "sha256:2c13740afdfa6b7478f04e219097362fc6b9d4ef4c10ceed166ec14d51ada7a9",
+            "fileVersion": "1.0.0.0",
+            "productVersion": "1.0.0"
+          }
+        },
+        "arguments": [
+          "--model",
+          "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\snapshot.json",
+          "--weather",
+          "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\weather.epw",
+          "--tbd",
+          "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\tas\\000000_SAM_AnalyticalModel.tbd",
+          "--out",
+          "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\benchmark-TAS.json"
+        ],
+        "succeeded": true,
+        "reported": {
+          "samCommit": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+          "runnerCommit": "e84aeff687033354e3f17891635fdf10d42ad68f",
+          "engine": {
+            "kind": "TAS",
+            "name": "Tas",
+            "version": "9.5.7.0",
+            "sdkVersion": "unknown"
+          },
+          "route": "Native-TAS",
+          "weather": {
+            "identity": "weather",
+            "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+          },
+          "designDaySource": "None",
+          "sourceFileHash": "sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05",
+          "canonicalModelHash": "sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500",
+          "canonicalizationVersion": "1.0.0",
+          "state": "Success"
+        }
+      },
+      "OpenStudio": {
+        "executable": {
+          "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_OpenStudio\\benchmark\\SAM.Analytical.OpenStudio.Benchmark\\bin\\x64\\Debug\\net8.0\\benchmark-openstudio.exe",
+          "sha256": "sha256:644059197b0638bdbfcf7d41b3a7c375b40198a7f53336d907c3e727619a5e06",
+          "fileVersion": "1.0.0.0",
+          "productVersion": "1.0.0",
+          "assembly": {
+            "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_OpenStudio\\benchmark\\SAM.Analytical.OpenStudio.Benchmark\\bin\\x64\\Debug\\net8.0\\benchmark-openstudio.dll",
+            "sha256": "sha256:4f53433a8617d12c78f792e5885d0ad9b2f027f676d76ba9ec9eb0670a5740dd",
+            "fileVersion": "1.0.0.0",
+            "productVersion": "1.0.0"
+          }
+        },
+        "arguments": [
+          "--model",
+          "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\snapshot.json",
+          "--weather",
+          "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\weather.epw",
+          "--out",
+          "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\benchmark-OpenStudio.json",
+          "--work",
+          "C:\\TasOut\\s05\\runs\\c9-concurrent-start\\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\\openstudio"
+        ],
+        "succeeded": true,
+        "reported": {
+          "samCommit": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+          "runnerCommit": "d4216f3525c01ca762c1b3e9b6d099733d037f54",
+          "engine": {
+            "kind": "OpenStudio",
+            "name": "EnergyPlus",
+            "version": "25.1.0",
+            "sdkVersion": "3.10.0"
+          },
+          "route": "Native-OpenStudio",
+          "weather": {
+            "identity": "weather",
+            "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+          },
+          "designDaySource": "None",
+          "sourceFileHash": "sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05",
+          "canonicalModelHash": "sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500",
+          "canonicalizationVersion": "1.0.0",
+          "state": "Success"
+        }
+      }
+    },
+    "environment": {
+      "SAM_COMMIT": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+      "RUNNER_COMMIT": "not set"
+    },
+    "weather": {
+      "source": "File",
+      "sha256": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3",
+      "originalPath": "C:\\TasOut\\s05\\inputs\\Budapest.epw"
+    },
+    "designDays": {
+      "source": "chosen by each producer from the snapshot (SAM_UI passes none): see producers.\u003Cengine\u003E.reported.designDaySource"
+    },
+    "settings": {
+      "producers": "each producer\u0027s arguments (producers.\u003Cengine\u003E.arguments) and its built-in workflow settings, which its executable SHA-256 pins"
+    },
+    "unknown": {
+      "application.sourceRevision": "this build\u0027s InformationalVersion \u00271.0.0\u0027 has no source revision after \u0027\u002B\u0027 (a local developer build); the component SHA-256 values identify the binaries",
+      "producers.Tas.reported.engine.sdkVersion": "the producer reported none (null in its B1a document; its warnings and notes say why)"
+    }
+  }
+}
