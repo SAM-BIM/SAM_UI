@@ -1,5 +1,16 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Q4 S05 preflight record (#244) closeout - 2026-10-20
+
+- **PR/status:** [SAM-BIM/SAM_UI#244](https://github.com/SAM-BIM/SAM_UI/pull/244) complete (documentation and evidence only), merged into `sow/2026-Q4` as `46a43d8d38019db05a7ea20de16516039f57d104`.
+  - Parents: base `ade096d0` and approved head `c9ac5ccecae40f44b722db6403a9c4c70b4e4b6b`, pinned with `--match-head-commit`; the merge tree equals that head.
+  - Owner direction 2026-10-20: merge the preflight once checked against the merged S03/S04. It is a rehearsal record: **no case in it is an S05 acceptance result.**
+- **Completed:** `documentation/S05-LicensedAcceptance-Preflight.md` and `documentation/evidence/s05-preflight-20261019/` (the 9-case matrix; rehearsal PASS for cases 1, 3, 4, 5, 7 on the local integration tree `8aafcb06`; 2, 8, 9 NOT RUN; 6 BLOCKED).
+  - 2026-10-20 update (`c9ac5cce`): the merged code tree `307cb0e3` equals `8aafcb06`; **case 4 was not post-F1** because the rehearsal used a `SAM.Weather.dll` from a local `SAM\build` older than SAM#212; the owner accepted `SAM_COMMIT` for developer-built Both producers until S06.
+- **Validation:** hosted final head Build `39373145898` PASS and SPDX `39373146005` PASS. Docs only; no local tests needed.
+- **Cleanup:** remote `docs/s05-preflight` deleted (lease on `c9ac5cce`, merged, no open PR).
+- **Next step:** formal S05 acceptance on a fresh build (dependency stack rebuilt at the Q4 tips 2026-10-20, sandboxed), recorded in `documentation/S05-LicensedAcceptance.md` through its own PR; same session.
+
 ## Q4 S04 stable canonical simulation snapshot (#243) closeout - 2026-10-20
 
 - **PR/status:** [SAM-BIM/SAM_UI#243](https://github.com/SAM-BIM/SAM_UI/pull/243) complete, merged into `sow/2026-Q4` as `307cb0e3c6926453147b4e65274024021905bcba`.
