@@ -239,6 +239,12 @@ namespace SAM.Analytical.UI.WPF.Tests
             }
 
             AnalyticalModel analyticalModel = Core.Convert.ToSAM<AnalyticalModel>(modelPath).First();
+
+            //The view state SAM_UI keeps on an open model (S04: left out of the snapshot, given back to the result model).
+            SAM.Geometry.UI.UIGeometrySettings uIGeometrySettings = new SAM.Geometry.UI.UIGeometrySettings();
+            uIGeometrySettings.AddViewSettings(SAM.Analytical.UI.Query.DefaultViewSettings(analyticalModel));
+            analyticalModel.SetValue(SAM.Analytical.UI.AnalyticalModelParameter.UIGeometrySettings, uIGeometrySettings);
+
             string json_Before = Core.Convert.ToString(analyticalModel);
 
             OpenStudioSimulationRun run = analyticalModel.RunOpenStudioSimulation(directory, epwPath, modelPath);
@@ -257,6 +263,13 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.NotEmpty(results);
             Assert.All(results, x => Assert.Equal(AnalyticalModelSimulationResult.OpenStudioSource, x.Source));
             Assert.Single(result.GetAnalyticalModelSimulationResults());
+
+            //S04: the snapshot carries no view state; the result model carries the open model's, as before.
+            Assert.False(Core.Convert.ToSAM<AnalyticalModel>(run.SnapshotPath).First().HasValue(SAM.Analytical.UI.AnalyticalModelParameter.UIGeometrySettings));
+            Assert.True(result.TryGetValue(SAM.Analytical.UI.AnalyticalModelParameter.UIGeometrySettings, out SAM.Geometry.UI.UIGeometrySettings uIGeometrySettings_Result));
+            //Compared after the same JSON round trip the saved file makes: UIGeometrySettings itself does not round-trip its default
+            //view's appearance dictionary, before S04 as after.
+            Assert.Equal(new SAM.Geometry.UI.UIGeometrySettings(JsonNode.Parse(uIGeometrySettings.ToJsonObject().ToJsonString()).AsObject()).ToJsonObject().ToJsonString(), uIGeometrySettings_Result.ToJsonObject().ToJsonString());
 
             //S03: the provenance of a real run names what actually ran - the CLI by hash, EnergyPlus by its own eplusout.err.
             JsonObject provenance = JsonNode.Parse(File.ReadAllText(run.ManifestPath))["provenance"].AsObject();

@@ -1,0 +1,108 @@
+// Temporary, NOT committed: S04 evidence with real producers on a licensed machine.
+#nullable enable
+
+using SAM.Analytical.Benchmark;
+using SAM.Core;
+using SAM.Geometry.UI;
+using System;
+using System.IO;
+using System.Linq;
+using System.Text.Json.Nodes;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace SAM.Analytical.UI.WPF.Tests
+{
+    [Collection(WpfCollection.Name)]
+    public class S04EvidenceHarness
+    {
+        private const string Inputs = @"C:\TasOut\s01b\inputs";
+        private const string Root = @"C:\TasOut\s04";
+        private readonly ITestOutputHelper output;
+
+        public S04EvidenceHarness(ITestOutputHelper output) { this.output = output; }
+
+        private static bool Enabled => Environment.GetEnvironmentVariable("S04_EVIDENCE") == "1";
+
+        /// <summary>Two real Both runs, each on the model opened afresh as the window opens it.</summary>
+        [WpfFact]
+        public void E1_TwoRealBothRuns_TwoSessions()
+        {
+            if (!Enabled) return;
+            Directory.CreateDirectory(Root);
+            string modelPath = Path.Combine(Root, "box-aperture.json");
+            File.Copy(Path.Combine(Inputs, "box-aperture.json"), modelPath, true);
+
+            string? samCommit_Before = Environment.GetEnvironmentVariable("SAM_COMMIT");
+            string? path_Before = Environment.GetEnvironmentVariable("PATH");
+            Environment.SetEnvironmentVariable("SAM_COMMIT", "62b5415697d1a5af143c6b581b7d42fbd6551ca8");
+            Environment.SetEnvironmentVariable("PATH", @"C:\Users\michal\Documents\GitHub\SAM-BIM\.icon-migration\runtime\OpenStudio-3.10.0+86d7e215a1-Windows\bin;" + path_Before);
+            try
+            {
+                foreach (string session in new[] { "session-1", "session-2" })
+                {
+                    AnalyticalModel analyticalModel = OpenAsTheWindowDoes(modelPath);
+                    EngineComparisonRun run = analyticalModel.RunEngineComparison(Path.Combine(Root, session), Path.Combine(Inputs, "Budapest.epw"),
+                        @"C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_Tas\build\benchmark-tas.exe",
+                        @"C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_OpenStudio\benchmark\SAM.Analytical.OpenStudio.Benchmark\bin\x64\Release\net8.0\benchmark-openstudio.exe",
+                        modelPath);
+                    output.WriteLine("{0}: status={1} view={2} snapshot={3}", session, run.Status, ViewGuid(analyticalModel), run.SnapshotSha256);
+                    foreach (EngineComparisonProducerRun producerRun in run.ProducerRuns)
+                    {
+                        JsonNode? provenance = producerRun.BenchmarkPath == null ? null : JsonNode.Parse(File.ReadAllText(producerRun.BenchmarkPath))?["provenance"];
+                        output.WriteLine("  {0}: exit={1} canonicalModelHash={2} sourceFileHash={3}", producerRun.Engine, producerRun.ExitCode, provenance?["canonicalModelHash"], provenance?["sourceFileHash"]);
+                    }
+                }
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("SAM_COMMIT", samCommit_Before);
+                Environment.SetEnvironmentVariable("PATH", path_Before);
+            }
+        }
+
+        /// <summary>The four historical S01b snapshots (pre-S04, four different canonical hashes) frozen again under S04.</summary>
+        [WpfFact]
+        public void E2_HistoricalSnapshots_RefrozenUnderS04()
+        {
+            if (!Enabled) return;
+            Directory.CreateDirectory(Root);
+            foreach (string path in Directory.GetFiles(@"C:\TasOut\s01b\runs", "snapshot.json", SearchOption.AllDirectories).OrderBy(x => x))
+            {
+                AnalyticalModel analyticalModel = Core.Convert.ToSAM<AnalyticalModel>(path).First();
+                string before = BenchmarkCanonicalJson.ComputeSha256(analyticalModel.ToJsonObject().ToJsonString());
+                string path_Refrozen = Path.Combine(Root, "refrozen-" + Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(path))!) + ".json");
+                AnalyticalModel? refrozen = analyticalModel.FreezeAnalyticalModel(path_Refrozen);
+                string after = BenchmarkCanonicalJson.ComputeSha256(Core.Convert.ToSAM<AnalyticalModel>(path_Refrozen).First().ToJsonObject().ToJsonString());
+                output.WriteLine("{0}: pre-S04 canonical {1} -> S04 canonical {2}, snapshot {3}", path.Replace(@"C:\TasOut\s01b\runs\", ""), before, after, Query.Sha256(path_Refrozen));
+            }
+        }
+
+        private static AnalyticalModel OpenAsTheWindowDoes(string path)
+        {
+            UIAnalyticalModel uIAnalyticalModel = new UIAnalyticalModel(path);
+            Assert.True(uIAnalyticalModel.Open());
+            AnalyticalModel analyticalModel = uIAnalyticalModel.JSAMObject;
+            if (!analyticalModel.TryGetValue(AnalyticalModelParameter.UIGeometrySettings, out UIGeometrySettings uIGeometrySettings) || uIGeometrySettings == null)
+            {
+                uIGeometrySettings = new UIGeometrySettings();
+            }
+
+            if (uIGeometrySettings.GetViewSettings<IViewSettings>() is not { Count: > 0 })
+            {
+                ViewSettings viewSettings = UI.Query.DefaultViewSettings(analyticalModel);
+                uIGeometrySettings.AddViewSettings(viewSettings);
+                uIGeometrySettings.ActiveGuid = viewSettings.Guid;
+                analyticalModel.SetValue(AnalyticalModelParameter.UIGeometrySettings, uIGeometrySettings);
+            }
+
+            return analyticalModel;
+        }
+
+        private static string ViewGuid(AnalyticalModel analyticalModel)
+        {
+            analyticalModel.TryGetValue(AnalyticalModelParameter.UIGeometrySettings, out UIGeometrySettings uIGeometrySettings);
+            return uIGeometrySettings?.ActiveGuid.ToString() ?? "(none)";
+        }
+    }
+}

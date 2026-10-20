@@ -76,9 +76,20 @@ namespace SAM.Analytical.UI.WPF
 
                 result.SnapshotSha256 = Query.Sha256(result.SnapshotPath);
 
+                //S04: the open model's view state, copied at the moment of the snapshot, for the result model; never a reason to fail.
+                Geometry.UI.UIGeometrySettings? viewState = null;
+                try
+                {
+                    viewState = Query.ViewState(analyticalModel);
+                }
+                catch (Exception exception)
+                {
+                    result.Diagnostics.Add("Warning: the view state could not be copied for the result model: " + exception.GetType().Name + ": " + exception.Message);
+                }
+
                 cancellationToken.ThrowIfCancellationRequested();
 
-                RunOpenStudioSimulation_Run(result, analyticalModel_Frozen, epwPath, progress, cancellationToken);
+                RunOpenStudioSimulation_Run(result, analyticalModel_Frozen, viewState, epwPath, progress, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -102,15 +113,31 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// Writes <paramref name="analyticalModel"/> to <paramref name="path"/> and returns the model read back from that file: an
         /// independent copy whose content is exactly the file's. Null when either step fails.
+        /// <para>
+        /// The file is <see cref="Query.SimulationSnapshotJsonObject"/> of the model (S04): everything except SAM_UI's view state, which is
+        /// regenerated on every open and would otherwise give the same model a different snapshot and canonical hash in each session.
+        /// A JSON snapshot is written exactly as <c>Core.Convert.ToFile</c> writes a JSON file, so a model with no view state gives the
+        /// same bytes as before S04.
+        /// </para>
         /// </summary>
         public static AnalyticalModel? FreezeAnalyticalModel(this AnalyticalModel analyticalModel, string path)
         {
-            if (analyticalModel == null || string.IsNullOrWhiteSpace(path))
+            if (analyticalModel == null || string.IsNullOrWhiteSpace(path) || !System.IO.Directory.Exists(Path.GetDirectoryName(path)))
             {
                 return null;
             }
 
-            if (!Core.Convert.ToFile(analyticalModel, path))
+            JsonObject? jsonObject = Query.SimulationSnapshotJsonObject(analyticalModel);
+            if (jsonObject == null)
+            {
+                return null;
+            }
+
+            if (Core.Query.SAMFileType(path) == Core.SAMFileType.Json)
+            {
+                File.WriteAllText(path, new JsonArray(jsonObject).ToJsonString(Core.Convert.SerializerOptions(Core.Formatting.Indented)));
+            }
+            else if (!Core.Convert.ToFile(new AnalyticalModel(jsonObject), path))
             {
                 return null;
             }
@@ -154,7 +181,7 @@ namespace SAM.Analytical.UI.WPF
         // Its own method, never inlined: every OpenStudio type is reached here, so a missing SAM_OpenStudio or OpenStudio assembly fails
         // this method's compilation inside the caller's try, and is recorded on the run like any other failure.
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void RunOpenStudioSimulation_Run(OpenStudioSimulationRun openStudioSimulationRun, AnalyticalModel analyticalModel_Frozen, string? epwPath, IProgress<Core.OpenStudio.OpenStudioSimulationProgress>? progress, CancellationToken cancellationToken)
+        private static void RunOpenStudioSimulation_Run(OpenStudioSimulationRun openStudioSimulationRun, AnalyticalModel analyticalModel_Frozen, Geometry.UI.UIGeometrySettings? viewState, string? epwPath, IProgress<Core.OpenStudio.OpenStudioSimulationProgress>? progress, CancellationToken cancellationToken)
         {
             openStudioSimulationRun.SamOpenStudioVersion = typeof(OpenStudioConversionResult).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? typeof(OpenStudioConversionResult).Assembly.GetName().Version?.ToString();
 
@@ -263,6 +290,17 @@ namespace SAM.Analytical.UI.WPF
             if (diagnostics != null)
             {
                 openStudioSimulationRun.ResultDiagnostics.AddRange(diagnostics);
+            }
+
+            //S04: the snapshot left the open model's view state out; the result model, which a person opens, gets back the copy taken
+            //with the snapshot. A failure here is a warning, never a failed run.
+            try
+            {
+                WithViewState(analyticalModel_Result, viewState);
+            }
+            catch (Exception exception)
+            {
+                openStudioSimulationRun.Diagnostics.Add("Warning: the result model was saved without the view state: " + exception.GetType().Name + ": " + exception.Message);
             }
 
             string resultModelPath = Path.Combine(openStudioSimulationRun.Directory!, Query.OpenStudioResultModelFileName(analyticalModel_Frozen.Name));
