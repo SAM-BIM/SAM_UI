@@ -50,6 +50,7 @@ namespace SAM.Analytical.UI.WPF
                 SourcePath = sourcePath,
                 ModelName = analyticalModel?.Name,
                 ModelGuid = analyticalModel?.Guid ?? Guid.Empty,
+                Provenance = Query.NewRunProvenance("OpenStudio"),
             };
 
             if (analyticalModel == null || string.IsNullOrWhiteSpace(directory))
@@ -102,6 +103,7 @@ namespace SAM.Analytical.UI.WPF
             finally
             {
                 result.FinishedUtc = DateTime.UtcNow;
+                CompleteRunProvenance(() => Query.CompleteOpenStudioRunProvenance(result), result.Diagnostics);
                 WriteManifest(result);
             }
 
@@ -183,12 +185,17 @@ namespace SAM.Analytical.UI.WPF
         {
             openStudioSimulationRun.SamOpenStudioVersion = typeof(OpenStudioConversionResult).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? typeof(OpenStudioConversionResult).Assembly.GetName().Version?.ToString();
 
+            //S03: the SAM assemblies this process loaded to convert and run, read here where their types are reached anyway.
+            openStudioSimulationRun.Provenance?.AddComponent(typeof(OpenStudioConversionResult).Assembly);
+            openStudioSimulationRun.Provenance?.AddComponent(typeof(Core.OpenStudio.OpenStudioRunOptions).Assembly);
+
             //The weather the converter will use, by its own precedence: the user's EPW, else the model's embedded WeatherData. The user's
             //path is passed on as given (null for embedded), so the conversion is exactly SAM_OpenStudio's; the resolved file is only
             //copied into the run folder, so the run keeps its weather when the original or the temporary export is gone.
             string? epwPath_User = !string.IsNullOrWhiteSpace(epwPath) && File.Exists(epwPath) ? epwPath : null;
             string? epwPath_Effective = epwPath_User ?? analyticalModel_Frozen.EmbeddedAnnualWeatherPath();
             openStudioSimulationRun.WeatherSource = epwPath_User != null ? "File" : epwPath_Effective != null ? "Embedded" : "None";
+            openStudioSimulationRun.WeatherOriginalPath = epwPath_User;
             if (epwPath_Effective != null)
             {
                 openStudioSimulationRun.WeatherPath = Path.Combine(openStudioSimulationRun.Directory!, OpenStudioSimulationRun.WeatherFileName);
@@ -202,15 +209,36 @@ namespace SAM.Analytical.UI.WPF
                 UseUniqueRunDirectory = false,
             };
 
+            openStudioSimulationRun.RunOptions = new JsonObject
+            {
+                ["epwPath"] = epwPath_User ?? "(none: the model's embedded WeatherData, SAM_OpenStudio's own precedence)",
+                ["outputDirectory"] = openStudioSimulationRun.Directory,
+                ["conversionOptions"] = "SAM_OpenStudio defaults",
+                ["run"] = true,
+                ["cliPath"] = openStudioRunOptions.CliPath ?? "(discovered by SAM_OpenStudio; the CLI that ran is engine.cli)",
+                ["runDirectory"] = openStudioRunOptions.RunDirectory ?? "(not set: a directory next to the OSW file)",
+                ["ddyPath"] = openStudioRunOptions.DdyPath ?? "(none)",
+                ["timeoutSeconds"] = openStudioRunOptions.TimeoutSeconds,
+                ["useUniqueRunDirectory"] = openStudioRunOptions.UseUniqueRunDirectory,
+                ["extractTimeSeries"] = openStudioRunOptions.ExtractTimeSeries,
+            };
+
             OpenStudioProgress progress_Run = new OpenStudioProgress(openStudioSimulationRun, progress);
 
             using OpenStudioConversionResult openStudioConversionResult = analyticalModel_Frozen.ToOpenStudio(epwPath_User, openStudioSimulationRun.Directory, null, openStudioRunOptions, true, progress_Run, cancellationToken);
+
+            //S03: asked only now that the conversion has loaded the SDK, so a missing OpenStudio stack fails in the conversion exactly as
+            //before. A version the SDK cannot give stays null and is written as unknown.
+            openStudioSimulationRun.OpenStudioSdkVersion = SafeVersion(Core.OpenStudio.Query.OpenStudioVersion);
+            openStudioSimulationRun.EnergyPlusSdkVersion = SafeVersion(Core.OpenStudio.Query.EnergyPlusVersion);
 
             if (openStudioConversionResult == null)
             {
                 openStudioSimulationRun.Diagnostics.Add("Error: SAM_OpenStudio returned no conversion result");
                 return;
             }
+
+            openStudioSimulationRun.DesignDaySource = openStudioConversionResult.DesignDaySource.ToString();
 
             foreach (Core.OpenStudio.OpenStudioDiagnostic openStudioDiagnostic in openStudioConversionResult.Diagnostics)
             {
@@ -285,6 +313,36 @@ namespace SAM.Analytical.UI.WPF
 
             openStudioSimulationRun.ResultModelPath = resultModelPath;
             openStudioSimulationRun.Status = OpenStudioSimulationStatus.Succeeded;
+        }
+
+        /// <summary>A version from the OpenStudio SDK, or null when the SDK cannot give one.</summary>
+        private static string? SafeVersion(Func<string> version)
+        {
+            try
+            {
+                string value = version();
+                return string.IsNullOrWhiteSpace(value) ? null : value;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Completes a run's provenance (S03) from a finally. Collecting provenance never changes how a run ended: a failure here is a warning
+        /// in the run's diagnostics, and the manifest is still written.
+        /// </summary>
+        internal static void CompleteRunProvenance(Action complete, List<string> diagnostics)
+        {
+            try
+            {
+                complete();
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Add("Warning: the run provenance could not be completed: " + exception.GetType().Name + ": " + exception.Message);
+            }
         }
 
         private static void WriteManifest(OpenStudioSimulationRun openStudioSimulationRun)

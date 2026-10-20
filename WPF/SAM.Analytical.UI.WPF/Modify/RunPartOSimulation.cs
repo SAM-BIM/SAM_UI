@@ -138,6 +138,16 @@ namespace SAM.Analytical.UI.WPF
         /// </param>
         public static AnalyticalModel RunPartOSimulation(AnalyticalModel analyticalModel, PartOSimulationContext partOSimulationContext, string projectName, PartORun partORun, CancellationToken externalCancellationToken, out string path_TBD, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes, out string refusal, out string? failure, PartOCanonicalTBD partOCanonicalTBD = null, PartOWorkflowRunner partOWorkflowRunner = null)
         {
+            return RunPartOSimulation(analyticalModel, partOSimulationContext, projectName, partORun, externalCancellationToken, out path_TBD, out path_TSD, out cancelled, out fullYear, out notes, out refusal, out failure, out WorkflowSettings? _, partOCanonicalTBD, partOWorkflowRunner);
+        }
+
+        /// <summary>
+        /// The same run, also handing back the <see cref="WorkflowSettings"/> it gave the workflow (S03: the run manifest records the settings
+        /// that ran, not the ones asked for).
+        /// </summary>
+        /// <param name="workflowSettings">The settings handed to the workflow; null where the run stopped before they were built.</param>
+        internal static AnalyticalModel RunPartOSimulation(AnalyticalModel analyticalModel, PartOSimulationContext partOSimulationContext, string projectName, PartORun partORun, CancellationToken externalCancellationToken, out string path_TBD, out string path_TSD, out bool cancelled, out bool fullYear, out List<string> notes, out string refusal, out string? failure, out WorkflowSettings? workflowSettings, PartOCanonicalTBD partOCanonicalTBD = null, PartOWorkflowRunner partOWorkflowRunner = null)
+        {
             path_TBD = null;
             path_TSD = null;
             cancelled = false;
@@ -145,6 +155,7 @@ namespace SAM.Analytical.UI.WPF
             notes = [];
             refusal = null;
             failure = null;
+            workflowSettings = null;
 
             if (analyticalModel is null || partOSimulationContext is null || string.IsNullOrWhiteSpace(projectName))
             {
@@ -483,7 +494,7 @@ namespace SAM.Analytical.UI.WPF
                     simulate = true;
                 }
 
-                WorkflowSettings workflowSettings = new()
+                workflowSettings = new()
                 {
                     Path_TBD = path_TBD,
 
