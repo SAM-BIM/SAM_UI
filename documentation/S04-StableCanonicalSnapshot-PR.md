@@ -10,8 +10,9 @@ Branch: `feature/s04-stable-canonical-snapshot`. Draft PR, not merged. **Validat
 Record commits follow it. The final PR head and hosted checks are in the PR description. `PROJECT_PROGRESS.md` is not touched.
 
 ## Status
-Implementation and local tests complete on 2026-10-19 (overnight owner-authorised S03+S04 session). Awaiting hosted CI
-and owner review. Not merged.
+Implementation and local tests complete on 2026-10-19 (overnight owner-authorised S03+S04 session). On 2026-10-20 S03
+merged first (`1e460bbe`); this branch was refreshed with `sow/2026-Q4` and re-validated (see "Integration with S03").
+**Integrated content SHA: `3bbba54b`.** Awaiting its hosted CI, then merge under the owner's 2026-10-20 authorisation.
 
 ## Problem (baseline `4d7f5bd8`), established from real evidence
 - **Two sessions, one model.** S01b runs B2 and B3 (machine-local in `C:\TasOut\s01b\runs`) each froze the same
@@ -149,6 +150,27 @@ benchmark-tas and benchmark-openstudio.
 S04 they had four canonical hashes (`6d455480…`, `fcb0cd9b…`, `a3df983c…`, `5e56751e…`). All four now give snapshot
 `0c30db14…` and canonical hash `05c1e334…`, the same values as E1, which came from the test build.
 
+## Integration with S03 (2026-10-20)
+- `3bbba54b` merges `sow/2026-Q4` `56e67d09` (S03 SAM_UI#242 merged as `1e460bbe`, plus its docs-only closeout) into
+  `b19b80ab`. The one conflict, in `OpenStudioSimulationTests.RealRun_…`, keeps both the S04 view-state block and the S03
+  provenance block. The resolved file and every code file equal the local integration tree `8aafcb06`; the only difference
+  from `8aafcb06` is `PROJECT_PROGRESS.md` (the S03 closeout, from the base).
+- S04 behaviour kept, checked in the merged tree: the snapshot drops only `UI Geometry Settings` and an emptied or empty
+  SAM.Analytical.UI set (`Query/SimulationSnapshot.cs`); every other parameter set, model parameter and the weather stay;
+  the view state is copied at freeze time and attached to the result model in a try/catch.
+- Full `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c Release` on `3bbba54b` (real `APPDATA`; dependency builds as above,
+  local, machine-local logs `C:\TasOut\s05\logs\fulltest-3bbba54b*.txt`):
+  - run 1: **2925/2926**. `TasRunManifestTests.Succeeded_RecordsTheWorkflowSettingsThatRan_AndTheEmbeddedWeather` (S03)
+    reported `Cancelled`, after exactly 5 s. Cause: under full-suite load, `ProgressWindowHost` did not confirm its dialog
+    thread's shutdown within its 5 s join, and `Simulate` then treats the run as possibly cancelled by design
+    (`!progressWindowHost.ShutdownCompleted`, unchanged since 2026-10-06). Timing, not a merge or S04 effect.
+  - run 2, same build: **2926/2926 PASS**.
+  - Recorded, not fixed here: on a heavily loaded machine an ordinary Tas run can be reported Cancelled when the progress
+    window's thread is slow to stop. Pre-existing product behaviour, outside S04.
+- **Local dependency caveat (found 2026-10-20):** the machine's `SAM\build` predates SAM#212 (F1), so these local runs used
+  a pre-F1 `SAM.Weather.dll`; hosted CI builds the dependencies from source and is the authoritative check. S05 acceptance
+  rebuilds the dependency stack from the `sow/2026-Q4` tips.
+
 ## Unresolved, risks
 - `UIGeometrySettings` does not round-trip its default view's appearance dictionary through JSON, because its keys are
   Guids. This is pre-existing, behaves the same before and after S04, and was found while writing the result-model test.
@@ -156,4 +178,5 @@ S04 they had four canonical hashes (`6d455480…`, `fcb0cd9b…`, `a3df983c…`,
 - The Both runs in the evidence needed `SAM_COMMIT` for the developer-built producers. See S03 (SAM_UI#242).
 
 ## Next step
-Owner review of the draft PR. After merge, add the post-merge `PROJECT_PROGRESS.md` closeout on `sow/2026-Q4`.
+Merge once the hosted Build and SPDX checks pass at the final head (owner authorisation 2026-10-20). After merge, add
+the post-merge `PROJECT_PROGRESS.md` closeout on `sow/2026-Q4`; S05 formal acceptance follows on the merged content.
