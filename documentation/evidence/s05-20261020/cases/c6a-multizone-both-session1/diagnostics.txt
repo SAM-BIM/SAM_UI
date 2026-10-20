@@ -1,0 +1,32 @@
+﻿Banner: Gate Fail: 12 match, 3 warn, 13 fail (8 contributing to numerical status, 5 informational and excluded); 0 missing on one engine, 0 unit mismatch, 0 not reported. Spaces: 2 matched, 0 only in Tas, 0 only in OpenStudio.
+
+Overall gate: Fail (numerical Fail, coverage Pass, provenance Pass, reconciliation Pass)
+Metrics: 12 match, 3 warn, 13 fail, 0 N/A; 28 of 28 required metrics comparable. Tolerance profile 'default'. A band is a tolerance band, not an engineering verdict (SAM_UI#232/#233).
+
+Spaces: Tas 2, OpenStudio 2; matched by GUID 2, by name 0.
+
+Model total vs sum of spaces:
+  TAS floorArea: model 80, sum of 2 spaces 80 m2 -> Match
+  TAS volume: model 240, sum of 2 spaces 240 m3 -> Match
+  OpenStudio floorArea: model 80, sum of 2 spaces 80 m2 -> Match
+  OpenStudio volume: model 240, sum of 2 spaces 240 m3 -> Match
+
+Tas run: Success
+  Note: Shared gbXML was exported from the source model (no --gbxml supplied).
+  Result sources: SAM.Analytical.Tas
+
+OpenStudio run: Success
+  Warning: [SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition a7560745-3e17-4a82-a7e3-e6f4878feb62) → SAM_InternalCondition_S37_OfficeCell_950dd279
+  Warning: [SAM-OS-RUN-002] Warning: Embedded design day 'London.Wea.Ctr-St.James.Park ANN CLG 0% CONDS DB=>GRad': the hourly humidity profile was approximated as a constant dew point (13.8 °C) from 31% RH at the maximum-dry-bulb hour
+  Warning: [SAM-OS-RUN-002] Warning: Embedded design day 'London.Wea.Ctr-St.James.Park ANN CLG 0% CONDS DB=>GRad': the hourly solar profile was approximated by the ASHRAEClearSky model with clearness 1.0; daily dry-bulb range, mean wind/pressure and the SummerDesignDay day type are derived from the SAM hourly profile
+  Warning: [SAM-OS-RUN-002] Warning: Embedded design day 'London.Wea.Ctr-St.James.Park ANN HTG 100% CONDS DB': the hourly humidity profile was approximated as a constant dew point (-8.9 °C) from 55% RH at the maximum-dry-bulb hour
+  Warning: [SAM-OS-RUN-002] Warning: Embedded design day 'London.Wea.Ctr-St.James.Park ANN HTG 100% CONDS DB': the hourly solar profile was approximated by the ASHRAEClearSky model with clearness 0.0; daily dry-bulb range, mean wind/pressure and the WinterDesignDay day type are derived from the SAM hourly profile
+  Note: [SAM-OS-RUN-002] Information: Annual weather source: explicit EPW (weather.epw)
+  Note: [SAM-OS-RUN-002] Information: Design-day source: AnalyticalModel heating/cooling design days (2 imported)
+  Note: [SAM-OS-RUN-002] Information: Ground temperatures taken from the SAM model WeatherData (depth 0.5 m set, 12 monthly values)
+  Result sources: SAM.Analytical.OpenStudio
+
+Run: Compared - C:\TasOut\s05\runs\c6a-multizone-both-session1\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054418_cf022309
+Tas producer: completed, C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_Tas\build\benchmark-tas.exe, exit code 0, 24 s, log C:\TasOut\s05\runs\c6a-multizone-both-session1\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054418_cf022309\benchmark-tas.log
+OpenStudio producer: completed, C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_OpenStudio\benchmark\SAM.Analytical.OpenStudio.Benchmark\bin\x64\Debug\net8.0\benchmark-openstudio.exe, exit code 0, 8.9 s, log C:\TasOut\s05\runs\c6a-multizone-both-session1\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054418_cf022309\benchmark-openstudio.log
+Run record: C:\TasOut\s05\runs\c6a-multizone-both-session1\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054418_cf022309\engine-comparison-run.json

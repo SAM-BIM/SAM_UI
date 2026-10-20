@@ -1,0 +1,140 @@
+{
+  "schemaVersion": "1.0.0",
+  "provenance": {
+    "sourceModelName": "000000_SAM_AnalyticalModel",
+    "sourceModelGuid": "1988f7b93ec047d0b87bf9cb345d9eab",
+    "sourceFileHash": "sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05",
+    "canonicalModelHash": "sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500",
+    "canonicalizationVersion": "1.0.0",
+    "samCommit": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+    "runnerCommit": "d4216f3525c01ca762c1b3e9b6d099733d037f54",
+    "engine": {
+      "kind": "OpenStudio",
+      "name": "EnergyPlus",
+      "version": "25.1.0",
+      "sdkVersion": "3.10.0"
+    },
+    "route": "Native-OpenStudio",
+    "weather": {
+      "identity": "weather",
+      "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+    },
+    "designDaySource": "None",
+    "runTimestampUtc": "2026-10-20T05:42:12.6266397Z",
+    "durationSeconds": 5.3232893,
+    "state": "Success",
+    "resultSources": [
+      "SAM.Analytical.OpenStudio"
+    ],
+    "warnings": [
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 9e54af09-65fb-4f64-98d7-200db3be2457) \u2192 SAM_InternalCondition_S39_OfficeOpen_30b69a1f"
+    ],
+    "notes": [
+      "[SAM-OS-RUN-002] Information: Annual weather source: explicit EPW (weather.epw)",
+      "[SAM-OS-RUN-002] Information: Ground temperatures taken from the SAM model WeatherData (depth 0.5 m set, 12 monthly values)",
+      "[SAM-OS-RUN-002] Information: No design-day source supplied; sizing-period runs stay disabled unless OpenStudioConversionOptions.RunSizingPeriods overrides"
+    ]
+  },
+  "model": {
+    "consumptionHeating": {
+      "value": 2173.9185033546732,
+      "unit": "kWh",
+      "available": true
+    },
+    "consumptionCooling": {
+      "value": 4556.226212241192,
+      "unit": "kWh",
+      "available": true
+    },
+    "peakHeatingLoad": {
+      "value": 3.2591834042717536,
+      "unit": "kW",
+      "available": true
+    },
+    "peakHeatingHour": {
+      "value": 8455,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "peakCoolingLoad": {
+      "value": 5.332620570657522,
+      "unit": "kW",
+      "available": true
+    },
+    "peakCoolingHour": {
+      "value": 5029,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "floorArea": {
+      "value": 50,
+      "unit": "m2",
+      "available": true
+    },
+    "volume": {
+      "value": 150,
+      "unit": "m3",
+      "available": true
+    }
+  },
+  "spaces": [
+    {
+      "guid": "cb68bed195af496bb255a13ffa5c58e9",
+      "name": "Office",
+      "area": {
+        "value": 50,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 150,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 3259.1834042717537,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 8455,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": null,
+          "unit": "W",
+          "available": false
+        },
+        "peakLoad": {
+          "value": 5332.620570657522,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 5029,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    }
+  ]
+}

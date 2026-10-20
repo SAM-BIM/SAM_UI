@@ -1,0 +1,28 @@
+﻿Banner: Gate Fail: 6 match, 0 warn, 10 fail (4 contributing to numerical status, 6 informational and excluded); 2 missing on one engine, 0 unit mismatch, 0 not reported. Spaces: 1 matched, 0 only in Tas, 0 only in OpenStudio.
+
+Overall gate: Fail (numerical Fail, coverage Warn, provenance Pass, reconciliation Pass)
+Metrics: 6 match, 0 warn, 10 fail, 2 N/A; 16 of 18 required metrics comparable. Tolerance profile 'default'. A band is a tolerance band, not an engineering verdict (SAM_UI#232/#233).
+
+Spaces: Tas 1, OpenStudio 1; matched by GUID 1, by name 0.
+
+Model total vs sum of spaces:
+  TAS floorArea: model 50, sum of 1 spaces 50 m2 -> Match
+  TAS volume: model 150, sum of 1 spaces 150 m3 -> Match
+  OpenStudio floorArea: model 50, sum of 1 spaces 50 m2 -> Match
+  OpenStudio volume: model 150, sum of 1 spaces 150 m3 -> Match
+
+Tas run: Success
+  Note: Shared gbXML was exported from the source model (no --gbxml supplied).
+  Result sources: SAM.Analytical.Tas
+
+OpenStudio run: Success
+  Warning: [SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 9e54af09-65fb-4f64-98d7-200db3be2457) → SAM_InternalCondition_S39_OfficeOpen_30b69a1f
+  Note: [SAM-OS-RUN-002] Information: Annual weather source: explicit EPW (weather.epw)
+  Note: [SAM-OS-RUN-002] Information: Ground temperatures taken from the SAM model WeatherData (depth 0.5 m set, 12 monthly values)
+  Note: [SAM-OS-RUN-002] Information: No design-day source supplied; sizing-period runs stay disabled unless OpenStudioConversionOptions.RunSizingPeriods overrides
+  Result sources: SAM.Analytical.OpenStudio
+
+Run: Compared - C:\TasOut\s05\runs\c9-concurrent-start\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de
+Tas producer: completed, C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_Tas\build\benchmark-tas.exe, exit code 0, 20.4 s, log C:\TasOut\s05\runs\c9-concurrent-start\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\benchmark-tas.log
+OpenStudio producer: completed, C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_OpenStudio\benchmark\SAM.Analytical.OpenStudio.Benchmark\bin\x64\Debug\net8.0\benchmark-openstudio.exe, exit code 0, 7.1 s, log C:\TasOut\s05\runs\c9-concurrent-start\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\benchmark-openstudio.log
+Run record: C:\TasOut\s05\runs\c9-concurrent-start\000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055156_c4d119de\engine-comparison-run.json

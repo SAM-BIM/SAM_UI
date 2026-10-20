@@ -1,0 +1,3 @@
+tas=C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_Tas\build\benchmark-tas.exe
+openstudio=C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_OpenStudio\benchmark\SAM.Analytical.OpenStudio.Benchmark\bin\x64\Debug\net8.0\benchmark-openstudio.exe
+samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8

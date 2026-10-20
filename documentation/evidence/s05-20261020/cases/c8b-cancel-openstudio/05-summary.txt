@@ -1,0 +1,13 @@
+﻿Title: OpenStudio Simulation
+The OpenStudio simulation was cancelled. No result model was saved and the open model was not changed.
+
+Run folder: C:\TasOut\s05\runs\c8b-cancel-openstudio\000000_SAM_AnalyticalModel_OpenStudio_20261020-055053_87a6b4d4
+Weather: File
+EnergyPlus: exit code -1, 0 warnings, 0 severe, 0 fatal
+
+Diagnostics:
+- Warning SAM-OS-IC-001: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope)
+- Warning SAM-OS-RUN-001: Simulation cancelled; the CLI/EnergyPlus process tree was terminated
+
+Open the run folder?
+

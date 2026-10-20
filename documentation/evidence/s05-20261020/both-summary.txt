@@ -1,0 +1,86 @@
+﻿== c3a-both-explicit-session1 / 000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054048_48f88268
+  status: Compared   started 2026-10-20T05:40:48.8423401Z finished 2026-10-20T05:41:16.8778057Z
+  snapshot: sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05
+  weather: File sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3
+  environment SAM_COMMIT: 62b5415697d1a5af143c6b581b7d42fbd6551ca8  RUNNER_COMMIT: not set
+  producer Tas: succeeded=True exit=0 21.0s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=e84aeff687033354e3f17891635fdf10d42ad68f engine=Tas 9.5.7.0 route=Native-TAS weather=sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 designDays=None
+    sourceFileHash=sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05 canonicalModelHash=sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500 canonicalization=1.0.0
+    executable sha256: sha256:07ab3e45b107bdd28a7d6b3622d05014b1edb95e015f86e5dc3e9c7a9ab3fbd2
+  producer OpenStudio: succeeded=True exit=0 6.6s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=d4216f3525c01ca762c1b3e9b6d099733d037f54 engine=EnergyPlus 25.1.0 route=Native-OpenStudio weather=sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 designDays=None
+    sourceFileHash=sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05 canonicalModelHash=sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500 canonicalization=1.0.0
+    executable sha256: sha256:644059197b0638bdbfcf7d41b3a7c375b40198a7f53336d907c3e727619a5e06
+  comparison.csv (LF-normalised): sha256:a88bceb0a13f15c5
+  comparison.md  (LF-normalised): sha256:62a669814d5c4d25
+  unknown: application.sourceRevision: this build's InformationalVersion '1.0.0' has no source revision after '+' (a local developer build); the component SHA-256 values identify the binaries
+  unknown: producers.Tas.reported.engine.sdkVersion: the producer reported none (null in its B1a document; its warnings and notes say why)
+== c3b-both-explicit-session2 / 000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054150_1d63d4f7
+  status: Compared   started 2026-10-20T05:41:50.0566200Z finished 2026-10-20T05:42:19.3370897Z
+  snapshot: sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05
+  weather: File sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3
+  environment SAM_COMMIT: 62b5415697d1a5af143c6b581b7d42fbd6551ca8  RUNNER_COMMIT: not set
+  producer Tas: succeeded=True exit=0 21.3s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=e84aeff687033354e3f17891635fdf10d42ad68f engine=Tas 9.5.7.0 route=Native-TAS weather=sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 designDays=None
+    sourceFileHash=sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05 canonicalModelHash=sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500 canonicalization=1.0.0
+    executable sha256: sha256:07ab3e45b107bdd28a7d6b3622d05014b1edb95e015f86e5dc3e9c7a9ab3fbd2
+  producer OpenStudio: succeeded=True exit=0 7.5s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=d4216f3525c01ca762c1b3e9b6d099733d037f54 engine=EnergyPlus 25.1.0 route=Native-OpenStudio weather=sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 designDays=None
+    sourceFileHash=sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05 canonicalModelHash=sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500 canonicalization=1.0.0
+    executable sha256: sha256:644059197b0638bdbfcf7d41b3a7c375b40198a7f53336d907c3e727619a5e06
+  comparison.csv (LF-normalised): sha256:a88bceb0a13f15c5
+  comparison.md  (LF-normalised): sha256:62a669814d5c4d25
+  unknown: application.sourceRevision: this build's InformationalVersion '1.0.0' has no source revision after '+' (a local developer build); the component SHA-256 values identify the binaries
+  unknown: producers.Tas.reported.engine.sdkVersion: the producer reported none (null in its B1a document; its warnings and notes say why)
+== c4-both-embedded / 000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054243_0850a579
+  status: Compared   started 2026-10-20T05:42:43.3272327Z finished 2026-10-20T05:43:11.4277726Z
+  snapshot: sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05
+  weather: Embedded sha256:5afbeb329bea4ce807f402f095fbc695f7fce8a2a29aa6c7b0d93a31a0063082
+  environment SAM_COMMIT: 62b5415697d1a5af143c6b581b7d42fbd6551ca8  RUNNER_COMMIT: not set
+  producer Tas: succeeded=True exit=0 20.5s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=e84aeff687033354e3f17891635fdf10d42ad68f engine=Tas 9.5.7.0 route=Native-TAS weather=sha256:5afbeb329bea4ce807f402f095fbc695f7fce8a2a29aa6c7b0d93a31a0063082 designDays=None
+    sourceFileHash=sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05 canonicalModelHash=sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500 canonicalization=1.0.0
+    executable sha256: sha256:07ab3e45b107bdd28a7d6b3622d05014b1edb95e015f86e5dc3e9c7a9ab3fbd2
+  producer OpenStudio: succeeded=True exit=0 7.0s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=d4216f3525c01ca762c1b3e9b6d099733d037f54 engine=EnergyPlus 25.1.0 route=Native-OpenStudio weather=sha256:5afbeb329bea4ce807f402f095fbc695f7fce8a2a29aa6c7b0d93a31a0063082 designDays=None
+    sourceFileHash=sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05 canonicalModelHash=sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500 canonicalization=1.0.0
+    executable sha256: sha256:644059197b0638bdbfcf7d41b3a7c375b40198a7f53336d907c3e727619a5e06
+  comparison.csv (LF-normalised): sha256:454e42dcde74cabf
+  comparison.md  (LF-normalised): sha256:8b18894da5619f4e
+  unknown: application.sourceRevision: this build's InformationalVersion '1.0.0' has no source revision after '+' (a local developer build); the component SHA-256 values identify the binaries
+  unknown: weather.originalPath: the weather is the model's embedded WeatherData, exported to EPW once for both producers; sha256 identifies the exported file
+  unknown: producers.Tas.reported.engine.sdkVersion: the producer reported none (null in its B1a document; its warnings and notes say why)
+﻿== c6a-multizone-both-session1 / 000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054418_cf022309
+  status: Compared   started 2026-10-20T05:44:18.1627020Z finished 2026-10-20T05:44:51.6211360Z
+  snapshot: sha256:a3b8cff8c90cb5e9827688fe56e244045585420268638c8667b8c11f44507f07
+  weather: File sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3
+  environment SAM_COMMIT: 62b5415697d1a5af143c6b581b7d42fbd6551ca8  RUNNER_COMMIT: not set
+  producer Tas: succeeded=True exit=0 24.0s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=e84aeff687033354e3f17891635fdf10d42ad68f engine=Tas 9.5.7.0 route=Native-TAS weather=sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 designDays=EmbeddedModel
+    sourceFileHash=sha256:a3b8cff8c90cb5e9827688fe56e244045585420268638c8667b8c11f44507f07 canonicalModelHash=sha256:356dcbed711b91d47a0f391ff306aaa352b102581f6a8f062da4858578026317 canonicalization=1.0.0
+    executable sha256: sha256:07ab3e45b107bdd28a7d6b3622d05014b1edb95e015f86e5dc3e9c7a9ab3fbd2
+  producer OpenStudio: succeeded=True exit=0 8.9s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=d4216f3525c01ca762c1b3e9b6d099733d037f54 engine=EnergyPlus 25.1.0 route=Native-OpenStudio weather=sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 designDays=EmbeddedModel
+    sourceFileHash=sha256:a3b8cff8c90cb5e9827688fe56e244045585420268638c8667b8c11f44507f07 canonicalModelHash=sha256:356dcbed711b91d47a0f391ff306aaa352b102581f6a8f062da4858578026317 canonicalization=1.0.0
+    executable sha256: sha256:644059197b0638bdbfcf7d41b3a7c375b40198a7f53336d907c3e727619a5e06
+  comparison.csv (LF-normalised): sha256:cd42ab3f46bbaf0c
+  comparison.md  (LF-normalised): sha256:aa53107e4253fcbb
+  unknown: application.sourceRevision: this build's InformationalVersion '1.0.0' has no source revision after '+' (a local developer build); the component SHA-256 values identify the binaries
+  unknown: producers.Tas.reported.engine.sdkVersion: the producer reported none (null in its B1a document; its warnings and notes say why)
+== c6b-multizone-both-session2 / 000000_SAM_AnalyticalModel_TasOpenStudio_20261020-054524_7e6722bc
+  status: Compared   started 2026-10-20T05:45:24.9298332Z finished 2026-10-20T05:45:59.1803598Z
+  snapshot: sha256:a3b8cff8c90cb5e9827688fe56e244045585420268638c8667b8c11f44507f07
+  weather: File sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3
+  environment SAM_COMMIT: 62b5415697d1a5af143c6b581b7d42fbd6551ca8  RUNNER_COMMIT: not set
+  producer Tas: succeeded=True exit=0 24.9s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=e84aeff687033354e3f17891635fdf10d42ad68f engine=Tas 9.5.7.0 route=Native-TAS weather=sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 designDays=EmbeddedModel
+    sourceFileHash=sha256:a3b8cff8c90cb5e9827688fe56e244045585420268638c8667b8c11f44507f07 canonicalModelHash=sha256:356dcbed711b91d47a0f391ff306aaa352b102581f6a8f062da4858578026317 canonicalization=1.0.0
+    executable sha256: sha256:07ab3e45b107bdd28a7d6b3622d05014b1edb95e015f86e5dc3e9c7a9ab3fbd2
+  producer OpenStudio: succeeded=True exit=0 9.0s error=
+    reported: state=Success samCommit=62b5415697d1a5af143c6b581b7d42fbd6551ca8 runnerCommit=d4216f3525c01ca762c1b3e9b6d099733d037f54 engine=EnergyPlus 25.1.0 route=Native-OpenStudio weather=sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3 designDays=EmbeddedModel
+    sourceFileHash=sha256:a3b8cff8c90cb5e9827688fe56e244045585420268638c8667b8c11f44507f07 canonicalModelHash=sha256:356dcbed711b91d47a0f391ff306aaa352b102581f6a8f062da4858578026317 canonicalization=1.0.0
+    executable sha256: sha256:644059197b0638bdbfcf7d41b3a7c375b40198a7f53336d907c3e727619a5e06
+  comparison.csv (LF-normalised): sha256:2288ac7755b3159f
+  comparison.md  (LF-normalised): sha256:aa53107e4253fcbb
+  unknown: application.sourceRevision: this build's InformationalVersion '1.0.0' has no source revision after '+' (a local developer build); the component SHA-256 values identify the binaries
+  unknown: producers.Tas.reported.engine.sdkVersion: the producer reported none (null in its B1a document; its warnings and notes say why)

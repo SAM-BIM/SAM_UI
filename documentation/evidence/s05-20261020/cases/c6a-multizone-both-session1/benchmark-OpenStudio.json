@@ -1,0 +1,202 @@
+{
+  "schemaVersion": "1.0.0",
+  "provenance": {
+    "sourceModelName": "000000_SAM_AnalyticalModel",
+    "sourceModelGuid": "b74990da73b240978846cc12560be0aa",
+    "sourceFileHash": "sha256:a3b8cff8c90cb5e9827688fe56e244045585420268638c8667b8c11f44507f07",
+    "canonicalModelHash": "sha256:356dcbed711b91d47a0f391ff306aaa352b102581f6a8f062da4858578026317",
+    "canonicalizationVersion": "1.0.0",
+    "samCommit": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+    "runnerCommit": "d4216f3525c01ca762c1b3e9b6d099733d037f54",
+    "engine": {
+      "kind": "OpenStudio",
+      "name": "EnergyPlus",
+      "version": "25.1.0",
+      "sdkVersion": "3.10.0"
+    },
+    "route": "Native-OpenStudio",
+    "weather": {
+      "identity": "weather",
+      "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+    },
+    "designDaySource": "EmbeddedModel",
+    "runTimestampUtc": "2026-10-20T05:44:43.3937215Z",
+    "durationSeconds": 5.5837984,
+    "state": "Success",
+    "resultSources": [
+      "SAM.Analytical.OpenStudio"
+    ],
+    "warnings": [
+      "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition a7560745-3e17-4a82-a7e3-e6f4878feb62) \u2192 SAM_InternalCondition_S37_OfficeCell_950dd279",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London.Wea.Ctr-St.James.Park ANN CLG 0% CONDS DB=\u003EGRad\u0027: the hourly humidity profile was approximated as a constant dew point (13.8 \u00B0C) from 31% RH at the maximum-dry-bulb hour",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London.Wea.Ctr-St.James.Park ANN CLG 0% CONDS DB=\u003EGRad\u0027: the hourly solar profile was approximated by the ASHRAEClearSky model with clearness 1.0; daily dry-bulb range, mean wind/pressure and the SummerDesignDay day type are derived from the SAM hourly profile",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London.Wea.Ctr-St.James.Park ANN HTG 100% CONDS DB\u0027: the hourly humidity profile was approximated as a constant dew point (-8.9 \u00B0C) from 55% RH at the maximum-dry-bulb hour",
+      "[SAM-OS-RUN-002] Warning: Embedded design day \u0027London.Wea.Ctr-St.James.Park ANN HTG 100% CONDS DB\u0027: the hourly solar profile was approximated by the ASHRAEClearSky model with clearness 0.0; daily dry-bulb range, mean wind/pressure and the WinterDesignDay day type are derived from the SAM hourly profile"
+    ],
+    "notes": [
+      "[SAM-OS-RUN-002] Information: Annual weather source: explicit EPW (weather.epw)",
+      "[SAM-OS-RUN-002] Information: Design-day source: AnalyticalModel heating/cooling design days (2 imported)",
+      "[SAM-OS-RUN-002] Information: Ground temperatures taken from the SAM model WeatherData (depth 0.5 m set, 12 monthly values)"
+    ]
+  },
+  "model": {
+    "consumptionHeating": {
+      "value": 32586.624958703087,
+      "unit": "kWh",
+      "available": true
+    },
+    "consumptionCooling": {
+      "value": 3928.4621857377015,
+      "unit": "kWh",
+      "available": true
+    },
+    "peakHeatingLoad": {
+      "value": 17.98919781223135,
+      "unit": "kW",
+      "available": true
+    },
+    "peakHeatingHour": {
+      "value": 919,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "peakCoolingLoad": {
+      "value": 22.221319656078137,
+      "unit": "kW",
+      "available": true
+    },
+    "peakCoolingHour": {
+      "value": 5029,
+      "unit": "hourOfYear",
+      "available": true
+    },
+    "floorArea": {
+      "value": 80,
+      "unit": "m2",
+      "available": true
+    },
+    "volume": {
+      "value": 240,
+      "unit": "m3",
+      "available": true
+    }
+  },
+  "spaces": [
+    {
+      "guid": "36181d863fae4cd999a7397be71f1147",
+      "name": "Cell 1",
+      "area": {
+        "value": 40,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 120,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 742.7775192618877,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 8986.196025194962,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 2733.000340122116,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 11119.755912860499,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 5029,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    },
+    {
+      "guid": "ac7a101a974e4f48962092d649ccf0ad",
+      "name": "Cell 2",
+      "area": {
+        "value": 40,
+        "unit": "m2",
+        "available": true
+      },
+      "volume": {
+        "value": 120,
+        "unit": "m3",
+        "available": true
+      },
+      "heating": {
+        "designLoad": {
+          "value": 742.6694335805023,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 9003.001787036388,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 919,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      },
+      "cooling": {
+        "designLoad": {
+          "value": 2697.479436878951,
+          "unit": "W",
+          "available": true
+        },
+        "peakLoad": {
+          "value": 11101.563743217635,
+          "unit": "W",
+          "available": true
+        },
+        "peakHour": {
+          "value": 5029,
+          "unit": "hourOfYear",
+          "available": true
+        },
+        "unmetHours": {
+          "value": 0,
+          "unit": "h",
+          "available": true
+        }
+      }
+    }
+  ]
+}

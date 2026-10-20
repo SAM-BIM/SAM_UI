@@ -1,0 +1,8 @@
+ 
+0 .
+0 ..
+0 000000_SAM_AnalyticalModel_OpenStudio_20261020-055443_c894a4a3
+0 000000_SAM_AnalyticalModel_TasOpenStudio_20261020-055407_40b31247
+507507 box-aperture.json
+7870 driver-console.txt
+0 evidence

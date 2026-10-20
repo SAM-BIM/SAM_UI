@@ -1,0 +1,5 @@
+﻿2026-10-20T05:54:08.9164425Z [before Energy Simulation (ribbon)] benchmark-tas.exe#29660(parent 41572)
+2026-10-20T05:54:10.2090007Z [before Run Simulation (ribbon)] benchmark-tas.exe#29660(parent 41572)
+2026-10-20T05:54:11.4079273Z [before OpenStudio Simulation (ribbon)] benchmark-tas.exe#29660(parent 41572)
+2026-10-20T05:54:44.6832379Z [before Comparison window Run] openstudio.exe#29896(parent 41572)
+2026-10-20T05:54:46.0718128Z [before Energy Simulation during OpenStudio (ribbon)] openstudio.exe#29896(parent 41572), energyplus.exe#22688(parent 29896)

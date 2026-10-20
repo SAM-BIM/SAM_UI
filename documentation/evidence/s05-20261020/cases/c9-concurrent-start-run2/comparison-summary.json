@@ -1,0 +1,627 @@
+{
+  "summarySchemaVersion": "1.0.0",
+  "toleranceProfile": "default",
+  "toleranceProfileDetail": {
+    "name": "default",
+    "warnRelative": 0.05,
+    "failRelative": 0.15,
+    "hourWarnAbsolute": 1,
+    "hourFailAbsolute": 24,
+    "defaultNearZeroFloor": 0,
+    "nearZeroFloors": {
+      "kWh": 1,
+      "Wh": 1000,
+      "kW": 0.01,
+      "W": 10,
+      "m2": 0.01,
+      "m3": 0.01,
+      "h": 0.5
+    }
+  },
+  "gate": "Fail",
+  "statuses": {
+    "overall": "Fail",
+    "numerical": "Fail",
+    "coverage": "Warn",
+    "provenance": "Pass",
+    "reconciliation": "Pass"
+  },
+  "provenanceCompatibility": {
+    "compatible": true,
+    "mismatches": []
+  },
+  "counts": {
+    "match": 6,
+    "warn": 0,
+    "fail": 10,
+    "notApplicable": 2
+  },
+  "coverage": {
+    "status": "Warn",
+    "requiredMetricCount": 18,
+    "comparableMetricCount": 16,
+    "unavailableRequiredMetricCount": 2,
+    "unmatchedSpaceCount": 0,
+    "ambiguousSpaceCount": 0,
+    "duplicateSpaceIdentityCount": 0
+  },
+  "schema": {
+    "tas": "1.0.0",
+    "openStudio": "1.0.0",
+    "driftNote": null
+  },
+  "provenance": {
+    "tas": {
+      "sourceModelName": "000000_SAM_AnalyticalModel",
+      "sourceModelGuid": "1988f7b93ec047d0b87bf9cb345d9eab",
+      "sourceFileHash": "sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05",
+      "canonicalModelHash": "sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500",
+      "canonicalizationVersion": "1.0.0",
+      "samCommit": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+      "runnerCommit": "e84aeff687033354e3f17891635fdf10d42ad68f",
+      "engine": {
+        "kind": "TAS",
+        "name": "Tas",
+        "version": "9.5.7.0",
+        "sdkVersion": null
+      },
+      "route": "Native-TAS",
+      "weather": {
+        "identity": "weather",
+        "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+      },
+      "designDaySource": "None",
+      "runTimestampUtc": "2026-10-20T05:54:08.7571499Z",
+      "durationSeconds": 18.9989642,
+      "state": "Success",
+      "resultSources": [
+        "SAM.Analytical.Tas"
+      ],
+      "warnings": [],
+      "notes": [
+        "Shared gbXML was exported from the source model (no --gbxml supplied)."
+      ]
+    },
+    "openStudio": {
+      "sourceModelName": "000000_SAM_AnalyticalModel",
+      "sourceModelGuid": "1988f7b93ec047d0b87bf9cb345d9eab",
+      "sourceFileHash": "sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05",
+      "canonicalModelHash": "sha256:05c1e334af00f339d36d5b97828692d3d7d27269d2168a945dfc4a35919c9500",
+      "canonicalizationVersion": "1.0.0",
+      "samCommit": "62b5415697d1a5af143c6b581b7d42fbd6551ca8",
+      "runnerCommit": "d4216f3525c01ca762c1b3e9b6d099733d037f54",
+      "engine": {
+        "kind": "OpenStudio",
+        "name": "EnergyPlus",
+        "version": "25.1.0",
+        "sdkVersion": "3.10.0"
+      },
+      "route": "Native-OpenStudio",
+      "weather": {
+        "identity": "weather",
+        "hash": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+      },
+      "designDaySource": "None",
+      "runTimestampUtc": "2026-10-20T05:54:29.7143415Z",
+      "durationSeconds": 4.9093101,
+      "state": "Success",
+      "resultSources": [
+        "SAM.Analytical.OpenStudio"
+      ],
+      "warnings": [
+        "[SAM-OS-IC-001] Warning: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope) (SAM InternalCondition 9e54af09-65fb-4f64-98d7-200db3be2457) \u2192 SAM_InternalCondition_S39_OfficeOpen_30b69a1f"
+      ],
+      "notes": [
+        "[SAM-OS-RUN-002] Information: Annual weather source: explicit EPW (weather.epw)",
+        "[SAM-OS-RUN-002] Information: Ground temperatures taken from the SAM model WeatherData (depth 0.5 m set, 12 monthly values)",
+        "[SAM-OS-RUN-002] Information: No design-day source supplied; sizing-period runs stay disabled unless OpenStudioConversionOptions.RunSizingPeriods overrides"
+      ]
+    }
+  },
+  "modelMetrics": [
+    {
+      "scope": "model",
+      "key": "consumptionHeating",
+      "unit": "kWh",
+      "availability": "Both",
+      "band": "Fail",
+      "informational": false,
+      "notApplicableReason": null,
+      "circular": false,
+      "tas": {
+        "value": 220.62682055425643,
+        "available": true,
+        "unit": "kWh"
+      },
+      "openStudio": {
+        "value": 2173.9185033546732,
+        "available": true,
+        "unit": "kWh"
+      },
+      "absoluteDifference": 1953.2916828004168,
+      "relativeDifference": 0.8985119174367405,
+      "signedDifference": 1953.2916828004168
+    },
+    {
+      "scope": "model",
+      "key": "consumptionCooling",
+      "unit": "kWh",
+      "availability": "Both",
+      "band": "Fail",
+      "informational": false,
+      "notApplicableReason": null,
+      "circular": false,
+      "tas": {
+        "value": 5540.314465834558,
+        "available": true,
+        "unit": "kWh"
+      },
+      "openStudio": {
+        "value": 4556.226212241192,
+        "available": true,
+        "unit": "kWh"
+      },
+      "absoluteDifference": 984.0882535933661,
+      "relativeDifference": 0.17762317638501215,
+      "signedDifference": -984.0882535933661
+    },
+    {
+      "scope": "model",
+      "key": "peakHeatingLoad",
+      "unit": "kW",
+      "availability": "Both",
+      "band": "Fail",
+      "informational": true,
+      "notApplicableReason": null,
+      "circular": false,
+      "tas": {
+        "value": 1.4238231201171876,
+        "available": true,
+        "unit": "kW"
+      },
+      "openStudio": {
+        "value": 3.2591834042717536,
+        "available": true,
+        "unit": "kW"
+      },
+      "absoluteDifference": 1.835360284154566,
+      "relativeDifference": 0.5631350115949265,
+      "signedDifference": 1.835360284154566
+    },
+    {
+      "scope": "model",
+      "key": "peakHeatingHour",
+      "unit": "hourOfYear",
+      "availability": "Both",
+      "band": "Fail",
+      "informational": true,
+      "notApplicableReason": null,
+      "circular": true,
+      "tas": {
+        "value": 775,
+        "available": true,
+        "unit": "hourOfYear"
+      },
+      "openStudio": {
+        "value": 8455,
+        "available": true,
+        "unit": "hourOfYear"
+      },
+      "absoluteDifference": 1080,
+      "relativeDifference": null,
+      "signedDifference": null
+    },
+    {
+      "scope": "model",
+      "key": "peakCoolingLoad",
+      "unit": "kW",
+      "availability": "Both",
+      "band": "Fail",
+      "informational": true,
+      "notApplicableReason": null,
+      "circular": false,
+      "tas": {
+        "value": 3.126279052734375,
+        "available": true,
+        "unit": "kW"
+      },
+      "openStudio": {
+        "value": 5.332620570657522,
+        "available": true,
+        "unit": "kW"
+      },
+      "absoluteDifference": 2.2063415179231467,
+      "relativeDifference": 0.4137443286446125,
+      "signedDifference": 2.2063415179231467
+    },
+    {
+      "scope": "model",
+      "key": "peakCoolingHour",
+      "unit": "hourOfYear",
+      "availability": "Both",
+      "band": "Fail",
+      "informational": true,
+      "notApplicableReason": null,
+      "circular": true,
+      "tas": {
+        "value": 3901,
+        "available": true,
+        "unit": "hourOfYear"
+      },
+      "openStudio": {
+        "value": 5029,
+        "available": true,
+        "unit": "hourOfYear"
+      },
+      "absoluteDifference": 1128,
+      "relativeDifference": null,
+      "signedDifference": null
+    },
+    {
+      "scope": "model",
+      "key": "floorArea",
+      "unit": "m2",
+      "availability": "Both",
+      "band": "Match",
+      "informational": false,
+      "notApplicableReason": null,
+      "circular": false,
+      "tas": {
+        "value": 50,
+        "available": true,
+        "unit": "m2"
+      },
+      "openStudio": {
+        "value": 50,
+        "available": true,
+        "unit": "m2"
+      },
+      "absoluteDifference": 0,
+      "relativeDifference": 0,
+      "signedDifference": 0
+    },
+    {
+      "scope": "model",
+      "key": "volume",
+      "unit": "m3",
+      "availability": "Both",
+      "band": "Match",
+      "informational": false,
+      "notApplicableReason": null,
+      "circular": false,
+      "tas": {
+        "value": 150,
+        "available": true,
+        "unit": "m3"
+      },
+      "openStudio": {
+        "value": 150,
+        "available": true,
+        "unit": "m3"
+      },
+      "absoluteDifference": 0,
+      "relativeDifference": 0,
+      "signedDifference": 0
+    }
+  ],
+  "spaces": [
+    {
+      "scope": "cb68bed195af496bb255a13ffa5c58e9",
+      "guid": "cb68bed195af496bb255a13ffa5c58e9",
+      "tasName": "Office",
+      "openStudioName": "Office",
+      "matchKind": "Guid",
+      "metrics": [
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "area",
+          "unit": "m2",
+          "availability": "Both",
+          "band": "Match",
+          "informational": false,
+          "notApplicableReason": null,
+          "circular": false,
+          "tas": {
+            "value": 50,
+            "available": true,
+            "unit": "m2"
+          },
+          "openStudio": {
+            "value": 50,
+            "available": true,
+            "unit": "m2"
+          },
+          "absoluteDifference": 0,
+          "relativeDifference": 0,
+          "signedDifference": 0
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "volume",
+          "unit": "m3",
+          "availability": "Both",
+          "band": "Match",
+          "informational": false,
+          "notApplicableReason": null,
+          "circular": false,
+          "tas": {
+            "value": 150,
+            "available": true,
+            "unit": "m3"
+          },
+          "openStudio": {
+            "value": 150,
+            "available": true,
+            "unit": "m3"
+          },
+          "absoluteDifference": 0,
+          "relativeDifference": 0,
+          "signedDifference": 0
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "heating.designLoad",
+          "unit": "W",
+          "availability": "TasOnly",
+          "band": "N/A",
+          "informational": false,
+          "notApplicableReason": "unavailable",
+          "circular": false,
+          "tas": {
+            "value": 1927.0106201171875,
+            "available": true,
+            "unit": "W"
+          },
+          "openStudio": {
+            "value": null,
+            "available": false,
+            "unit": "W"
+          },
+          "absoluteDifference": null,
+          "relativeDifference": null,
+          "signedDifference": null
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "heating.peakLoad",
+          "unit": "W",
+          "availability": "Both",
+          "band": "Fail",
+          "informational": false,
+          "notApplicableReason": null,
+          "circular": false,
+          "tas": {
+            "value": 1926.94873046875,
+            "available": true,
+            "unit": "W"
+          },
+          "openStudio": {
+            "value": 3259.1834042717537,
+            "available": true,
+            "unit": "W"
+          },
+          "absoluteDifference": 1332.2346738030037,
+          "relativeDifference": 0.408763333802224,
+          "signedDifference": 1332.2346738030037
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "heating.peakHour",
+          "unit": "hourOfYear",
+          "availability": "Both",
+          "band": "Fail",
+          "informational": true,
+          "notApplicableReason": null,
+          "circular": true,
+          "tas": {
+            "value": 936,
+            "available": true,
+            "unit": "hourOfYear"
+          },
+          "openStudio": {
+            "value": 8455,
+            "available": true,
+            "unit": "hourOfYear"
+          },
+          "absoluteDifference": 1241,
+          "relativeDifference": null,
+          "signedDifference": null
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "heating.unmetHours",
+          "unit": "h",
+          "availability": "Both",
+          "band": "Match",
+          "informational": false,
+          "notApplicableReason": null,
+          "circular": false,
+          "tas": {
+            "value": 0,
+            "available": true,
+            "unit": "h"
+          },
+          "openStudio": {
+            "value": 0,
+            "available": true,
+            "unit": "h"
+          },
+          "absoluteDifference": 0,
+          "relativeDifference": 0,
+          "signedDifference": 0
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "cooling.designLoad",
+          "unit": "W",
+          "availability": "TasOnly",
+          "band": "N/A",
+          "informational": false,
+          "notApplicableReason": "unavailable",
+          "circular": false,
+          "tas": {
+            "value": 3415.618896484375,
+            "available": true,
+            "unit": "W"
+          },
+          "openStudio": {
+            "value": null,
+            "available": false,
+            "unit": "W"
+          },
+          "absoluteDifference": null,
+          "relativeDifference": null,
+          "signedDifference": null
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "cooling.peakLoad",
+          "unit": "W",
+          "availability": "Both",
+          "band": "Fail",
+          "informational": false,
+          "notApplicableReason": null,
+          "circular": false,
+          "tas": {
+            "value": 3415.45556640625,
+            "available": true,
+            "unit": "W"
+          },
+          "openStudio": {
+            "value": 5332.620570657522,
+            "available": true,
+            "unit": "W"
+          },
+          "absoluteDifference": 1917.165004251272,
+          "relativeDifference": 0.3595164851593561,
+          "signedDifference": 1917.165004251272
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "cooling.peakHour",
+          "unit": "hourOfYear",
+          "availability": "Both",
+          "band": "Fail",
+          "informational": true,
+          "notApplicableReason": null,
+          "circular": true,
+          "tas": {
+            "value": 4358,
+            "available": true,
+            "unit": "hourOfYear"
+          },
+          "openStudio": {
+            "value": 5029,
+            "available": true,
+            "unit": "hourOfYear"
+          },
+          "absoluteDifference": 671,
+          "relativeDifference": null,
+          "signedDifference": null
+        },
+        {
+          "scope": "cb68bed195af496bb255a13ffa5c58e9",
+          "key": "cooling.unmetHours",
+          "unit": "h",
+          "availability": "Both",
+          "band": "Match",
+          "informational": false,
+          "notApplicableReason": null,
+          "circular": false,
+          "tas": {
+            "value": 0,
+            "available": true,
+            "unit": "h"
+          },
+          "openStudio": {
+            "value": 0,
+            "available": true,
+            "unit": "h"
+          },
+          "absoluteDifference": 0,
+          "relativeDifference": 0,
+          "signedDifference": 0
+        }
+      ]
+    }
+  ],
+  "spaceDiagnostics": {
+    "tasCount": 1,
+    "openStudioCount": 1,
+    "matchedByGuid": 1,
+    "matchedByName": 0,
+    "onlyInTas": [],
+    "onlyInOpenStudio": [],
+    "duplicateTasGuids": [],
+    "duplicateOpenStudioGuids": [],
+    "duplicateTasNames": [],
+    "duplicateOpenStudioNames": [],
+    "ambiguousNameMatches": []
+  },
+  "reconciliation": [
+    {
+      "engine": "TAS",
+      "key": "floorArea",
+      "unit": "m2",
+      "modelTotal": 50,
+      "modelTotalAvailable": true,
+      "sumOfSpaces": 50,
+      "contributingSpaces": 1,
+      "spacesMissingValue": 0,
+      "excludedSpaces": 0,
+      "complete": true,
+      "absoluteDifference": 0,
+      "relativeDifference": 0,
+      "band": "Match",
+      "notApplicableReason": null
+    },
+    {
+      "engine": "TAS",
+      "key": "volume",
+      "unit": "m3",
+      "modelTotal": 150,
+      "modelTotalAvailable": true,
+      "sumOfSpaces": 150,
+      "contributingSpaces": 1,
+      "spacesMissingValue": 0,
+      "excludedSpaces": 0,
+      "complete": true,
+      "absoluteDifference": 0,
+      "relativeDifference": 0,
+      "band": "Match",
+      "notApplicableReason": null
+    },
+    {
+      "engine": "OpenStudio",
+      "key": "floorArea",
+      "unit": "m2",
+      "modelTotal": 50,
+      "modelTotalAvailable": true,
+      "sumOfSpaces": 50,
+      "contributingSpaces": 1,
+      "spacesMissingValue": 0,
+      "excludedSpaces": 0,
+      "complete": true,
+      "absoluteDifference": 0,
+      "relativeDifference": 0,
+      "band": "Match",
+      "notApplicableReason": null
+    },
+    {
+      "engine": "OpenStudio",
+      "key": "volume",
+      "unit": "m3",
+      "modelTotal": 150,
+      "modelTotalAvailable": true,
+      "sumOfSpaces": 150,
+      "contributingSpaces": 1,
+      "spacesMissingValue": 0,
+      "excludedSpaces": 0,
+      "complete": true,
+      "absoluteDifference": 0,
+      "relativeDifference": 0,
+      "band": "Match",
+      "notApplicableReason": null
+    }
+  ]
+}
