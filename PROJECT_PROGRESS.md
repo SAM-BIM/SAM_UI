@@ -1,5 +1,25 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Q4 S03 run settings and version traceability (#242) closeout - 2026-10-20
+
+- **PR/status:** [SAM-BIM/SAM_UI#242](https://github.com/SAM-BIM/SAM_UI/pull/242) complete, merged into `sow/2026-Q4` as `1e460bbeb292f898b662407322590cb562b04199`.
+  - Parents: base `4d7f5bd8` and approved head `2724f0c52c189c1af171bb45f6ab8bb18ede5b32`, pinned with `--match-head-commit`; the merge tree equals that head.
+  - The owner authorised the merge in chat on 2026-10-20 (S03/S04/S05 closeout session: "authorized to merge PRs once their acceptance gates pass").
+  - Validated content SHA: `87126efc` (review fixes). `2724f0c5` is record-only.
+  - This completes roadmap task **S03**.
+- **Completed:** `Classes/Provenance/SimulationRunProvenance.cs` writes `"provenance"` (`sam-ui.run-provenance/1`) into every Tas, OpenStudio and Both run manifest.
+  - Tas only now writes `<project>.tas-run.json` on every outcome; status is the workflow's own return.
+  - Build identity is the assembly stamp, never `SAM_COMMIT` or Git HEAD; unknown items are `"unknown"` with a reason.
+  - Review fixes kept at merge: weather `contentSha256` excludes the WeatherData `Guid`; `TBD.Document` looked up in both registry views; no stale unknown reasons.
+  - Record: `documentation/S03-RunProvenance-PR.md`; manifests `documentation/evidence/s03-20261019/`.
+- **Validation:** local full `SAM.Analytical.UI.WPF.Tests` **2912/2912** on `87126efc`; hosted final head Build (`39328188434`) PASS and SPDX (`39328188446`) PASS.
+- **Cleanup:** remote and local `feature/s03-simulation-provenance` deleted (lease on `2724f0c5`, merged, no open PR, no same-named branch in dependency repositories).
+- **Unresolved:**
+  - Both with developer-built producers still needs `SAM_COMMIT` set by hand. Owner decision 2026-10-20: accepted as temporary until S06; the manifest records it as a manual override and it does not prove packaged-app provenance.
+  - OpenStudio CLI on `PATH` (ladybug 3.11 / E+ 25.2) differs from the in-process SDK (3.10 / E+ 25.1) on this laptop; for S06.
+  - Part O routes write no `tas-run.json`.
+- **Next step:** S04 (SAM_UI#243) refresh against this merge and merge; same session.
+
 ## Q4 S02 shared simulation concurrency guard (#241) closeout - 2026-10-19
 
 - **PR/status:** [SAM-BIM/SAM_UI#241](https://github.com/SAM-BIM/SAM_UI/pull/241) complete, merged into `sow/2026-Q4` as `49eebe138db3b750f0bdca030a9bdb20ac1bb6e4`.
