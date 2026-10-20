@@ -1,5 +1,14 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Q4 Simulation dialog consistency (#246) closeout - 2026-10-20
+
+- **Status:** PR SAM_UI#246 merged into `sow/2026-Q4`, merge SHA `a3ea6bb6`, tested head `dbfd86d1` (final PR checks `build` and `spdx` green). The owner approved the merge in chat. Independent UI-quality task, not S07 or a roadmap stage.
+- **Completed:** `RunSimulationWindow.xaml` and `EngineComparisonWindow.xaml` restyled to the Part O conventions (PartOStyles merge, Roboto Light, margins, heading/caption styles, primary button, 28 px button row, surface banner). `AGENTS.md` gained "SAM_UI dialog conventions" and "Validation policy" (CLAUDE.md imports AGENTS.md).
+- **Decisions:** XAML-only; no `.cs`, simulation, progress or status-colour code touched. Part O windows not restyled. Roboto Light is not shipped and falls back to a system font, as in Part O; left unchanged.
+- **Validation:** affected project built (0 errors); 10/10 targeted tests; screenshots at 100%/150% of Part O reference, Run Simulation and Compare (1180 and 760 px) in `documentation/evidence/sim-dialog-consistency/`; button interactions (Run, Cancel, disabled engines) checked without a licensed run. 150% was a render scale, not a real display session.
+- **Unresolved:** engine run progress/failure/partial states still use MessageBox and code-behind banner colours (literal RGB); font bundling or replacement is an open owner decision.
+- **Next step:** owner decision on Roboto Light (bundle with NOTICE entry, or switch all dialogs to a system font) as its own PR; optional follow-up to move engine progress to the shared progress window.
+
 ## Q4 S05 licensed Phase A GUI acceptance (#245) closeout - 2026-10-20
 
 - **PR/status:** [SAM-BIM/SAM_UI#245](https://github.com/SAM-BIM/SAM_UI/pull/245) complete (record, evidence and test harness only), merged into `sow/2026-Q4` as `9acce82978bfa99483722b1e529243367a67c070`.
