@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
 using System.Threading;
 
 namespace SAM.Analytical.UI.WPF
@@ -49,6 +50,7 @@ namespace SAM.Analytical.UI.WPF
                 SourcePath = sourcePath,
                 ModelName = analyticalModel?.Name,
                 ModelGuid = analyticalModel?.Guid ?? Guid.Empty,
+                Provenance = Query.NewRunProvenance("OpenStudio"),
             };
 
             if (analyticalModel == null || string.IsNullOrWhiteSpace(directory))
@@ -74,9 +76,20 @@ namespace SAM.Analytical.UI.WPF
 
                 result.SnapshotSha256 = Query.Sha256(result.SnapshotPath);
 
+                //S04: the open model's view state, copied at the moment of the snapshot, for the result model; never a reason to fail.
+                Geometry.UI.UIGeometrySettings? viewState = null;
+                try
+                {
+                    viewState = Query.ViewState(analyticalModel);
+                }
+                catch (Exception exception)
+                {
+                    result.Diagnostics.Add("Warning: the view state could not be copied for the result model: " + exception.GetType().Name + ": " + exception.Message);
+                }
+
                 cancellationToken.ThrowIfCancellationRequested();
 
-                RunOpenStudioSimulation_Run(result, analyticalModel_Frozen, epwPath, progress, cancellationToken);
+                RunOpenStudioSimulation_Run(result, analyticalModel_Frozen, viewState, epwPath, progress, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -90,6 +103,7 @@ namespace SAM.Analytical.UI.WPF
             finally
             {
                 result.FinishedUtc = DateTime.UtcNow;
+                CompleteRunProvenance(() => Query.CompleteOpenStudioRunProvenance(result), result.Diagnostics);
                 WriteManifest(result);
             }
 
@@ -99,15 +113,31 @@ namespace SAM.Analytical.UI.WPF
         /// <summary>
         /// Writes <paramref name="analyticalModel"/> to <paramref name="path"/> and returns the model read back from that file: an
         /// independent copy whose content is exactly the file's. Null when either step fails.
+        /// <para>
+        /// The file is <see cref="Query.SimulationSnapshotJsonObject"/> of the model (S04): everything except SAM_UI's view state, which is
+        /// regenerated on every open and would otherwise give the same model a different snapshot and canonical hash in each session.
+        /// A JSON snapshot is written exactly as <c>Core.Convert.ToFile</c> writes a JSON file, so a model with no view state gives the
+        /// same bytes as before S04.
+        /// </para>
         /// </summary>
         public static AnalyticalModel? FreezeAnalyticalModel(this AnalyticalModel analyticalModel, string path)
         {
-            if (analyticalModel == null || string.IsNullOrWhiteSpace(path))
+            if (analyticalModel == null || string.IsNullOrWhiteSpace(path) || !System.IO.Directory.Exists(Path.GetDirectoryName(path)))
             {
                 return null;
             }
 
-            if (!Core.Convert.ToFile(analyticalModel, path))
+            JsonObject? jsonObject = Query.SimulationSnapshotJsonObject(analyticalModel);
+            if (jsonObject == null)
+            {
+                return null;
+            }
+
+            if (Core.Query.SAMFileType(path) == Core.SAMFileType.Json)
+            {
+                File.WriteAllText(path, new JsonArray(jsonObject).ToJsonString(Core.Convert.SerializerOptions(Core.Formatting.Indented)));
+            }
+            else if (!Core.Convert.ToFile(new AnalyticalModel(jsonObject), path))
             {
                 return null;
             }
@@ -151,9 +181,13 @@ namespace SAM.Analytical.UI.WPF
         // Its own method, never inlined: every OpenStudio type is reached here, so a missing SAM_OpenStudio or OpenStudio assembly fails
         // this method's compilation inside the caller's try, and is recorded on the run like any other failure.
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void RunOpenStudioSimulation_Run(OpenStudioSimulationRun openStudioSimulationRun, AnalyticalModel analyticalModel_Frozen, string? epwPath, IProgress<Core.OpenStudio.OpenStudioSimulationProgress>? progress, CancellationToken cancellationToken)
+        private static void RunOpenStudioSimulation_Run(OpenStudioSimulationRun openStudioSimulationRun, AnalyticalModel analyticalModel_Frozen, Geometry.UI.UIGeometrySettings? viewState, string? epwPath, IProgress<Core.OpenStudio.OpenStudioSimulationProgress>? progress, CancellationToken cancellationToken)
         {
             openStudioSimulationRun.SamOpenStudioVersion = typeof(OpenStudioConversionResult).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? typeof(OpenStudioConversionResult).Assembly.GetName().Version?.ToString();
+
+            //S03: the SAM assemblies this process loaded to convert and run, read here where their types are reached anyway.
+            openStudioSimulationRun.Provenance?.AddComponent(typeof(OpenStudioConversionResult).Assembly);
+            openStudioSimulationRun.Provenance?.AddComponent(typeof(Core.OpenStudio.OpenStudioRunOptions).Assembly);
 
             //The weather the converter will use, by its own precedence: the user's EPW, else the model's embedded WeatherData. The user's
             //path is passed on as given (null for embedded), so the conversion is exactly SAM_OpenStudio's; the resolved file is only
@@ -161,6 +195,7 @@ namespace SAM.Analytical.UI.WPF
             string? epwPath_User = !string.IsNullOrWhiteSpace(epwPath) && File.Exists(epwPath) ? epwPath : null;
             string? epwPath_Effective = epwPath_User ?? analyticalModel_Frozen.EmbeddedAnnualWeatherPath();
             openStudioSimulationRun.WeatherSource = epwPath_User != null ? "File" : epwPath_Effective != null ? "Embedded" : "None";
+            openStudioSimulationRun.WeatherOriginalPath = epwPath_User;
             if (epwPath_Effective != null)
             {
                 openStudioSimulationRun.WeatherPath = Path.Combine(openStudioSimulationRun.Directory!, OpenStudioSimulationRun.WeatherFileName);
@@ -174,15 +209,36 @@ namespace SAM.Analytical.UI.WPF
                 UseUniqueRunDirectory = false,
             };
 
+            openStudioSimulationRun.RunOptions = new JsonObject
+            {
+                ["epwPath"] = epwPath_User ?? "(none: the model's embedded WeatherData, SAM_OpenStudio's own precedence)",
+                ["outputDirectory"] = openStudioSimulationRun.Directory,
+                ["conversionOptions"] = "SAM_OpenStudio defaults",
+                ["run"] = true,
+                ["cliPath"] = openStudioRunOptions.CliPath ?? "(discovered by SAM_OpenStudio; the CLI that ran is engine.cli)",
+                ["runDirectory"] = openStudioRunOptions.RunDirectory ?? "(not set: a directory next to the OSW file)",
+                ["ddyPath"] = openStudioRunOptions.DdyPath ?? "(none)",
+                ["timeoutSeconds"] = openStudioRunOptions.TimeoutSeconds,
+                ["useUniqueRunDirectory"] = openStudioRunOptions.UseUniqueRunDirectory,
+                ["extractTimeSeries"] = openStudioRunOptions.ExtractTimeSeries,
+            };
+
             OpenStudioProgress progress_Run = new OpenStudioProgress(openStudioSimulationRun, progress);
 
             using OpenStudioConversionResult openStudioConversionResult = analyticalModel_Frozen.ToOpenStudio(epwPath_User, openStudioSimulationRun.Directory, null, openStudioRunOptions, true, progress_Run, cancellationToken);
+
+            //S03: asked only now that the conversion has loaded the SDK, so a missing OpenStudio stack fails in the conversion exactly as
+            //before. A version the SDK cannot give stays null and is written as unknown.
+            openStudioSimulationRun.OpenStudioSdkVersion = SafeVersion(Core.OpenStudio.Query.OpenStudioVersion);
+            openStudioSimulationRun.EnergyPlusSdkVersion = SafeVersion(Core.OpenStudio.Query.EnergyPlusVersion);
 
             if (openStudioConversionResult == null)
             {
                 openStudioSimulationRun.Diagnostics.Add("Error: SAM_OpenStudio returned no conversion result");
                 return;
             }
+
+            openStudioSimulationRun.DesignDaySource = openStudioConversionResult.DesignDaySource.ToString();
 
             foreach (Core.OpenStudio.OpenStudioDiagnostic openStudioDiagnostic in openStudioConversionResult.Diagnostics)
             {
@@ -236,6 +292,17 @@ namespace SAM.Analytical.UI.WPF
                 openStudioSimulationRun.ResultDiagnostics.AddRange(diagnostics);
             }
 
+            //S04: the snapshot left the open model's view state out; the result model, which a person opens, gets back the copy taken
+            //with the snapshot. A failure here is a warning, never a failed run.
+            try
+            {
+                WithViewState(analyticalModel_Result, viewState);
+            }
+            catch (Exception exception)
+            {
+                openStudioSimulationRun.Diagnostics.Add("Warning: the result model was saved without the view state: " + exception.GetType().Name + ": " + exception.Message);
+            }
+
             string resultModelPath = Path.Combine(openStudioSimulationRun.Directory!, Query.OpenStudioResultModelFileName(analyticalModel_Frozen.Name));
             if (!Core.Convert.ToFile(analyticalModel_Result, resultModelPath))
             {
@@ -246,6 +313,36 @@ namespace SAM.Analytical.UI.WPF
 
             openStudioSimulationRun.ResultModelPath = resultModelPath;
             openStudioSimulationRun.Status = OpenStudioSimulationStatus.Succeeded;
+        }
+
+        /// <summary>A version from the OpenStudio SDK, or null when the SDK cannot give one.</summary>
+        private static string? SafeVersion(Func<string> version)
+        {
+            try
+            {
+                string value = version();
+                return string.IsNullOrWhiteSpace(value) ? null : value;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Completes a run's provenance (S03) from a finally. Collecting provenance never changes how a run ended: a failure here is a warning
+        /// in the run's diagnostics, and the manifest is still written.
+        /// </summary>
+        internal static void CompleteRunProvenance(Action complete, List<string> diagnostics)
+        {
+            try
+            {
+                complete();
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Add("Warning: the run provenance could not be completed: " + exception.GetType().Name + ": " + exception.Message);
+            }
         }
 
         private static void WriteManifest(OpenStudioSimulationRun openStudioSimulationRun)

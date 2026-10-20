@@ -87,6 +87,16 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        /// <summary>The file the selected weather was read from in this dialog; null for the model's (internal) weather or one not read from a file.</summary>
+        public string? SelectedWeatherDataPath
+        {
+            get
+            {
+                string text = selectSAMObjectComboBoxControl_WeatherData.SelectedText;
+                return text != null && text != InternalText && System.IO.File.Exists(text) ? text : null;
+            }
+        }
+
         public WeatherData SelectedWeatherData
         {
             get

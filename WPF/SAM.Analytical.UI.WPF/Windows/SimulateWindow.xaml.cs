@@ -39,6 +39,14 @@ namespace SAM.Analytical.UI.WPF
             }
         }
 
+        public string? SelectedWeatherDataPath
+        {
+            get
+            {
+                return simulateControl.SelectedWeatherDataPath;
+            }
+        }
+
         public WeatherData SelectedWeatherData
         {
             get

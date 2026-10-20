@@ -1,5 +1,43 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Q4 S04 stable canonical simulation snapshot (#243) closeout - 2026-10-20
+
+- **PR/status:** [SAM-BIM/SAM_UI#243](https://github.com/SAM-BIM/SAM_UI/pull/243) complete, merged into `sow/2026-Q4` as `307cb0e3c6926453147b4e65274024021905bcba`.
+  - Parents: base `56e67d09` and approved head `dac1e5403175f4453f67a3c9108ec246af23e0ba`, pinned with `--match-head-commit`; the merge tree equals that head.
+  - The owner authorised the merge in chat on 2026-10-20 (same authorisation as S03).
+  - Validated content: `29ca1d1a` (S04 alone); integrated with merged S03 as `3bbba54b` (conflict in `OpenStudioSimulationTests.RealRun_…` resolved by keeping both blocks; code tree equals the overnight integration tree `8aafcb06`). `dac1e540` is record-only.
+  - This completes roadmap task **S04** (finding F7).
+- **Completed:** `Query/SimulationSnapshot.cs` freezes the model without `UI Geometry Settings` and without an emptied/empty SAM.Analytical.UI set, so the same saved model gives the same snapshot and canonical hash across sessions and builds; the OpenStudio result model gets a freeze-time copy of the view state.
+  - Record: `documentation/S04-StableCanonicalSnapshot-PR.md`; evidence `documentation/evidence/s04-20261019/`.
+- **Validation:**
+  - Local full `SAM.Analytical.UI.WPF.Tests` on `3bbba54b`: run 1 2925/2926 (S03 `TasRunManifestTests.Succeeded_…` reported Cancelled after the 5 s `ProgressWindowHost` shutdown join under load), run 2 **2926/2926**. Logs machine-local `C:\TasOut\s05\logs\`.
+  - Hosted: `3bbba54b` Build `39371452078` PASS; final head `dac1e540` Build `39372086508` PASS and SPDX `39372086507` PASS.
+- **Cleanup:** remote and local `feature/s04-stable-canonical-snapshot` deleted (lease on `dac1e540`, merged, no open PR, no same-named dependency branch).
+- **Unresolved:**
+  - Pre-existing (2026-10-06) fail-safe: when `ProgressWindowHost` cannot confirm its dialog thread stopped within 5 s, `Simulate` reports the Tas run as Cancelled; under heavy load a successful run can be reported Cancelled. Not changed here.
+  - The local `SAM\build` on this laptop predated SAM#212 (F1 EPW writer), so overnight local real-engine evidence (S03, S04, S05 preflight) used a pre-F1 `SAM.Weather.dll`. Explicit-EPW results are unaffected; embedded-weather evidence from those builds is not post-F1. S05 rebuilds the stack.
+- **Next step:** S05 preflight (#244) closeout, then formal S05 acceptance on a fresh build of this merge; same session.
+
+## Q4 S03 run settings and version traceability (#242) closeout - 2026-10-20
+
+- **PR/status:** [SAM-BIM/SAM_UI#242](https://github.com/SAM-BIM/SAM_UI/pull/242) complete, merged into `sow/2026-Q4` as `1e460bbeb292f898b662407322590cb562b04199`.
+  - Parents: base `4d7f5bd8` and approved head `2724f0c52c189c1af171bb45f6ab8bb18ede5b32`, pinned with `--match-head-commit`; the merge tree equals that head.
+  - The owner authorised the merge in chat on 2026-10-20 (S03/S04/S05 closeout session: "authorized to merge PRs once their acceptance gates pass").
+  - Validated content SHA: `87126efc` (review fixes). `2724f0c5` is record-only.
+  - This completes roadmap task **S03**.
+- **Completed:** `Classes/Provenance/SimulationRunProvenance.cs` writes `"provenance"` (`sam-ui.run-provenance/1`) into every Tas, OpenStudio and Both run manifest.
+  - Tas only now writes `<project>.tas-run.json` on every outcome; status is the workflow's own return.
+  - Build identity is the assembly stamp, never `SAM_COMMIT` or Git HEAD; unknown items are `"unknown"` with a reason.
+  - Review fixes kept at merge: weather `contentSha256` excludes the WeatherData `Guid`; `TBD.Document` looked up in both registry views; no stale unknown reasons.
+  - Record: `documentation/S03-RunProvenance-PR.md`; manifests `documentation/evidence/s03-20261019/`.
+- **Validation:** local full `SAM.Analytical.UI.WPF.Tests` **2912/2912** on `87126efc`; hosted final head Build (`39328188434`) PASS and SPDX (`39328188446`) PASS.
+- **Cleanup:** remote and local `feature/s03-simulation-provenance` deleted (lease on `2724f0c5`, merged, no open PR, no same-named branch in dependency repositories).
+- **Unresolved:**
+  - Both with developer-built producers still needs `SAM_COMMIT` set by hand. Owner decision 2026-10-20: accepted as temporary until S06; the manifest records it as a manual override and it does not prove packaged-app provenance.
+  - OpenStudio CLI on `PATH` (ladybug 3.11 / E+ 25.2) differs from the in-process SDK (3.10 / E+ 25.1) on this laptop; for S06.
+  - Part O routes write no `tas-run.json`.
+- **Next step:** S04 (SAM_UI#243) refresh against this merge and merge; same session.
+
 ## Q4 S02 shared simulation concurrency guard (#241) closeout - 2026-10-19
 
 - **PR/status:** [SAM-BIM/SAM_UI#241](https://github.com/SAM-BIM/SAM_UI/pull/241) complete, merged into `sow/2026-Q4` as `49eebe138db3b750f0bdca030a9bdb20ac1bb6e4`.

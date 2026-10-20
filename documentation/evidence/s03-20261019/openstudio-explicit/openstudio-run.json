@@ -1,0 +1,157 @@
+{
+  "schema": "sam-ui.openstudio-run/1",
+  "id": "a3e1abb2",
+  "status": "Succeeded",
+  "startedUtc": "2026-10-19T20:37:24.9571192Z",
+  "finishedUtc": "2026-10-19T20:37:33.9366947Z",
+  "durationSeconds": 8.98,
+  "sourcePath": "C:\\TasOut\\s01b\\inputs\\box-aperture.json",
+  "model": {
+    "name": "000000_SAM_AnalyticalModel",
+    "guid": "1988f7b93ec047d0b87bf9cb345d9eab"
+  },
+  "snapshot": {
+    "path": "snapshot.json",
+    "sha256": "sha256:0c30db14a9b10f5e651248e70c942bf875ca93dcee9436998b9960e47c0a6d05"
+  },
+  "weather": {
+    "source": "File",
+    "path": "weather.epw",
+    "sha256": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3"
+  },
+  "engine": {
+    "route": "Native-OpenStudio",
+    "samOpenStudioVersion": "1.0.0.0",
+    "cliPath": "C:\\Program Files\\ladybug_tools\\openstudio\\bin\\openstudio.exe",
+    "exitCode": 0,
+    "warningCount": 10,
+    "severeCount": 0,
+    "fatalCount": 0
+  },
+  "outputs": {
+    "osm": "000000_SAM_AnalyticalModel.osm",
+    "osw": "000000_SAM_AnalyticalModel.osw",
+    "sql": "run/eplusout.sql",
+    "err": "run/eplusout.err",
+    "resultModel": "000000_SAM_AnalyticalModel_OpenStudio.json"
+  },
+  "resultCount": 13,
+  "removedResultCount": 0,
+  "diagnostics": [
+    "Warning SAM-OS-IC-001: Pollutant generation is not converted (EnergyPlus generic contaminant modelling is out of scope)",
+    "Information SAM-OS-HVAC-001: Exhaust air flows (ExhaustAirFlowPerPerson) are not converted \u2014 exhaust needs fan/air-loop equipment, deferred to the detailed-HVAC programme",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (1) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (5.565) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (2.7) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (24) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (2) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (1) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (1) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-MAT-002: Vapour diffusion factor (9999) is not converted \u2014 EnergyPlus moisture modelling (HAMT/EMPD) needs data SAM does not carry",
+    "Information SAM-OS-RUN-002: Annual weather source: explicit EPW (Budapest.epw)",
+    "Information SAM-OS-RUN-001: Site coordinates taken from the SAM model Location (lat 47.517, lon 19.033, elevation 129 m), overriding the EPW header; the time zone stays with the EPW header",
+    "Information SAM-OS-RUN-002: Ground temperatures taken from the SAM model WeatherData (depth 0.5 m set, 12 monthly values)",
+    "Information SAM-OS-RUN-002: No design-day source supplied; sizing-period runs stay disabled unless OpenStudioConversionOptions.RunSizingPeriods overrides"
+  ],
+  "resultDiagnostics": [],
+  "error": null,
+  "provenance": {
+    "schema": "sam-ui.run-provenance/1",
+    "route": "OpenStudio",
+    "application": {
+      "entryAssembly": {
+        "name": "testhost",
+        "version": "15.0.0.0",
+        "informationalVersion": "17.11.1",
+        "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_UI\\WPF\\SAM.Analytical.UI.WPF.Tests\\bin\\Release\\testhost.dll",
+        "sha256": "sha256:d3817a1f17e00b7f7b1040ab01e7aae73378f80c32aa4f62cb99c2aeed3cd5ad"
+      },
+      "sourceRevision": "unknown",
+      "sourceRevisionOf": "the \u002Bbuild metadata of SAM.Analytical.UI.WPF\u0027s InformationalVersion; SAM_Deploy installers stamp their SAM_Deploy commit, which pins every repository",
+      "components": [
+        {
+          "name": "SAM.Core",
+          "version": "1.0.0.0",
+          "informationalVersion": "1.0.0",
+          "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_UI\\WPF\\SAM.Analytical.UI.WPF.Tests\\bin\\Release\\SAM.Core.dll",
+          "sha256": "sha256:7a3c7b15908467342c60cde31b565dc026b47f8a0cd1e3160c14bf163559d8a9"
+        },
+        {
+          "name": "SAM.Analytical",
+          "version": "1.0.0.0",
+          "informationalVersion": "1.0.0",
+          "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_UI\\WPF\\SAM.Analytical.UI.WPF.Tests\\bin\\Release\\SAM.Analytical.dll",
+          "sha256": "sha256:9576dcd158e3545d73f6b29706b73af7d20c09325193257927bc46ee31119970"
+        },
+        {
+          "name": "SAM.Analytical.UI.WPF",
+          "version": "1.0.0.0",
+          "informationalVersion": "1.0.0",
+          "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_UI\\WPF\\SAM.Analytical.UI.WPF.Tests\\bin\\Release\\SAM.Analytical.UI.WPF.dll",
+          "sha256": "sha256:d3827634681ffaf848982bd608c7ef54c087d6491a26f499ff3ff8ae18e69009"
+        },
+        {
+          "name": "SAM.Analytical.OpenStudio",
+          "version": "1.0.0.0",
+          "informationalVersion": "unknown",
+          "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_UI\\WPF\\SAM.Analytical.UI.WPF.Tests\\bin\\Release\\SAM.Analytical.OpenStudio.dll",
+          "sha256": "sha256:b1b5b9efce7ebb0938b8dda3bf8bc497091ee79083dcd53f446edd65e97402bb"
+        },
+        {
+          "name": "SAM.Core.OpenStudio",
+          "version": "1.0.0.0",
+          "informationalVersion": "unknown",
+          "path": "C:\\Users\\michal\\Documents\\GitHub\\SAM-BIM\\SAM_UI\\WPF\\SAM.Analytical.UI.WPF.Tests\\bin\\Release\\SAM.Core.OpenStudio.dll",
+          "sha256": "sha256:09c77b85b9a54d192c23878e5956e9b41a7c4e9db5ed37030591e9a51247a842"
+        }
+      ]
+    },
+    "engine": {
+      "openStudioSdkVersion": "3.10.0",
+      "energyPlusVersionOfSdk": "25.1.0",
+      "energyPlusVersion": "25.2.0-cf7368216c",
+      "cli": {
+        "path": "C:\\Program Files\\ladybug_tools\\openstudio\\bin\\openstudio.exe",
+        "sha256": "sha256:ef290e843774448c18467debb286abc90dc8625c0679c011cb4892e519100b6e",
+        "fileVersion": "3.11.0",
+        "productVersion": "3.11.0.241b8abb4d"
+      }
+    },
+    "weather": {
+      "source": "File",
+      "sha256": "sha256:472ffb4e2f10867600949a392ce46891fc1bd05f2fc8d8917a99bca7d26209c3",
+      "originalPath": "C:\\TasOut\\s01b\\inputs\\Budapest.epw"
+    },
+    "designDays": {
+      "source": "None"
+    },
+    "settings": {
+      "runOptions": {
+        "epwPath": "C:\\TasOut\\s01b\\inputs\\Budapest.epw",
+        "outputDirectory": "C:\\TasOut\\s03\\openstudio-explicit\\000000_SAM_AnalyticalModel_OpenStudio_20261019-203724_a3e1abb2",
+        "conversionOptions": "SAM_OpenStudio defaults",
+        "run": true,
+        "cliPath": "(discovered by SAM_OpenStudio; the CLI that ran is engine.cli)",
+        "runDirectory": "(not set: a directory next to the OSW file)",
+        "ddyPath": "(none)",
+        "timeoutSeconds": 3600,
+        "useUniqueRunDirectory": false,
+        "extractTimeSeries": false
+      }
+    },
+    "unknown": {
+      "application.sourceRevision": "this build\u0027s InformationalVersion \u00271.0.0\u0027 has no source revision after \u0027\u002B\u0027 (a local developer build); the component SHA-256 values identify the binaries",
+      "application.components[SAM.Analytical.OpenStudio].informationalVersion": "the assembly carries no InformationalVersion",
+      "application.components[SAM.Core.OpenStudio].informationalVersion": "the assembly carries no InformationalVersion"
+    }
+  }
+}
