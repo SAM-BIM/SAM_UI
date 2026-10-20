@@ -9,6 +9,20 @@ S04 (SAM_UI#243) were open and unmerged. **No case below is an S05 PASS.**
 Status values: **PASS**, **FAIL**, **NOT RUN**, **BLOCKED**. Rehearsal results are labelled "rehearsal" and never count as
 acceptance results.
 
+## Status update (2026-10-20): validated against the merged S03/S04
+- S03 merged as SAM_UI#242 `1e460bbe`, S04 as SAM_UI#243 `307cb0e3`, both with green final-head CI. The SAM_UI code tree of
+  `307cb0e3` equals the rehearsal tree `8aafcb06`: `git diff 8aafcb06 307cb0e3` touches only `PROJECT_PROGRESS.md` and the
+  S04 record. The rehearsal therefore exercised exactly the merged SAM_UI code.
+- **Correction, case 4 is not post-F1 evidence.** The rehearsal app and the developer-built producers took
+  `SAM.Weather.dll` from this laptop's `SAM\build`, built 2026-10-17, before SAM#212 (F1, 2026-10-19). The F1 code is absent
+  from that binary (sha256 `f99f827f…`, the same in `app-int`, `SAM_Tas\build` and the OpenStudio producer folder). So case 4
+  ran with the pre-F1 EPW writer. Explicit-EPW cases (3, 5) and the Tas-only case 1 do not use the EPW writer and are not
+  affected.
+- Owner decision (2026-10-20): `SAM_COMMIT` is accepted as a temporary requirement for developer-built producers in Both
+  runs until S06. The value must be the SAM commit the producers were built from; it does not prove packaged-app provenance.
+- Formal acceptance is a separate record on a fresh build of the dependency stack at the `sow/2026-Q4` tips:
+  `documentation/S05-LicensedAcceptance.md`. **No result in this preflight record is an acceptance result.**
+
 ## Rehearsal build (2026-10-19)
 - **Tree:** local integration merge `8aafcb06` (not pushed): `sow/2026-Q4` `4d7f5bd8` + S04 head `b19b80ab` + S03 head
   `2724f0c5`. The one textual conflict, both PRs appending to `OpenStudioSimulationTests.RealRun_…`, was resolved by keeping
@@ -41,7 +55,7 @@ Engine numbers are recorded, not judged: numerical agreement is not a criterion.
 | 1 | Tas only | Run Simulation > Tas on the box; dialog defaults (model weather), Full Year ticked | success box; model replaced by the TAS result | `box.tbd/.tsd/.json`; **`box.tas-run.json`** `status: Succeeded`, TAS `9.5.7.0` + TBD.exe hash, weather source, the `WorkflowSettings` that ran | none | driver log, message box, `tas-run.json`; for acceptance also persisted values vs baseline (`compare-persisted.ps1`) | **Rehearsal PASS.** Message "Model successfuly converted"; `status: Succeeded`; weather `Embedded`; `T3DRoute: GbXML`, `SimulateTo: 365` (`c1-tas-run-simulation/`) |
 | 2 | OpenStudio only | Run Simulation > OpenStudio on the box, explicit EPW | Succeeded summary; open model unchanged | run folder: `openstudio-run.json` `Succeeded`, OSM/OSW/SQL, result model with view state; CLI hash, E+ version from `eplusout.err` | none | manifest, result model, screenshot | **NOT RUN** from the ribbon: no driver. Code path ran with real OpenStudio (S03 evidence `openstudio-*`; S04 `RealRun_…`). |
 | 3 | Both | Run Simulation > Both on the box, explicit EPW, **in two separate app sessions** | `Compared`; comparison window opens | `engine-comparison-run.json`, two B1a, comparison csv/md/summary; S03 provenance per producer; S04 identical snapshot and canonical hash across sessions | none | manifests, B1a, comparison window | **Rehearsal PASS** with manual `SAM_COMMIT`. Both sessions `Compared`, snapshot `0c30db14…`, both producers `canonicalModelHash` `05c1e334…` (`c3a-…`, `c3b-…`). Gate "Fail" is engine agreement, not a criterion. **Without `SAM_COMMIT`: FAIL** (developer producers refuse, S03 evidence) - owner decision / S06 |
-| 4 | Box, embedded post-F1 weather | as 3 with no EPW chosen | as 3; weather `Embedded` | as 3; `provenance.weather.source: Embedded`, exported EPW hash | none | as 3 | **Rehearsal PASS** with manual `SAM_COMMIT`: `Compared`, weather `Embedded`, same snapshot and canonical hash as 3 (`c4-both-embedded/`). Tas-only embedded is case 1. |
+| 4 | Box, embedded post-F1 weather | as 3 with no EPW chosen | as 3; weather `Embedded` | as 3; `provenance.weather.source: Embedded`, exported EPW hash | none | as 3 | **Rehearsal PASS** with manual `SAM_COMMIT`: `Compared`, weather `Embedded`, same snapshot and canonical hash as 3 (`c4-both-embedded/`). Tas-only embedded is case 1. **Not post-F1** (pre-F1 `SAM.Weather.dll`, see the 2026-10-20 status update). |
 | 5 | Box, explicit EPW | as 3 with `Budapest.epw` | as 3 | as 3; `weather.source: File`, EPW hash `472ffb4e…` | none | as 3 | **Rehearsal PASS** (same runs as 3). |
 | 6 | One multizone model | as 3 on a multizone fixture | as 3 | as 3 | none | as 3 | **BLOCKED**: no committed multizone fixture with cleared provenance. HungaryHouse is machine-local and unconfirmed (owner decision 3). |
 | 7 | Injected Tas refusal | Energy Simulation with `-BlockTsd` (a directory at `box.tsd`) | "Simulation failed" box: TAS return code 0, error log, TAS-SIM-001; model not replaced | `box.tas-run.json` `status: Failed` with the same failure text | "Simulation failed: the TAS simulation did not complete ..." | driver log, message box, `tas-run.json` | **Rehearsal PASS.** Box title "Simulation failed", return code 0, TAS-SIM-001 lines; `tas-run.json` `Failed` with the same text (`c7-…`). The driver's close step timed out with the app open (as in S01b case E3); the app was closed by hand. TAS opened its error log in Notepad (TAS behaviour). |
