@@ -102,6 +102,12 @@ namespace SAM.Analytical.UI.WPF
 
         public string? WeatherSha256 { get; set; }
 
+        /// <summary>The EPW the user chose, as given; null for the embedded weather or none.</summary>
+        public string? WeatherOriginalPath { get; set; }
+
+        /// <summary>The run's provenance (S03): this build, each producer's identity and what each producer reported.</summary>
+        public SimulationRunProvenance? Provenance { get; set; }
+
         public List<EngineComparisonProducerRun> ProducerRuns { get; } = new List<EngineComparisonProducerRun>();
 
         /// <summary>SAM_Validation's overall gate ("Pass", "Warn", "Fail") when the documents were compared.</summary>
@@ -161,6 +167,7 @@ namespace SAM.Analytical.UI.WPF
                 ["reports"] = reportPaths,
                 ["diagnostics"] = diagnostics,
                 ["error"] = Exception == null ? null : Exception.GetType().Name + ": " + Exception.Message,
+                ["provenance"] = Provenance?.ToJsonObject(),
             };
 
             return jsonObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true });

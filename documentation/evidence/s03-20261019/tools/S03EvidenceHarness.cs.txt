@@ -1,0 +1,135 @@
+// Temporary, NOT committed: produces S03 representative manifests from real engines on a licensed machine.
+#nullable enable
+
+using SAM.Core;
+using SAM.Weather;
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace SAM.Analytical.UI.WPF.Tests
+{
+    [Collection(WpfCollection.Name)]
+    public class S03EvidenceHarness
+    {
+        private const string Inputs = @"C:\TasOut\s01b\inputs";
+        private const string Root = @"C:\TasOut\s03";
+        private readonly ITestOutputHelper output;
+
+        public S03EvidenceHarness(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        private static bool Enabled => Environment.GetEnvironmentVariable("S03_EVIDENCE") == "1";
+
+        [WpfFact]
+        public void E1_RealTas_ExplicitEpw()
+        {
+            if (!Enabled) return;
+            RunTas("tas-explicit", explicitEpw: true);
+        }
+
+        [WpfFact]
+        public void E2_RealTas_EmbeddedWeather()
+        {
+            if (!Enabled) return;
+            RunTas("tas-embedded", explicitEpw: false);
+        }
+
+        private void RunTas(string name, bool explicitEpw)
+        {
+            string directory = Path.Combine(Root, name);
+            Directory.CreateDirectory(directory);
+            string modelPath = Path.Combine(directory, "box-aperture.json");
+            File.Copy(Path.Combine(Inputs, "box-aperture.json"), modelPath, true);
+
+            UIAnalyticalModel uIAnalyticalModel = new UIAnalyticalModel(modelPath);
+            Assert.True(uIAnalyticalModel.Open());
+
+            string epw = Path.Combine(Inputs, "Budapest.epw");
+            WeatherData? weatherData;
+            if (explicitEpw)
+            {
+                Assert.True(UI.Query.TryGetWeatherData(epw, out weatherData));
+            }
+            else
+            {
+                Assert.True(uIAnalyticalModel.JSAMObject.TryGetValue(Analytical.AnalyticalModelParameter.WeatherData, out weatherData));
+                weatherData = new WeatherData(weatherData);
+            }
+
+            PartOSimulationOutcome outcome = Modify.Simulate(uIAnalyticalModel, "box", directory, weatherData!, explicitEpw ? epw : null, null);
+            output.WriteLine("Ran={0} Cancelled={1} Failure={2} Refusal={3}", outcome.Ran, outcome.Cancelled, outcome.Failure, outcome.Refusal);
+            output.WriteLine(File.ReadAllText(Path.Combine(directory, "box.tas-run.json")));
+        }
+
+        [WpfFact]
+        public void E3_RealBoth_WithoutSamCommit()
+        {
+            if (!Enabled) return;
+            RunBoth("both-no-samcommit", null);
+        }
+
+        [WpfFact]
+        public void E4_RealBoth_WithManualSamCommit()
+        {
+            if (!Enabled) return;
+            RunBoth("both-manual-samcommit", "62b5415697d1a5af143c6b581b7d42fbd6551ca8");
+        }
+
+        private void RunBoth(string name, string? samCommit)
+        {
+            string directory = Path.Combine(Root, name);
+            Directory.CreateDirectory(directory);
+            AnalyticalModel analyticalModel = Core.Convert.ToSAM<AnalyticalModel>(Path.Combine(Inputs, "box-aperture.json")).First();
+
+            string? samCommit_Before = Environment.GetEnvironmentVariable("SAM_COMMIT");
+            string? path_Before = Environment.GetEnvironmentVariable("PATH");
+            Environment.SetEnvironmentVariable("SAM_COMMIT", samCommit);
+            Environment.SetEnvironmentVariable("PATH", @"C:\Users\michal\Documents\GitHub\SAM-BIM\.icon-migration\runtime\OpenStudio-3.10.0+86d7e215a1-Windows\bin;" + path_Before);
+            try
+            {
+                EngineComparisonRun run = analyticalModel.RunEngineComparison(directory, Path.Combine(Inputs, "Budapest.epw"),
+                    @"C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_Tas\build\benchmark-tas.exe",
+                    @"C:\Users\michal\Documents\GitHub\SAM-BIM\SAM_OpenStudio\benchmark\SAM.Analytical.OpenStudio.Benchmark\bin\x64\Release\net8.0\benchmark-openstudio.exe",
+                    Path.Combine(Inputs, "box-aperture.json"));
+                output.WriteLine("Status={0} Manifest={1}", run.Status, run.ManifestPath);
+                output.WriteLine(File.ReadAllText(run.ManifestPath!));
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("SAM_COMMIT", samCommit_Before);
+                Environment.SetEnvironmentVariable("PATH", path_Before);
+            }
+        }
+    }
+}
+
+namespace SAM.Analytical.UI.WPF.Tests
+{
+    public class S03EvidenceHarnessOpenStudio
+    {
+        private readonly Xunit.Abstractions.ITestOutputHelper output;
+        public S03EvidenceHarnessOpenStudio(Xunit.Abstractions.ITestOutputHelper output) { this.output = output; }
+
+        [Xunit.Fact]
+        public void E5_RealOpenStudio_ExplicitEpw() { if (System.Environment.GetEnvironmentVariable("S03_EVIDENCE") == "1") Run("openstudio-explicit", true); }
+
+        [Xunit.Fact]
+        public void E6_RealOpenStudio_Embedded() { if (System.Environment.GetEnvironmentVariable("S03_EVIDENCE") == "1") Run("openstudio-embedded", false); }
+
+        private void Run(string name, bool explicitEpw)
+        {
+            string directory = System.IO.Path.Combine(@"C:\TasOut\s03", name);
+            System.IO.Directory.CreateDirectory(directory);
+            string modelPath = @"C:\TasOut\s01b\inputs\box-aperture.json";
+            AnalyticalModel analyticalModel = Core.Convert.ToSAM<AnalyticalModel>(modelPath)[0];
+            OpenStudioSimulationRun run = analyticalModel.RunOpenStudioSimulation(directory, explicitEpw ? @"C:\TasOut\s01b\inputs\Budapest.epw" : null, modelPath);
+            output.WriteLine("Status={0} Manifest={1}", run.Status, run.ManifestPath);
+        }
+    }
+}

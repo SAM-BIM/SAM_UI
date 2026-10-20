@@ -257,6 +257,18 @@ namespace SAM.Analytical.UI.WPF.Tests
             Assert.NotEmpty(results);
             Assert.All(results, x => Assert.Equal(AnalyticalModelSimulationResult.OpenStudioSource, x.Source));
             Assert.Single(result.GetAnalyticalModelSimulationResults());
+
+            //S03: the provenance of a real run names what actually ran - the CLI by hash, EnergyPlus by its own eplusout.err.
+            JsonObject provenance = JsonNode.Parse(File.ReadAllText(run.ManifestPath))["provenance"].AsObject();
+            JsonObject engine = provenance["engine"].AsObject();
+            Assert.Equal(Query.Sha256(run.CliPath), (string)engine["cli"]["sha256"]);
+            Assert.Equal(SimulationRunProvenance.EnergyPlusVersionFromErr(run.ErrorFilePath), (string)engine["energyPlusVersion"]);
+            Assert.NotEqual(SimulationRunProvenance.Unknown, (string)engine["energyPlusVersion"]);
+            Assert.NotEqual(SimulationRunProvenance.Unknown, (string)engine["openStudioSdkVersion"]);
+            Assert.Equal(run.DesignDaySource, (string)provenance["designDays"]["source"]);
+            Assert.Equal(epwPath == null ? "Embedded" : "File", (string)provenance["weather"]["source"]);
+            Assert.Equal(run.WeatherSha256, (string)provenance["weather"]["sha256"]);
+            Assert.False((bool)provenance["settings"]["runOptions"]["useUniqueRunDirectory"]);
         }
     }
 }

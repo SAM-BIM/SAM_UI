@@ -75,6 +75,24 @@ namespace SAM.Analytical.UI.WPF
 
         public string? WeatherSha256 { get; set; }
 
+        /// <summary>The EPW the user chose, as given; null for the embedded weather or none.</summary>
+        public string? WeatherOriginalPath { get; set; }
+
+        /// <summary>The loaded OpenStudio SDK's version; null when the SDK was not loaded.</summary>
+        public string? OpenStudioSdkVersion { get; set; }
+
+        /// <summary>The EnergyPlus version the loaded SDK targets (the version that ran is read from eplusout.err).</summary>
+        public string? EnergyPlusSdkVersion { get; set; }
+
+        /// <summary>The design-day basis SAM_OpenStudio's conversion established ("None", "Ddy", "EmbeddedModel"); null without a conversion result.</summary>
+        public string? DesignDaySource { get; set; }
+
+        /// <summary>The OpenStudioRunOptions and conversion arguments the run was given, as values.</summary>
+        public JsonObject? RunOptions { get; set; }
+
+        /// <summary>The run's provenance (S03), completed when the run ends.</summary>
+        public SimulationRunProvenance? Provenance { get; set; }
+
         /// <summary>The SAM.Analytical.OpenStudio build that converted the model (its InformationalVersion).</summary>
         public string? SamOpenStudioVersion { get; set; }
 
@@ -167,6 +185,7 @@ namespace SAM.Analytical.UI.WPF
                 ["diagnostics"] = ToJsonArray(Diagnostics),
                 ["resultDiagnostics"] = ToJsonArray(ResultDiagnostics),
                 ["error"] = Exception == null ? null : Exception.GetType().Name + ": " + Exception.Message,
+                ["provenance"] = Provenance?.ToJsonObject(),
             };
 
             return result;

@@ -59,6 +59,7 @@ namespace SAM.Analytical.UI.WPF
                 StartedUtc = DateTime.UtcNow,
                 SourcePath = sourcePath,
                 ModelName = analyticalModel?.Name,
+                Provenance = Query.NewRunProvenance("Both"),
             };
 
             if (analyticalModel == null || string.IsNullOrWhiteSpace(directory))
@@ -91,6 +92,7 @@ namespace SAM.Analytical.UI.WPF
                 string? epwPath_User = !string.IsNullOrWhiteSpace(epwPath) && File.Exists(epwPath) ? epwPath : null;
                 string? epwPath_Source = epwPath_User ?? EmbeddedWeatherPath(analyticalModel_Frozen);
                 result.WeatherSource = epwPath_User != null ? "File" : epwPath_Source != null ? "Embedded" : "None";
+                result.WeatherOriginalPath = epwPath_User;
                 if (epwPath_Source == null)
                 {
                     result.Diagnostics.Add("Error: no weather - choose an EPW file, or give the model annual WeatherData; nothing was run");
@@ -133,6 +135,9 @@ namespace SAM.Analytical.UI.WPF
                         producerRun.Error = "Not run: " + inputChange;
                         continue;
                     }
+
+                    //S03: the binary about to run, described before it runs.
+                    Query.AddProducerProvenance(result.Provenance, producerRun);
 
                     Stopwatch stopwatch = Stopwatch.StartNew();
                     try
@@ -211,6 +216,7 @@ namespace SAM.Analytical.UI.WPF
             finally
             {
                 result.FinishedUtc = DateTime.UtcNow;
+                CompleteRunProvenance(() => Query.CompleteEngineComparisonRunProvenance(result), result.Diagnostics);
                 WriteEngineComparisonManifest(result);
             }
 
