@@ -1,5 +1,23 @@
 # Project Progress - SAM_UI (2026-Q4)
 
+## Q4 S05 licensed Phase A GUI acceptance (#245) closeout - 2026-10-20
+
+- **PR/status:** [SAM-BIM/SAM_UI#245](https://github.com/SAM-BIM/SAM_UI/pull/245) complete (record, evidence and test harness only), merged into `sow/2026-Q4` as `9acce82978bfa99483722b1e529243367a67c070`.
+  - Parents: base `ad1f2486` and approved head `4f0d12b0657d90e78a88604237b6b075792e5218`, pinned with `--match-head-commit`; the merge tree equals that head.
+  - The owner authorised merging once the gates pass (chat, 2026-10-20). This completes roadmap task **S05**: **all nine cases PASS**.
+- **Completed:** `documentation/S05-LicensedAcceptance.md`, evidence `documentation/evidence/s05-20261020/` (manifests, B1a, comparisons, driver logs, process snapshots, screenshots, harness `tools/`).
+  - Real SAM Analytical ribbon on a licensed laptop (TAS 9.5.7, OpenStudio 3.10 / E+ 25.1), on a fresh build of `ad1f2486`: dependency stack rebuilt with `BuildAlls_v5 skip2027` at the Q4 tips, app built Release into `C:\TasOut\s05\app`, `APPDATA`/`USERPROFILE` sandboxed.
+  - Cases: 1 Tas only (602/602 persisted values exact vs S01b); 2 OpenStudio only; 3/5 Both explicit EPW in two sessions (identical snapshot `0c30db14…` and canonical hash `05c1e334…`; comparison unchanged vs S01b B2); 4 Both embedded, post-F1 (exported EPW equals SAM#212's corrected EPW); 6 multizone (SAM_OpenStudio's committed two-cell fixture, two sessions); 7 injected Tas refusal; 8 cancel Both and OpenStudio; 9 concurrent starts from every ribbon entry point and the comparison window, all refused.
+  - `SAM_COMMIT` (owner decision 2026-10-20, until S06) was set only for Both runs, to SAM `62b54156`, verified to be the clean commit the producers were built from.
+- **Finding:** the laptop's `SAM\build` predated SAM#212 (F1) before this session, so the overnight S03/S04 real-engine evidence and the #244 preflight used a pre-F1 `SAM.Weather.dll` (recorded in the S04 and #244 closeouts).
+- **Validation:**
+  - Local unit tests on the merged content with the rebuilt dependencies: **2926/2926** (`C:\TasOut\s05\logs\fulltest-q4-fresh-deps.txt`).
+  - Hosted final head `4f0d12b0`: Build `39378742481` PASS, SPDX `39378742474` PASS.
+- **Harness defects** (classified in the record, fixed in the harness, attempts kept as evidence): lost folder-dialog click; missing sandbox Desktop; BM_CLICK ignored by an inactive message box; a miscounted CIM process wait; the comparison-window refusal looked for at the wrong depth. No product defect found.
+- **Cleanup:** remote and local `docs/s05-acceptance` deleted (lease on `4f0d12b0`). Untracked `NuGet\`/`Microsoft\` folders that the sandboxed builds created in repository roots were removed; no tracked file changed. Processes started by the runs (app, TAS Notepad) were closed.
+- **Unresolved:** Both with developer-built producers needs `SAM_COMMIT` (S06); OpenStudio CLI selection depends on `PATH` (S06); Optimisation follow-up not driven in the GUI (same guarded path as Energy Simulation); Part O Hub unguarded (S02 decision); local `integration/s03-s04-local` (`8aafcb06`) kept, as its commits are not ancestors of Q4 although its content is.
+- **Next step:** SAM roadmap status PR (S01-S05 Done, S06 Next). Then S06 as a separate owner-started task: new session, Claude Opus 5.5, effort High, Build mode (SAM_Deploy candidate packaging and an installed smoke run).
+
 ## Q4 S05 preflight record (#244) closeout - 2026-10-20
 
 - **PR/status:** [SAM-BIM/SAM_UI#244](https://github.com/SAM-BIM/SAM_UI/pull/244) complete (documentation and evidence only), merged into `sow/2026-Q4` as `46a43d8d38019db05a7ea20de16516039f57d104`.
