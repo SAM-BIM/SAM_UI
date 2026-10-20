@@ -33,6 +33,9 @@ the merged S01-S04 content. Branch `docs/s05-acceptance`, base `sow/2026-Q4` `ad
    the sandboxed profile; every file in them was newer than the build start. No tracked file changed in any repository.
    Installed SAM and the real `%APPDATA%\SAM` were not touched.
 
+5. Unit tests on the same content with the rebuilt (post-F1) dependencies: `dotnet test WPF/SAM.Analytical.UI.WPF.Tests -c
+   Release` **2926/2926 PASS** (4 min 19 s; machine-local log `C:\TasOut\s05\logs\fulltest-q4-fresh-deps.txt`).
+
 ## Environment
 - TAS 9.5.7.0 (licensed; `TBD.exe` sha256 `aa658fcd…`).
 - OpenStudio 3.10.0 (`.icon-migration\runtime\OpenStudio-3.10.0+86d7e215a1-Windows\bin` first on `PATH`; CLI sha256
