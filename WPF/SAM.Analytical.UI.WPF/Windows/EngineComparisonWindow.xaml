@@ -1,10 +1,15 @@
 <Window x:Class="SAM.Analytical.UI.WPF.EngineComparisonWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Compare Tas / OpenStudio" Height="780" Width="1180" MinWidth="760" MinHeight="480" WindowStartupLocation="CenterOwner">
+        Title="Compare Tas / OpenStudio" Height="780" Width="1180" MinWidth="760" MinHeight="480"
+        FontFamily="Roboto Light" WindowStartupLocation="CenterOwner">
     <!-- SAM_UI#231, Phase 1: a lightweight view over SAM_Validation's comparison of two B1a documents. Every value, difference,
          band and note shown is SAM_Validation's; this window only lays them out. No charts in Phase 1. -->
     <Window.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="/SAM.Analytical.UI.WPF;component/Themes/PartOStyles.xaml"/>
+        </ResourceDictionary.MergedDictionaries>
         <Style x:Key="Style_Row" TargetType="DataGridRow">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Status}" Value="NotEquivalent">
@@ -90,8 +95,9 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Setter Property="ToolTip" Value="{Binding StatusText}"/>
         </Style>
+        </ResourceDictionary>
     </Window.Resources>
-    <Grid Margin="10">
+    <Grid Margin="16,14,16,14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -99,7 +105,10 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <GroupBox Grid.Row="0" Header="Runs (B1a documents)" Padding="6">
+        <GroupBox Grid.Row="0" Padding="8">
+            <GroupBox.Header>
+                <TextBlock Text="Runs (B1a documents)" Style="{StaticResource PartO.SectionHeading}" Margin="0"/>
+            </GroupBox.Header>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -118,14 +127,14 @@
                 <TextBox x:Name="TextBox_OpenStudio" Grid.Row="1" Grid.Column="1" IsReadOnly="True" Margin="0,0,6,4"/>
                 <Button x:Name="Button_BrowseOpenStudio" Grid.Row="1" Grid.Column="2" Content="Browse..." Width="90" Margin="0,0,0,4"/>
                 <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4,0,0">
-                    <Button x:Name="Button_Run" Content="Run Tas + OpenStudio..." Padding="10,3" Margin="0,0,8,0" ToolTipService.ShowOnDisabled="True"/>
-                    <Button x:Name="Button_LoadFolder" Content="Load run folder..." Padding="10,3" Margin="0,0,8,0"/>
-                    <Button x:Name="Button_Compare" Content="Compare" Padding="10,3"/>
+                    <Button x:Name="Button_Run" Content="Run Tas + OpenStudio..." Height="28" Padding="12,0" Margin="0,0,8,0" Style="{StaticResource PartO.PrimaryButton}" ToolTipService.ShowOnDisabled="True"/>
+                    <Button x:Name="Button_LoadFolder" Content="Load run folder..." Height="28" Padding="12,0" Margin="0,0,8,0"/>
+                    <Button x:Name="Button_Compare" Content="Compare" Height="28" Padding="12,0"/>
                 </StackPanel>
             </Grid>
         </GroupBox>
 
-        <Border x:Name="Border_Banner" Grid.Row="1" Margin="0,8,0,8" Padding="8,6" Background="#F2F2F2">
+        <Border x:Name="Border_Banner" Grid.Row="1" Margin="0,8,0,8" Padding="10,8" Background="{StaticResource PartO.Brush.Surface}" BorderBrush="{StaticResource PartO.Brush.Border}" BorderThickness="1">
             <TextBlock x:Name="TextBlock_Banner" TextWrapping="Wrap" Text="Choose a Tas and an OpenStudio B1a document, load a comparison run folder, or run both engines on the open model."/>
         </Border>
 
@@ -224,16 +233,16 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <StackPanel Grid.Row="0">
-                <TextBlock TextWrapping="Wrap" Foreground="#6A6A6A"
+                <TextBlock Style="{StaticResource PartO.Caption}"
                            Text="Normalized difference (%) = 100 × |OpenStudio − TAS| / max(|TAS|, |OpenStudio|, applicable near-zero floor). It is unsigned and is not percentage change against TAS; peak hours use circular hours and no percentage. Bands are provisional tolerance bands, not engineering verdicts."/>
-                <TextBlock TextWrapping="Wrap" Foreground="#6A6A6A" Margin="0,3,0,0"
+                <TextBlock Style="{StaticResource PartO.Caption}" Margin="0,3,0,0"
                            Text="Values, differences, bands and notes are SAM_Validation's (benchmark-compare). Missing values are never shown as zero. Unit mismatches and informational rows are labelled; informational rows keep their band but are excluded from the numerical status."/>
             </StackPanel>
             <WrapPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-                <Button x:Name="Button_OpenReport" Content="Open report" Padding="10,3" Margin="6,0,0,0" IsEnabled="False"/>
-                <Button x:Name="Button_Export" Content="Export reports..." Padding="10,3" Margin="6,0,0,0" IsEnabled="False"/>
-                <Button x:Name="Button_OpenFolder" Content="Open run folder" Padding="10,3" Margin="6,0,0,0" IsEnabled="False"/>
-                <Button x:Name="Button_Close" Content="Close" Padding="10,3" Margin="6,0,0,0" IsCancel="True"/>
+                <Button x:Name="Button_OpenReport" Content="Open report" Height="28" Padding="12,0" Margin="6,0,0,0" IsEnabled="False"/>
+                <Button x:Name="Button_Export" Content="Export reports..." Height="28" Padding="12,0" Margin="6,0,0,0" IsEnabled="False"/>
+                <Button x:Name="Button_OpenFolder" Content="Open run folder" Height="28" Padding="12,0" Margin="6,0,0,0" IsEnabled="False"/>
+                <Button x:Name="Button_Close" Content="Close" Height="28" Padding="12,0" Margin="6,0,0,0" IsCancel="True"/>
             </WrapPanel>
         </Grid>
     </Grid>

@@ -175,3 +175,34 @@ a separate inventory and authorization.
 When recommending a task or writing a prompt or handover, state the model,
 effort, new or existing session and Plan or Build mode, with a brief reason.
 A recommendation does not mean any setting was changed automatically.
+
+## SAM_UI dialog conventions
+
+`CLAUDE.md` imports this file, so these are the only copy; do not restate them elsewhere.
+The reference is the Part O windows (`WPF/SAM.Analytical.UI.WPF/Windows/PartO*Window.xaml`);
+do not invent a parallel design system and do not restyle Part O when touching other dialogs.
+
+- Merge `Themes/PartOStyles.xaml` and use its resources: `PartO.Brush.*` colours (no literal hex for text,
+  borders, surfaces or status), `PartO.SectionHeading`, `PartO.Caption` for secondary text,
+  `PartO.PrimaryButton` for the one action a dialog wants, `PartO.StatusGlyph` beside a status label.
+- Window: `FontFamily="Roboto Light"`, `WindowStartupLocation="CenterOwner"`, `Owner` set by the caller,
+  `ShowInTaskbar="False"` for a modal dialog, `SizeToContent="Height"` with a `Width`/`MinWidth` for forms,
+  `ResizeMode="CanResizeWithGrip"` only where content can grow. Content margin `16,14`.
+- Buttons: bottom-right, `Height="28"`, `MinWidth` 90 (or `Padding="12,0"`), 8 px apart; one primary
+  with `IsDefault`, Cancel/Close with `IsCancel`. A disabled choice keeps a tooltip saying why
+  (`ToolTipService.ShowOnDisabled`).
+- Status is never colour alone: pair colour with a glyph or words. Warning is amber, failure red, success
+  green (`PartO.Brush.Warning/Danger/Success`). Long operations use the shared progress window
+  (`documentation/ProgressDialogPattern.md`), not an ad-hoc bar.
+- Restyling is XAML-only: keep element names, handlers, cancellation, diagnostics and result logic as they are.
+
+## Validation policy
+
+Size validation to the change; do not run the full 26-repository BuildAll or the licensed simulation suite
+for styling changes unless a concrete dependency or regression risk requires it.
+
+- Documentation change: documentation review (links, accuracy, no internal files promoted to `master`).
+- UI-only change: build the affected SAM_UI project(s) and run the targeted tests that cover the changed code;
+  compare the window against the Part O reference (ownership, resize, DPI scaling, buttons, error and cancel paths).
+- Simulation logic change: focused unit tests plus the relevant workflow checks.
+- Installer change: packaging and deployment validation.
